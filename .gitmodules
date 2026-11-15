@@ -1,0 +1,3 @@
+[submodule "external/NEE"]
+	path = external/NEE
+	url = https://github.com/Lemiort/NEE.git
