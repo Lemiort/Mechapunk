@@ -10,11 +10,21 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # find_package calls reuse them.
 find_package(glfw3 REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(glaze CONFIG REQUIRED)
 
 include(CTest)
 
 # The engine, consumed as a git submodule. Only the `nee` library is built.
 add_subdirectory(external/NEE EXCLUDE_FROM_ALL)
+
+# Headless simulation library and its command-line runner.
+add_subdirectory(sim)
+add_executable(mechapunk-sim tools/sim_runner/main.cpp)
+target_link_libraries(mechapunk-sim PRIVATE mechapunk::sim)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 add_executable(mechapunk app/main.cpp)
 target_link_libraries(mechapunk PRIVATE nee::nee glfw spdlog::spdlog)
