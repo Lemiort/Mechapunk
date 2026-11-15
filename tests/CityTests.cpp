@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <vector>
 
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Random.hpp"
@@ -81,4 +82,38 @@ TEST(RoutePlanner, FindsShortestGridDistance) {
     EXPECT_EQ(routes.DistanceMeters(sim::NodeId{1}, sim::NodeId{1}), 0U);
     EXPECT_FALSE(routes.DistanceMeters(sim::NodeId{0}, sim::NodeId{3}));
     EXPECT_FALSE(routes.DistanceMeters(sim::NodeId{0}, sim::NodeId{9}));
+
+    const std::vector<sim::NodeId> expected{sim::NodeId{0}, sim::NodeId{1},
+                                            sim::NodeId{2}};
+    EXPECT_EQ(routes.Path(sim::NodeId{0}, sim::NodeId{2}), expected);
+    EXPECT_EQ(routes.Path(sim::NodeId{1}, sim::NodeId{1}),
+              std::vector<sim::NodeId>{sim::NodeId{1}});
+    EXPECT_TRUE(routes.Path(sim::NodeId{0}, sim::NodeId{3}).empty());
+}
+
+TEST(RoutePlanner, PathLengthMatchesDistance) {
+    sim::Pcg32 random = sim::Pcg32::FromSeed(4);
+    sim::EntityIdAllocator ids;
+    const sim::City city = sim::GenerateCity({.residents = 80}, random, ids);
+    sim::RoutePlanner routes(city);
+    const auto edgeLength = [&](sim::NodeId a, sim::NodeId b) {
+        for (const sim::CityEdge& edge : city.edges) {
+            if ((edge.from == a && edge.to == b) ||
+                (edge.from == b && edge.to == a)) {
+                return edge.lengthMeters;
+            }
+        }
+        ADD_FAILURE() << "no street between " << a.value << " and " << b.value;
+        return 0U;
+    };
+    const sim::NodeId origin = city.buildings.front().entrance;
+    for (const sim::Building& building : city.buildings) {
+        const auto path = routes.Path(origin, building.entrance);
+        ASSERT_FALSE(path.empty());
+        std::uint32_t length = 0;
+        for (std::size_t index = 1; index < path.size(); ++index) {
+            length += edgeLength(path[index - 1], path[index]);
+        }
+        EXPECT_EQ(length, routes.DistanceMeters(origin, building.entrance));
+    }
 }

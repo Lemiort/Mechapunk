@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -51,6 +52,14 @@ struct WorldParams {
     std::uint32_t robots{100};
 };
 
+// A walk in progress, derived from a robot's state; not saved separately.
+struct Commute {
+    EntityId from;
+    EntityId to;
+    Tick departedAt{};
+    Tick arrivesAt{};
+};
+
 enum class EventKind : std::uint8_t {
     LeftHome,
     ArrivedAtWork,
@@ -90,6 +99,11 @@ public:
     [[nodiscard]] Tick CurrentTick() const noexcept { return state_.tick; }
     [[nodiscard]] const Robot* FindRobot(EntityId id) const noexcept;
 
+    // The walk a commuting robot is on; nothing for robots at home or work.
+    [[nodiscard]] std::optional<Commute> CommuteOf(const Robot& robot);
+    // Walking time between two buildings' entrances, in whole minutes.
+    [[nodiscard]] std::uint32_t WalkingMinutes(EntityId from, EntityId to);
+
     // Receives every event produced by later steps.
     void SetEventSink(EventSink sink) { sink_ = std::move(sink); }
 
@@ -105,7 +119,6 @@ private:
 
     void UpdateRobot(Robot& robot);
     void ScheduleNextCommute(Robot& robot);
-    [[nodiscard]] std::uint32_t WalkingMinutes(EntityId from, EntityId to);
     void Emit(const SimEvent& event) const;
 
     WorldState state_;

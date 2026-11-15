@@ -26,8 +26,15 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
-add_executable(mechapunk app/main.cpp)
-target_link_libraries(mechapunk PRIVATE nee::nee glfw spdlog::spdlog)
+add_executable(mechapunk
+    app/CityView.cpp
+    app/GameRenderer.cpp
+    app/SimulationHost.cpp
+    app/main.cpp
+)
+target_link_libraries(mechapunk PRIVATE
+    nee::nee mechapunk::sim glfw spdlog::spdlog
+)
 
 # Runtime assets: engine assets first, then game assets (when present) so the
 # game can override engine files with the same name.

@@ -83,16 +83,24 @@ public:
     // Nothing when `to` cannot be reached from `from`.
     [[nodiscard]] std::optional<std::uint32_t> DistanceMeters(NodeId from,
                                                               NodeId to);
+    // Nodes of a shortest route, from `from` to `to` inclusive. Empty when
+    // unreachable. Ties between equally short routes are broken the same way
+    // on every run.
+    [[nodiscard]] std::vector<NodeId> Path(NodeId from, NodeId to);
 
 private:
     struct Neighbor {
         std::uint32_t node{};
         std::uint32_t lengthMeters{};
     };
-    const std::vector<std::uint32_t>& DistancesFrom(std::uint32_t origin);
+    struct Tree {
+        std::vector<std::uint32_t> distances;
+        std::vector<std::uint32_t> previous;
+    };
+    const Tree& TreeFrom(std::uint32_t origin);
 
     std::vector<std::vector<Neighbor>> adjacency_;
-    std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> cache_;
+    std::unordered_map<std::uint32_t, Tree> cache_;
 };
 
 }  // namespace mechapunk::sim

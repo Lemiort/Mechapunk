@@ -186,21 +186,40 @@ std::optional<std::uint32_t> RoutePlanner::DistanceMeters(NodeId from,
     if (from.value >= adjacency_.size() || to.value >= adjacency_.size()) {
         return std::nullopt;
     }
-    const std::uint32_t distance = DistancesFrom(from.value)[to.value];
+    const std::uint32_t distance = TreeFrom(from.value).distances[to.value];
     if (distance == kUnreachable) {
         return std::nullopt;
     }
     return distance;
 }
 
-const std::vector<std::uint32_t>& RoutePlanner::DistancesFrom(
-    std::uint32_t origin) {
+std::vector<NodeId> RoutePlanner::Path(NodeId from, NodeId to) {
+    if (from.value >= adjacency_.size() || to.value >= adjacency_.size()) {
+        return {};
+    }
+    const Tree& tree = TreeFrom(from.value);
+    if (tree.distances[to.value] == kUnreachable) {
+        return {};
+    }
+    std::vector<NodeId> path;
+    for (std::uint32_t node = to.value; node != from.value;
+         node = tree.previous[node]) {
+        path.push_back(NodeId{node});
+    }
+    path.push_back(from);
+    std::ranges::reverse(path);
+    return path;
+}
+
+const RoutePlanner::Tree& RoutePlanner::TreeFrom(std::uint32_t origin) {
     if (const auto cached = cache_.find(origin); cached != cache_.end()) {
         return cached->second;
     }
     // Dijkstra over whole meters; integer arithmetic keeps results identical
-    // on every platform.
+    // on every platform. The queue orders equal distances by node index, so
+    // the chosen route among equally short ones is always the same.
     std::vector<std::uint32_t> distances(adjacency_.size(), kUnreachable);
+    std::vector<std::uint32_t> previous(adjacency_.size(), kUnreachable);
     using Item = std::pair<std::uint32_t, std::uint32_t>;  // distance, node
     std::priority_queue<Item, std::vector<Item>, std::greater<>> frontier;
     distances[origin] = 0;
@@ -215,11 +234,15 @@ const std::vector<std::uint32_t>& RoutePlanner::DistancesFrom(
             const std::uint32_t candidate = distance + neighbor.lengthMeters;
             if (candidate < distances[neighbor.node]) {
                 distances[neighbor.node] = candidate;
+                previous[neighbor.node] = node;
                 frontier.emplace(candidate, neighbor.node);
             }
         }
     }
-    return cache_.emplace(origin, std::move(distances)).first->second;
+    return cache_
+        .emplace(origin, Tree{.distances = std::move(distances),
+                              .previous = std::move(previous)})
+        .first->second;
 }
 
 }  // namespace mechapunk::sim

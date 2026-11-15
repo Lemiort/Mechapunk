@@ -9,7 +9,8 @@ evenings in a 3D city that you observe. Built on the
 - `external/NEE` – the engine, as a git submodule. Engine features are
   developed and merged in the NEE repository, then picked up here by
   updating the submodule. No game code goes into NEE.
-- `app/` – the game executable.
+- `app/` – the game executable: runs the simulation on NEE's
+  `SimulationThread` and draws the city with NEE's deferred renderer.
 - `sim/` – the city simulation as a library (`mechapunk::sim`). Pure C++ with
   no engine or OpenGL dependency, so it also runs headless.
 - `tools/sim_runner/` – `mechapunk-sim`, a command-line runner for the
@@ -31,6 +32,35 @@ Run `mechapunk` from the build directory so it finds the copied assets.
 Requires an OpenGL 4.6 core driver.
 
 Run the tests with `ctest --test-dir build/build/Release --output-on-failure`.
+
+## Playing
+
+`mechapunk` continues `mechapunk-save.json` from the working directory when
+it exists, and otherwise starts a new city. It saves there when you quit.
+Start over with `--new`, or pick a city with `--seed N --robots N`; use
+`--save FILE` for another save file. A save that cannot be read is moved
+aside to `FILE.broken` instead of being overwritten.
+
+| Input             | Action                                         |
+| ----------------- | ---------------------------------------------- |
+| Drag (either button) | Orbit the camera                            |
+| Wheel             | Zoom                                           |
+| WASD / arrows     | Move the camera                                |
+| Space             | Pause or resume                                |
+| N                 | One minute forward while paused (hold to repeat) |
+| 1–5               | Speed: 1, 10, 60, 300 or 1200 game minutes per second |
+| F5                | Save now                                       |
+| Esc               | Save and quit                                  |
+
+Robots walking to or from work are drawn as yellow spheres moving along
+their route; robots at home or at work are inside their building. Habitats
+are cyan towers, workplaces magenta; the dark towers are decoration.
+Sunlight follows the time of day, and neon signs light the streets at night.
+
+The simulation steps once per game minute on its own thread and publishes a
+snapshot after each step. The renderer places walking robots from their
+departure and arrival times, so movement stays smooth at any frame rate
+and speed.
 
 ## Simulation
 

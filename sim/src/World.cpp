@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <expected>
 #include <format>
+#include <optional>
 #include <functional>
 #include <stdexcept>
 #include <string>
@@ -220,6 +221,26 @@ std::uint32_t World::WalkingMinutes(EntityId from, EntityId to) {
     // Round up; even next door takes a minute.
     return std::max<std::uint32_t>(
         1, (*meters + kWalkingMetersPerMinute - 1) / kWalkingMetersPerMinute);
+}
+
+std::optional<Commute> World::CommuteOf(const Robot& robot) {
+    EntityId from;
+    EntityId to;
+    if (robot.activity == RobotActivity::CommutingToWork) {
+        from = robot.home;
+        to = robot.workplace;
+    } else if (robot.activity == RobotActivity::CommutingHome) {
+        from = robot.workplace;
+        to = robot.home;
+    } else {
+        return std::nullopt;
+    }
+    const std::uint32_t walk = WalkingMinutes(from, to);
+    const Tick arrives = robot.nextActionAt;
+    return Commute{.from = from,
+                   .to = to,
+                   .departedAt = arrives >= walk ? arrives - walk : 0,
+                   .arrivesAt = arrives};
 }
 
 void World::Emit(const SimEvent& event) const {

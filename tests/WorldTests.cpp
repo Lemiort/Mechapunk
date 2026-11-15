@@ -116,6 +116,41 @@ TEST(World, ValidationRejectsBrokenReferences) {
     EXPECT_FALSE(sim::World::FromState(overfull).has_value());
 }
 
+TEST(World, CommuteMatchesTheLastDeparture) {
+    sim::World world = sim::World::Generate({.seed = 8, .robots = 120});
+    std::map<std::uint64_t, sim::Tick> lastDeparture;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::LeftHome ||
+            event.kind == sim::EventKind::LeftWork) {
+            lastDeparture[event.robot.value] = event.tick;
+        }
+    });
+    std::size_t commuting = 0;
+    // Check after every minute of a whole day to catch robots mid-walk.
+    for (sim::Tick minute = 0; minute < sim::kMinutesPerDay; ++minute) {
+        world.Step();
+        for (const sim::Robot& robot : world.State().robots) {
+            const auto commute = world.CommuteOf(robot);
+            const bool walking =
+                robot.activity == sim::RobotActivity::CommutingToWork ||
+                robot.activity == sim::RobotActivity::CommutingHome;
+            ASSERT_EQ(commute.has_value(), walking);
+            if (!commute) {
+                continue;
+            }
+            ++commuting;
+            EXPECT_EQ(commute->departedAt, lastDeparture[robot.id.value]);
+            EXPECT_EQ(commute->arrivesAt, robot.nextActionAt);
+            EXPECT_GT(commute->arrivesAt, world.CurrentTick() - 1);
+            const bool toWork =
+                robot.activity == sim::RobotActivity::CommutingToWork;
+            EXPECT_EQ(commute->from, toWork ? robot.home : robot.workplace);
+            EXPECT_EQ(commute->to, toWork ? robot.workplace : robot.home);
+        }
+    }
+    EXPECT_GT(commuting, 0U);
+}
+
 TEST(World, DescribesEvents) {
     sim::World world = sim::World::Generate({.seed = 1, .robots = 5});
     std::vector<std::string> lines;

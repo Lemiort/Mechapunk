@@ -1,0 +1,72 @@
+#pragma once
+
+#include <memory>
+#include <span>
+#include <string>
+
+#include "Camera.hpp"
+#include "DebugRenderer.hpp"
+#include "DeferredPipeline.hpp"
+#include "ForwardPipeline.hpp"
+#include "GBuffer.hpp"
+#include "Material.hpp"
+#include "Mesh.hpp"
+#include "RenderQueue.hpp"
+#include "Scene.hpp"
+#include "Shader.hpp"
+#include "Text2D.hpp"
+#include "TextRenderer.hpp"
+
+namespace mechapunk {
+
+// Meshes and surface materials shared by everything the game draws.
+struct RenderAssets {
+    std::unique_ptr<Mesh> cube;    // 1x1x1, base on y = 0
+    std::unique_ptr<Mesh> plane;   // 1x1 on y = 0
+    std::unique_ptr<Mesh> sphere;  // radius 1
+    std::shared_ptr<Material> ground;
+    std::shared_ptr<Material> street;
+    std::shared_ptr<Material> habitat;
+    std::shared_ptr<Material> workplace;
+    std::shared_ptr<Material> tower;
+    std::shared_ptr<Material> robot;
+};
+
+// Owns NEE's deferred pipeline and the game's render assets. Must be created
+// and destroyed while the OpenGL context is current.
+class GameRenderer {
+public:
+    GameRenderer(int width, int height);
+    ~GameRenderer();
+    GameRenderer(const GameRenderer&) = delete;
+    GameRenderer& operator=(const GameRenderer&) = delete;
+    GameRenderer(GameRenderer&&) = delete;
+    GameRenderer& operator=(GameRenderer&&) = delete;
+
+    [[nodiscard]] RenderAssets& Assets() noexcept { return assets_; }
+
+    void Resize(int width, int height);
+    // Draws the queued meshes lit by the scene's lights, then the overlay
+    // text lines on top.
+    void Render(const Scene& scene, RenderQueue& queue, const Camera& camera);
+    // A text line for the overlay; positions are in [-1, 1] screen units.
+    [[nodiscard]] FontLine2d MakeText(std::string text, float x, float y,
+                                      float size) const;
+
+private:
+    std::shared_ptr<Shader> meshShader_;
+    std::shared_ptr<Shader> geometryShader_;
+    std::shared_ptr<Shader> stencilShader_;
+    std::shared_ptr<Shader> pointLightShader_;
+    std::shared_ptr<Shader> spotLightShader_;
+    std::shared_ptr<Shader> directionalLightShader_;
+    std::shared_ptr<Shader> textShader_;
+    std::shared_ptr<GBuffer> gBuffer_;
+    std::unique_ptr<ForwardPipeline> forwardPipeline_;
+    std::unique_ptr<DeferredPipeline> deferredPipeline_;
+    std::shared_ptr<Font2d> font_;
+    std::unique_ptr<TextRenderer> textRenderer_;
+    RenderAssets assets_;
+};
+
+}  // namespace mechapunk
