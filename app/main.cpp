@@ -28,6 +28,7 @@
 #include "OrbitCamera.hpp"
 #include "RenderQueue.hpp"
 #include "Scene.hpp"
+#include "Screenshot.hpp"
 #include "SimulationHost.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Save.hpp"
@@ -147,6 +148,11 @@ public:
             HandleHeldInput(seconds);
             if (width_ > 0 && height_ > 0) {
                 RenderFrame();
+                if (screenshotRequested_) {
+                    // Read the finished frame before it is swapped away.
+                    screenshotRequested_ = false;
+                    TakeScreenshot();
+                }
                 glfwSwapBuffers(&window_);
             }
             glfwPollEvents();
@@ -204,6 +210,8 @@ private:
                    key < GLFW_KEY_1 + static_cast<int>(kSpeeds.size())) {
             host_.SetSpeed(
                 kSpeeds.at(static_cast<std::size_t>(key - GLFW_KEY_1)));
+        } else if (key == GLFW_KEY_F12) {
+            screenshotRequested_ = true;
         } else if (key == GLFW_KEY_F5) {
             auto saved = host_.Save(savePath_);
             ShowMessage(saved
@@ -287,8 +295,19 @@ private:
         }
         queue_.SubmitText(renderer_.MakeText(
             "Drag: orbit   Wheel: zoom   WASD: move   Space: pause   N: step "
-            "  1-5: speed   F5: save   Esc: save and quit",
+            "  1-5: speed   F5: save   F12: screenshot   Esc: save and quit",
             -0.98F, -0.96F, 20.0F));
+    }
+
+    void TakeScreenshot() {
+        auto path = TimestampedScreenshotPath("screenshots");
+        if (!path) {
+            ShowMessage(std::format("Screenshot failed: {}", path.error()));
+            return;
+        }
+        auto saved = SaveScreenshot(*path, width_, height_);
+        ShowMessage(saved ? std::format("Screenshot saved: {}", path->string())
+                          : std::format("Screenshot failed: {}", saved.error()));
     }
 
     void ShowMessage(std::string message) {
@@ -322,6 +341,7 @@ private:
     double lastCursorY_{};
     std::string message_;
     double messageUntil_{};
+    bool screenshotRequested_{false};
 };
 
 int RunGame(GLFWwindow& window, const Options& options) {

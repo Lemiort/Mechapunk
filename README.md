@@ -50,6 +50,7 @@ aside to `FILE.broken` instead of being overwritten.
 | N                 | One minute forward while paused (hold to repeat) |
 | 1–5               | Speed: 1, 10, 60, 300 or 1200 game minutes per second |
 | F5                | Save now                                       |
+| F12               | Screenshot to `screenshots/`                   |
 | Esc               | Save and quit                                  |
 
 Robots walking to or from work are drawn as yellow spheres moving along
