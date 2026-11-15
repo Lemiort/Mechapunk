@@ -174,7 +174,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v1-city.json";
+        kFixtureDirectory / "saves" / "v2-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -185,4 +185,45 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(sim::kMinutesPerDay);
+}
+
+// A save from the first release, before rooms existed, must load through the
+// migration and go on living: robots keep their homes and jobs, and the
+// stores added to their habitats fill up in the evening.
+TEST(Save, Version1FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v1-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    sim::SaveDocument original;
+    ASSERT_FALSE(glz::read_json(original, fixture));
+    auto& v1Robots = original["world"]["robots"].get_array();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    ASSERT_EQ(state->robots.size(), v1Robots.size());
+    const sim::RoomIndex rooms(state->city);
+    for (std::size_t index = 0; index < v1Robots.size(); ++index) {
+        const sim::Robot& robot = state->robots[index];
+        const auto home = rooms.Find(robot.apartment);
+        const auto work = rooms.Find(robot.workspace);
+        ASSERT_TRUE(home && work) << robot.name;
+        EXPECT_EQ(home->building->id.value,
+                  v1Robots[index]["home"].as<std::uint64_t>());
+        EXPECT_EQ(work->building->id.value,
+                  v1Robots[index]["workplace"].as<std::uint64_t>());
+    }
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    std::uint64_t visits = 0;
+    world->SetEventSink([&](const sim::SimEvent& event) {
+        visits += event.kind == sim::EventKind::ArrivedAtVenue ? 1 : 0;
+    });
+    world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_GT(visits, 0U);
+    // Saving the migrated world writes the current version.
+    EXPECT_NE(Serialize(world->State()).find("\"version\": 2"),
+              std::string::npos);
 }

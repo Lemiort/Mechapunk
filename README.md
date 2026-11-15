@@ -53,10 +53,12 @@ aside to `FILE.broken` instead of being overwritten.
 | F12               | Screenshot to `screenshots/`                   |
 | Esc               | Save and quit                                  |
 
-Robots walking to or from work are drawn as yellow spheres moving along
-their route; robots at home or at work are inside their building. Habitats
-are cyan towers, workplaces magenta; the dark towers are decoration.
-Sunlight follows the time of day, and neon signs light the streets at night.
+Walking robots are drawn as yellow spheres moving along their route; robots
+in an apartment, workspace or venue are inside their building. Habitats are
+cyan towers with colored store signs at street level, workplaces are
+magenta, and the dark towers are decoration. Building height follows the
+number of floors. Sunlight follows the time of day, and neon lights the
+streets at night.
 
 The simulation steps once per game minute on its own thread and publishes a
 snapshot after each step. The renderer places walking robots from their
@@ -65,11 +67,28 @@ and speed.
 
 ## Simulation
 
-The simulation advances in steps of one game minute. Each robot has a home
-and a workplace with fixed shift hours. It leaves home in time to arrive a
-little early (its own habit plus some daily variation), works its shift,
-and walks home. Walking times come from shortest routes over the street
-graph.
+The simulation advances in steps of one game minute and models the city
+down to single rooms:
+
+- Habitats have stores on the ground floor (bars, noodle diners, charging
+  bays, repair shops, arcades and parts shops, each with a name, opening
+  hours, capacity and prices) and apartments above.
+- Workplaces are split into workspaces over their floors and pay a wage per
+  shift.
+- Every robot has its own apartment and workspace, and is always in a known
+  room or walking between two.
+
+Robots have four needs from 0 to 1000: charge, condition, social and fun.
+They change every ten minutes with what the robot is doing, and venues
+restore some of them; a bar restores more social the more guests it has.
+
+A robot leaves home in time to arrive a little early for its shift (its own
+habit plus daily variation) and works it. After work it weighs each open
+venue it can afford and fit in: how much the visit would relieve its needs,
+the walk, the price and a little whim. It compares that with going home,
+stays a while, and decides again. It always gets home early enough for six
+hours of rest before its next shift. Walking times come from shortest routes
+over the street graph plus stairs.
 
 Runs are deterministic: the same save or seed always produces the same
 states and events, on every platform. All simulation state is integral, and
@@ -81,6 +100,14 @@ Try it from the build directory:
 ./mechapunk-sim --seed 42 --robots 200 --days 2 --follow 3
 ./mechapunk-sim --seed 42 --robots 200 --days 2 --save city.json
 ./mechapunk-sim --load city.json --hours 12 --all
+```
+
+A followed robot's evening reads like this:
+
+```text
+Day 1 18:00  LU-775 Lumen left Service Bay 2, Repair Shop 1 for Spark Lot (charging bay, Hab Block 4) (4 min walk)
+Day 1 18:04  LU-775 Lumen arrived at Spark Lot (charging bay, Hab Block 4), paid 6 cr, 6 others there, staying 47 min
+Day 1 19:50  LU-775 Lumen arrived at The Overclock (bar, Hab Block 6), paid 15 cr, 12 others there, staying 132 min
 ```
 
 ### Saves

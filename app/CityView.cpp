@@ -15,11 +15,15 @@
 
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Random.hpp"
+#include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk {
 
 namespace {
 constexpr float kStreetWidth = 0.5F;
+constexpr float kFloorHeight = 0.38F;
+constexpr float kStoreSignHeight = 0.3F;
+constexpr float kStoreSignSpacing = 0.65F;
 constexpr float kStreetHeight = 0.03F;
 constexpr float kBuildingFootprint = 2.0F;
 // Distance from an intersection to the center of a building beside it.
@@ -37,6 +41,25 @@ constexpr std::uint64_t kDecorationStream = 100;
 constexpr glm::vec3 kHabitatNeon{0.1F, 0.9F, 1.0F};
 constexpr glm::vec3 kWorkplaceNeon{1.0F, 0.2F, 0.8F};
 constexpr glm::vec3 kTowerNeon{1.0F, 0.6F, 0.1F};
+
+glm::vec3 StoreNeon(sim::RoomKind kind) {
+    switch (kind) {
+        case sim::RoomKind::Bar:
+            return {1.0F, 0.15F, 0.6F};
+        case sim::RoomKind::Diner:
+            return {1.0F, 0.5F, 0.1F};
+        case sim::RoomKind::ChargingBay:
+            return {0.2F, 1.0F, 0.4F};
+        case sim::RoomKind::RepairShop:
+            return {0.25F, 0.5F, 1.0F};
+        case sim::RoomKind::Arcade:
+            return {0.7F, 0.2F, 1.0F};
+        case sim::RoomKind::Shop:
+            return {1.0F, 0.9F, 0.2F};
+        default:
+            return {1.0F, 1.0F, 1.0F};
+    }
+}
 constexpr glm::vec3 kSunColor{1.0F, 0.86F, 0.7F};
 constexpr glm::vec3 kDaySky{0.45F, 0.47F, 0.55F};
 constexpr glm::vec3 kNightSky{0.04F, 0.04F, 0.1F};
@@ -111,8 +134,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                            (kQuadrantOffset * ring);
         const bool habitat = building.kind == sim::BuildingKind::Habitat;
         const float height =
-            habitat ? 2.0F + (static_cast<float>(building.capacity) * 0.07F)
-                    : 1.2F + (static_cast<float>(building.capacity) * 0.05F);
+            0.3F + (static_cast<float>(building.floors) * kFloorHeight);
         buildingCenters_[building.id.value] = centerOnGround;
         statics_.push_back(
             {.mesh = assets_.cube.get(),
@@ -128,6 +150,21 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
              (kBuildingFootprint * 0.5F + 0.3F)) +
             glm::vec3{0.0F, height * 0.5F, 0.0F};
         neonSigns_.emplace_back(sign, habitat ? kHabitatNeon : kWorkplaceNeon);
+        // Every ground-floor store gets its own sign at street level, side by
+        // side along the street-facing wall.
+        const glm::vec3 storefront =
+            centerOnGround - (glm::vec3{quadrant.x, 0.0F, quadrant.y} *
+                              (kBuildingFootprint * 0.5F + 0.2F));
+        float offset = -kStoreSignSpacing * 0.5F;
+        for (const sim::Room& room : building.rooms) {
+            if (room.floor == 0 && sim::IsVenue(room.kind)) {
+                neonSigns_.emplace_back(
+                    storefront + glm::vec3{offset * quadrant.x,
+                                           kStoreSignHeight, 0.0F},
+                    StoreNeon(room.kind));
+                offset += kStoreSignSpacing;
+            }
+        }
     }
 
     // Decorative towers fill the remaining corners for a denser skyline.
@@ -214,8 +251,8 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
         queue.SubmitOpaqueMesh(*item.mesh, item.transform, item.material);
     }
     for (const RobotFrame& robot : frame.robots) {
-        if (robot.activity != sim::RobotActivity::CommutingToWork &&
-            robot.activity != sim::RobotActivity::CommutingHome) {
+        if (robot.activity != sim::RobotActivity::Walking ||
+            !robot.from.IsValid()) {
             continue;
         }
         queue.SubmitOpaqueMesh(

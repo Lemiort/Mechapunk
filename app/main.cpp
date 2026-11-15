@@ -285,8 +285,10 @@ private:
         queue_.SubmitText(renderer_.MakeText(status, -0.98F, 0.91F, 32.0F));
         if (frame != nullptr) {
             queue_.SubmitText(renderer_.MakeText(
-                std::format("{} at home   {} working   {} walking",
-                            frame->atHome, frame->working, frame->commuting),
+                std::format("{} resting   {} working   {} out at venues   {} "
+                            "walking",
+                            frame->resting, frame->working, frame->visiting,
+                            frame->walking),
                 -0.98F, 0.84F, 24.0F));
         }
         if (glfwGetTime() < messageUntil_) {

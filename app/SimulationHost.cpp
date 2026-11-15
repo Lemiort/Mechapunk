@@ -123,16 +123,29 @@ void SimulationHost::Publish() {
     frame.robots.reserve(world_.State().robots.size());
     for (const sim::Robot& robot : world_.State().robots) {
         RobotFrame robotFrame{.id = robot.id, .activity = robot.activity};
-        if (const auto commute = world_.CommuteOf(robot)) {
-            robotFrame.from = commute->from;
-            robotFrame.to = commute->to;
-            robotFrame.departedAt = commute->departedAt;
-            robotFrame.arrivesAt = commute->arrivesAt;
-            ++frame.commuting;
-        } else if (robot.activity == sim::RobotActivity::Working) {
-            ++frame.working;
-        } else {
-            ++frame.atHome;
+        switch (robot.activity) {
+            case sim::RobotActivity::Resting:
+                ++frame.resting;
+                break;
+            case sim::RobotActivity::Working:
+                ++frame.working;
+                break;
+            case sim::RobotActivity::Visiting:
+                ++frame.visiting;
+                break;
+            case sim::RobotActivity::Walking:
+                ++frame.walking;
+                break;
+        }
+        if (const auto walk = sim::World::WalkOf(robot)) {
+            const auto from = world_.Rooms().Find(walk->from);
+            const auto to = world_.Rooms().Find(walk->to);
+            if (from && to) {
+                robotFrame.from = from->building->id;
+                robotFrame.to = to->building->id;
+                robotFrame.departedAt = walk->departedAt;
+                robotFrame.arrivesAt = walk->arrivesAt;
+            }
         }
         frame.robots.push_back(robotFrame);
     }

@@ -2,16 +2,20 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
 #include <limits>
 #include <optional>
 #include <queue>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk::sim {
 
@@ -19,25 +23,49 @@ namespace {
 constexpr std::uint32_t kUnreachable = std::numeric_limits<std::uint32_t>::max();
 // One candidate street segment in this many is considered for removal.
 constexpr std::uint32_t kStreetRemovalOdds = 10;
-constexpr std::uint32_t kMinHabitatCapacity = 30;
-constexpr std::uint32_t kMaxHabitatCapacity = 60;
+constexpr std::uint32_t kMinApartments = 30;
+constexpr std::uint32_t kMaxApartments = 60;
+constexpr std::uint32_t kApartmentsPerFloor = 6;
+constexpr std::uint32_t kMinStores = 1;
+constexpr std::uint32_t kMaxStores = 3;
 constexpr std::uint32_t kMinWorkplaceJobs = 15;
 constexpr std::uint32_t kMaxWorkplaceJobs = 40;
+constexpr std::uint32_t kMinWorkspaceSize = 5;
+constexpr std::uint32_t kMaxWorkspaceSize = 10;
+constexpr std::uint32_t kWorkspacesPerFloor = 2;
 
 struct WorkplaceType {
     std::string_view name;
+    std::string_view workspace;
     Shift shift;
 };
 
-// Shift times in minutes of the day.
+// Shift times in minutes of the day; wages in credits per shift.
 constexpr std::array kWorkplaceTypes{
-    WorkplaceType{"Foundry", {.startMinute = 6 * 60, .lengthMinutes = 600}},
-    WorkplaceType{"Assembly Line",
-                  {.startMinute = 7 * 60, .lengthMinutes = 480}},
-    WorkplaceType{"Repair Shop", {.startMinute = 8 * 60, .lengthMinutes = 600}},
-    WorkplaceType{"Corp Tower", {.startMinute = 9 * 60, .lengthMinutes = 540}},
-    WorkplaceType{"Noodle Bar", {.startMinute = 14 * 60, .lengthMinutes = 480}},
-    WorkplaceType{"Data Farm", {.startMinute = 22 * 60, .lengthMinutes = 480}},
+    WorkplaceType{.name = "Foundry",
+                  .workspace = "Smelting Bay",
+                  .shift = {.startMinute = 6 * 60, .lengthMinutes = 600,
+                            .wage = 130}},
+    WorkplaceType{.name = "Assembly Line",
+                  .workspace = "Assembly Cell",
+                  .shift = {.startMinute = 7 * 60, .lengthMinutes = 480,
+                            .wage = 100}},
+    WorkplaceType{.name = "Repair Shop",
+                  .workspace = "Service Bay",
+                  .shift = {.startMinute = 8 * 60, .lengthMinutes = 600,
+                            .wage = 110}},
+    WorkplaceType{.name = "Corp Tower",
+                  .workspace = "Office Floor",
+                  .shift = {.startMinute = 9 * 60, .lengthMinutes = 540,
+                            .wage = 150}},
+    WorkplaceType{.name = "Noodle Bar",
+                  .workspace = "Kitchen",
+                  .shift = {.startMinute = 14 * 60, .lengthMinutes = 480,
+                            .wage = 90}},
+    WorkplaceType{.name = "Data Farm",
+                  .workspace = "Server Hall",
+                  .shift = {.startMinute = 22 * 60, .lengthMinutes = 480,
+                            .wage = 120}},
 };
 
 bool IsConnected(std::uint32_t nodeCount, const std::vector<CityEdge>& edges,
@@ -74,12 +102,118 @@ NodeId RandomNodeInColumns(const CityParams& params, Pcg32& random,
     const std::uint32_t row = random.UniformInt(0, params.gridSize - 1);
     return NodeId{(row * params.gridSize) + column};
 }
+
+template <typename T>
+const T& Pick(std::span<const T> items, Pcg32& random) {
+    return items[random.UniformInt(0, static_cast<std::uint32_t>(items.size() - 1))];
+}
+
+// Ground-floor stores and apartments above. Store kinds rotate through every
+// venue kind so each city has some of each.
+Building MakeHabitat(const CityParams& params, Pcg32& random,
+                     EntityIdAllocator& ids, std::uint32_t number,
+                     std::uint32_t& storeRotation) {
+    Building building{.id = ids.Allocate(),
+                      .name = std::format("Hab Block {}", number),
+                      .kind = BuildingKind::Habitat,
+                      .entrance = RandomNodeInColumns(params, random, 0,
+                                                      params.gridSize / 2),
+                      .floors = 1,
+                      .shift = {},
+                      .rooms = {}};
+    const std::uint32_t stores = random.UniformInt(kMinStores, kMaxStores);
+    for (std::uint32_t store = 0; store < stores; ++store) {
+        const RoomKind kind =
+            VenueKinds()[storeRotation++ % VenueKinds().size()];
+        const VenueRules& rules = *FindVenueRules(kind);
+        building.rooms.push_back(
+            {.id = ids.Allocate(),
+             .name = std::string{Pick(VenueNames(kind), random)},
+             .kind = kind,
+             .floor = 0,
+             .capacity = random.UniformInt(rules.minCapacity,
+                                           rules.maxCapacity)});
+    }
+    const std::uint32_t apartments =
+        random.UniformInt(kMinApartments, kMaxApartments);
+    for (std::uint32_t index = 0; index < apartments; ++index) {
+        const std::uint32_t floor = 1 + (index / kApartmentsPerFloor);
+        building.rooms.push_back(
+            {.id = ids.Allocate(),
+             .name = std::format("Apartment {}-{:02}", floor,
+                                 (index % kApartmentsPerFloor) + 1),
+             .kind = RoomKind::Apartment,
+             .floor = floor,
+             .capacity = 1});
+        building.floors = floor + 1;
+    }
+    return building;
+}
+
+Building MakeWorkplace(const CityParams& params, Pcg32& random,
+                       EntityIdAllocator& ids,
+                       std::array<std::uint32_t, kWorkplaceTypes.size()>& counts) {
+    const std::uint32_t typeIndex = random.UniformInt(
+        0, static_cast<std::uint32_t>(kWorkplaceTypes.size() - 1));
+    const WorkplaceType& type = kWorkplaceTypes.at(typeIndex);
+    Building building{
+        .id = ids.Allocate(),
+        .name = std::format("{} {}", type.name, ++counts.at(typeIndex)),
+        .kind = BuildingKind::Workplace,
+        .entrance = RandomNodeInColumns(params, random, params.gridSize / 2,
+                                        params.gridSize - 1),
+        .floors = 1,
+        .shift = type.shift,
+        .rooms = {}};
+    const std::uint32_t jobs =
+        random.UniformInt(kMinWorkplaceJobs, kMaxWorkplaceJobs);
+    std::uint32_t staffed = 0;
+    for (std::uint32_t index = 0; staffed < jobs; ++index) {
+        const std::uint32_t size = std::min(
+            jobs - staffed,
+            random.UniformInt(kMinWorkspaceSize, kMaxWorkspaceSize));
+        const std::uint32_t floor = index / kWorkspacesPerFloor;
+        building.rooms.push_back(
+            {.id = ids.Allocate(),
+             .name = std::format("{} {}", type.workspace, index + 1),
+             .kind = RoomKind::Workspace,
+             .floor = floor,
+             .capacity = size});
+        building.floors = floor + 1;
+        staffed += size;
+    }
+    return building;
+}
 }  // namespace
 
 const Building* City::FindBuilding(EntityId id) const noexcept {
     const auto found = std::ranges::lower_bound(buildings, id, std::less{},
                                                 &Building::id);
     return found != buildings.end() && found->id == id ? &*found : nullptr;
+}
+
+RoomIndex::RoomIndex(const City& city) {
+    for (const Building& building : city.buildings) {
+        for (const Room& room : building.rooms) {
+            const RoomRef ref{.building = &building, .room = &room};
+            rooms_.emplace(room.id.value, ref);
+            byKind_[static_cast<std::uint8_t>(room.kind)].push_back(ref);
+        }
+    }
+}
+
+std::optional<RoomRef> RoomIndex::Find(EntityId room) const {
+    const auto found = rooms_.find(room.value);
+    if (found == rooms_.end()) {
+        return std::nullopt;
+    }
+    return found->second;
+}
+
+const std::vector<RoomRef>& RoomIndex::RoomsOfKind(RoomKind kind) const {
+    static const std::vector<RoomRef> kNone;
+    const auto found = byKind_.find(static_cast<std::uint8_t>(kind));
+    return found != byKind_.end() ? found->second : kNone;
 }
 
 City GenerateCity(const CityParams& params, Pcg32& random,
@@ -132,40 +266,26 @@ City GenerateCity(const CityParams& params, Pcg32& random,
         }
     }
 
-    // Habitats in the western half, workplaces in the eastern half; the
-    // middle column is shared.
-    const std::uint32_t middle = size / 2;
-    std::uint32_t housing = 0;
-    std::uint32_t habitatNumber = 0;
-    while (housing < params.residents) {
-        const std::uint32_t capacity =
-            random.UniformInt(kMinHabitatCapacity, kMaxHabitatCapacity);
-        city.buildings.push_back(
-            {.id = ids.Allocate(),
-             .name = std::format("Hab Block {}", ++habitatNumber),
-             .kind = BuildingKind::Habitat,
-             .entrance = RandomNodeInColumns(params, random, 0, middle),
-             .capacity = capacity,
-             .shift = {}});
-        housing += capacity;
+    std::uint32_t apartments = 0;
+    std::uint32_t habitats = 0;
+    std::uint32_t storeRotation = random.UniformInt(
+        0, static_cast<std::uint32_t>(VenueKinds().size() - 1));
+    while (apartments < params.residents) {
+        Building habitat =
+            MakeHabitat(params, random, ids, ++habitats, storeRotation);
+        apartments += static_cast<std::uint32_t>(std::ranges::count(
+            habitat.rooms, RoomKind::Apartment, &Room::kind));
+        city.buildings.push_back(std::move(habitat));
     }
 
     std::array<std::uint32_t, kWorkplaceTypes.size()> typeCounts{};
     std::uint32_t jobs = 0;
     while (jobs < params.residents) {
-        const std::uint32_t typeIndex = random.UniformInt(
-            0, static_cast<std::uint32_t>(kWorkplaceTypes.size() - 1));
-        const WorkplaceType& type = kWorkplaceTypes.at(typeIndex);
-        const std::uint32_t capacity =
-            random.UniformInt(kMinWorkplaceJobs, kMaxWorkplaceJobs);
-        city.buildings.push_back(
-            {.id = ids.Allocate(),
-             .name = std::format("{} {}", type.name, ++typeCounts.at(typeIndex)),
-             .kind = BuildingKind::Workplace,
-             .entrance = RandomNodeInColumns(params, random, middle, size - 1),
-             .capacity = capacity,
-             .shift = type.shift});
-        jobs += capacity;
+        Building workplace = MakeWorkplace(params, random, ids, typeCounts);
+        for (const Room& room : workplace.rooms) {
+            jobs += room.capacity;
+        }
+        city.buildings.push_back(std::move(workplace));
     }
     return city;
 }

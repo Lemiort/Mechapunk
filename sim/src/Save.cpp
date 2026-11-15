@@ -17,6 +17,7 @@
 
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Ids.hpp"
+#include "Migrations.hpp"
 #include "mechapunk/sim/World.hpp"
 
 // Ids are written as plain numbers rather than {"value": n}.
@@ -38,11 +39,19 @@ struct glz::meta<mechapunk::sim::BuildingKind> {
         enumerate("habitat", Habitat, "workplace", Workplace);
 };
 template <>
+struct glz::meta<mechapunk::sim::RoomKind> {
+    using enum mechapunk::sim::RoomKind;
+    static constexpr auto value = enumerate(
+        "apartment", Apartment, "workspace", Workspace, "bar", Bar, "diner",
+        Diner, "chargingBay", ChargingBay, "repairShop", RepairShop, "arcade",
+        Arcade, "shop", Shop);
+};
+template <>
 struct glz::meta<mechapunk::sim::RobotActivity> {
     using enum mechapunk::sim::RobotActivity;
     static constexpr auto value =
-        enumerate("atHome", AtHome, "commutingToWork", CommutingToWork,
-                  "working", Working, "commutingHome", CommutingHome);
+        enumerate("resting", Resting, "walking", Walking, "working", Working,
+                  "visiting", Visiting);
 };
 
 namespace mechapunk::sim {
@@ -53,8 +62,11 @@ constexpr glz::opts kWriteOptions{.prettify = true};
 // instead of silently filling in a default.
 constexpr glz::opts kReadOptions{.error_on_missing_keys = true};
 
-// No migrations yet: version 1 is the first save format.
-constexpr std::array<Migration, 0> kMigrations{};
+constexpr std::array kMigrations{
+    Migration{.fromVersion = 1,
+              .summary = "rooms, needs and credits",
+              .apply = &migrations::V1ToV2},
+};
 }  // namespace
 
 std::span<const Migration> SaveMigrations() noexcept { return kMigrations; }

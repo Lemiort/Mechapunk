@@ -5,10 +5,14 @@ every fixture, so old saves keep working as the format evolves.
 
 | File           | Version | How it was made                                                       |
 | -------------- | ------- | --------------------------------------------------------------------- |
-| `v1-city.json` | 1       | `mechapunk-sim --seed 6 --robots 60 --minutes 1900 --save v1-city.json` |
+| `v1-city.json` | 1       | `mechapunk-sim --seed 6 --robots 60 --minutes 1900 --save v1-city.json` (game 0.1.0) |
+| `v2-city.json` | 2       | `mechapunk-sim --seed 5 --robots 60 --minutes 2580 --save v2-city.json` (game 0.2.0) |
 
-`v1-city.json` stops at Day 2 07:40, so robots are at home, commuting and
-working at once.
+`v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
+working. `v2-city.json` stops at Day 2 19:00, with robots resting, walking,
+working and out at venues. `Version1FixtureMigratesAndRuns` loads the v1
+fixture through the migration, checks every robot kept its home and
+workplace, and runs two days of evenings.
 
 ## Changing the save format
 

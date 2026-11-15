@@ -1,0 +1,2876 @@
+{
+   "format": "mechapunk-save",
+   "version": 2,
+   "gameVersion": "0.2.0",
+   "world": {
+      "tick": 2580,
+      "seed": 5,
+      "ids": {
+         "next": 171
+      },
+      "random": {
+         "state": 13268884502423333059,
+         "increment": 7
+      },
+      "city": {
+         "nodes": [
+            {
+               "id": 0,
+               "x": 0,
+               "z": 0
+            },
+            {
+               "id": 1,
+               "x": 120,
+               "z": 0
+            },
+            {
+               "id": 2,
+               "x": 240,
+               "z": 0
+            },
+            {
+               "id": 3,
+               "x": 360,
+               "z": 0
+            },
+            {
+               "id": 4,
+               "x": 480,
+               "z": 0
+            },
+            {
+               "id": 5,
+               "x": 600,
+               "z": 0
+            },
+            {
+               "id": 6,
+               "x": 720,
+               "z": 0
+            },
+            {
+               "id": 7,
+               "x": 840,
+               "z": 0
+            },
+            {
+               "id": 8,
+               "x": 0,
+               "z": 120
+            },
+            {
+               "id": 9,
+               "x": 120,
+               "z": 120
+            },
+            {
+               "id": 10,
+               "x": 240,
+               "z": 120
+            },
+            {
+               "id": 11,
+               "x": 360,
+               "z": 120
+            },
+            {
+               "id": 12,
+               "x": 480,
+               "z": 120
+            },
+            {
+               "id": 13,
+               "x": 600,
+               "z": 120
+            },
+            {
+               "id": 14,
+               "x": 720,
+               "z": 120
+            },
+            {
+               "id": 15,
+               "x": 840,
+               "z": 120
+            },
+            {
+               "id": 16,
+               "x": 0,
+               "z": 240
+            },
+            {
+               "id": 17,
+               "x": 120,
+               "z": 240
+            },
+            {
+               "id": 18,
+               "x": 240,
+               "z": 240
+            },
+            {
+               "id": 19,
+               "x": 360,
+               "z": 240
+            },
+            {
+               "id": 20,
+               "x": 480,
+               "z": 240
+            },
+            {
+               "id": 21,
+               "x": 600,
+               "z": 240
+            },
+            {
+               "id": 22,
+               "x": 720,
+               "z": 240
+            },
+            {
+               "id": 23,
+               "x": 840,
+               "z": 240
+            },
+            {
+               "id": 24,
+               "x": 0,
+               "z": 360
+            },
+            {
+               "id": 25,
+               "x": 120,
+               "z": 360
+            },
+            {
+               "id": 26,
+               "x": 240,
+               "z": 360
+            },
+            {
+               "id": 27,
+               "x": 360,
+               "z": 360
+            },
+            {
+               "id": 28,
+               "x": 480,
+               "z": 360
+            },
+            {
+               "id": 29,
+               "x": 600,
+               "z": 360
+            },
+            {
+               "id": 30,
+               "x": 720,
+               "z": 360
+            },
+            {
+               "id": 31,
+               "x": 840,
+               "z": 360
+            },
+            {
+               "id": 32,
+               "x": 0,
+               "z": 480
+            },
+            {
+               "id": 33,
+               "x": 120,
+               "z": 480
+            },
+            {
+               "id": 34,
+               "x": 240,
+               "z": 480
+            },
+            {
+               "id": 35,
+               "x": 360,
+               "z": 480
+            },
+            {
+               "id": 36,
+               "x": 480,
+               "z": 480
+            },
+            {
+               "id": 37,
+               "x": 600,
+               "z": 480
+            },
+            {
+               "id": 38,
+               "x": 720,
+               "z": 480
+            },
+            {
+               "id": 39,
+               "x": 840,
+               "z": 480
+            },
+            {
+               "id": 40,
+               "x": 0,
+               "z": 600
+            },
+            {
+               "id": 41,
+               "x": 120,
+               "z": 600
+            },
+            {
+               "id": 42,
+               "x": 240,
+               "z": 600
+            },
+            {
+               "id": 43,
+               "x": 360,
+               "z": 600
+            },
+            {
+               "id": 44,
+               "x": 480,
+               "z": 600
+            },
+            {
+               "id": 45,
+               "x": 600,
+               "z": 600
+            },
+            {
+               "id": 46,
+               "x": 720,
+               "z": 600
+            },
+            {
+               "id": 47,
+               "x": 840,
+               "z": 600
+            },
+            {
+               "id": 48,
+               "x": 0,
+               "z": 720
+            },
+            {
+               "id": 49,
+               "x": 120,
+               "z": 720
+            },
+            {
+               "id": 50,
+               "x": 240,
+               "z": 720
+            },
+            {
+               "id": 51,
+               "x": 360,
+               "z": 720
+            },
+            {
+               "id": 52,
+               "x": 480,
+               "z": 720
+            },
+            {
+               "id": 53,
+               "x": 600,
+               "z": 720
+            },
+            {
+               "id": 54,
+               "x": 720,
+               "z": 720
+            },
+            {
+               "id": 55,
+               "x": 840,
+               "z": 720
+            },
+            {
+               "id": 56,
+               "x": 0,
+               "z": 840
+            },
+            {
+               "id": 57,
+               "x": 120,
+               "z": 840
+            },
+            {
+               "id": 58,
+               "x": 240,
+               "z": 840
+            },
+            {
+               "id": 59,
+               "x": 360,
+               "z": 840
+            },
+            {
+               "id": 60,
+               "x": 480,
+               "z": 840
+            },
+            {
+               "id": 61,
+               "x": 600,
+               "z": 840
+            },
+            {
+               "id": 62,
+               "x": 720,
+               "z": 840
+            },
+            {
+               "id": 63,
+               "x": 840,
+               "z": 840
+            }
+         ],
+         "edges": [
+            {
+               "from": 0,
+               "to": 1,
+               "lengthMeters": 120
+            },
+            {
+               "from": 0,
+               "to": 8,
+               "lengthMeters": 120
+            },
+            {
+               "from": 1,
+               "to": 2,
+               "lengthMeters": 120
+            },
+            {
+               "from": 1,
+               "to": 9,
+               "lengthMeters": 120
+            },
+            {
+               "from": 2,
+               "to": 3,
+               "lengthMeters": 120
+            },
+            {
+               "from": 2,
+               "to": 10,
+               "lengthMeters": 120
+            },
+            {
+               "from": 3,
+               "to": 4,
+               "lengthMeters": 120
+            },
+            {
+               "from": 3,
+               "to": 11,
+               "lengthMeters": 120
+            },
+            {
+               "from": 4,
+               "to": 5,
+               "lengthMeters": 120
+            },
+            {
+               "from": 4,
+               "to": 12,
+               "lengthMeters": 120
+            },
+            {
+               "from": 5,
+               "to": 6,
+               "lengthMeters": 120
+            },
+            {
+               "from": 5,
+               "to": 13,
+               "lengthMeters": 120
+            },
+            {
+               "from": 6,
+               "to": 7,
+               "lengthMeters": 120
+            },
+            {
+               "from": 6,
+               "to": 14,
+               "lengthMeters": 120
+            },
+            {
+               "from": 7,
+               "to": 15,
+               "lengthMeters": 120
+            },
+            {
+               "from": 8,
+               "to": 9,
+               "lengthMeters": 120
+            },
+            {
+               "from": 8,
+               "to": 16,
+               "lengthMeters": 120
+            },
+            {
+               "from": 9,
+               "to": 10,
+               "lengthMeters": 120
+            },
+            {
+               "from": 9,
+               "to": 17,
+               "lengthMeters": 120
+            },
+            {
+               "from": 10,
+               "to": 11,
+               "lengthMeters": 120
+            },
+            {
+               "from": 10,
+               "to": 18,
+               "lengthMeters": 120
+            },
+            {
+               "from": 11,
+               "to": 12,
+               "lengthMeters": 120
+            },
+            {
+               "from": 11,
+               "to": 19,
+               "lengthMeters": 120
+            },
+            {
+               "from": 12,
+               "to": 13,
+               "lengthMeters": 120
+            },
+            {
+               "from": 12,
+               "to": 20,
+               "lengthMeters": 120
+            },
+            {
+               "from": 13,
+               "to": 14,
+               "lengthMeters": 120
+            },
+            {
+               "from": 13,
+               "to": 21,
+               "lengthMeters": 120
+            },
+            {
+               "from": 14,
+               "to": 15,
+               "lengthMeters": 120
+            },
+            {
+               "from": 14,
+               "to": 22,
+               "lengthMeters": 120
+            },
+            {
+               "from": 15,
+               "to": 23,
+               "lengthMeters": 120
+            },
+            {
+               "from": 16,
+               "to": 24,
+               "lengthMeters": 120
+            },
+            {
+               "from": 17,
+               "to": 18,
+               "lengthMeters": 120
+            },
+            {
+               "from": 17,
+               "to": 25,
+               "lengthMeters": 120
+            },
+            {
+               "from": 18,
+               "to": 19,
+               "lengthMeters": 120
+            },
+            {
+               "from": 18,
+               "to": 26,
+               "lengthMeters": 120
+            },
+            {
+               "from": 19,
+               "to": 20,
+               "lengthMeters": 120
+            },
+            {
+               "from": 19,
+               "to": 27,
+               "lengthMeters": 120
+            },
+            {
+               "from": 20,
+               "to": 21,
+               "lengthMeters": 120
+            },
+            {
+               "from": 20,
+               "to": 28,
+               "lengthMeters": 120
+            },
+            {
+               "from": 21,
+               "to": 22,
+               "lengthMeters": 120
+            },
+            {
+               "from": 22,
+               "to": 23,
+               "lengthMeters": 120
+            },
+            {
+               "from": 22,
+               "to": 30,
+               "lengthMeters": 120
+            },
+            {
+               "from": 23,
+               "to": 31,
+               "lengthMeters": 120
+            },
+            {
+               "from": 24,
+               "to": 25,
+               "lengthMeters": 120
+            },
+            {
+               "from": 24,
+               "to": 32,
+               "lengthMeters": 120
+            },
+            {
+               "from": 25,
+               "to": 33,
+               "lengthMeters": 120
+            },
+            {
+               "from": 26,
+               "to": 27,
+               "lengthMeters": 120
+            },
+            {
+               "from": 26,
+               "to": 34,
+               "lengthMeters": 120
+            },
+            {
+               "from": 27,
+               "to": 28,
+               "lengthMeters": 120
+            },
+            {
+               "from": 27,
+               "to": 35,
+               "lengthMeters": 120
+            },
+            {
+               "from": 28,
+               "to": 29,
+               "lengthMeters": 120
+            },
+            {
+               "from": 28,
+               "to": 36,
+               "lengthMeters": 120
+            },
+            {
+               "from": 29,
+               "to": 37,
+               "lengthMeters": 120
+            },
+            {
+               "from": 30,
+               "to": 31,
+               "lengthMeters": 120
+            },
+            {
+               "from": 30,
+               "to": 38,
+               "lengthMeters": 120
+            },
+            {
+               "from": 31,
+               "to": 39,
+               "lengthMeters": 120
+            },
+            {
+               "from": 32,
+               "to": 33,
+               "lengthMeters": 120
+            },
+            {
+               "from": 32,
+               "to": 40,
+               "lengthMeters": 120
+            },
+            {
+               "from": 33,
+               "to": 34,
+               "lengthMeters": 120
+            },
+            {
+               "from": 33,
+               "to": 41,
+               "lengthMeters": 120
+            },
+            {
+               "from": 34,
+               "to": 35,
+               "lengthMeters": 120
+            },
+            {
+               "from": 34,
+               "to": 42,
+               "lengthMeters": 120
+            },
+            {
+               "from": 35,
+               "to": 36,
+               "lengthMeters": 120
+            },
+            {
+               "from": 35,
+               "to": 43,
+               "lengthMeters": 120
+            },
+            {
+               "from": 36,
+               "to": 37,
+               "lengthMeters": 120
+            },
+            {
+               "from": 36,
+               "to": 44,
+               "lengthMeters": 120
+            },
+            {
+               "from": 37,
+               "to": 45,
+               "lengthMeters": 120
+            },
+            {
+               "from": 38,
+               "to": 39,
+               "lengthMeters": 120
+            },
+            {
+               "from": 38,
+               "to": 46,
+               "lengthMeters": 120
+            },
+            {
+               "from": 39,
+               "to": 47,
+               "lengthMeters": 120
+            },
+            {
+               "from": 40,
+               "to": 41,
+               "lengthMeters": 120
+            },
+            {
+               "from": 40,
+               "to": 48,
+               "lengthMeters": 120
+            },
+            {
+               "from": 41,
+               "to": 42,
+               "lengthMeters": 120
+            },
+            {
+               "from": 41,
+               "to": 49,
+               "lengthMeters": 120
+            },
+            {
+               "from": 42,
+               "to": 43,
+               "lengthMeters": 120
+            },
+            {
+               "from": 42,
+               "to": 50,
+               "lengthMeters": 120
+            },
+            {
+               "from": 43,
+               "to": 44,
+               "lengthMeters": 120
+            },
+            {
+               "from": 43,
+               "to": 51,
+               "lengthMeters": 120
+            },
+            {
+               "from": 44,
+               "to": 45,
+               "lengthMeters": 120
+            },
+            {
+               "from": 44,
+               "to": 52,
+               "lengthMeters": 120
+            },
+            {
+               "from": 45,
+               "to": 53,
+               "lengthMeters": 120
+            },
+            {
+               "from": 46,
+               "to": 47,
+               "lengthMeters": 120
+            },
+            {
+               "from": 46,
+               "to": 54,
+               "lengthMeters": 120
+            },
+            {
+               "from": 47,
+               "to": 55,
+               "lengthMeters": 120
+            },
+            {
+               "from": 48,
+               "to": 49,
+               "lengthMeters": 120
+            },
+            {
+               "from": 48,
+               "to": 56,
+               "lengthMeters": 120
+            },
+            {
+               "from": 49,
+               "to": 50,
+               "lengthMeters": 120
+            },
+            {
+               "from": 49,
+               "to": 57,
+               "lengthMeters": 120
+            },
+            {
+               "from": 50,
+               "to": 51,
+               "lengthMeters": 120
+            },
+            {
+               "from": 50,
+               "to": 58,
+               "lengthMeters": 120
+            },
+            {
+               "from": 51,
+               "to": 52,
+               "lengthMeters": 120
+            },
+            {
+               "from": 51,
+               "to": 59,
+               "lengthMeters": 120
+            },
+            {
+               "from": 52,
+               "to": 53,
+               "lengthMeters": 120
+            },
+            {
+               "from": 52,
+               "to": 60,
+               "lengthMeters": 120
+            },
+            {
+               "from": 53,
+               "to": 54,
+               "lengthMeters": 120
+            },
+            {
+               "from": 53,
+               "to": 61,
+               "lengthMeters": 120
+            },
+            {
+               "from": 54,
+               "to": 62,
+               "lengthMeters": 120
+            },
+            {
+               "from": 55,
+               "to": 63,
+               "lengthMeters": 120
+            },
+            {
+               "from": 56,
+               "to": 57,
+               "lengthMeters": 120
+            },
+            {
+               "from": 57,
+               "to": 58,
+               "lengthMeters": 120
+            },
+            {
+               "from": 58,
+               "to": 59,
+               "lengthMeters": 120
+            },
+            {
+               "from": 59,
+               "to": 60,
+               "lengthMeters": 120
+            },
+            {
+               "from": 60,
+               "to": 61,
+               "lengthMeters": 120
+            },
+            {
+               "from": 61,
+               "to": 62,
+               "lengthMeters": 120
+            },
+            {
+               "from": 62,
+               "to": 63,
+               "lengthMeters": 120
+            }
+         ],
+         "buildings": [
+            {
+               "id": 1,
+               "name": "Hab Block 1",
+               "kind": "habitat",
+               "entrance": 34,
+               "floors": 10,
+               "shift": {
+                  "startMinute": 0,
+                  "lengthMinutes": 0,
+                  "wage": 0
+               },
+               "rooms": [
+                  {
+                     "id": 2,
+                     "name": "Volt Station",
+                     "kind": "chargingBay",
+                     "floor": 0,
+                     "capacity": 10
+                  },
+                  {
+                     "id": 3,
+                     "name": "Fix-It Clinic",
+                     "kind": "repairShop",
+                     "floor": 0,
+                     "capacity": 7
+                  },
+                  {
+                     "id": 4,
+                     "name": "Bit Pit",
+                     "kind": "arcade",
+                     "floor": 0,
+                     "capacity": 13
+                  },
+                  {
+                     "id": 5,
+                     "name": "Apartment 1-01",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 6,
+                     "name": "Apartment 1-02",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 7,
+                     "name": "Apartment 1-03",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 8,
+                     "name": "Apartment 1-04",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 9,
+                     "name": "Apartment 1-05",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 10,
+                     "name": "Apartment 1-06",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 11,
+                     "name": "Apartment 2-01",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 12,
+                     "name": "Apartment 2-02",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 13,
+                     "name": "Apartment 2-03",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 14,
+                     "name": "Apartment 2-04",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 15,
+                     "name": "Apartment 2-05",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 16,
+                     "name": "Apartment 2-06",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 17,
+                     "name": "Apartment 3-01",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 18,
+                     "name": "Apartment 3-02",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 19,
+                     "name": "Apartment 3-03",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 20,
+                     "name": "Apartment 3-04",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 21,
+                     "name": "Apartment 3-05",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 22,
+                     "name": "Apartment 3-06",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 23,
+                     "name": "Apartment 4-01",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 24,
+                     "name": "Apartment 4-02",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 25,
+                     "name": "Apartment 4-03",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 26,
+                     "name": "Apartment 4-04",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 27,
+                     "name": "Apartment 4-05",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 28,
+                     "name": "Apartment 4-06",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 29,
+                     "name": "Apartment 5-01",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 30,
+                     "name": "Apartment 5-02",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 31,
+                     "name": "Apartment 5-03",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 32,
+                     "name": "Apartment 5-04",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 33,
+                     "name": "Apartment 5-05",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 34,
+                     "name": "Apartment 5-06",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 35,
+                     "name": "Apartment 6-01",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 36,
+                     "name": "Apartment 6-02",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 37,
+                     "name": "Apartment 6-03",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 38,
+                     "name": "Apartment 6-04",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 39,
+                     "name": "Apartment 6-05",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 40,
+                     "name": "Apartment 6-06",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 41,
+                     "name": "Apartment 7-01",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 42,
+                     "name": "Apartment 7-02",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 43,
+                     "name": "Apartment 7-03",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 44,
+                     "name": "Apartment 7-04",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 45,
+                     "name": "Apartment 7-05",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 46,
+                     "name": "Apartment 7-06",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 47,
+                     "name": "Apartment 8-01",
+                     "kind": "apartment",
+                     "floor": 8,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 48,
+                     "name": "Apartment 8-02",
+                     "kind": "apartment",
+                     "floor": 8,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 49,
+                     "name": "Apartment 8-03",
+                     "kind": "apartment",
+                     "floor": 8,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 50,
+                     "name": "Apartment 8-04",
+                     "kind": "apartment",
+                     "floor": 8,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 51,
+                     "name": "Apartment 8-05",
+                     "kind": "apartment",
+                     "floor": 8,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 52,
+                     "name": "Apartment 8-06",
+                     "kind": "apartment",
+                     "floor": 8,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 53,
+                     "name": "Apartment 9-01",
+                     "kind": "apartment",
+                     "floor": 9,
+                     "capacity": 1
+                  }
+               ]
+            },
+            {
+               "id": 54,
+               "name": "Hab Block 2",
+               "kind": "habitat",
+               "entrance": 9,
+               "floors": 8,
+               "shift": {
+                  "startMinute": 0,
+                  "lengthMinutes": 0,
+                  "wage": 0
+               },
+               "rooms": [
+                  {
+                     "id": 55,
+                     "name": "Chrome Goods",
+                     "kind": "shop",
+                     "floor": 0,
+                     "capacity": 9
+                  },
+                  {
+                     "id": 56,
+                     "name": "The Cold Solder",
+                     "kind": "bar",
+                     "floor": 0,
+                     "capacity": 15
+                  },
+                  {
+                     "id": 57,
+                     "name": "Grease Trap",
+                     "kind": "diner",
+                     "floor": 0,
+                     "capacity": 20
+                  },
+                  {
+                     "id": 58,
+                     "name": "Apartment 1-01",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 59,
+                     "name": "Apartment 1-02",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 60,
+                     "name": "Apartment 1-03",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 61,
+                     "name": "Apartment 1-04",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 62,
+                     "name": "Apartment 1-05",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 63,
+                     "name": "Apartment 1-06",
+                     "kind": "apartment",
+                     "floor": 1,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 64,
+                     "name": "Apartment 2-01",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 65,
+                     "name": "Apartment 2-02",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 66,
+                     "name": "Apartment 2-03",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 67,
+                     "name": "Apartment 2-04",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 68,
+                     "name": "Apartment 2-05",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 69,
+                     "name": "Apartment 2-06",
+                     "kind": "apartment",
+                     "floor": 2,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 70,
+                     "name": "Apartment 3-01",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 71,
+                     "name": "Apartment 3-02",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 72,
+                     "name": "Apartment 3-03",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 73,
+                     "name": "Apartment 3-04",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 74,
+                     "name": "Apartment 3-05",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 75,
+                     "name": "Apartment 3-06",
+                     "kind": "apartment",
+                     "floor": 3,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 76,
+                     "name": "Apartment 4-01",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 77,
+                     "name": "Apartment 4-02",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 78,
+                     "name": "Apartment 4-03",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 79,
+                     "name": "Apartment 4-04",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 80,
+                     "name": "Apartment 4-05",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 81,
+                     "name": "Apartment 4-06",
+                     "kind": "apartment",
+                     "floor": 4,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 82,
+                     "name": "Apartment 5-01",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 83,
+                     "name": "Apartment 5-02",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 84,
+                     "name": "Apartment 5-03",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 85,
+                     "name": "Apartment 5-04",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 86,
+                     "name": "Apartment 5-05",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 87,
+                     "name": "Apartment 5-06",
+                     "kind": "apartment",
+                     "floor": 5,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 88,
+                     "name": "Apartment 6-01",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 89,
+                     "name": "Apartment 6-02",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 90,
+                     "name": "Apartment 6-03",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 91,
+                     "name": "Apartment 6-04",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 92,
+                     "name": "Apartment 6-05",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 93,
+                     "name": "Apartment 6-06",
+                     "kind": "apartment",
+                     "floor": 6,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 94,
+                     "name": "Apartment 7-01",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 95,
+                     "name": "Apartment 7-02",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 96,
+                     "name": "Apartment 7-03",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  },
+                  {
+                     "id": 97,
+                     "name": "Apartment 7-04",
+                     "kind": "apartment",
+                     "floor": 7,
+                     "capacity": 1
+                  }
+               ]
+            },
+            {
+               "id": 98,
+               "name": "Foundry 1",
+               "kind": "workplace",
+               "entrance": 39,
+               "floors": 1,
+               "shift": {
+                  "startMinute": 360,
+                  "lengthMinutes": 600,
+                  "wage": 130
+               },
+               "rooms": [
+                  {
+                     "id": 99,
+                     "name": "Smelting Bay 1",
+                     "kind": "workspace",
+                     "floor": 0,
+                     "capacity": 10
+                  },
+                  {
+                     "id": 100,
+                     "name": "Smelting Bay 2",
+                     "kind": "workspace",
+                     "floor": 0,
+                     "capacity": 6
+                  }
+               ]
+            },
+            {
+               "id": 101,
+               "name": "Noodle Bar 1",
+               "kind": "workplace",
+               "entrance": 46,
+               "floors": 2,
+               "shift": {
+                  "startMinute": 840,
+                  "lengthMinutes": 480,
+                  "wage": 90
+               },
+               "rooms": [
+                  {
+                     "id": 102,
+                     "name": "Kitchen 1",
+                     "kind": "workspace",
+                     "floor": 0,
+                     "capacity": 10
+                  },
+                  {
+                     "id": 103,
+                     "name": "Kitchen 2",
+                     "kind": "workspace",
+                     "floor": 0,
+                     "capacity": 10
+                  },
+                  {
+                     "id": 104,
+                     "name": "Kitchen 3",
+                     "kind": "workspace",
+                     "floor": 1,
+                     "capacity": 7
+                  },
+                  {
+                     "id": 105,
+                     "name": "Kitchen 4",
+                     "kind": "workspace",
+                     "floor": 1,
+                     "capacity": 4
+                  }
+               ]
+            },
+            {
+               "id": 106,
+               "name": "Noodle Bar 2",
+               "kind": "workplace",
+               "entrance": 38,
+               "floors": 2,
+               "shift": {
+                  "startMinute": 840,
+                  "lengthMinutes": 480,
+                  "wage": 90
+               },
+               "rooms": [
+                  {
+                     "id": 107,
+                     "name": "Kitchen 1",
+                     "kind": "workspace",
+                     "floor": 0,
+                     "capacity": 8
+                  },
+                  {
+                     "id": 108,
+                     "name": "Kitchen 2",
+                     "kind": "workspace",
+                     "floor": 0,
+                     "capacity": 9
+                  },
+                  {
+                     "id": 109,
+                     "name": "Kitchen 3",
+                     "kind": "workspace",
+                     "floor": 1,
+                     "capacity": 8
+                  },
+                  {
+                     "id": 110,
+                     "name": "Kitchen 4",
+                     "kind": "workspace",
+                     "floor": 1,
+                     "capacity": 9
+                  }
+               ]
+            }
+         ]
+      },
+      "robots": [
+         {
+            "id": 111,
+            "name": "NE-289 Mira",
+            "apartment": 6,
+            "workspace": 105,
+            "activity": "working",
+            "location": 105,
+            "destination": 0,
+            "departedAt": 2253,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 5,
+            "needs": {
+               "charge": 608,
+               "condition": 349,
+               "social": 358,
+               "fun": 298
+            },
+            "credits": 197
+         },
+         {
+            "id": 112,
+            "name": "OM-536 Dex",
+            "apartment": 50,
+            "workspace": 99,
+            "activity": "visiting",
+            "location": 56,
+            "destination": 0,
+            "departedAt": 2499,
+            "nextActionAt": 2630,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 15,
+            "needs": {
+               "charge": 384,
+               "condition": 378,
+               "social": 610,
+               "fun": 455
+            },
+            "credits": 343
+         },
+         {
+            "id": 113,
+            "name": "LU-507 Pike",
+            "apartment": 34,
+            "workspace": 104,
+            "activity": "working",
+            "location": 104,
+            "destination": 0,
+            "departedAt": 2245,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 14,
+            "needs": {
+               "charge": 596,
+               "condition": 365,
+               "social": 242,
+               "fun": 167
+            },
+            "credits": 123
+         },
+         {
+            "id": 114,
+            "name": "OM-127 Juno",
+            "apartment": 20,
+            "workspace": 103,
+            "activity": "working",
+            "location": 103,
+            "destination": 0,
+            "departedAt": 2250,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 608,
+               "condition": 574,
+               "social": 267,
+               "fun": 238
+            },
+            "credits": 199
+         },
+         {
+            "id": 115,
+            "name": "TS-326 Sol",
+            "apartment": 22,
+            "workspace": 104,
+            "activity": "working",
+            "location": 104,
+            "destination": 0,
+            "departedAt": 2245,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 11,
+            "needs": {
+               "charge": 596,
+               "condition": 573,
+               "social": 0,
+               "fun": 69
+            },
+            "credits": 255
+         },
+         {
+            "id": 116,
+            "name": "KX-131 Ulla",
+            "apartment": 74,
+            "workspace": 104,
+            "activity": "working",
+            "location": 104,
+            "destination": 0,
+            "departedAt": 2244,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 600,
+               "condition": 399,
+               "social": 449,
+               "fun": 345
+            },
+            "credits": 123
+         },
+         {
+            "id": 117,
+            "name": "NE-358 Pike",
+            "apartment": 92,
+            "workspace": 103,
+            "activity": "working",
+            "location": 103,
+            "destination": 0,
+            "departedAt": 2250,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 5,
+            "needs": {
+               "charge": 608,
+               "condition": 300,
+               "social": 0,
+               "fun": 0
+            },
+            "credits": 264
+         },
+         {
+            "id": 118,
+            "name": "LU-836 Tess",
+            "apartment": 48,
+            "workspace": 99,
+            "activity": "visiting",
+            "location": 4,
+            "destination": 0,
+            "departedAt": 2529,
+            "nextActionAt": 2649,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 11,
+            "needs": {
+               "charge": 477,
+               "condition": 233,
+               "social": 288,
+               "fun": 558
+            },
+            "credits": 269
+         },
+         {
+            "id": 119,
+            "name": "TS-773 Vex",
+            "apartment": 78,
+            "workspace": 110,
+            "activity": "working",
+            "location": 110,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 12,
+            "needs": {
+               "charge": 600,
+               "condition": 578,
+               "social": 219,
+               "fun": 75
+            },
+            "credits": 192
+         },
+         {
+            "id": 120,
+            "name": "OM-565 Bolt",
+            "apartment": 31,
+            "workspace": 105,
+            "activity": "working",
+            "location": 105,
+            "destination": 0,
+            "departedAt": 2260,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 6,
+            "needs": {
+               "charge": 620,
+               "condition": 262,
+               "social": 140,
+               "fun": 121
+            },
+            "credits": 258
+         },
+         {
+            "id": 121,
+            "name": "LU-887 Vera",
+            "apartment": 45,
+            "workspace": 107,
+            "activity": "working",
+            "location": 107,
+            "destination": 0,
+            "departedAt": 2239,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 19,
+            "needs": {
+               "charge": 588,
+               "condition": 466,
+               "social": 243,
+               "fun": 432
+            },
+            "credits": 134
+         },
+         {
+            "id": 122,
+            "name": "OM-467 Iris",
+            "apartment": 73,
+            "workspace": 107,
+            "activity": "working",
+            "location": 107,
+            "destination": 0,
+            "departedAt": 2247,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 600,
+               "condition": 521,
+               "social": 310,
+               "fun": 152
+            },
+            "credits": 116
+         },
+         {
+            "id": 123,
+            "name": "NE-815 Sable",
+            "apartment": 70,
+            "workspace": 104,
+            "activity": "working",
+            "location": 104,
+            "destination": 0,
+            "departedAt": 2240,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 19,
+            "needs": {
+               "charge": 596,
+               "condition": 467,
+               "social": 290,
+               "fun": 688
+            },
+            "credits": 199
+         },
+         {
+            "id": 124,
+            "name": "ZR-513 Vex",
+            "apartment": 91,
+            "workspace": 110,
+            "activity": "working",
+            "location": 110,
+            "destination": 0,
+            "departedAt": 2239,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 588,
+               "condition": 256,
+               "social": 337,
+               "fun": 327
+            },
+            "credits": 180
+         },
+         {
+            "id": 125,
+            "name": "OM-949 Onyx",
+            "apartment": 68,
+            "workspace": 109,
+            "activity": "working",
+            "location": 109,
+            "destination": 0,
+            "departedAt": 2251,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 9,
+            "needs": {
+               "charge": 608,
+               "condition": 481,
+               "social": 620,
+               "fun": 431
+            },
+            "credits": 203
+         },
+         {
+            "id": 126,
+            "name": "VR-853 Juno",
+            "apartment": 38,
+            "workspace": 105,
+            "activity": "working",
+            "location": 105,
+            "destination": 0,
+            "departedAt": 2237,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 19,
+            "needs": {
+               "charge": 588,
+               "condition": 557,
+               "social": 535,
+               "fun": 569
+            },
+            "credits": 181
+         },
+         {
+            "id": 127,
+            "name": "LU-516 Vera",
+            "apartment": 93,
+            "workspace": 100,
+            "activity": "visiting",
+            "location": 56,
+            "destination": 0,
+            "departedAt": 2557,
+            "nextActionAt": 2694,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 5,
+            "needs": {
+               "charge": 864,
+               "condition": 399,
+               "social": 486,
+               "fun": 584
+            },
+            "credits": 391
+         },
+         {
+            "id": 128,
+            "name": "TS-149 Zed",
+            "apartment": 36,
+            "workspace": 109,
+            "activity": "working",
+            "location": 109,
+            "destination": 0,
+            "departedAt": 2250,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 5,
+            "needs": {
+               "charge": 608,
+               "condition": 547,
+               "social": 303,
+               "fun": 530
+            },
+            "credits": 161
+         },
+         {
+            "id": 129,
+            "name": "TS-539 Vera",
+            "apartment": 32,
+            "workspace": 105,
+            "activity": "working",
+            "location": 105,
+            "destination": 0,
+            "departedAt": 2238,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 18,
+            "needs": {
+               "charge": 588,
+               "condition": 469,
+               "social": 0,
+               "fun": 155
+            },
+            "credits": 167
+         },
+         {
+            "id": 130,
+            "name": "ZR-978 Vex",
+            "apartment": 16,
+            "workspace": 104,
+            "activity": "working",
+            "location": 104,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 11,
+            "needs": {
+               "charge": 596,
+               "condition": 234,
+               "social": 466,
+               "fun": 394
+            },
+            "credits": 232
+         },
+         {
+            "id": 131,
+            "name": "OM-253 Iris",
+            "apartment": 89,
+            "workspace": 103,
+            "activity": "working",
+            "location": 103,
+            "destination": 0,
+            "departedAt": 2250,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 9,
+            "needs": {
+               "charge": 608,
+               "condition": 504,
+               "social": 470,
+               "fun": 209
+            },
+            "credits": 235
+         },
+         {
+            "id": 132,
+            "name": "TS-676 Quill",
+            "apartment": 95,
+            "workspace": 99,
+            "activity": "visiting",
+            "location": 2,
+            "destination": 0,
+            "departedAt": 2567,
+            "nextActionAt": 2621,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 655,
+               "condition": 246,
+               "social": 452,
+               "fun": 720
+            },
+            "credits": 251
+         },
+         {
+            "id": 133,
+            "name": "KX-471 Iris",
+            "apartment": 35,
+            "workspace": 103,
+            "activity": "working",
+            "location": 103,
+            "destination": 0,
+            "departedAt": 2239,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 19,
+            "needs": {
+               "charge": 588,
+               "condition": 378,
+               "social": 415,
+               "fun": 368
+            },
+            "credits": 108
+         },
+         {
+            "id": 134,
+            "name": "LU-292 Wren",
+            "apartment": 65,
+            "workspace": 99,
+            "activity": "visiting",
+            "location": 56,
+            "destination": 0,
+            "departedAt": 2462,
+            "nextActionAt": 2606,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 7,
+            "needs": {
+               "charge": 595,
+               "condition": 482,
+               "social": 442,
+               "fun": 555
+            },
+            "credits": 309
+         },
+         {
+            "id": 135,
+            "name": "KX-198 Nova",
+            "apartment": 72,
+            "workspace": 110,
+            "activity": "working",
+            "location": 110,
+            "destination": 0,
+            "departedAt": 2243,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 19,
+            "needs": {
+               "charge": 596,
+               "condition": 227,
+               "social": 395,
+               "fun": 362
+            },
+            "credits": 255
+         },
+         {
+            "id": 136,
+            "name": "LU-698 Zed",
+            "apartment": 40,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2258,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 7,
+            "needs": {
+               "charge": 612,
+               "condition": 488,
+               "social": 365,
+               "fun": 405
+            },
+            "credits": 135
+         },
+         {
+            "id": 137,
+            "name": "ZR-271 Lumen",
+            "apartment": 33,
+            "workspace": 109,
+            "activity": "working",
+            "location": 109,
+            "destination": 0,
+            "departedAt": 2255,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 5,
+            "needs": {
+               "charge": 612,
+               "condition": 517,
+               "social": 503,
+               "fun": 550
+            },
+            "credits": 186
+         },
+         {
+            "id": 138,
+            "name": "TS-770 Lumen",
+            "apartment": 37,
+            "workspace": 107,
+            "activity": "working",
+            "location": 107,
+            "destination": 0,
+            "departedAt": 2243,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 596,
+               "condition": 395,
+               "social": 263,
+               "fun": 453
+            },
+            "credits": 147
+         },
+         {
+            "id": 139,
+            "name": "NE-342 Kai",
+            "apartment": 46,
+            "workspace": 107,
+            "activity": "working",
+            "location": 107,
+            "destination": 0,
+            "departedAt": 2251,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 10,
+            "needs": {
+               "charge": 608,
+               "condition": 271,
+               "social": 437,
+               "fun": 306
+            },
+            "credits": 112
+         },
+         {
+            "id": 140,
+            "name": "HK-900 Lumen",
+            "apartment": 79,
+            "workspace": 100,
+            "activity": "walking",
+            "location": 56,
+            "destination": 4,
+            "departedAt": 2578,
+            "nextActionAt": 2585,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 16,
+            "needs": {
+               "charge": 675,
+               "condition": 457,
+               "social": 583,
+               "fun": 321
+            },
+            "credits": 311
+         },
+         {
+            "id": 141,
+            "name": "VR-494 Sable",
+            "apartment": 39,
+            "workspace": 104,
+            "activity": "working",
+            "location": 104,
+            "destination": 0,
+            "departedAt": 2254,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 8,
+            "needs": {
+               "charge": 608,
+               "condition": 248,
+               "social": 292,
+               "fun": 252
+            },
+            "credits": 113
+         },
+         {
+            "id": 142,
+            "name": "HK-730 Vex",
+            "apartment": 29,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 600,
+               "condition": 467,
+               "social": 546,
+               "fun": 434
+            },
+            "credits": 211
+         },
+         {
+            "id": 143,
+            "name": "OM-244 Ash",
+            "apartment": 80,
+            "workspace": 107,
+            "activity": "working",
+            "location": 107,
+            "destination": 0,
+            "departedAt": 2254,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 7,
+            "needs": {
+               "charge": 608,
+               "condition": 453,
+               "social": 350,
+               "fun": 423
+            },
+            "credits": 157
+         },
+         {
+            "id": 144,
+            "name": "KX-331 Zed",
+            "apartment": 21,
+            "workspace": 103,
+            "activity": "working",
+            "location": 103,
+            "destination": 0,
+            "departedAt": 2257,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 6,
+            "needs": {
+               "charge": 612,
+               "condition": 589,
+               "social": 294,
+               "fun": 278
+            },
+            "credits": 264
+         },
+         {
+            "id": 145,
+            "name": "HK-556 Vera",
+            "apartment": 18,
+            "workspace": 102,
+            "activity": "working",
+            "location": 102,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 13,
+            "needs": {
+               "charge": 596,
+               "condition": 423,
+               "social": 414,
+               "fun": 303
+            },
+            "credits": 124
+         },
+         {
+            "id": 146,
+            "name": "OM-540 Lumen",
+            "apartment": 49,
+            "workspace": 103,
+            "activity": "working",
+            "location": 103,
+            "destination": 0,
+            "departedAt": 2245,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 16,
+            "needs": {
+               "charge": 600,
+               "condition": 445,
+               "social": 236,
+               "fun": 545
+            },
+            "credits": 153
+         },
+         {
+            "id": 147,
+            "name": "NE-678 Rhea",
+            "apartment": 41,
+            "workspace": 110,
+            "activity": "working",
+            "location": 110,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 18,
+            "needs": {
+               "charge": 600,
+               "condition": 259,
+               "social": 0,
+               "fun": 162
+            },
+            "credits": 262
+         },
+         {
+            "id": 148,
+            "name": "KX-891 Ulla",
+            "apartment": 88,
+            "workspace": 107,
+            "activity": "working",
+            "location": 107,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 600,
+               "condition": 276,
+               "social": 476,
+               "fun": 432
+            },
+            "credits": 202
+         },
+         {
+            "id": 149,
+            "name": "ZR-518 Rhea",
+            "apartment": 58,
+            "workspace": 107,
+            "activity": "working",
+            "location": 107,
+            "destination": 0,
+            "departedAt": 2243,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 19,
+            "needs": {
+               "charge": 596,
+               "condition": 314,
+               "social": 124,
+               "fun": 227
+            },
+            "credits": 139
+         },
+         {
+            "id": 150,
+            "name": "VR-397 Iris",
+            "apartment": 84,
+            "workspace": 104,
+            "activity": "working",
+            "location": 104,
+            "destination": 0,
+            "departedAt": 2253,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 5,
+            "needs": {
+               "charge": 612,
+               "condition": 490,
+               "social": 0,
+               "fun": 134
+            },
+            "credits": 190
+         },
+         {
+            "id": 151,
+            "name": "HK-713 Lumen",
+            "apartment": 23,
+            "workspace": 103,
+            "activity": "working",
+            "location": 103,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 10,
+            "needs": {
+               "charge": 600,
+               "condition": 425,
+               "social": 270,
+               "fun": 391
+            },
+            "credits": 158
+         },
+         {
+            "id": 152,
+            "name": "OM-153 Onyx",
+            "apartment": 81,
+            "workspace": 99,
+            "activity": "resting",
+            "location": 81,
+            "destination": 0,
+            "departedAt": 2531,
+            "nextActionAt": 3207,
+            "shiftStartsAt": 3240,
+            "punctualityMinutes": 8,
+            "needs": {
+               "charge": 696,
+               "condition": 503,
+               "social": 634,
+               "fun": 681
+            },
+            "credits": 281
+         },
+         {
+            "id": 153,
+            "name": "KX-551 Onyx",
+            "apartment": 28,
+            "workspace": 107,
+            "activity": "working",
+            "location": 107,
+            "destination": 0,
+            "departedAt": 2239,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 18,
+            "needs": {
+               "charge": 588,
+               "condition": 510,
+               "social": 0,
+               "fun": 43
+            },
+            "credits": 196
+         },
+         {
+            "id": 154,
+            "name": "ZR-161 Quill",
+            "apartment": 71,
+            "workspace": 109,
+            "activity": "working",
+            "location": 109,
+            "destination": 0,
+            "departedAt": 2258,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 6,
+            "needs": {
+               "charge": 612,
+               "condition": 442,
+               "social": 345,
+               "fun": 371
+            },
+            "credits": 146
+         },
+         {
+            "id": 155,
+            "name": "TS-313 Pike",
+            "apartment": 47,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2240,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 20,
+            "needs": {
+               "charge": 596,
+               "condition": 363,
+               "social": 308,
+               "fun": 294
+            },
+            "credits": 174
+         },
+         {
+            "id": 156,
+            "name": "OM-239 Echo",
+            "apartment": 75,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2245,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 19,
+            "needs": {
+               "charge": 596,
+               "condition": 467,
+               "social": 414,
+               "fun": 439
+            },
+            "credits": 194
+         },
+         {
+            "id": 157,
+            "name": "TS-115 Rook",
+            "apartment": 76,
+            "workspace": 99,
+            "activity": "visiting",
+            "location": 56,
+            "destination": 0,
+            "departedAt": 2486,
+            "nextActionAt": 2613,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 19,
+            "needs": {
+               "charge": 758,
+               "condition": 524,
+               "social": 398,
+               "fun": 565
+            },
+            "credits": 269
+         },
+         {
+            "id": 158,
+            "name": "LU-795 Rhea",
+            "apartment": 12,
+            "workspace": 100,
+            "activity": "walking",
+            "location": 56,
+            "destination": 12,
+            "departedAt": 2578,
+            "nextActionAt": 2586,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 15,
+            "needs": {
+               "charge": 569,
+               "condition": 464,
+               "social": 590,
+               "fun": 453
+            },
+            "credits": 257
+         },
+         {
+            "id": 159,
+            "name": "OM-640 Onyx",
+            "apartment": 51,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2242,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 20,
+            "needs": {
+               "charge": 596,
+               "condition": 346,
+               "social": 155,
+               "fun": 311
+            },
+            "credits": 140
+         },
+         {
+            "id": 160,
+            "name": "NE-278 Tarn",
+            "apartment": 42,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2235,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 20,
+            "needs": {
+               "charge": 588,
+               "condition": 291,
+               "social": 0,
+               "fun": 0
+            },
+            "credits": 264
+         },
+         {
+            "id": 161,
+            "name": "NE-217 Iris",
+            "apartment": 66,
+            "workspace": 110,
+            "activity": "working",
+            "location": 110,
+            "destination": 0,
+            "departedAt": 2243,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 596,
+               "condition": 599,
+               "social": 0,
+               "fun": 176
+            },
+            "credits": 276
+         },
+         {
+            "id": 162,
+            "name": "LU-457 Tess",
+            "apartment": 67,
+            "workspace": 100,
+            "activity": "visiting",
+            "location": 4,
+            "destination": 0,
+            "departedAt": 2566,
+            "nextActionAt": 2674,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 11,
+            "needs": {
+               "charge": 682,
+               "condition": 543,
+               "social": 668,
+               "fun": 513
+            },
+            "credits": 245
+         },
+         {
+            "id": 163,
+            "name": "HK-601 Rhea",
+            "apartment": 7,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2258,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 8,
+            "needs": {
+               "charge": 612,
+               "condition": 333,
+               "social": 0,
+               "fun": 0
+            },
+            "credits": 286
+         },
+         {
+            "id": 164,
+            "name": "TS-735 Ulla",
+            "apartment": 17,
+            "workspace": 100,
+            "activity": "visiting",
+            "location": 56,
+            "destination": 0,
+            "departedAt": 2515,
+            "nextActionAt": 2639,
+            "shiftStartsAt": 1800,
+            "punctualityMinutes": 17,
+            "needs": {
+               "charge": 88,
+               "condition": 258,
+               "social": 281,
+               "fun": 404
+            },
+            "credits": 290
+         },
+         {
+            "id": 165,
+            "name": "NE-299 Pike",
+            "apartment": 8,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 18,
+            "needs": {
+               "charge": 600,
+               "condition": 407,
+               "social": 0,
+               "fun": 84
+            },
+            "credits": 219
+         },
+         {
+            "id": 166,
+            "name": "TS-169 Quill",
+            "apartment": 52,
+            "workspace": 109,
+            "activity": "working",
+            "location": 109,
+            "destination": 0,
+            "departedAt": 2251,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 8,
+            "needs": {
+               "charge": 608,
+               "condition": 236,
+               "social": 72,
+               "fun": 0
+            },
+            "credits": 133
+         },
+         {
+            "id": 167,
+            "name": "LU-255 Juno",
+            "apartment": 43,
+            "workspace": 108,
+            "activity": "working",
+            "location": 108,
+            "destination": 0,
+            "departedAt": 2242,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 15,
+            "needs": {
+               "charge": 596,
+               "condition": 527,
+               "social": 0,
+               "fun": 0
+            },
+            "credits": 243
+         },
+         {
+            "id": 168,
+            "name": "NE-830 Sable",
+            "apartment": 9,
+            "workspace": 109,
+            "activity": "working",
+            "location": 109,
+            "destination": 0,
+            "departedAt": 2253,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 11,
+            "needs": {
+               "charge": 608,
+               "condition": 277,
+               "social": 69,
+               "fun": 27
+            },
+            "credits": 261
+         },
+         {
+            "id": 169,
+            "name": "KX-862 Mira",
+            "apartment": 44,
+            "workspace": 109,
+            "activity": "working",
+            "location": 109,
+            "destination": 0,
+            "departedAt": 2242,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 12,
+            "needs": {
+               "charge": 596,
+               "condition": 552,
+               "social": 0,
+               "fun": 0
+            },
+            "credits": 227
+         },
+         {
+            "id": 170,
+            "name": "ZR-894 Nova",
+            "apartment": 5,
+            "workspace": 109,
+            "activity": "working",
+            "location": 109,
+            "destination": 0,
+            "departedAt": 2246,
+            "nextActionAt": 2760,
+            "shiftStartsAt": 2280,
+            "punctualityMinutes": 15,
+            "needs": {
+               "charge": 600,
+               "condition": 559,
+               "social": 33,
+               "fun": 163
+            },
+            "credits": 175
+         }
+      ]
+   }
+}

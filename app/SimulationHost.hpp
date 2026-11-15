@@ -19,7 +19,7 @@ namespace mechapunk {
 struct RobotFrame {
     sim::EntityId id;
     sim::RobotActivity activity{};
-    // Set while commuting.
+    // Buildings walked between; set while walking.
     sim::EntityId from;
     sim::EntityId to;
     sim::Tick departedAt{};
@@ -30,9 +30,10 @@ struct RobotFrame {
 struct WorldFrame {
     sim::Tick tick{};
     std::vector<RobotFrame> robots;
-    std::uint32_t atHome{};
+    std::uint32_t resting{};
     std::uint32_t working{};
-    std::uint32_t commuting{};
+    std::uint32_t visiting{};
+    std::uint32_t walking{};
 };
 
 // Runs a World on a SimulationThread. The world belongs to the worker while

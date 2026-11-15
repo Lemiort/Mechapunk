@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <set>
 #include <vector>
 
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Random.hpp"
+#include "mechapunk/sim/Venues.hpp"
 
 namespace sim = mechapunk::sim;
 
@@ -32,14 +34,75 @@ TEST(City, EveryBuildingIsReachable) {
 
 TEST(City, HasRoomForEveryResident) {
     const sim::City city = Generate(11, 250);
-    std::uint32_t housing = 0;
+    std::uint32_t apartments = 0;
     std::uint32_t jobs = 0;
     for (const sim::Building& building : city.buildings) {
-        (building.kind == sim::BuildingKind::Habitat ? housing : jobs) +=
-            building.capacity;
+        for (const sim::Room& room : building.rooms) {
+            if (room.kind == sim::RoomKind::Apartment) {
+                apartments += room.capacity;
+            } else if (room.kind == sim::RoomKind::Workspace) {
+                jobs += room.capacity;
+            }
+        }
     }
-    EXPECT_GE(housing, 250U);
+    EXPECT_GE(apartments, 250U);
     EXPECT_GE(jobs, 250U);
+}
+
+TEST(City, BuildingsHaveFloorsAndRooms) {
+    const sim::City city = Generate(12, 300);
+    std::set<sim::RoomKind> venueKinds;
+    std::set<std::uint64_t> roomIds;
+    for (const sim::Building& building : city.buildings) {
+        ASSERT_FALSE(building.rooms.empty()) << building.name;
+        for (const sim::Room& room : building.rooms) {
+            EXPECT_TRUE(roomIds.insert(room.id.value).second);
+            EXPECT_GT(room.id, building.id);
+            EXPECT_LT(room.floor, building.floors) << room.name;
+            EXPECT_GT(room.capacity, 0U);
+            if (building.kind == sim::BuildingKind::Habitat) {
+                // Stores on the ground floor, homes above.
+                EXPECT_EQ(room.kind == sim::RoomKind::Apartment,
+                          room.floor > 0)
+                    << room.name;
+                if (sim::IsVenue(room.kind)) {
+                    venueKinds.insert(room.kind);
+                }
+            } else {
+                EXPECT_EQ(room.kind, sim::RoomKind::Workspace);
+            }
+        }
+        if (building.kind == sim::BuildingKind::Workplace) {
+            EXPECT_GT(building.shift.wage, 0U) << building.name;
+        }
+    }
+    // A city this size has every kind of venue.
+    EXPECT_EQ(venueKinds.size(), sim::VenueKinds().size());
+}
+
+TEST(RoomIndex, FindsRoomsAndTheirBuildings) {
+    const sim::City city = Generate(13, 80);
+    const sim::RoomIndex index(city);
+    const sim::Building& building = city.buildings.back();
+    const sim::Room& room = building.rooms.back();
+    const auto found = index.Find(room.id);
+    ASSERT_TRUE(found.has_value());
+    EXPECT_EQ(found->room, &room);
+    EXPECT_EQ(found->building, &building);
+    EXPECT_FALSE(index.Find(building.id).has_value());
+    EXPECT_FALSE(index.RoomsOfKind(sim::RoomKind::Apartment).empty());
+}
+
+TEST(Venues, OpeningHoursWrapPastMidnight) {
+    const sim::VenueRules& bar = *sim::FindVenueRules(sim::RoomKind::Bar);
+    EXPECT_TRUE(sim::IsOpen(bar, 23 * 60));
+    EXPECT_TRUE(sim::IsOpen(bar, 60));
+    EXPECT_FALSE(sim::IsOpen(bar, 12 * 60));
+    EXPECT_EQ(sim::MinutesUntilClose(bar, 23 * 60), 4U * 60U);
+    const sim::VenueRules& charging =
+        *sim::FindVenueRules(sim::RoomKind::ChargingBay);
+    EXPECT_TRUE(sim::IsOpen(charging, 4 * 60));
+    EXPECT_EQ(sim::FindVenueRules(sim::RoomKind::Apartment), nullptr);
 }
 
 TEST(City, BuildingsAreSortedAndFindable) {

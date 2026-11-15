@@ -3,8 +3,10 @@
 add_library(mechapunk_sim STATIC
     src/City.cpp
     src/GameTime.cpp
+    src/Migrations.cpp
     src/Random.cpp
     src/Save.cpp
+    src/Venues.cpp
     src/World.cpp
 )
 add_library(mechapunk::sim ALIAS mechapunk_sim)

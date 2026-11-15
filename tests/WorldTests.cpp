@@ -3,10 +3,12 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Save.hpp"
+#include "mechapunk/sim/Venues.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace sim = mechapunk::sim;
@@ -17,15 +19,23 @@ std::string Serialize(const sim::World& world) {
     EXPECT_TRUE(json.has_value());
     return json.value_or("");
 }
+
+sim::World Copy(const sim::World& world) {
+    auto copy = sim::World::FromState(world.State());
+    EXPECT_TRUE(copy.has_value()) << copy.error();
+    return std::move(*copy);
+}
 }  // namespace
 
 TEST(World, GeneratesPopulationAtHome) {
     const sim::World world = sim::World::Generate({.seed = 4, .robots = 60});
     ASSERT_EQ(world.State().robots.size(), 60U);
     for (const sim::Robot& robot : world.State().robots) {
-        EXPECT_EQ(robot.activity, sim::RobotActivity::AtHome);
+        EXPECT_EQ(robot.activity, sim::RobotActivity::Resting);
+        EXPECT_EQ(robot.location, robot.apartment);
         EXPECT_GT(robot.nextActionAt, 0U);
         EXPECT_LT(robot.nextActionAt, robot.shiftStartsAt);
+        EXPECT_GT(robot.credits, 0);
     }
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }
@@ -42,117 +52,201 @@ TEST(World, SameSeedRunsIdentically) {
     EXPECT_NE(Serialize(first), Serialize(other));
 }
 
-TEST(World, RobotsKeepTheirDailyRoutine) {
-    sim::World world = sim::World::Generate({.seed = 8, .robots = 120});
-    std::map<std::uint64_t, std::vector<sim::EventKind>> history;
-    std::uint64_t lateArrivals = 0;
-    std::uint64_t wrongShiftLengths = 0;
+TEST(World, RobotsWorkEveryDayOnTime) {
+    sim::World world = sim::World::Generate({.seed = 8, .robots = 150});
+    std::map<std::uint64_t, std::uint32_t> shifts;
+    std::uint64_t late = 0;
+    std::uint64_t wrongLengths = 0;
     world.SetEventSink([&](const sim::SimEvent& event) {
-        history[event.robot.value].push_back(event.kind);
-        if (event.kind == sim::EventKind::ArrivedAtWork && event.minutes > 0) {
-            ++lateArrivals;
+        if (event.kind == sim::EventKind::ClockedIn) {
+            late += event.minutes > 0 ? 1 : 0;
         }
-        if (event.kind == sim::EventKind::LeftWork) {
+        if (event.kind == sim::EventKind::ShiftEnded) {
+            ++shifts[event.robot.value];
             const sim::Robot* robot = world.FindRobot(event.robot);
-            const sim::Building* work =
-                world.State().city.FindBuilding(robot->workplace);
-            if (event.tick !=
-                robot->shiftStartsAt + work->shift.lengthMinutes) {
-                ++wrongShiftLengths;
+            const auto workspace = world.Rooms().Find(robot->workspace);
+            if (event.tick != robot->shiftStartsAt +
+                                  workspace->building->shift.lengthMinutes) {
+                ++wrongLengths;
             }
         }
     });
-    world.RunFor(3 * sim::kMinutesPerDay);
+    world.RunFor(4 * sim::kMinutesPerDay);
+    EXPECT_EQ(late, 0U);
+    EXPECT_EQ(wrongLengths, 0U);
+    ASSERT_EQ(shifts.size(), 150U);
+    for (const auto& [robot, count] : shifts) {
+        // Three full shifts in four days, whatever the shift hours.
+        EXPECT_GE(count, 3U) << "robot " << robot;
+    }
+}
 
-    EXPECT_EQ(lateArrivals, 0U);
-    EXPECT_EQ(wrongShiftLengths, 0U);
-    ASSERT_EQ(history.size(), 120U);
-    const std::vector<sim::EventKind> cycle{
-        sim::EventKind::LeftHome, sim::EventKind::ArrivedAtWork,
-        sim::EventKind::LeftWork, sim::EventKind::ArrivedHome};
-    for (const auto& [robot, events] : history) {
-        // At least two complete workdays in three days, whatever the shift.
-        EXPECT_GE(events.size(), 8U) << "robot " << robot;
-        for (std::size_t index = 0; index < events.size(); ++index) {
-            EXPECT_EQ(events[index], cycle[index % cycle.size()])
-                << "robot " << robot << " event " << index;
+TEST(World, RobotsRestBeforeEveryShift) {
+    sim::World world = sim::World::Generate({.seed = 9, .robots = 150});
+    std::map<std::uint64_t, sim::Tick> cameHome;
+    std::uint64_t checked = 0;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::ArrivedHome) {
+            cameHome[event.robot.value] = event.tick;
+        }
+        const sim::Robot* robot = world.FindRobot(event.robot);
+        if (event.kind == sim::EventKind::Departed &&
+            event.otherRoom == robot->workspace &&
+            cameHome.contains(event.robot.value)) {
+            ++checked;
+            EXPECT_GE(event.tick - cameHome[event.robot.value],
+                      sim::World::kRestMinutes)
+                << robot->name << " at " << sim::FormatTime(event.tick);
+        }
+    });
+    world.RunFor(5 * sim::kMinutesPerDay);
+    EXPECT_GT(checked, 300U);
+}
+
+TEST(World, EveningsAreSpentInOpenVenuesWithinCapacity) {
+    sim::World world = sim::World::Generate({.seed = 10, .robots = 300});
+    std::map<sim::RoomKind, std::uint64_t> visits;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind != sim::EventKind::ArrivedAtVenue) {
+            return;
+        }
+        const auto venue = world.Rooms().Find(event.room);
+        ASSERT_TRUE(venue.has_value());
+        const sim::VenueRules* rules = sim::FindVenueRules(venue->room->kind);
+        ASSERT_NE(rules, nullptr);
+        EXPECT_TRUE(sim::IsOpen(*rules, sim::MinuteOfDay(event.tick)))
+            << world.Describe(event);
+        EXPECT_EQ(event.credits, rules->price);
+        ++visits[venue->room->kind];
+    });
+    for (sim::Tick minute = 0; minute < 3 * sim::kMinutesPerDay; ++minute) {
+        world.Step();
+        for (const sim::RoomKind kind : sim::VenueKinds()) {
+            for (const sim::RoomRef& venue : world.Rooms().RoomsOfKind(kind)) {
+                ASSERT_LE(world.GuestsIn(venue.room->id), venue.room->capacity)
+                    << venue.room->name;
+            }
         }
     }
+    // Robots use most kinds of venue, not just one.
+    EXPECT_GE(visits.size(), 4U);
+}
+
+TEST(World, CreditsAreWagesMinusPrices) {
+    sim::World world = sim::World::Generate({.seed = 11, .robots = 100});
+    std::map<std::uint64_t, std::int64_t> expected;
+    for (const sim::Robot& robot : world.State().robots) {
+        expected[robot.id.value] = robot.credits;
+    }
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::ShiftEnded) {
+            expected[event.robot.value] += event.credits;
+        } else if (event.kind == sim::EventKind::ArrivedAtVenue) {
+            expected[event.robot.value] -= event.credits;
+        }
+    });
+    world.RunFor(3 * sim::kMinutesPerDay);
+    for (const sim::Robot& robot : world.State().robots) {
+        EXPECT_EQ(robot.credits, expected[robot.id.value]) << robot.name;
+        EXPECT_GE(robot.credits, 0) << robot.name;
+    }
+}
+
+TEST(World, NeedsStayInRangeOverWeeks) {
+    sim::World world = sim::World::Generate({.seed = 12, .robots = 200});
+    world.RunFor(21 * sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+    std::int64_t social = 0;
+    for (const sim::Robot& robot : world.State().robots) {
+        social += robot.needs.social;
+    }
+    // Evenings out keep the population from drifting to zero.
+    EXPECT_GT(social / 200, 200);
+}
+
+TEST(World, WalkMatchesTheLastDeparture) {
+    sim::World world = sim::World::Generate({.seed = 8, .robots = 120});
+    std::map<std::uint64_t, sim::SimEvent> lastDeparture;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::Departed) {
+            lastDeparture[event.robot.value] = event;
+        }
+    });
+    std::size_t walking = 0;
+    for (sim::Tick minute = 0; minute < sim::kMinutesPerDay; ++minute) {
+        world.Step();
+        for (const sim::Robot& robot : world.State().robots) {
+            const auto walk = sim::World::WalkOf(robot);
+            ASSERT_EQ(walk.has_value(),
+                      robot.activity == sim::RobotActivity::Walking);
+            if (!walk) {
+                continue;
+            }
+            ++walking;
+            const sim::SimEvent& departure = lastDeparture[robot.id.value];
+            EXPECT_EQ(walk->departedAt, departure.tick);
+            EXPECT_EQ(walk->from, departure.room);
+            EXPECT_EQ(walk->to, departure.otherRoom);
+            EXPECT_EQ(walk->arrivesAt - walk->departedAt, departure.minutes);
+        }
+    }
+    EXPECT_GT(walking, 0U);
 }
 
 TEST(World, FromStateContinuesIdentically) {
     sim::World original = sim::World::Generate({.seed = 6, .robots = 50});
-    original.RunFor(sim::kMinutesPerDay + 333);
-    auto copy = sim::World::FromState(original.State());
-    ASSERT_TRUE(copy.has_value()) << copy.error();
+    original.RunFor(sim::kMinutesPerDay + 1150);  // Mid-evening.
+    sim::World copy = Copy(original);
     original.RunFor(sim::kMinutesPerDay);
-    copy->RunFor(sim::kMinutesPerDay);
-    EXPECT_EQ(Serialize(original), Serialize(*copy));
+    copy.RunFor(sim::kMinutesPerDay);
+    EXPECT_EQ(Serialize(original), Serialize(copy));
 }
 
-TEST(World, ValidationRejectsBrokenReferences) {
+TEST(World, ValidationRejectsInconsistentStates) {
     const sim::World world = sim::World::Generate({.seed = 2, .robots = 30});
+    const auto rejects = [](sim::WorldState state, const char* expected) {
+        auto result = sim::World::FromState(std::move(state));
+        ASSERT_FALSE(result.has_value()) << expected;
+        EXPECT_NE(result.error().find(expected), std::string::npos)
+            << result.error();
+    };
 
     sim::WorldState missingHome = world.State();
-    missingHome.robots.front().home = sim::EntityId{999999};
-    auto result = sim::World::FromState(missingHome);
-    ASSERT_FALSE(result.has_value());
-    EXPECT_NE(result.error().find("home"), std::string::npos);
+    missingHome.robots.front().apartment = sim::EntityId{999999};
+    rejects(missingHome, "apartment");
 
     sim::WorldState workAtHome = world.State();
-    workAtHome.robots.front().workplace = workAtHome.robots.front().home;
-    EXPECT_FALSE(sim::World::FromState(workAtHome).has_value());
+    workAtHome.robots.front().workspace = workAtHome.robots.front().apartment;
+    rejects(workAtHome, "workspace");
+
+    sim::WorldState sharedFlat = world.State();
+    sharedFlat.robots[1].apartment = sharedFlat.robots[0].apartment;
+    sharedFlat.robots[1].location = sharedFlat.robots[0].apartment;
+    rejects(sharedFlat, "capacity");
+
+    sim::WorldState wrongPlace = world.State();
+    wrongPlace.robots.front().location = wrongPlace.robots.front().workspace;
+    rejects(wrongPlace, "match");
 
     sim::WorldState unordered = world.State();
     std::swap(unordered.robots[0], unordered.robots[1]);
-    EXPECT_FALSE(sim::World::FromState(unordered).has_value());
+    rejects(unordered, "id");
 
     sim::WorldState badStreet = world.State();
     badStreet.city.edges.front().to = sim::NodeId{100000};
-    EXPECT_FALSE(sim::World::FromState(badStreet).has_value());
+    rejects(badStreet, "street");
 
-    sim::WorldState overfull = world.State();
-    overfull.city.buildings.front().capacity = 0;
-    EXPECT_FALSE(sim::World::FromState(overfull).has_value());
+    sim::WorldState badNeed = world.State();
+    badNeed.robots.front().needs.fun = 1001;
+    rejects(badNeed, "range");
+
+    sim::WorldState floating = world.State();
+    floating.city.buildings.front().rooms.back().floor = 999;
+    rejects(floating, "floor");
 }
 
-TEST(World, CommuteMatchesTheLastDeparture) {
-    sim::World world = sim::World::Generate({.seed = 8, .robots = 120});
-    std::map<std::uint64_t, sim::Tick> lastDeparture;
-    world.SetEventSink([&](const sim::SimEvent& event) {
-        if (event.kind == sim::EventKind::LeftHome ||
-            event.kind == sim::EventKind::LeftWork) {
-            lastDeparture[event.robot.value] = event.tick;
-        }
-    });
-    std::size_t commuting = 0;
-    // Check after every minute of a whole day to catch robots mid-walk.
-    for (sim::Tick minute = 0; minute < sim::kMinutesPerDay; ++minute) {
-        world.Step();
-        for (const sim::Robot& robot : world.State().robots) {
-            const auto commute = world.CommuteOf(robot);
-            const bool walking =
-                robot.activity == sim::RobotActivity::CommutingToWork ||
-                robot.activity == sim::RobotActivity::CommutingHome;
-            ASSERT_EQ(commute.has_value(), walking);
-            if (!commute) {
-                continue;
-            }
-            ++commuting;
-            EXPECT_EQ(commute->departedAt, lastDeparture[robot.id.value]);
-            EXPECT_EQ(commute->arrivesAt, robot.nextActionAt);
-            EXPECT_GT(commute->arrivesAt, world.CurrentTick() - 1);
-            const bool toWork =
-                robot.activity == sim::RobotActivity::CommutingToWork;
-            EXPECT_EQ(commute->from, toWork ? robot.home : robot.workplace);
-            EXPECT_EQ(commute->to, toWork ? robot.workplace : robot.home);
-        }
-    }
-    EXPECT_GT(commuting, 0U);
-}
-
-TEST(World, DescribesEvents) {
-    sim::World world = sim::World::Generate({.seed = 1, .robots = 5});
+TEST(World, DescribesEventsWithRoomsAndBuildings) {
+    sim::World world = sim::World::Generate({.seed = 1, .robots = 40});
     std::vector<std::string> lines;
     world.SetEventSink([&](const sim::SimEvent& event) {
         lines.push_back(world.Describe(event));
@@ -160,6 +254,8 @@ TEST(World, DescribesEvents) {
     world.RunFor(sim::kMinutesPerDay);
     ASSERT_FALSE(lines.empty());
     EXPECT_EQ(lines.front().rfind("Day 1 ", 0), 0U) << lines.front();
-    EXPECT_NE(lines.front().find(" left Hab Block "), std::string::npos)
+    EXPECT_NE(lines.front().find(" left Apartment "), std::string::npos)
+        << lines.front();
+    EXPECT_NE(lines.front().find(", Hab Block "), std::string::npos)
         << lines.front();
 }

@@ -28,10 +28,35 @@ struct CityEdge {
 
 enum class BuildingKind : std::uint8_t { Habitat, Workplace };
 
+enum class RoomKind : std::uint8_t {
+    Apartment,
+    Workspace,
+    // Venues robots visit after work; see Venues.hpp.
+    Bar,
+    Diner,
+    ChargingBay,
+    RepairShop,
+    Arcade,
+    Shop,
+};
+
+// One room on one floor. Ids come from the world's entity counter, so a room
+// can be referenced directly, and robots always know which room they are in.
+struct Room {
+    EntityId id;
+    std::string name;
+    RoomKind kind{RoomKind::Apartment};
+    // 0 is the ground floor.
+    std::uint32_t floor{};
+    // Residents of an apartment, workers of a workspace, guests of a venue.
+    std::uint32_t capacity{};
+};
+
 // Daily working hours of a workplace.
 struct Shift {
     std::uint32_t startMinute{};  // Minute of the day the shift starts.
     std::uint32_t lengthMinutes{};
+    std::uint32_t wage{};  // Credits paid at the end of each shift.
 };
 
 struct Building {
@@ -39,10 +64,11 @@ struct Building {
     std::string name;
     BuildingKind kind{BuildingKind::Habitat};
     NodeId entrance;
-    // Residents for a habitat, jobs for a workplace.
-    std::uint32_t capacity{};
+    std::uint32_t floors{1};
     // Used by workplaces only.
     Shift shift;
+    // Sorted by id.
+    std::vector<Room> rooms;
 };
 
 // Saved city layout. Buildings are kept sorted by id.
@@ -54,11 +80,31 @@ struct City {
     [[nodiscard]] const Building* FindBuilding(EntityId id) const noexcept;
 };
 
+// A room together with the building that contains it.
+struct RoomRef {
+    const Building* building{};
+    const Room* room{};
+};
+
+// Lookup from room ids to rooms. Derived from a City and never saved; it
+// points into the City, which must outlive it and not change.
+class RoomIndex {
+public:
+    explicit RoomIndex(const City& city);
+    [[nodiscard]] std::optional<RoomRef> Find(EntityId room) const;
+    // Every room of `kind`, in id order.
+    [[nodiscard]] const std::vector<RoomRef>& RoomsOfKind(RoomKind kind) const;
+
+private:
+    std::unordered_map<std::uint64_t, RoomRef> rooms_;
+    std::unordered_map<std::uint8_t, std::vector<RoomRef>> byKind_;
+};
+
 struct CityParams {
     // Intersections per side of the square street grid.
     std::uint32_t gridSize{8};
     std::uint32_t blockMeters{120};
-    // Habitats and workplaces are added until both can hold this many.
+    // Apartments and workspaces are added until both hold this many.
     std::uint32_t residents{100};
 };
 
@@ -69,8 +115,9 @@ struct EntityIdAllocator {
     EntityId Allocate() noexcept { return EntityId{next++}; }
 };
 
-// Builds a connected street grid with a few missing segments, residential
-// habitats concentrated in the west and workplaces in the east.
+// Builds a connected street grid with a few missing segments. Habitats,
+// concentrated in the west, have stores on the ground floor and apartments
+// above; workplaces in the east are split into workspaces over their floors.
 [[nodiscard]] City GenerateCity(const CityParams& params, Pcg32& random,
                                 EntityIdAllocator& ids);
 

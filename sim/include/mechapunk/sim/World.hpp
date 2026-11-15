@@ -5,39 +5,49 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Ids.hpp"
 #include "mechapunk/sim/Random.hpp"
+#include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk::sim {
 
 enum class RobotActivity : std::uint8_t {
-    AtHome,
-    CommutingToWork,
-    Working,
-    CommutingHome,
+    Resting,   // In its apartment.
+    Walking,   // On the way from `location` to `destination`.
+    Working,   // In its workspace.
+    Visiting,  // In a venue.
 };
 
 struct Robot {
     EntityId id;
     std::string name;
-    EntityId home;
-    EntityId workplace;
-    RobotActivity activity{RobotActivity::AtHome};
-    // Tick of the next scheduled change: leaving, arriving or ending a shift.
+    EntityId apartment;  // Room the robot lives in.
+    EntityId workspace;  // Room the robot works in.
+    RobotActivity activity{RobotActivity::Resting};
+    // Room the robot is in, or has just left while walking.
+    EntityId location;
+    // Room the robot is walking to; none unless walking.
+    EntityId destination;
+    Tick departedAt{};
+    // Tick of the next scheduled change: leaving, arriving, ending a shift
+    // or ending a visit.
     Tick nextActionAt{};
-    // Start of the shift the robot is heading to or working.
+    // Start of the shift the robot is heading to, working, or last worked.
     Tick shiftStartsAt{};
     // Personal habit: minutes the robot aims to arrive before its shift.
     std::uint32_t punctualityMinutes{};
+    Needs needs;
+    std::int64_t credits{};
 };
 
 // Everything that defines a running world. This is exactly what a save
-// contains; caches such as routes are rebuilt after loading. Robots are kept
-// sorted by id.
+// contains; caches such as routes and room lookups are rebuilt after
+// loading. Robots are kept sorted by id.
 struct WorldState {
     Tick tick{};
     std::uint64_t seed{};
@@ -52,8 +62,8 @@ struct WorldParams {
     std::uint32_t robots{100};
 };
 
-// A walk in progress, derived from a robot's state; not saved separately.
-struct Commute {
+// A walk in progress, between two rooms.
+struct Walk {
     EntityId from;
     EntityId to;
     Tick departedAt{};
@@ -61,10 +71,11 @@ struct Commute {
 };
 
 enum class EventKind : std::uint8_t {
-    LeftHome,
-    ArrivedAtWork,
-    LeftWork,
-    ArrivedHome,
+    Departed,        // room: left; otherRoom: heading to; minutes: walk.
+    ClockedIn,       // room: workspace; minutes: late by.
+    ShiftEnded,      // room: workspace; credits: wage earned.
+    ArrivedAtVenue,  // room: venue; credits: price; minutes: planned stay.
+    ArrivedHome,     // room: apartment.
 };
 
 // Something that happened during a step, for logs and observers. Events are
@@ -73,21 +84,27 @@ struct SimEvent {
     Tick tick{};
     EventKind kind{};
     EntityId robot;
-    // Building the robot left or arrived at.
-    EntityId place;
-    // Destination when leaving; the place it came from when arriving.
-    EntityId otherPlace;
-    // Walking time when leaving; minutes after shift start when arriving
-    // at work late (0 when on time).
+    EntityId room;
+    EntityId otherRoom;
     std::uint32_t minutes{};
+    std::int64_t credits{};
+    // Other robots already in the room on arrival.
+    std::uint32_t others{};
 };
 
 // Deterministic simulation of the city. The same WorldState always produces
 // the same sequence of states and events, on every platform: all state is
 // integral and randomness comes from the saved Pcg32.
+//
+// Each step is one game minute. Robots work fixed shifts; after work they
+// weigh their needs, credits, walking time and opening hours to pick a venue
+// or go home, and they head home in time to rest before the next shift.
 class World {
 public:
     using EventSink = std::function<void(const SimEvent&)>;
+
+    // Minutes at home a robot keeps free before leaving for its next shift.
+    static constexpr Tick kRestMinutes = 6 * kMinutesPerHour;
 
     // Builds a new city and population from a seed.
     [[nodiscard]] static World Generate(const WorldParams& params);
@@ -95,14 +112,26 @@ public:
     [[nodiscard]] static std::expected<World, std::string> FromState(
         WorldState state);
 
+    // Derived lookups point into the state, so a World can be moved but not
+    // copied.
+    World(World&&) noexcept = default;
+    World& operator=(World&&) noexcept = default;
+    World(const World&) = delete;
+    World& operator=(const World&) = delete;
+    ~World() = default;
+
     [[nodiscard]] const WorldState& State() const noexcept { return state_; }
     [[nodiscard]] Tick CurrentTick() const noexcept { return state_.tick; }
     [[nodiscard]] const Robot* FindRobot(EntityId id) const noexcept;
+    [[nodiscard]] const RoomIndex& Rooms() const noexcept { return rooms_; }
+    // Robots in a venue right now, not counting those still on their way.
+    [[nodiscard]] std::uint32_t GuestsIn(EntityId room) const;
 
-    // The walk a commuting robot is on; nothing for robots at home or work.
-    [[nodiscard]] std::optional<Commute> CommuteOf(const Robot& robot);
-    // Walking time between two buildings' entrances, in whole minutes.
-    [[nodiscard]] std::uint32_t WalkingMinutes(EntityId from, EntityId to);
+    // The walk a robot is on; nothing unless it is walking.
+    [[nodiscard]] static std::optional<Walk> WalkOf(const Robot& robot);
+    // Walking time between two rooms, in whole minutes, including stairs.
+    [[nodiscard]] std::uint32_t WalkingMinutes(EntityId fromRoom,
+                                               EntityId toRoom);
 
     // Receives every event produced by later steps.
     void SetEventSink(EventSink sink) { sink_ = std::move(sink); }
@@ -111,18 +140,32 @@ public:
     void Step();
     void RunFor(Tick minutes);
 
-    // "Day 2 07:41  KX-417 Vera left Hab Block 3 for Foundry 1 (19 min walk)"
+    // "Day 2 19:41  KX-417 Vera arrived at Neon Wok (noodle diner, Hab Block
+    // 3), paid 10 cr, 4 others there"
     [[nodiscard]] std::string Describe(const SimEvent& event) const;
+    // "Neon Wok (noodle diner, Hab Block 3)" or "Apartment 4-02, Hab Block 3"
+    [[nodiscard]] std::string DescribeRoom(EntityId room) const;
 
 private:
     explicit World(WorldState state);
 
-    void UpdateRobot(Robot& robot);
+    void UpdateNeeds();
+    void Act(Robot& robot);
+    void Arrive(Robot& robot);
+    void Decide(Robot& robot);
+    void StartWalk(Robot& robot, EntityId destination);
     void ScheduleNextCommute(Robot& robot);
+    [[nodiscard]] Tick LatestHomeTick(const Robot& robot);
+    [[nodiscard]] const Building& WorkplaceOf(const Robot& robot) const;
     void Emit(const SimEvent& event) const;
 
     WorldState state_;
     RoutePlanner routes_;
+    RoomIndex rooms_;
+    // Robots in or heading to each venue room, for capacity checks.
+    std::unordered_map<std::uint64_t, std::uint32_t> reserved_;
+    // Robots inside each venue room.
+    std::unordered_map<std::uint64_t, std::uint32_t> guests_;
     EventSink sink_;
 };
 

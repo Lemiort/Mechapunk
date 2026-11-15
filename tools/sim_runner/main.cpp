@@ -3,11 +3,14 @@
 //   mechapunk-sim --seed 42 --robots 200 --days 3 --save city.json
 //   mechapunk-sim --load city.json --days 1 --follow 5
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <charconv>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
+#include <format>
+#include <map>
 #include <optional>
 #include <print>
 #include <span>
@@ -18,6 +21,7 @@
 
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Save.hpp"
+#include "mechapunk/sim/Venues.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace sim = mechapunk::sim;
@@ -123,47 +127,74 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
 }
 
 struct DayStats {
-    std::uint64_t commutes{};
-    std::uint64_t commuteMinutes{};
+    std::uint64_t walks{};
+    std::uint64_t walkMinutes{};
     std::uint64_t lateArrivals{};
+    std::uint64_t wages{};
+    std::uint64_t spent{};
+    std::map<std::string, std::uint64_t> visitsByKind;
 
-    void Add(const sim::SimEvent& event) {
-        if (event.kind == sim::EventKind::LeftHome ||
-            event.kind == sim::EventKind::LeftWork) {
-            ++commutes;
-            commuteMinutes += event.minutes;
-        } else if (event.kind == sim::EventKind::ArrivedAtWork &&
-                   event.minutes > 0) {
-            ++lateArrivals;
+    void Add(const sim::World& world, const sim::SimEvent& event) {
+        switch (event.kind) {
+            case sim::EventKind::Departed:
+                ++walks;
+                walkMinutes += event.minutes;
+                break;
+            case sim::EventKind::ClockedIn:
+                lateArrivals += event.minutes > 0 ? 1 : 0;
+                break;
+            case sim::EventKind::ShiftEnded:
+                wages += static_cast<std::uint64_t>(event.credits);
+                break;
+            case sim::EventKind::ArrivedAtVenue: {
+                spent += static_cast<std::uint64_t>(event.credits);
+                const auto room = world.Rooms().Find(event.room);
+                const sim::VenueRules* rules =
+                    room ? sim::FindVenueRules(room->room->kind) : nullptr;
+                ++visitsByKind[rules != nullptr ? std::string{rules->label}
+                                                : "?"];
+                break;
+            }
+            case sim::EventKind::ArrivedHome:
+                break;
         }
     }
 };
 
 void PrintSummary(std::uint64_t day, const sim::World& world,
                   const DayStats& stats) {
-    std::uint64_t home = 0;
-    std::uint64_t working = 0;
-    std::uint64_t commuting = 0;
+    std::array<std::uint64_t, 4> activities{};
+    std::int64_t charge = 0;
+    std::int64_t condition = 0;
+    std::int64_t social = 0;
+    std::int64_t fun = 0;
+    std::int64_t credits = 0;
     for (const sim::Robot& robot : world.State().robots) {
-        switch (robot.activity) {
-            case sim::RobotActivity::AtHome:
-                ++home;
-                break;
-            case sim::RobotActivity::Working:
-                ++working;
-                break;
-            default:
-                ++commuting;
-                break;
-        }
+        ++activities.at(static_cast<std::size_t>(robot.activity));
+        charge += robot.needs.charge;
+        condition += robot.needs.condition;
+        social += robot.needs.social;
+        fun += robot.needs.fun;
+        credits += robot.credits;
     }
-    const std::uint64_t average =
-        stats.commutes == 0 ? 0 : stats.commuteMinutes / stats.commutes;
+    const auto count = std::max<std::int64_t>(
+        1, static_cast<std::int64_t>(world.State().robots.size()));
+    std::string visits;
+    for (const auto& [label, number] : stats.visitsByKind) {
+        visits += std::format("{}{} {}", visits.empty() ? "" : ", ", number,
+                              label);
+    }
     std::println(
-        "== Day {} done: {} commutes, {} min average walk, {} late arrivals; "
-        "now {} at home, {} working, {} commuting",
-        day, stats.commutes, average, stats.lateArrivals, home, working,
-        commuting);
+        "== Day {} done: {} walks ({} min average), {} late, {} cr earned, {} "
+        "cr spent\n   visits: {}\n   now {} resting, {} working, {} visiting, "
+        "{} walking; average charge {}, condition {}, social {}, fun {}, "
+        "credits {}",
+        day, stats.walks,
+        stats.walks == 0 ? 0 : stats.walkMinutes / stats.walks,
+        stats.lateArrivals, stats.wages, stats.spent,
+        visits.empty() ? "none" : visits, activities[0], activities[2],
+        activities[3], activities[1], charge / count, condition / count,
+        social / count, fun / count, credits / count);
 }
 
 
@@ -213,7 +244,7 @@ int Run(std::span<char*> arguments) {
 
     DayStats stats;
     world->SetEventSink([&](const sim::SimEvent& event) {
-        stats.Add(event);
+        stats.Add(*world, event);
         const bool show =
             !options->quiet &&
             (options->all || std::ranges::find(followed, event.robot) !=
