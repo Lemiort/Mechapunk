@@ -26,6 +26,10 @@ constexpr std::uint32_t kStreetRemovalOdds = 10;
 constexpr std::uint32_t kMinApartments = 30;
 constexpr std::uint32_t kMaxApartments = 60;
 constexpr std::uint32_t kApartmentsPerFloor = 6;
+// Daily rent of a habitat's lowest apartments; each floor up costs a credit
+// more.
+constexpr std::uint32_t kMinBaseRent = 25;
+constexpr std::uint32_t kMaxBaseRent = 40;
 constexpr std::uint32_t kMinStores = 1;
 constexpr std::uint32_t kMaxStores = 3;
 constexpr std::uint32_t kMinWorkplaceJobs = 15;
@@ -136,6 +140,7 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
     }
     const std::uint32_t apartments =
         random.UniformInt(kMinApartments, kMaxApartments);
+    const std::uint32_t baseRent = random.UniformInt(kMinBaseRent, kMaxBaseRent);
     for (std::uint32_t index = 0; index < apartments; ++index) {
         const std::uint32_t floor = 1 + (index / kApartmentsPerFloor);
         building.rooms.push_back(
@@ -144,7 +149,8 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
                                  (index % kApartmentsPerFloor) + 1),
              .kind = RoomKind::Apartment,
              .floor = floor,
-             .capacity = 1});
+             .capacity = 1,
+             .rent = baseRent + floor});
         building.floors = floor + 1;
     }
     return building;

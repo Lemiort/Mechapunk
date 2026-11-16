@@ -22,8 +22,8 @@ namespace mechapunk::sim {
 // Any change to them needs a new kCurrentSaveVersion, a migration from the
 // previous version, and a new fixture under tests/fixtures/saves.
 inline constexpr std::string_view kSaveFormatName = "mechapunk-save";
-inline constexpr std::uint32_t kCurrentSaveVersion = 2;
-inline constexpr std::string_view kGameVersion = "0.2.0";
+inline constexpr std::uint32_t kCurrentSaveVersion = 3;
+inline constexpr std::string_view kGameVersion = "0.3.0";
 
 // Untyped JSON tree of the "world" object, which migrations edit. Keys are
 // sorted and 64-bit integers are kept exactly.

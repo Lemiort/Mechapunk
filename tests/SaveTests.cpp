@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <expected>
 #include <filesystem>
 #include <fstream>
@@ -174,7 +175,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v2-city.json";
+        kFixtureDirectory / "saves" / "v3-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -224,6 +225,41 @@ TEST(Save, Version1FixtureMigratesAndRuns) {
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(visits, 0U);
     // Saving the migrated world writes the current version.
-    EXPECT_NE(Serialize(world->State()).find("\"version\": 2"),
+    EXPECT_NE(Serialize(world->State()).find("\"version\": 3"),
               std::string::npos);
+}
+
+// A version 2 save (rooms, no rent or days off) loads through one migration:
+// every apartment gets rent, every robot two days off, and the city keeps
+// collecting rent and taking days off.
+TEST(Save, Version2FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v2-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    for (const sim::Building& building : state->city.buildings) {
+        for (const sim::Room& room : building.rooms) {
+            EXPECT_EQ(room.rent > 0, room.kind == sim::RoomKind::Apartment)
+                << room.name;
+        }
+    }
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_EQ(std::popcount(static_cast<unsigned>(robot.daysOff)), 2)
+            << robot.name;
+        if (robot.activity == sim::RobotActivity::Resting) {
+            EXPECT_EQ(robot.commuteAt, robot.nextActionAt) << robot.name;
+        }
+    }
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    std::uint64_t rentPaid = 0;
+    world->SetEventSink([&](const sim::SimEvent& event) {
+        rentPaid += event.kind == sim::EventKind::RentPaid ? 1 : 0;
+    });
+    world->RunFor(3 * sim::kMinutesPerDay);
+    EXPECT_GT(rentPaid, 0U);
 }

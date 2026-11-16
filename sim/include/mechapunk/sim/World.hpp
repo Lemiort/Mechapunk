@@ -41,8 +41,14 @@ struct Robot {
     Tick shiftStartsAt{};
     // Personal habit: minutes the robot aims to arrive before its shift.
     std::uint32_t punctualityMinutes{};
+    // Bit d set: no shift starts on day of the week d (0 = Monday).
+    std::uint8_t daysOff{};
+    // When the robot leaves home for its next shift; planned on getting home.
+    Tick commuteAt{};
     Needs needs;
     std::int64_t credits{};
+    // Rent not yet paid; collected from later credits first.
+    std::int64_t rentOwed{};
 };
 
 // Everything that defines a running world. This is exactly what a save
@@ -76,6 +82,8 @@ enum class EventKind : std::uint8_t {
     ShiftEnded,      // room: workspace; credits: wage earned.
     ArrivedAtVenue,  // room: venue; credits: price; minutes: planned stay.
     ArrivedHome,     // room: apartment.
+    RentPaid,        // room: apartment; credits: paid.
+    RentMissed,      // room: apartment; credits: now owed in total.
 };
 
 // Something that happened during a step, for logs and observers. Events are
@@ -105,6 +113,8 @@ public:
 
     // Minutes at home a robot keeps free before leaving for its next shift.
     static constexpr Tick kRestMinutes = 6 * kMinutesPerHour;
+    // Every night ends at home by this minute of the day, 03:30.
+    static constexpr Tick kBedtimeMinute = (3 * kMinutesPerHour) + 30;
 
     // Builds a new city and population from a seed.
     [[nodiscard]] static World Generate(const WorldParams& params);
@@ -156,6 +166,16 @@ private:
     void StartWalk(Robot& robot, EntityId destination);
     void ScheduleNextCommute(Robot& robot);
     [[nodiscard]] Tick LatestHomeTick(const Robot& robot);
+    void CollectRent();
+    // Sets when a robot at home next acts: an outing on a free day, or
+    // leaving for work.
+    void PlanAtHome(Robot& robot);
+    [[nodiscard]] static bool IsDayOff(const Robot& robot, Tick tick) noexcept;
+    // First shift start after `after` that is not on a day off.
+    [[nodiscard]] Tick NextShiftStart(const Robot& robot, Tick after) const;
+    // Longest time the robot may need between leaving home and its shift.
+    [[nodiscard]] Tick MaxCommuteLead(const Robot& robot);
+    [[nodiscard]] std::int64_t RentOf(const Robot& robot) const;
     [[nodiscard]] const Building& WorkplaceOf(const Robot& robot) const;
     void Emit(const SimEvent& event) const;
 

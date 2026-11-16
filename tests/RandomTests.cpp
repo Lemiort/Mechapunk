@@ -50,9 +50,12 @@ TEST(Pcg32, UniformIntStaysInRangeAndCoversIt) {
 }
 
 TEST(GameTime, FormatsDaysAndClock) {
-    EXPECT_EQ(sim::FormatTime(0), "Day 1 00:00");
+    EXPECT_EQ(sim::FormatTime(0), "Day 1 Mon 00:00");
     EXPECT_EQ(sim::FormatTime((2 * sim::kMinutesPerDay) + (7 * 60) + 42),
-              "Day 3 07:42");
+              "Day 3 Wed 07:42");
+    EXPECT_EQ(sim::DayOfWeek(6 * sim::kMinutesPerDay), 6U);
+    EXPECT_EQ(sim::DayOfWeek(7 * sim::kMinutesPerDay), 0U);
+    EXPECT_EQ(sim::WeekdayName(6), "Sun");
     EXPECT_EQ(sim::MinuteOfDay(sim::kMinutesPerDay + 5), 5U);
     EXPECT_EQ(sim::StartOfDay(sim::kMinutesPerDay + 5), sim::kMinutesPerDay);
 }

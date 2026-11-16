@@ -15,4 +15,8 @@ namespace mechapunk::sim::migrations {
 // will keep changing while old saves must keep loading the same way.
 [[nodiscard]] std::expected<void, std::string> V1ToV2(SaveDocument& world);
 
+// Version 2 to 3: apartments get a daily rent, robots get two days off a
+// week, a planned departure for work, and rent owed.
+[[nodiscard]] std::expected<void, std::string> V2ToV3(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

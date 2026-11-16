@@ -175,4 +175,36 @@ std::expected<void, std::string> V1ToV2(SaveDocument& world) try {
         std::format("the version 1 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V2ToV3(SaveDocument& world) try {
+    // Rent of a version 2 apartment: a flat base plus a credit per floor.
+    constexpr std::uint64_t kBaseRent = 30;
+    constexpr std::uint64_t kDaysPerWeek = 7;
+
+    for (SaveDocument& building : world["city"]["buildings"].get_array()) {
+        for (SaveDocument& room : building["rooms"].get_array()) {
+            const bool apartment = room["kind"].get_string() == "apartment";
+            room["rent"] = apartment
+                               ? kBaseRent + room["floor"].as<std::uint64_t>()
+                               : std::uint64_t{0};
+        }
+    }
+    for (SaveDocument& robot : world["robots"].get_array()) {
+        // Two consecutive days off, spread over the week by robot id.
+        const std::uint64_t first =
+            robot["id"].as<std::uint64_t>() % kDaysPerWeek;
+        robot["daysOff"] = (std::uint64_t{1} << first) |
+                           (std::uint64_t{1} << ((first + 1) % kDaysPerWeek));
+        // A robot at home was already waiting to leave for work; others plan
+        // their departure when they next get home.
+        robot["commuteAt"] = robot["activity"].get_string() == "resting"
+                                 ? robot["nextActionAt"].as<std::uint64_t>()
+                                 : std::uint64_t{0};
+        robot["rentOwed"] = std::int64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 2 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

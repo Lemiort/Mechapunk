@@ -109,7 +109,11 @@ std::string Activity(const CityView& city, const RobotFrame& robot) {
     const std::string until = sim::FormatClock(sim::MinuteOfDay(robot.nextActionAt));
     switch (robot.activity) {
         case sim::RobotActivity::Resting:
-            return std::format("Resting at home, leaves for work at {}", until);
+            return robot.nextActionAt < robot.commuteAt
+                       ? std::format("Resting at home, going out around {}",
+                                     until)
+                       : std::format("Resting at home, leaves for work at {}",
+                                     until);
         case sim::RobotActivity::Working:
             return std::format("Working at {} until {}",
                                RoomLabel(city, robot.location), until);
@@ -164,9 +168,16 @@ void DescribeRobot(Panel& panel, const RobotFrame& robot,
     need("Social", robot.needs.social);
     need("Fun", robot.needs.fun);
     panel.Line(std::format("Credits   {}", robot.credits));
+    if (robot.rentOwed > 0) {
+        panel.Line(std::format("Behind on rent: owes {} cr", robot.rentOwed),
+                   kWarning);
+    }
     panel.Gap();
     if (info != nullptr) {
-        panel.Line(std::format("Home: {}", RoomLabel(city, info->apartment)),
+        const auto home = city.Rooms().Find(info->apartment);
+        panel.Line(std::format("Home: {}, {} cr a night",
+                               RoomLabel(city, info->apartment),
+                               home ? home->room->rent : 0),
                    kDim);
         const auto work = city.Rooms().Find(info->workspace);
         if (work) {
@@ -180,6 +191,14 @@ void DescribeRobot(Panel& panel, const RobotFrame& robot,
                             shift.wage),
                 kDim);
         }
+        std::string daysOff;
+        for (std::uint32_t day = 0; day < sim::kDaysPerWeek; ++day) {
+            if (((info->daysOff >> day) & 1U) != 0) {
+                daysOff += std::format("{}{}", daysOff.empty() ? "" : ", ",
+                                       sim::WeekdayName(day));
+            }
+        }
+        panel.Line(std::format("Days off: {}", daysOff), kDim);
     }
     panel.Gap();
     panel.Line("Recent", kHeading);
@@ -261,7 +280,7 @@ void DescribeBuilding(Panel& panel, const Selection& selection,
             inside != occupants.end() ? inside->second.size() : 0;
         if (room.kind == sim::RoomKind::Apartment) {
             panel.Line(std::format(
-                "{}: {}", room.name,
+                "{} ({} cr): {}", room.name, room.rent,
                 count > 0 ? std::string{Name(host, inside->second.front()->id)}
                           : std::string{"nobody home"}),
                 count > 0 ? glm::vec4{0.85F, 0.88F, 0.95F, 1.0F} : kDim);

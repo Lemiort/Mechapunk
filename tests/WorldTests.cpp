@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <bit>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -71,13 +72,14 @@ TEST(World, RobotsWorkEveryDayOnTime) {
             }
         }
     });
-    world.RunFor(4 * sim::kMinutesPerDay);
+    world.RunFor(7 * sim::kMinutesPerDay);
     EXPECT_EQ(late, 0U);
     EXPECT_EQ(wrongLengths, 0U);
     ASSERT_EQ(shifts.size(), 150U);
     for (const auto& [robot, count] : shifts) {
-        // Three full shifts in four days, whatever the shift hours.
-        EXPECT_GE(count, 3U) << "robot " << robot;
+        // Five working days a week; the last night shift may still be
+        // running when the week ends.
+        EXPECT_GE(count, 4U) << "robot " << robot;
     }
 }
 
@@ -132,24 +134,111 @@ TEST(World, EveningsAreSpentInOpenVenuesWithinCapacity) {
     EXPECT_GE(visits.size(), 4U);
 }
 
-TEST(World, CreditsAreWagesMinusPrices) {
+TEST(World, CreditsAreWagesMinusPricesAndRent) {
     sim::World world = sim::World::Generate({.seed = 11, .robots = 100});
     std::map<std::uint64_t, std::int64_t> expected;
+    std::map<std::uint64_t, std::int64_t> rentDue;
     for (const sim::Robot& robot : world.State().robots) {
         expected[robot.id.value] = robot.credits;
+        rentDue[robot.id.value] =
+            world.Rooms().Find(robot.apartment)->room->rent;
     }
+    std::map<std::uint64_t, std::int64_t> rentPaid;
+    std::uint64_t nights = 0;
     world.SetEventSink([&](const sim::SimEvent& event) {
         if (event.kind == sim::EventKind::ShiftEnded) {
             expected[event.robot.value] += event.credits;
         } else if (event.kind == sim::EventKind::ArrivedAtVenue) {
             expected[event.robot.value] -= event.credits;
+        } else if (event.kind == sim::EventKind::RentPaid) {
+            EXPECT_EQ(sim::MinuteOfDay(event.tick), 0U);
+            expected[event.robot.value] -= event.credits;
+            rentPaid[event.robot.value] += event.credits;
         }
     });
-    world.RunFor(3 * sim::kMinutesPerDay);
+    for (sim::Tick day = 0; day < 6; ++day) {
+        world.RunFor(sim::kMinutesPerDay);
+        ++nights;
+    }
     for (const sim::Robot& robot : world.State().robots) {
         EXPECT_EQ(robot.credits, expected[robot.id.value]) << robot.name;
         EXPECT_GE(robot.credits, 0) << robot.name;
+        // Every night's rent is either paid or still owed.
+        EXPECT_EQ(rentPaid[robot.id.value] + robot.rentOwed,
+                  rentDue[robot.id.value] * static_cast<std::int64_t>(nights))
+            << robot.name;
     }
+}
+
+TEST(World, RobotsKeepABudgetForRent) {
+    sim::World world = sim::World::Generate({.seed = 14, .robots = 150});
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind != sim::EventKind::ArrivedAtVenue) {
+            return;
+        }
+        // The price is already paid on arrival; what is left must cover
+        // tonight's rent and anything owed.
+        const sim::Robot* robot = world.FindRobot(event.robot);
+        const std::int64_t rent =
+            world.Rooms().Find(robot->apartment)->room->rent;
+        EXPECT_GE(robot->credits, rent + robot->rentOwed) << robot->name;
+    });
+    world.RunFor(7 * sim::kMinutesPerDay);
+}
+
+TEST(World, NobodyWorksOnTheirDaysOff) {
+    sim::World world = sim::World::Generate({.seed = 15, .robots = 150});
+    std::map<std::uint64_t, std::uint32_t> shifts;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind != sim::EventKind::ClockedIn) {
+            return;
+        }
+        const sim::Robot* robot = world.FindRobot(event.robot);
+        const std::uint32_t day = sim::DayOfWeek(robot->shiftStartsAt);
+        EXPECT_EQ((robot->daysOff >> day) & 1U, 0U)
+            << robot->name << " worked on " << sim::WeekdayName(day);
+        ++shifts[event.robot.value];
+    });
+    world.RunFor(14 * sim::kMinutesPerDay);
+    for (const sim::Robot& robot : world.State().robots) {
+        EXPECT_EQ(std::popcount(static_cast<unsigned>(robot.daysOff)), 2)
+            << robot.name;
+        // Five working days a week, give or take the first and last shift.
+        EXPECT_GE(shifts[robot.id.value], 9U) << robot.name;
+        EXPECT_LE(shifts[robot.id.value], 11U) << robot.name;
+    }
+}
+
+TEST(World, DaysOffAreSpentOutAndNightsAtHome) {
+    sim::World world = sim::World::Generate({.seed = 16, .robots = 150});
+    std::uint64_t dayOffVisits = 0;
+    std::map<std::uint64_t, bool> out;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        const sim::Robot* robot = world.FindRobot(event.robot);
+        if (event.kind == sim::EventKind::ArrivedAtVenue) {
+            out[event.robot.value] = true;
+            const std::uint32_t minute = sim::MinuteOfDay(event.tick);
+            const bool dayOff =
+                ((robot->daysOff >> sim::DayOfWeek(event.tick)) & 1U) != 0;
+            if (dayOff && minute >= 9 * 60 && minute < 18 * 60) {
+                ++dayOffVisits;
+            }
+        } else if (event.kind == sim::EventKind::ArrivedHome) {
+            out[event.robot.value] = false;
+        }
+    });
+    for (sim::Tick minute = 0; minute < 14 * sim::kMinutesPerDay; ++minute) {
+        world.Step();
+        // By 04:00 everyone who went out has come home.
+        if (sim::MinuteOfDay(world.CurrentTick()) == 4 * 60) {
+            for (const sim::Robot& robot : world.State().robots) {
+                EXPECT_NE(robot.activity, sim::RobotActivity::Visiting)
+                    << robot.name << " at "
+                    << sim::FormatTime(world.CurrentTick());
+            }
+        }
+    }
+    EXPECT_GT(dayOffVisits, 300U);
 }
 
 TEST(World, NeedsStayInRangeOverWeeks) {

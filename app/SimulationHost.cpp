@@ -37,7 +37,8 @@ SimulationHost::SimulationHost(sim::World world)
         robotInfo_.emplace(robot.id.value,
                            RobotInfo{.name = robot.name,
                                      .apartment = robot.apartment,
-                                     .workspace = robot.workspace});
+                                     .workspace = robot.workspace,
+                                     .daysOff = robot.daysOff});
     }
     // Runs on the worker inside World::Step, where reading the world is safe.
     world_.SetEventSink([this](const sim::SimEvent& event) { Record(event); });
@@ -183,8 +184,10 @@ void SimulationHost::Publish() {
                               .destination = robot.destination,
                               .nextActionAt = robot.nextActionAt,
                               .shiftStartsAt = robot.shiftStartsAt,
+                              .commuteAt = robot.commuteAt,
                               .needs = robot.needs,
-                              .credits = robot.credits};
+                              .credits = robot.credits,
+                              .rentOwed = robot.rentOwed};
         switch (robot.activity) {
             case sim::RobotActivity::Resting:
                 ++frame.resting;

@@ -132,6 +132,8 @@ struct DayStats {
     std::uint64_t lateArrivals{};
     std::uint64_t wages{};
     std::uint64_t spent{};
+    std::uint64_t rent{};
+    std::uint64_t behindOnRent{};
     std::map<std::string, std::uint64_t> visitsByKind;
 
     void Add(const sim::World& world, const sim::SimEvent& event) {
@@ -156,6 +158,12 @@ struct DayStats {
                 break;
             }
             case sim::EventKind::ArrivedHome:
+                break;
+            case sim::EventKind::RentPaid:
+                rent += static_cast<std::uint64_t>(event.credits);
+                break;
+            case sim::EventKind::RentMissed:
+                ++behindOnRent;
                 break;
         }
     }
@@ -186,12 +194,13 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
     }
     std::println(
         "== Day {} done: {} walks ({} min average), {} late, {} cr earned, {} "
-        "cr spent\n   visits: {}\n   now {} resting, {} working, {} visiting, "
-        "{} walking; average charge {}, condition {}, social {}, fun {}, "
-        "credits {}",
+        "cr spent, {} cr rent, {} behind on rent\n   visits: {}\n   now {} "
+        "resting, {} working, {} visiting, {} walking; average charge {}, "
+        "condition {}, social {}, fun {}, credits {}",
         day, stats.walks,
         stats.walks == 0 ? 0 : stats.walkMinutes / stats.walks,
-        stats.lateArrivals, stats.wages, stats.spent,
+        stats.lateArrivals, stats.wages, stats.spent, stats.rent,
+        stats.behindOnRent,
         visits.empty() ? "none" : visits, activities[0], activities[2],
         activities[3], activities[1], charge / count, condition / count,
         social / count, fun / count, credits / count);

@@ -66,6 +66,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 1,
               .summary = "rooms, needs and credits",
               .apply = &migrations::V1ToV2},
+    Migration{.fromVersion = 2,
+              .summary = "rent and days off",
+              .apply = &migrations::V2ToV3},
 };
 }  // namespace
 

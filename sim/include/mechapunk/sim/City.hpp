@@ -50,6 +50,8 @@ struct Room {
     std::uint32_t floor{};
     // Residents of an apartment, workers of a workspace, guests of a venue.
     std::uint32_t capacity{};
+    // Credits charged every midnight; apartments only.
+    std::uint32_t rent{};
 };
 
 // Daily working hours of a workplace.

@@ -32,6 +32,16 @@ constexpr std::uint32_t kMinSerialNumber = 100;
 constexpr std::uint32_t kMaxSerialNumber = 999;
 constexpr std::int32_t kMinStartingNeed = 550;
 constexpr std::int32_t kMaxStartingNeed = 950;
+// A day off starts no earlier than this and may start up to two hours later.
+constexpr Tick kOutingEarliestMinute = 9 * kMinutesPerHour;
+constexpr std::uint32_t kOutingSpreadMinutes = 120;
+// No new outings from home after this minute of the day.
+constexpr Tick kLastOutingMinute = 20 * kMinutesPerHour;
+// A break at home between outings on a free day.
+constexpr std::uint32_t kMinHomeBreak = 90;
+constexpr std::uint32_t kMaxHomeBreak = 240;
+// An outing needs at least this long before the robot must be back.
+constexpr Tick kMinOutingMinutes = 60;
 constexpr std::uint32_t kMinStartingCredits = 40;
 constexpr std::uint32_t kMaxStartingCredits = 200;
 // Needs change every this many minutes.
@@ -60,6 +70,9 @@ constexpr Tick kBedtimeWindow = 2 * kMinutesPerHour;
 constexpr std::int64_t kWalkCostPerMinute = 6;
 constexpr std::int64_t kPriceCostPerCredit = 3;
 constexpr std::uint32_t kMaxWhim = 80;
+// Going straight from one venue to another of the same kind is less
+// appealing than trying something different.
+constexpr std::int64_t kSameKindPenalty = 150;
 
 constexpr std::array<std::string_view, 8> kModelPrefixes{
     "KX", "VR", "NE", "TS", "OM", "ZR", "HK", "LU"};
@@ -172,6 +185,12 @@ World World::Generate(const WorldParams& params) {
                        .social = need(), .fun = need()};
         robot.credits = population.UniformInt(kMinStartingCredits,
                                               kMaxStartingCredits);
+        // Two consecutive days off a week, different for each robot, so
+        // workplaces stay staffed every day.
+        const std::uint32_t firstDayOff =
+            population.UniformInt(0, kDaysPerWeek - 1);
+        robot.daysOff = static_cast<std::uint8_t>(
+            (1U << firstDayOff) | (1U << ((firstDayOff + 1) % kDaysPerWeek)));
         state.robots.push_back(std::move(robot));
     }
 
@@ -241,6 +260,9 @@ std::uint32_t World::WalkingMinutes(EntityId fromRoom, EntityId toRoom) {
 
 void World::Step() {
     ++state_.tick;
+    if (MinuteOfDay(state_.tick) == 0) {
+        CollectRent();
+    }
     if (state_.tick % kNeedPeriod == 0) {
         UpdateNeeds();
     }
@@ -295,7 +317,11 @@ void World::UpdateNeeds() {
 void World::Act(Robot& robot) {
     switch (robot.activity) {
         case RobotActivity::Resting:
-            StartWalk(robot, robot.workspace);
+            if (state_.tick >= robot.commuteAt) {
+                StartWalk(robot, robot.workspace);
+            } else {
+                Decide(robot);  // Time off: go out, or stay in a while.
+            }
             break;
         case RobotActivity::Walking:
             Arrive(robot);
@@ -388,9 +414,13 @@ void World::Decide(Robot& robot) {
     }
     EntityId best = robot.apartment;
 
+    // Keep enough for tonight's rent and anything already owed.
+    const std::int64_t reserve = RentOf(robot) + robot.rentOwed;
+    const auto here = rooms_.Find(robot.location);
+    const RoomKind hereKind = here ? here->room->kind : RoomKind::Apartment;
     for (const RoomKind kind : VenueKinds()) {
         const VenueRules& rules = *FindVenueRules(kind);
-        if (robot.credits < static_cast<std::int64_t>(rules.price)) {
+        if (robot.credits - static_cast<std::int64_t>(rules.price) < reserve) {
             continue;
         }
         for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
@@ -421,13 +451,18 @@ void World::Decide(Robot& robot) {
             const std::int64_t score =
                 Relief(robot.needs, effects, periods) -
                 (kWalkCostPerMinute * walk) -
-                (kPriceCostPerCredit * rules.price) +
+                (kPriceCostPerCredit * rules.price) -
+                (kind == hereKind ? kSameKindPenalty : 0) +
                 state_.random.UniformInt(0, kMaxWhim);
             if (score > bestScore) {
                 bestScore = score;
                 best = room.id;
             }
         }
+    }
+    if (best == robot.location) {
+        PlanAtHome(robot);  // Already home and staying in.
+        return;
     }
     StartWalk(robot, best);
 }
@@ -451,28 +486,107 @@ void World::StartWalk(Robot& robot, EntityId destination) {
 }
 
 void World::ScheduleNextCommute(Robot& robot) {
-    const Building& work = WorkplaceOf(robot);
     const Tick now = state_.tick;
     const Tick lead = WalkingMinutes(robot.apartment, robot.workspace) +
                       robot.punctualityMinutes +
                       state_.random.UniformInt(0, kMaxDailyExtraMinutes);
-    // The next shift whose departure time is still ahead.
-    Tick start = StartOfDay(now) + work.shift.startMinute;
-    while (start <= now + lead) {
+    // The next working day's shift whose departure time is still ahead.
+    const Tick start = NextShiftStart(robot, now + lead);
+    robot.shiftStartsAt = start;
+    robot.commuteAt = start - lead;
+    PlanAtHome(robot);
+}
+
+void World::PlanAtHome(Robot& robot) {
+    const Tick now = state_.tick;
+    robot.nextActionAt = robot.commuteAt;
+    const Tick latest =
+        robot.commuteAt > kRestMinutes ? robot.commuteAt - kRestMinutes : 0;
+    const Tick today = StartOfDay(now);
+    Tick outing = 0;
+    if (IsDayOff(robot, now) && MinuteOfDay(now) < kLastOutingMinute) {
+        // Back home on a free day: out again after a break, but not before
+        // the morning.
+        const Tick afterBreak =
+            now + state_.random.UniformInt(kMinHomeBreak, kMaxHomeBreak);
+        const Tick morning = today + kOutingEarliestMinute +
+                             state_.random.UniformInt(0, kOutingSpreadMinutes);
+        outing = std::max(afterBreak, morning);
+    } else {
+        for (Tick day = 1; day <= kDaysPerWeek; ++day) {
+            const Tick start = today + (day * kMinutesPerDay);
+            if (IsDayOff(robot, start)) {
+                outing = start + kOutingEarliestMinute +
+                         state_.random.UniformInt(0, kOutingSpreadMinutes);
+                break;
+            }
+        }
+    }
+    if (outing > now && outing + kMinOutingMinutes <= latest &&
+        outing < robot.nextActionAt) {
+        robot.nextActionAt = outing;
+    }
+}
+
+bool World::IsDayOff(const Robot& robot, Tick tick) noexcept {
+    return ((robot.daysOff >> DayOfWeek(tick)) & 1U) != 0;
+}
+
+Tick World::NextShiftStart(const Robot& robot, Tick after) const {
+    Tick start = StartOfDay(after) + WorkplaceOf(robot).shift.startMinute;
+    // At most a week ahead: validation guarantees a working day.
+    while (start <= after || IsDayOff(robot, start)) {
         start += kMinutesPerDay;
     }
-    robot.shiftStartsAt = start;
-    robot.nextActionAt = start - lead;
+    return start;
+}
+
+Tick World::MaxCommuteLead(const Robot& robot) {
+    return WalkingMinutes(robot.apartment, robot.workspace) +
+           robot.punctualityMinutes + kMaxDailyExtraMinutes;
 }
 
 Tick World::LatestHomeTick(const Robot& robot) {
-    // The shift after the one last worked; leave room for the walk there,
-    // the robot's usual margin and a full rest.
-    const Tick nextShift = robot.shiftStartsAt + kMinutesPerDay;
-    const Tick margin = WalkingMinutes(robot.apartment, robot.workspace) +
-                        robot.punctualityMinutes + kMaxDailyExtraMinutes +
-                        kRestMinutes;
-    return nextShift > margin ? nextShift - margin : 0;
+    const Tick now = state_.tick;
+    // A full rest before the next working day's shift.
+    const Tick lead = MaxCommuteLead(robot);
+    const Tick nextShift = NextShiftStart(robot, now + lead);
+    const Tick margin = lead + kRestMinutes;
+    const Tick beforeWork = nextShift > margin ? nextShift - margin : 0;
+    // And home by the end of every night, workday or not.
+    Tick bedtime = StartOfDay(now) + kBedtimeMinute;
+    if (bedtime <= now) {
+        bedtime += kMinutesPerDay;
+    }
+    return std::min(beforeWork, bedtime);
+}
+
+std::int64_t World::RentOf(const Robot& robot) const {
+    const auto apartment = rooms_.Find(robot.apartment);
+    return apartment ? apartment->room->rent : 0;
+}
+
+void World::CollectRent() {
+    for (Robot& robot : state_.robots) {
+        const std::int64_t due = RentOf(robot) + robot.rentOwed;
+        const std::int64_t paid = std::min(robot.credits, due);
+        robot.credits -= paid;
+        robot.rentOwed = due - paid;
+        if (paid > 0) {
+            Emit({.tick = state_.tick,
+                  .kind = EventKind::RentPaid,
+                  .robot = robot.id,
+                  .room = robot.apartment,
+                  .credits = paid});
+        }
+        if (robot.rentOwed > 0) {
+            Emit({.tick = state_.tick,
+                  .kind = EventKind::RentMissed,
+                  .robot = robot.id,
+                  .room = robot.apartment,
+                  .credits = robot.rentOwed});
+        }
+    }
 }
 
 const Building& World::WorkplaceOf(const Robot& robot) const {
@@ -530,6 +644,12 @@ std::string World::Describe(const SimEvent& event) const {
                 event.others == 1 ? "" : "s", event.minutes);
         case EventKind::ArrivedHome:
             return std::format("{}  {} got home to {}", when, who, room);
+        case EventKind::RentPaid:
+            return std::format("{}  {} paid {} cr rent for {}", when, who,
+                               event.credits, room);
+        case EventKind::RentMissed:
+            return std::format("{}  {} is behind on rent, owes {} cr", when,
+                               who, event.credits);
     }
     return std::format("{}  {}: unknown event", when, who);
 }
@@ -626,6 +746,13 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                                     robot.name, robot.id.value));
         }
         previous = robot.id;
+        // At least one working day a week.
+        constexpr std::uint32_t kWholeWeek = (1U << kDaysPerWeek) - 1;
+        if ((robot.daysOff & kWholeWeek) == kWholeWeek ||
+            robot.daysOff > kWholeWeek) {
+            return fail(std::format("Robot '{}' has invalid days off",
+                                    robot.name));
+        }
         const Room* apartment = roomOfKind(robot.apartment, RoomKind::Apartment);
         const Room* workspace = roomOfKind(robot.workspace, RoomKind::Workspace);
         if (apartment == nullptr || workspace == nullptr) {
@@ -668,7 +795,7 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
         };
         if (!inRange(robot.needs.charge) || !inRange(robot.needs.condition) ||
             !inRange(robot.needs.social) || !inRange(robot.needs.fun) ||
-            robot.credits < 0) {
+            robot.credits < 0 || robot.rentOwed < 0) {
             return fail(std::format("Robot '{}' has needs or credits out of "
                                     "range",
                                     robot.name));

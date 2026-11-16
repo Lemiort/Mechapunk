@@ -101,13 +101,23 @@ Robots have four needs from 0 to 1000: charge, condition, social and fun.
 They change every ten minutes with what the robot is doing, and venues
 restore some of them; a bar restores more social the more guests it has.
 
+Apartments have a daily rent, a little higher on upper floors, collected at
+midnight. What a robot cannot pay is owed and collected first from later
+credits. Robots keep a budget: they skip a venue if paying would leave less
+than tonight's rent and what they owe.
+
+Days have weekday names; Day 1 is a Monday. Every robot has two consecutive
+days off a week, different for each robot so workplaces stay staffed. On a
+day off a robot gets up mid-morning and goes out, comes home for breaks, and
+goes out again until the evening.
+
 A robot leaves home in time to arrive a little early for its shift (its own
 habit plus daily variation) and works it. After work it weighs each open
 venue it can afford and fit in: how much the visit would relieve its needs,
 the walk, the price and a little whim. It compares that with going home,
 stays a while, and decides again. It always gets home early enough for six
-hours of rest before its next shift. Walking times come from shortest routes
-over the street graph plus stairs.
+hours of rest before its next shift, and every night ends at home by 03:30.
+Walking times come from shortest routes over the street graph plus stairs.
 
 Runs are deterministic: the same save or seed always produces the same
 states and events, on every platform. All simulation state is integral, and

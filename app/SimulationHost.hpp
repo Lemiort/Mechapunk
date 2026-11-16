@@ -34,8 +34,10 @@ struct RobotFrame {
     sim::Tick arrivesAt{};
     sim::Tick nextActionAt{};
     sim::Tick shiftStartsAt{};
+    sim::Tick commuteAt{};
     sim::Needs needs;
     std::int64_t credits{};
+    std::int64_t rentOwed{};
 };
 
 // What does not change while the game runs.
@@ -43,6 +45,7 @@ struct RobotInfo {
     std::string name;
     sim::EntityId apartment;
     sim::EntityId workspace;
+    std::uint8_t daysOff{};
 };
 
 // Immutable copy of the world's visible state, published after every step.
