@@ -82,14 +82,24 @@ enum class PropKind : std::uint8_t {
     // Parks.
     Tree,
     Bench,
+    // On the table in front of an occupied spot, base on the table top.
+    Drink,
+    Meal,
+    Mug,
+    // A shopping basket in the right hand of a robot standing at the origin.
+    Basket,
 };
 
 [[nodiscard]] const PropModel& Prop(PropKind kind);
 
 enum class Pose : std::uint8_t { Standing, Walking, Sitting, Lying };
 
+// What a walking robot carries home.
+enum class Carried : std::uint8_t { Nothing, ShoppingBag, Parcel };
+
 // A humanoid robot about 1.7 m tall, facing +z with its feet on y = 0 (or,
 // lying, on its back along -z). `phase` animates walking, in radians.
-[[nodiscard]] PropModel RobotFigure(Pose pose, float phase, glm::vec3 accent);
+[[nodiscard]] PropModel RobotFigure(Pose pose, float phase, glm::vec3 accent,
+                                    Carried carried = Carried::Nothing);
 
 }  // namespace mechapunk

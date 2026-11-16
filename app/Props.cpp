@@ -31,6 +31,12 @@ constexpr vec3 kPot{0.5F, 0.3F, 0.25F};
 constexpr vec3 kChrome{0.7F, 0.72F, 0.76F};
 constexpr vec3 kLampShade{0.85F, 0.78F, 0.6F};
 constexpr vec3 kBulb{1.0F, 0.95F, 0.8F};
+constexpr vec3 kBottle{0.12F, 0.45F, 0.22F};
+constexpr vec3 kAmber{0.85F, 0.55F, 0.15F};
+constexpr vec3 kFood{0.75F, 0.4F, 0.2F};
+constexpr vec3 kBasket{0.85F, 0.15F, 0.2F};
+constexpr vec3 kPaperBag{0.78F, 0.62F, 0.4F};
+constexpr vec3 kParcel{0.42F, 0.3F, 0.18F};
 constexpr std::array<vec3, 6> kGoods{
     vec3{0.85F, 0.2F, 0.2F}, vec3{0.2F, 0.5F, 0.9F}, vec3{0.95F, 0.8F, 0.2F},
     vec3{0.3F, 0.8F, 0.4F},  vec3{0.8F, 0.4F, 0.9F}, vec3{0.9F, 0.55F, 0.2F}};
@@ -226,6 +232,27 @@ PropModel Make(PropKind kind) {
                  Box(0, 2.0F, 0, 2.6F, 2.2F, 2.6F, kLeaf),
                  Box(0.2F, 3.6F, -0.1F, 1.6F, 1.2F, 1.6F, kLeaf)};
             break;
+        case PropKind::Drink:
+            // A bottle and a glass beside it.
+            m = {Box(0, 0, 0, 0.08F, 0.22F, 0.08F, kBottle),
+                 Box(0, 0.22F, 0, 0.03F, 0.09F, 0.03F, kBottle),
+                 Box(0.13F, 0, 0.04F, 0.06F, 0.09F, 0.06F, kAmber)};
+            break;
+        case PropKind::Meal:
+            // A plate of food and a cup.
+            m = {Box(0, 0, 0, 0.28F, 0.02F, 0.28F, kWhite),
+                 Box(0, 0.02F, 0, 0.17F, 0.05F, 0.15F, kFood),
+                 Box(0.24F, 0, 0.06F, 0.08F, 0.1F, 0.08F, kWhite)};
+            break;
+        case PropKind::Mug:
+            m = {Box(0, 0, 0, 0.09F, 0.11F, 0.09F, kNeonPink),
+                 Box(0.06F, 0.03F, 0, 0.03F, 0.05F, 0.02F, kNeonPink)};
+            break;
+        case PropKind::Basket:
+            m = {Box(0.36F, 0.5F, 0.04F, 0.16F, 0.2F, 0.34F, kBasket),
+                 Box(0.36F, 0.7F, 0.04F, 0.03F, 0.13F, 0.03F, kBasket),
+                 Box(0.36F, 0.66F, 0.0F, 0.12F, 0.06F, 0.14F, kFood)};
+            break;
         case PropKind::Bench:
             m = {Box(0, 0.42F, 0, 1.6F, 0.06F, 0.45F, kWood),
                  Box(0, 0.48F, -0.2F, 1.6F, 0.4F, 0.05F, kWood)};
@@ -359,7 +386,7 @@ const PropModel& Prop(PropKind kind) {
     return found->second;
 }
 
-PropModel RobotFigure(Pose pose, float phase, vec3 accent) {
+PropModel RobotFigure(Pose pose, float phase, vec3 accent, Carried carried) {
     const float swing = pose == Pose::Walking ? std::sin(phase) * 28.0F : 0.0F;
     PropModel m;
     const auto limb = [](vec3 pivot, float length, float thickness,
@@ -396,6 +423,24 @@ PropModel RobotFigure(Pose pose, float phase, vec3 accent) {
     }
     m.push_back(Box(0, 1.5F, 0, 0.3F, 0.28F, 0.3F, kChrome));
     m.push_back(Box(0, 1.58F, 0.15F, 0.24F, 0.07F, 0.03F, kNeonCyan));
+    if (carried == Carried::ShoppingBag) {
+        // Hanging from the right hand, swinging with the arm.
+        const vec3 hand{0.11F * 2.7F, 1.45F, 0.0F};
+        m.push_back(PropPart{.pivot = hand,
+                             .base = {0.0F, -0.98F, 0.0F},
+                             .size = {0.12F, 0.32F, 0.3F},
+                             .angleX = swing,
+                             .color = kPaperBag});
+        m.push_back(PropPart{.pivot = hand,
+                             .base = {0.0F, -0.68F, 0.0F},
+                             .size = {0.02F, 0.08F, 0.16F},
+                             .angleX = swing,
+                             .color = kPaperBag});
+    } else if (carried == Carried::Parcel) {
+        // Under the left arm.
+        m.push_back(Box(-0.3F, 1.0F, 0.04F, 0.2F, 0.24F, 0.36F, kParcel));
+        m.push_back(Box(-0.3F, 1.1F, 0.04F, 0.21F, 0.03F, 0.37F, kYellow));
+    }
     return m;
 }
 

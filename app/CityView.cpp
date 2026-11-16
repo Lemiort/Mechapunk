@@ -767,8 +767,17 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
             (renderTick - static_cast<double>(robot.departedAt)) * 75.0);
         const float phase = walked / 0.75F * std::numbers::pi_v<float>;
         const float yaw = glm::degrees(std::atan2(direction.x, direction.z));
+        // Shopping comes home in a bag; the black market wraps it up.
+        Carried carried = Carried::Nothing;
+        if (const auto left = rooms_.Find(robot.location)) {
+            if (left->room->kind == sim::RoomKind::Shop) {
+                carried = Carried::ShoppingBag;
+            } else if (left->room->kind == sim::RoomKind::BlackMarket) {
+                carried = Carried::Parcel;
+            }
+        }
         SubmitModel(queue, RobotFigure(Pose::Walking, phase,
-                                       selected ? kSelected : Accent(robot.id)),
+                                       selected ? kSelected : Accent(robot.id), carried),
                     position, yaw, 0.0F, vec3(1.0F),
                     figureScale * (selected ? 1.2F : 1.0F));
         robotMarkers_.push_back(
@@ -885,6 +894,11 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
                                     selected ? kSelected : Accent(robot)),
                         origin, spot.yawDegrees + yawOffset, lying ? -90.0F : 0.0F,
                         vec3(1.0F), kS);
+            if (spot.item) {
+                SubmitModel(queue, Prop(spot.item->kind),
+                            ToWorld(shape, current, spot.item->position),
+                            spot.item->yawDegrees + yawOffset, 0.0F, spot.item->tint, kS);
+            }
             robotMarkers_.push_back(
                 {.id = robot,
                  .position = origin + vec3{0.0F, (lying ? 0.2F : 0.9F) * kS, 0.0F},

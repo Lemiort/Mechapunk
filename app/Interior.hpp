@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include <glm/ext/vector_float3.hpp>
@@ -36,6 +37,8 @@ struct Spot {
     glm::vec3 position{0.0F};
     float yawDegrees{};
     Pose pose{Pose::Standing};
+    // Shown while the spot is taken: a drink on the table, a basket in hand.
+    std::optional<PlacedProp> item;
 };
 
 // A ceiling lamp. Lamps of a sim room light up while the room is in use;

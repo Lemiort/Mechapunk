@@ -238,6 +238,15 @@ Spot MakeSpot(const Frame& frame, float x, float u, vec2 facing, Pose pose,
             .pose = pose};
 }
 
+// `spot`, with `kind` set out at frame coordinates (x, u, y) while taken.
+Spot WithItem(Spot spot, const Frame& frame, PropKind kind, float x, float u,
+              float y) {
+    spot.item = PlacedProp{.kind = kind,
+                           .position = frame.At(x, u, y),
+                           .yawDegrees = spot.yawDegrees};
+    return spot;
+}
+
 // Standing spots on a grid, for rooms with more occupants than furniture.
 void FillStanding(RoomPlan& room, const Frame& frame, float x0, float x1,
                   float u0, float u1, std::size_t wanted) {
@@ -358,7 +367,8 @@ void Apartment(FloorPlan& plan, const Frame& f, const sim::Room* room) {
     // kitchen.
     area.spots.push_back(MakeSpot(f, 1.5F, 7.75F, {0.0F, -1.0F}, Pose::Lying, 0.67F));
     area.spots.push_back(MakeSpot(f, 6.45F, 8.2F, {-1.0F, 0.0F}, Pose::Sitting));
-    area.spots.push_back(MakeSpot(f, 6.0F, 4.6F, {1.0F, 0.0F}, Pose::Standing));
+    area.spots.push_back(WithItem(MakeSpot(f, 6.0F, 4.6F, {1.0F, 0.0F}, Pose::Standing), f,
+                                  PropKind::Meal, 6.55F, 4.3F, 0.92F));
     plan.rooms.push_back(std::move(area));
 }
 
@@ -422,7 +432,9 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
             for (int stool = 0; stool < 4; ++stool) {
                 const float x = middle - 1.2F + (0.8F * static_cast<float>(stool));
                 Place(plan, PropKind::Stool, f.At(x, 5.6F), f.Dir(0, -1), fabric);
-                spots.push_back(MakeSpot(f, x, 5.6F, {0, -1}, Pose::Sitting, 0.31F));
+                spots.push_back(WithItem(MakeSpot(f, x, 5.6F, {0, -1}, Pose::Sitting, 0.31F),
+                                         f, bar ? PropKind::Drink : PropKind::Meal, x,
+                                         4.95F, 1.1F));
             }
             const int columns = std::max(1, static_cast<int>((width - 1.0F) / 3.2F));
             for (int row = 0; row < 3; ++row) {
@@ -432,12 +444,20 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
                     const float u = 9.5F + (4.0F * static_cast<float>(row));
                     if (bar) {
                         Place(plan, PropKind::BarTable, f.At(x, u), f.Dir(0, 1));
-                        spots.push_back(MakeSpot(f, x - 0.6F, u, {1, 0}, Pose::Standing));
-                        spots.push_back(MakeSpot(f, x + 0.6F, u, {-1, 0}, Pose::Standing));
+                        spots.push_back(WithItem(MakeSpot(f, x - 0.6F, u, {1, 0}, Pose::Standing),
+                                                 f, PropKind::Drink, x - 0.18F, u - 0.1F,
+                                                 1.04F));
+                        spots.push_back(WithItem(MakeSpot(f, x + 0.6F, u, {-1, 0}, Pose::Standing),
+                                                 f, PropKind::Drink, x + 0.18F, u + 0.1F,
+                                                 1.04F));
                     } else {
                         Place(plan, PropKind::Booth, f.At(x, u), f.Dir(0, 1), fabric);
-                        spots.push_back(MakeSpot(f, x, u - 0.75F, {0, 1}, Pose::Sitting));
-                        spots.push_back(MakeSpot(f, x, u + 0.75F, {0, -1}, Pose::Sitting));
+                        spots.push_back(WithItem(MakeSpot(f, x, u - 0.75F, {0, 1}, Pose::Sitting),
+                                                 f, PropKind::Meal, x - 0.2F, u - 0.18F,
+                                                 0.77F));
+                        spots.push_back(WithItem(MakeSpot(f, x, u + 0.75F, {0, -1}, Pose::Sitting),
+                                                 f, PropKind::Meal, x + 0.2F, u + 0.18F,
+                                                 0.77F));
                     }
                 }
             }
@@ -498,7 +518,9 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
                     const float x = 1.5F + (2.6F * static_cast<float>(shelf));
                     const float u = 3.0F + (4.0F * static_cast<float>(row));
                     Place(plan, PropKind::GoodsShelf, f.At(x, u), f.Dir(0, 1));
-                    spots.push_back(MakeSpot(f, x, u + 1.2F, {0, -1}, Pose::Standing));
+                    const Spot browsing = MakeSpot(f, x, u + 1.2F, {0, -1}, Pose::Standing);
+                    spots.push_back(
+                        WithItem(browsing, f, PropKind::Basket, x, u + 1.2F, 0.0F));
                 }
             }
             Place(plan, PropKind::Checkout, f.At(width - 1.4F, kDepth - 3.0F),
@@ -635,7 +657,8 @@ void Workspace(FloorPlan& plan, const sim::Room& room, const Frame& f, float wid
                 Place(plan, PropKind::Desk, f.At(x, u), f.Dir(0, 1));
                 Place(plan, PropKind::Chair, f.At(x, u + 0.7F), f.Dir(0, -1),
                       Fabric(room.id.value));
-                spots.push_back(MakeSpot(f, x, u + 0.7F, {0, -1}, Pose::Sitting));
+                spots.push_back(WithItem(MakeSpot(f, x, u + 0.7F, {0, -1}, Pose::Sitting), f,
+                                         PropKind::Mug, x + 0.5F, u + 0.15F, 0.78F));
             }
         }
         Place(plan, PropKind::Plant, f.At(0.5F, kDepth - 0.6F), f.Dir(0, -1));
