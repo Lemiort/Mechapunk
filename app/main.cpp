@@ -31,7 +31,9 @@
 
 #include "CityView.hpp"
 #include "GameRenderer.hpp"
+#include "ImGuiOverlay.hpp"
 #include "Inspector.hpp"
+#include "imgui.h"
 #include "OrbitCamera.hpp"
 #include "RenderQueue.hpp"
 #include "Scene.hpp"
@@ -55,7 +57,9 @@ constexpr double kMessageSeconds = 3.0;
 // Pixels the cursor may move between press and release for a click.
 constexpr double kClickTolerance = 6.0;
 constexpr float kInteriorDistance = 6.0F;
-constexpr float kInspectorTextSize = 20.0F;
+// UI font shipped with the imgui package, copied next to the game.
+constexpr const char* kUiFont = "fonts/Roboto-Medium.ttf";
+constexpr float kUiFontSize = 17.0F;
 
 struct Options {
     bool startNew{false};
@@ -137,9 +141,17 @@ public:
         glfwSetFramebufferSizeCallback(&window_, &Game::OnResize);
         glfwGetFramebufferSize(&window_, &width_, &height_);
         renderer_.Resize(width_, height_);
+        // After the game's own callbacks: ImGui forwards events to them.
+        overlay_ = std::make_unique<ImGuiOverlay>(
+            window_, ImGuiOverlaySettings{.iniFile = "mechapunk-ui.ini"});
+        SetUpUiStyle();
     }
 
-    ~Game() { glfwSetWindowUserPointer(&window_, nullptr); }
+    ~Game() {
+        // Restores the game's callbacks while the GL context is current.
+        overlay_.reset();
+        glfwSetWindowUserPointer(&window_, nullptr);
+    }
     Game(const Game&) = delete;
     Game& operator=(const Game&) = delete;
     Game(Game&&) = delete;
@@ -190,7 +202,8 @@ private:
     }
 
     static void OnScroll(GLFWwindow* window, double /*x*/, double y) {
-        if (Game* game = From(window); game != nullptr) {
+        if (Game* game = From(window);
+            game != nullptr && !game->overlay_->WantsMouse()) {
             game->camera_.Zoom(static_cast<float>(y));
         }
     }
@@ -204,7 +217,7 @@ private:
     }
 
     void Key(int key, int action) {
-        if (action == GLFW_RELEASE) {
+        if (action == GLFW_RELEASE || overlay_->WantsKeyboard()) {
             return;
         }
         if (key == GLFW_KEY_N) {
@@ -244,8 +257,9 @@ private:
     }
 
     void HandleHeldInput(float seconds) {
+        const bool uiKeyboard = overlay_->WantsKeyboard();
         const auto held = [&](int key) {
-            return glfwGetKey(&window_, key) == GLFW_PRESS;
+            return !uiKeyboard && glfwGetKey(&window_, key) == GLFW_PRESS;
         };
         const float step = kPanPerSecond * seconds;
         float right = 0.0F;
@@ -269,11 +283,16 @@ private:
         double x = 0.0;
         double y = 0.0;
         glfwGetCursorPos(&window_, &x, &y);
-        const bool dragging =
+        const bool buttonDown =
             glfwGetMouseButton(&window_, GLFW_MOUSE_BUTTON_LEFT) ==
                 GLFW_PRESS ||
             glfwGetMouseButton(&window_, GLFW_MOUSE_BUTTON_RIGHT) ==
                 GLFW_PRESS;
+        // A press that starts over a window belongs to the UI until release.
+        if (buttonDown && !wasDragging_) {
+            pressOnUi_ = overlay_->WantsMouse();
+        }
+        const bool dragging = buttonDown && !pressOnUi_;
         if (dragging && wasDragging_) {
             camera_.Orbit(
                 static_cast<float>(-(x - lastCursorX_) * kOrbitDegreesPerPixel),
@@ -288,11 +307,12 @@ private:
         } else if (leftDown) {
             clickTravel_ +=
                 std::abs(x - lastCursorX_) + std::abs(y - lastCursorY_);
-        } else if (leftWasDown_ && clickTravel_ < kClickTolerance) {
+        } else if (leftWasDown_ && clickTravel_ < kClickTolerance &&
+                   !pressOnUi_) {
             Click(x, y);
         }
         leftWasDown_ = leftDown;
-        wasDragging_ = dragging;
+        wasDragging_ = buttonDown;
         lastCursorX_ = x;
         lastCursorY_ = y;
     }
@@ -362,9 +382,37 @@ private:
             city_.FloorCenter(selection_.building, selection_.floor));
     }
 
+    // Applies a selection chosen in the inspector, moving the camera to the
+    // building and floor it shows.
+    void ApplySelection(const Selection& next) {
+        if (!next.building.IsValid()) {
+            selection_ = next;
+            return;
+        }
+        if (next.building != selection_.building) {
+            OpenBuilding(next.building);
+        }
+        const std::uint32_t floors = city_.Floors(next.building);
+        selection_.floor = std::min(next.floor, floors > 0 ? floors - 1 : 0);
+        selection_.room = next.room;
+        selection_.robot = next.robot;
+        camera_.FocusTarget(
+            city_.FloorCenter(selection_.building, selection_.floor));
+    }
+
     void RenderFrame() {
         const auto frame = host_.LatestFrame();
         const double renderTick = host_.RenderTick();
+
+        overlay_->BeginFrame();
+        DrawStatusWindow(frame.get(), renderTick);
+        if (frame != nullptr) {
+            if (const auto next =
+                    DrawInspector(selection_, *frame, city_, host_)) {
+                ApplySelection(*next);
+            }
+        }
+
         queue_.Clear();
         if (frame != nullptr) {
             city_.Submit(queue_, *frame, renderTick, selection_);
@@ -373,60 +421,93 @@ private:
             scene_,
             std::fmod(renderTick, static_cast<double>(sim::kMinutesPerDay)),
             selection_);
-        SubmitOverlay(frame.get(), renderTick);
         renderer_.Render(scene_, queue_, camera_.MakeCamera(width_, height_));
+        overlay_->Render();
     }
 
-    void SubmitOverlay(const WorldFrame* frame, double renderTick) {
-        const auto tick = static_cast<sim::Tick>(std::floor(renderTick));
-        std::string status =
-            std::format("{}   x{}", sim::FormatTime(tick), host_.Speed());
-        if (host_.IsPaused()) {
-            status += "   PAUSED";
+    void SetUpUiStyle() {
+        ImGuiIO& io = ImGui::GetIO();
+        if (std::filesystem::exists(kUiFont)) {
+            if (ImFont* font = io.Fonts->AddFontFromFileTTF(kUiFont,
+                                                            kUiFontSize)) {
+                io.FontDefault = font;
+            }
+        } else {
+            spdlog::warn("UI font {} not found; using ImGui's default",
+                         kUiFont);
         }
-        queue_.SubmitText(renderer_.MakeText(status, -0.98F, 0.91F, 32.0F));
-        if (frame != nullptr) {
-            queue_.SubmitText(renderer_.MakeText(
-                std::format("{} resting   {} working   {} out at venues   {} "
-                            "walking",
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.WindowRounding = 6.0F;
+        style.FrameRounding = 4.0F;
+        style.GrabRounding = 4.0F;
+        style.Colors[ImGuiCol_WindowBg].w = 0.9F;
+        // Neon accents to match the city.
+        style.Colors[ImGuiCol_TitleBgActive] = ImVec4{0.45F, 0.1F, 0.4F, 1.0F};
+        style.Colors[ImGuiCol_PlotHistogram] = ImVec4{0.1F, 0.75F, 0.85F, 1.0F};
+        style.Colors[ImGuiCol_Header] = ImVec4{0.1F, 0.45F, 0.55F, 0.6F};
+        style.Colors[ImGuiCol_HeaderHovered] =
+            ImVec4{0.1F, 0.55F, 0.65F, 0.8F};
+    }
+
+    void DrawStatusWindow(const WorldFrame* frame, double renderTick) {
+        constexpr float kMargin = 10.0F;
+        ImGui::SetNextWindowPos(ImVec2{kMargin, kMargin},
+                                ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("City", nullptr,
+                         ImGuiWindowFlags_AlwaysAutoResize)) {
+            const auto tick = static_cast<sim::Tick>(std::floor(renderTick));
+            ImGui::TextUnformatted(sim::FormatTime(tick).c_str());
+
+            bool paused = host_.IsPaused();
+            if (ImGui::Checkbox("Paused", &paused)) {
+                host_.SetPaused(paused);
+            }
+            ImGui::SameLine();
+            ImGui::BeginDisabled(!paused);
+            if (ImGui::Button("Step")) {
+                host_.RequestStep();
+            }
+            ImGui::EndDisabled();
+
+            for (std::size_t index = 0; index < kSpeeds.size(); ++index) {
+                if (index > 0) {
+                    ImGui::SameLine();
+                }
+                const std::string label = std::format("x{}", kSpeeds.at(index));
+                if (ImGui::RadioButton(label.c_str(),
+                                       host_.Speed() == kSpeeds.at(index))) {
+                    host_.SetSpeed(kSpeeds.at(index));
+                }
+            }
+
+            if (frame != nullptr) {
+                ImGui::Text("%u resting, %u working, %u out, %u walking",
                             frame->resting, frame->working, frame->visiting,
-                            frame->walking),
-                -0.98F, 0.84F, 24.0F));
-        }
-        if (glfwGetTime() < messageUntil_) {
-            queue_.SubmitText(
-                renderer_.MakeText(message_, -0.98F, 0.78F, 24.0F));
-        }
-        if (frame != nullptr) {
-            SubmitInspector(*frame);
-        }
-        queue_.SubmitText(renderer_.MakeText(
-            "Click: inspect   Q/E: floor   Drag: orbit   Wheel: zoom   WASD: "
-            "move   Space: pause   N: step   1-5: speed   F5: save   F12: "
-            "screenshot   Esc: close / quit",
-            -0.98F, -0.96F, 20.0F));
-    }
-
-    void SubmitInspector(const WorldFrame& frame) {
-        constexpr float kLeft = 0.30F;
-        constexpr float kTop = 0.91F;
-        // Roughly half the font size per character, in pixels.
-        const auto maxChars = static_cast<std::size_t>(
-            ((1.0F - kLeft) * 0.5F * static_cast<float>(width_)) /
-            (kInspectorTextSize * 0.5F));
-        float y = kTop;
-        for (const InspectorLine& line :
-             DescribeSelection(selection_, frame, city_, host_, maxChars)) {
-            FontLine2d text =
-                renderer_.MakeText(line.text, kLeft, y, line.size);
-            text.SetColor(line.color);
-            queue_.SubmitText(std::move(text));
-            // Line height in screen units follows the font size.
-            y -= (line.size * 1.25F) / (static_cast<float>(height_) * 0.5F);
-            if (y < -0.9F) {
-                break;
+                            frame->walking);
+            }
+            if (ImGui::Button("Save")) {
+                auto saved = host_.Save(savePath_);
+                ShowMessage(saved ? std::format("Saved {}", savePath_.string())
+                                  : std::format("Save failed: {}",
+                                                saved.error()));
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Screenshot")) {
+                screenshotRequested_ = true;
+            }
+            if (glfwGetTime() < messageUntil_) {
+                ImGui::TextDisabled("%s", message_.c_str());
+            }
+            if (ImGui::CollapsingHeader("Controls")) {
+                ImGui::BulletText("Click a building, room or robot to inspect");
+                ImGui::BulletText("Q / E: floor down / up");
+                ImGui::BulletText("Drag: orbit   Wheel: zoom   WASD: move");
+                ImGui::BulletText("Space: pause   N: step   1-5: speed");
+                ImGui::BulletText("F5: save   F12: screenshot");
+                ImGui::BulletText("Esc: close the selection, then quit");
             }
         }
+        ImGui::End();
     }
 
     void TakeScreenshot() {
@@ -466,7 +547,9 @@ private:
     SimulationHost host_;
     CityView city_;
     OrbitCamera camera_;
+    std::unique_ptr<ImGuiOverlay> overlay_;
     bool wasDragging_{false};
+    bool pressOnUi_{false};
     bool leftWasDown_{false};
     double clickTravel_{};
     double lastCursorX_{};

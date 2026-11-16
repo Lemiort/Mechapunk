@@ -1,11 +1,13 @@
 #include "Inspector.hpp"
 
+#include <imgui.h>
+
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,66 +18,24 @@
 namespace mechapunk {
 
 namespace {
-constexpr float kTitleSize = 28.0F;
-constexpr float kTextSize = 20.0F;
-constexpr std::size_t kNeedBarWidth = 20;
-constexpr std::size_t kRecentEvents = 8;
-constexpr std::size_t kListedOccupants = 12;
-constexpr glm::vec4 kTitle{1.0F, 0.85F, 0.3F, 1.0F};
-constexpr glm::vec4 kHeading{0.55F, 0.85F, 1.0F, 1.0F};
-constexpr glm::vec4 kDim{0.6F, 0.62F, 0.7F, 1.0F};
-constexpr glm::vec4 kWarning{1.0F, 0.45F, 0.35F, 1.0F};
-
-class Panel {
-public:
-    explicit Panel(std::size_t maxChars) : maxChars_(maxChars) {}
-
-    void Title(std::string text) {
-        std::ranges::transform(text, text.begin(), [](unsigned char c) {
-            return static_cast<char>(std::toupper(c));
-        });
-        lines_.push_back({.text = std::move(text),
-                          .size = kTitleSize,
-                          .color = kTitle});
-    }
-
-    void Line(std::string_view text, glm::vec4 color = {0.85F, 0.88F, 0.95F,
-                                                        1.0F}) {
-        // Wrap at spaces; continuation lines are indented.
-        std::string_view rest = text;
-        bool first = true;
-        while (!rest.empty()) {
-            const std::size_t room = first ? maxChars_ : maxChars_ - 2;
-            std::size_t cut = rest.size();
-            if (rest.size() > room) {
-                cut = rest.rfind(' ', room);
-                if (cut == std::string_view::npos || cut == 0) {
-                    cut = room;
-                }
-            }
-            lines_.push_back({.text = std::string(first ? "" : "  ") +
-                                      std::string(rest.substr(0, cut)),
-                              .size = kTextSize,
-                              .color = color});
-            rest.remove_prefix(cut);
-            while (!rest.empty() && rest.front() == ' ') {
-                rest.remove_prefix(1);
-            }
-            first = false;
-        }
-    }
-
-    void Gap() { lines_.push_back({.text = "", .size = kTextSize * 0.5F}); }
-
-    [[nodiscard]] std::vector<InspectorLine> Take() { return std::move(lines_); }
-
-private:
-    std::size_t maxChars_;
-    std::vector<InspectorLine> lines_;
-};
+constexpr float kPanelWidth = 430.0F;
+constexpr float kMargin = 10.0F;
+constexpr float kNeedLabelWidth = 90.0F;
+constexpr std::int32_t kLowNeed = 250;
+constexpr std::size_t kRecentEvents = 30;
+constexpr ImVec4 kTitle{1.0F, 0.85F, 0.3F, 1.0F};
+constexpr ImVec4 kWarning{1.0F, 0.45F, 0.35F, 1.0F};
+constexpr ImVec4 kLowBar{0.85F, 0.25F, 0.2F, 1.0F};
 
 std::string FloorName(std::uint32_t floor) {
     return floor == 0 ? "ground floor" : std::format("floor {}", floor);
+}
+
+std::string KindLabel(sim::RoomKind kind) {
+    if (const sim::VenueRules* rules = sim::FindVenueRules(kind)) {
+        return std::string{rules->label};
+    }
+    return kind == sim::RoomKind::Apartment ? "apartment" : "workspace";
 }
 
 std::string RoomLabel(const CityView& city, sim::EntityId room) {
@@ -90,49 +50,13 @@ std::string RoomLabel(const CityView& city, sim::EntityId room) {
     return std::format("{}, {}", found->room->name, found->building->name);
 }
 
-std::string_view KindLabel(sim::RoomKind kind) {
-    if (const sim::VenueRules* rules = sim::FindVenueRules(kind)) {
-        return rules->label;
-    }
-    return kind == sim::RoomKind::Apartment ? "apartment" : "workspace";
+std::string Clock(sim::Tick tick) {
+    return sim::FormatClock(sim::MinuteOfDay(tick));
 }
 
-std::string Hours(std::uint32_t opens, std::uint32_t closes) {
-    if (opens == closes) {
-        return "open around the clock";
-    }
-    return std::format("open {}-{}", sim::FormatClock(opens),
-                       sim::FormatClock(closes));
-}
-
-std::string Activity(const CityView& city, const RobotFrame& robot) {
-    const std::string until = sim::FormatClock(sim::MinuteOfDay(robot.nextActionAt));
-    switch (robot.activity) {
-        case sim::RobotActivity::Resting:
-            return robot.nextActionAt < robot.commuteAt
-                       ? std::format("Resting at home, going out around {}",
-                                     until)
-                       : std::format("Resting at home, leaves for work at {}",
-                                     until);
-        case sim::RobotActivity::Working:
-            return std::format("Working at {} until {}",
-                               RoomLabel(city, robot.location), until);
-        case sim::RobotActivity::Visiting:
-            return std::format("At {} until {}",
-                               RoomLabel(city, robot.location), until);
-        case sim::RobotActivity::Walking:
-            return std::format("Walking to {}, arrives {}",
-                               RoomLabel(city, robot.destination), until);
-    }
-    return "Unknown";
-}
-
-std::string NeedBar(std::string_view name, std::int32_t value) {
-    const auto filled = static_cast<std::size_t>(
-        std::clamp(value, 0, sim::Needs::kMax) * kNeedBarWidth /
-        sim::Needs::kMax);
-    return std::format("{:<10}[{}{}] {}", name, std::string(filled, '#'),
-                       std::string(kNeedBarWidth - filled, '.'), value);
+std::string Name(const SimulationHost& host, sim::EntityId robot) {
+    const RobotInfo* info = host.FindRobotInfo(robot);
+    return info != nullptr ? info->name : "unknown robot";
 }
 
 // Robots in each room right now, in id order.
@@ -147,49 +71,113 @@ std::map<std::uint64_t, std::vector<const RobotFrame*>> Occupants(
     return occupants;
 }
 
-std::string_view Name(const SimulationHost& host, sim::EntityId robot) {
-    const RobotInfo* info = host.FindRobotInfo(robot);
-    return info != nullptr ? std::string_view{info->name} : "unknown robot";
+// The open building and floor that show a room, with the room selected.
+Selection ShowRoom(const CityView& city, sim::EntityId room) {
+    const auto found = city.Rooms().Find(room);
+    if (!found) {
+        return {};
+    }
+    return {.building = found->building->id,
+            .floor = found->room->floor,
+            .room = room,
+            .robot = {}};
 }
 
-void DescribeRobot(Panel& panel, const RobotFrame& robot,
-                   const CityView& city, const SimulationHost& host) {
-    const RobotInfo* info = host.FindRobotInfo(robot.id);
-    panel.Title(std::string{Name(host, robot.id)});
-    panel.Line(Activity(city, robot));
-    panel.Gap();
-    const auto need = [&](std::string_view name, std::int32_t value) {
-        panel.Line(NeedBar(name, value), value < 250 ? kWarning : glm::vec4{
-                                                          0.85F, 0.88F, 0.95F,
-                                                          1.0F});
-    };
-    need("Charge", robot.needs.charge);
-    need("Condition", robot.needs.condition);
-    need("Social", robot.needs.social);
-    need("Fun", robot.needs.fun);
-    panel.Line(std::format("Credits   {}", robot.credits));
-    if (robot.rentOwed > 0) {
-        panel.Line(std::format("Behind on rent: owes {} cr", robot.rentOwed),
-                   kWarning);
+// A clickable room name; returns where clicking it leads.
+std::optional<Selection> RoomLink(const CityView& city, sim::EntityId room,
+                                  std::string_view prefix) {
+    const std::string label = std::format("{}{}##room{}", prefix,
+                                          RoomLabel(city, room), room.value);
+    std::optional<Selection> result;
+    if (ImGui::Selectable(label.c_str())) {
+        result = ShowRoom(city, room);
     }
-    panel.Gap();
-    if (info != nullptr) {
-        const auto home = city.Rooms().Find(info->apartment);
-        panel.Line(std::format("Home: {}, {} cr a night",
-                               RoomLabel(city, info->apartment),
-                               home ? home->room->rent : 0),
-                   kDim);
-        const auto work = city.Rooms().Find(info->workspace);
-        if (work) {
+    ImGui::SetItemTooltip("Show this room");
+    return result;
+}
+
+void Title(const std::string& text) {
+    ImGui::PushStyleColor(ImGuiCol_Text, kTitle);
+    ImGui::TextUnformatted(text.c_str());
+    ImGui::PopStyleColor();
+}
+
+void NeedBar(const char* name, std::int32_t value) {
+    ImGui::TextUnformatted(name);
+    ImGui::SameLine(kNeedLabelWidth);
+    const bool low = value < kLowNeed;
+    if (low) {
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, kLowBar);
+    }
+    const std::string text = std::to_string(value);
+    ImGui::ProgressBar(static_cast<float>(value) /
+                           static_cast<float>(sim::Needs::kMax),
+                       ImVec2{-1.0F, 0.0F}, text.c_str());
+    if (low) {
+        ImGui::PopStyleColor();
+    }
+}
+
+std::optional<Selection> DrawRobot(const RobotFrame& robot,
+                                   const CityView& city,
+                                   const SimulationHost& host) {
+    std::optional<Selection> result;
+    const auto follow = [&](std::optional<Selection> link) {
+        if (link) {
+            result = link;
+        }
+    };
+    Title(Name(host, robot.id));
+
+    switch (robot.activity) {
+        case sim::RobotActivity::Resting: {
+            const bool goingOut = robot.nextActionAt < robot.commuteAt;
+            ImGui::Text("Resting at home, %s at %s",
+                        goingOut ? "going out" : "leaves for work",
+                        Clock(robot.nextActionAt).c_str());
+            break;
+        }
+        case sim::RobotActivity::Working:
+        case sim::RobotActivity::Visiting:
+            ImGui::Text("%s until %s",
+                        robot.activity == sim::RobotActivity::Working
+                            ? "Working"
+                            : "Out",
+                        Clock(robot.nextActionAt).c_str());
+            follow(RoomLink(city, robot.location, "at "));
+            break;
+        case sim::RobotActivity::Walking:
+            ImGui::Text("Walking, arrives %s",
+                        Clock(robot.nextActionAt).c_str());
+            follow(RoomLink(city, robot.destination, "to "));
+            break;
+    }
+
+    ImGui::SeparatorText("Needs");
+    NeedBar("Charge", robot.needs.charge);
+    NeedBar("Condition", robot.needs.condition);
+    NeedBar("Social", robot.needs.social);
+    NeedBar("Fun", robot.needs.fun);
+    ImGui::Text("Credits: %lld", static_cast<long long>(robot.credits));
+    if (robot.rentOwed > 0) {
+        ImGui::TextColored(kWarning, "Behind on rent: owes %lld cr",
+                           static_cast<long long>(robot.rentOwed));
+    }
+
+    if (const RobotInfo* info = host.FindRobotInfo(robot.id)) {
+        ImGui::SeparatorText("Home and work");
+        follow(RoomLink(city, info->apartment, "Home: "));
+        if (const auto home = city.Rooms().Find(info->apartment)) {
+            ImGui::TextDisabled("%u cr a night", home->room->rent);
+        }
+        follow(RoomLink(city, info->workspace, "Work: "));
+        if (const auto work = city.Rooms().Find(info->workspace)) {
             const sim::Shift& shift = work->building->shift;
-            panel.Line(
-                std::format("Work: {}, {}-{}, {} cr a shift",
-                            RoomLabel(city, info->workspace),
-                            sim::FormatClock(shift.startMinute),
-                            sim::FormatClock(shift.startMinute +
-                                             shift.lengthMinutes),
-                            shift.wage),
-                kDim);
+            const std::string hours = std::format(
+                "{}-{}, {} cr a shift", sim::FormatClock(shift.startMinute),
+                sim::FormatClock(shift.startMinute + shift.lengthMinutes),
+                shift.wage);
+            ImGui::TextDisabled("%s", hours.c_str());
         }
         std::string daysOff;
         for (std::uint32_t day = 0; day < sim::kDaysPerWeek; ++day) {
@@ -198,117 +186,229 @@ void DescribeRobot(Panel& panel, const RobotFrame& robot,
                                        sim::WeekdayName(day));
             }
         }
-        panel.Line(std::format("Days off: {}", daysOff), kDim);
+        ImGui::TextDisabled("Days off: %s", daysOff.c_str());
     }
-    panel.Gap();
-    panel.Line("Recent", kHeading);
-    for (const std::string& event : host.RecentEvents(robot.id, kRecentEvents)) {
-        panel.Line(event);
+
+    ImGui::SeparatorText("Recent");
+    if (ImGui::BeginChild("recent", ImVec2{0.0F, 0.0F},
+                          ImGuiChildFlags_Borders)) {
+        for (const std::string& event :
+             host.RecentEvents(robot.id, kRecentEvents)) {
+            ImGui::TextWrapped("%s", event.c_str());
+        }
+        // Follow new events unless the player scrolled up.
+        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+            ImGui::SetScrollHereY(1.0F);
+        }
     }
+    ImGui::EndChild();
+    return result;
 }
 
-void DescribeRoom(Panel& panel, sim::EntityId roomId, const WorldFrame& frame,
-                  const CityView& city, const SimulationHost& host) {
-    const auto found = city.Rooms().Find(roomId);
+std::optional<Selection> DrawRoom(const Selection& selection,
+                                  const WorldFrame& frame,
+                                  const CityView& city,
+                                  const SimulationHost& host) {
+    std::optional<Selection> result;
+    const auto found = city.Rooms().Find(selection.room);
     if (!found) {
-        return;
+        return result;
     }
     const sim::Room& room = *found->room;
-    panel.Title(room.name);
-    panel.Line(std::format("{} in {}, {}", KindLabel(room.kind),
-                           found->building->name, FloorName(room.floor)));
+    Title(room.name);
+    ImGui::Text("%s in %s, %s", KindLabel(room.kind).c_str(),
+                found->building->name.c_str(), FloorName(room.floor).c_str());
     if (const sim::VenueRules* rules = sim::FindVenueRules(room.kind)) {
-        panel.Line(std::format("{}, {} cr a visit",
-                               Hours(rules->opensAt, rules->closesAt),
-                               rules->price),
-                   kDim);
+        if (rules->opensAt == rules->closesAt) {
+            ImGui::TextDisabled("Open around the clock, %u cr a visit",
+                                rules->price);
+        } else {
+            ImGui::TextDisabled("Open %s-%s, %u cr a visit",
+                                sim::FormatClock(rules->opensAt).c_str(),
+                                sim::FormatClock(rules->closesAt).c_str(),
+                                rules->price);
+        }
+    } else if (room.kind == sim::RoomKind::Apartment) {
+        ImGui::TextDisabled("%u cr a night", room.rent);
     }
+
     const auto occupants = Occupants(frame);
     const auto inside = occupants.find(room.id.value);
     const std::size_t count =
         inside != occupants.end() ? inside->second.size() : 0;
-    panel.Line(std::format("{} of {} here now", count, room.capacity));
-    if (inside != occupants.end()) {
-        panel.Gap();
-        std::size_t listed = 0;
+    const std::string occupancy = std::format("{} of {}", count, room.capacity);
+    ImGui::ProgressBar(static_cast<float>(count) /
+                           static_cast<float>(std::max(room.capacity, 1U)),
+                       ImVec2{-1.0F, 0.0F}, occupancy.c_str());
+
+    if (count > 0 &&
+        ImGui::BeginTable("occupants", 2,
+                          ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
+                              ImGuiTableFlags_ScrollY)) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Robot");
+        ImGui::TableSetupColumn("Until", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableHeadersRow();
         for (const RobotFrame* robot : inside->second) {
-            if (++listed > kListedOccupants) {
-                panel.Line(std::format("...and {} more",
-                                       count - kListedOccupants),
-                           kDim);
-                break;
+            ImGui::PushID(static_cast<int>(robot->id.value));
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            const std::string name = Name(host, robot->id);
+            if (ImGui::Selectable(name.c_str(), false,
+                                  ImGuiSelectableFlags_SpanAllColumns)) {
+                Selection next = selection;
+                next.robot = robot->id;
+                next.room = {};
+                result = next;
             }
-            panel.Line(std::format("{}, until {}", Name(host, robot->id),
-                                   sim::FormatClock(sim::MinuteOfDay(
-                                       robot->nextActionAt))));
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(Clock(robot->nextActionAt).c_str());
+            ImGui::PopID();
         }
+        ImGui::EndTable();
     }
-    panel.Gap();
-    panel.Line("Click a robot inside to inspect it", kDim);
+    return result;
 }
 
-void DescribeBuilding(Panel& panel, const Selection& selection,
-                      const WorldFrame& frame, const CityView& city,
-                      const SimulationHost& host) {
-    const sim::Building* building = city.City().FindBuilding(selection.building);
+std::optional<Selection> DrawBuilding(const Selection& selection,
+                                      const WorldFrame& frame,
+                                      const CityView& city,
+                                      const SimulationHost& host) {
+    std::optional<Selection> result;
+    const sim::Building* building =
+        city.City().FindBuilding(selection.building);
     if (building == nullptr) {
-        return;
+        return result;
     }
-    panel.Title(building->name);
+    Title(building->name);
     const bool habitat = building->kind == sim::BuildingKind::Habitat;
-    panel.Line(std::format("{}, {} floors", habitat ? "habitat" : "workplace",
-                           building->floors));
+    ImGui::Text("%s, %u floors", habitat ? "Habitat" : "Workplace",
+                building->floors);
     if (!habitat) {
-        panel.Line(std::format("shift {}-{}, {} cr",
-                               sim::FormatClock(building->shift.startMinute),
-                               sim::FormatClock(building->shift.startMinute +
-                                                building->shift.lengthMinutes),
-                               building->shift.wage),
-                   kDim);
+        ImGui::TextDisabled(
+            "Shift %s-%s, %u cr",
+            sim::FormatClock(building->shift.startMinute).c_str(),
+            sim::FormatClock(building->shift.startMinute +
+                             building->shift.lengthMinutes)
+                .c_str(),
+            building->shift.wage);
     }
-    panel.Gap();
-    panel.Line(std::format("Viewing {}  (Q/E: floor down/up)",
-                           FloorName(selection.floor)),
-               kHeading);
+
+    auto floor = static_cast<int>(selection.floor);
+    const std::string floorName = FloorName(selection.floor);
+    if (ImGui::SliderInt("Floor", &floor, 0,
+                         static_cast<int>(building->floors) - 1,
+                         floorName.c_str())) {
+        Selection next = selection;
+        next.floor = static_cast<std::uint32_t>(floor);
+        next.room = {};
+        result = next;
+    }
+    ImGui::SetItemTooltip("Q / E change floors too");
+
     const auto occupants = Occupants(frame);
-    for (const sim::Room& room : building->rooms) {
-        if (room.floor != selection.floor) {
-            continue;
+    if (ImGui::BeginTable("rooms", 3,
+                          ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
+                              ImGuiTableFlags_ScrollY)) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Room");
+        ImGui::TableSetupColumn("Who");
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableHeadersRow();
+        for (const sim::Room& room : building->rooms) {
+            if (room.floor != selection.floor) {
+                continue;
+            }
+            const auto inside = occupants.find(room.id.value);
+            const std::size_t count =
+                inside != occupants.end() ? inside->second.size() : 0;
+            ImGui::PushID(static_cast<int>(room.id.value));
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable(room.name.c_str())) {
+                Selection next = selection;
+                next.room = room.id;
+                next.robot = {};
+                result = next;
+            }
+            ImGui::TableNextColumn();
+            if (room.kind == sim::RoomKind::Apartment) {
+                if (count == 0) {
+                    ImGui::TextDisabled("nobody home");
+                } else {
+                    const RobotFrame* robot = inside->second.front();
+                    const std::string name = Name(host, robot->id);
+                    if (ImGui::Selectable(name.c_str())) {
+                        Selection next = selection;
+                        next.robot = robot->id;
+                        next.room = {};
+                        result = next;
+                    }
+                }
+                ImGui::TableNextColumn();
+                ImGui::TextDisabled("%u cr", room.rent);
+            } else {
+                ImGui::Text("%zu of %u", count, room.capacity);
+                ImGui::TableNextColumn();
+                ImGui::TextDisabled("%s", KindLabel(room.kind).c_str());
+            }
+            ImGui::PopID();
         }
-        const auto inside = occupants.find(room.id.value);
-        const std::size_t count =
-            inside != occupants.end() ? inside->second.size() : 0;
-        if (room.kind == sim::RoomKind::Apartment) {
-            panel.Line(std::format(
-                "{} ({} cr): {}", room.name, room.rent,
-                count > 0 ? std::string{Name(host, inside->second.front()->id)}
-                          : std::string{"nobody home"}),
-                count > 0 ? glm::vec4{0.85F, 0.88F, 0.95F, 1.0F} : kDim);
-        } else {
-            panel.Line(std::format("{} ({}): {} of {}", room.name,
-                                   KindLabel(room.kind), count, room.capacity));
-        }
+        ImGui::EndTable();
     }
+    return result;
 }
 }  // namespace
 
-std::vector<InspectorLine> DescribeSelection(const Selection& selection,
-                                             const WorldFrame& frame,
-                                             const CityView& city,
-                                             const SimulationHost& host,
-                                             std::size_t maxChars) {
-    Panel panel(std::max<std::size_t>(maxChars, 20));
-    if (selection.robot.IsValid()) {
-        if (const RobotFrame* robot =
-                SimulationHost::FindRobot(frame, selection.robot)) {
-            DescribeRobot(panel, *robot, city, host);
-        }
-    } else if (selection.room.IsValid()) {
-        DescribeRoom(panel, selection.room, frame, city, host);
-    } else if (selection.building.IsValid()) {
-        DescribeBuilding(panel, selection, frame, city, host);
+std::optional<Selection> DrawInspector(const Selection& selection,
+                                       const WorldFrame& frame,
+                                       const CityView& city,
+                                       const SimulationHost& host) {
+    if (!selection.building.IsValid() && !selection.robot.IsValid() &&
+        !selection.room.IsValid()) {
+        return std::nullopt;
     }
-    return panel.Take();
+    const ImGuiViewport& viewport = *ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(
+        ImVec2{viewport.WorkPos.x + viewport.WorkSize.x - kMargin,
+               viewport.WorkPos.y + kMargin},
+        ImGuiCond_FirstUseEver, ImVec2{1.0F, 0.0F});
+    ImGui::SetNextWindowSize(
+        ImVec2{kPanelWidth, viewport.WorkSize.y - (4.0F * kMargin)},
+        ImGuiCond_FirstUseEver);
+
+    bool open = true;
+    std::optional<Selection> result;
+    if (ImGui::Begin("Inspector", &open)) {
+        if ((selection.robot.IsValid() || selection.room.IsValid()) &&
+            selection.building.IsValid()) {
+            if (ImGui::SmallButton("< Back to floor")) {
+                Selection next = selection;
+                next.robot = {};
+                next.room = {};
+                result = next;
+            }
+        }
+        std::optional<Selection> clicked;
+        if (selection.robot.IsValid()) {
+            if (const RobotFrame* robot =
+                    SimulationHost::FindRobot(frame, selection.robot)) {
+                clicked = DrawRobot(*robot, city, host);
+            }
+        } else if (selection.room.IsValid()) {
+            clicked = DrawRoom(selection, frame, city, host);
+        } else {
+            clicked = DrawBuilding(selection, frame, city, host);
+        }
+        if (clicked) {
+            result = clicked;
+        }
+    }
+    ImGui::End();
+    if (!open) {
+        return Selection{};
+    }
+    return result;
 }
 
 }  // namespace mechapunk

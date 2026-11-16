@@ -1,26 +1,18 @@
 #pragma once
 
-#include <cstddef>
-#include <string>
-#include <vector>
-
-#include <glm/ext/vector_float4.hpp>
+#include <optional>
 
 #include "CityView.hpp"
 #include "SimulationHost.hpp"
 
 namespace mechapunk {
 
-struct InspectorLine {
-    std::string text;
-    float size{20.0F};
-    glm::vec4 color{0.85F, 0.88F, 0.95F, 1.0F};
-};
-
-// Describes the selected robot, room or open building for the side panel.
-// Lines longer than `maxChars` are wrapped.
-[[nodiscard]] std::vector<InspectorLine> DescribeSelection(
+// Draws the inspector window for the selected building, room or robot with
+// Dear ImGui. Names, rooms and floors in it are clickable: the result is the
+// selection the player asked for, or an empty selection when the window was
+// closed. Nothing when the selection should stay as it is.
+[[nodiscard]] std::optional<Selection> DrawInspector(
     const Selection& selection, const WorldFrame& frame, const CityView& city,
-    const SimulationHost& host, std::size_t maxChars);
+    const SimulationHost& host);
 
 }  // namespace mechapunk

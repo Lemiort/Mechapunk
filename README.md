@@ -57,20 +57,29 @@ aside to `FILE.broken` instead of being overwritten.
 
 ### Inspecting
 
+The interface is drawn with [Dear ImGui](https://github.com/ocornut/imgui)
+through NEE's `ImGuiOverlay`. The **City** window shows the day and time,
+pause and step, speed, how many robots are resting, working, out and
+walking, and buttons to save and take a screenshot. Window positions are
+kept in `mechapunk-ui.ini` next to the game.
+
 Click a building to open it as a cutaway: the floors below are solid, the
 floor you are looking at shows every room as a colored tile, and the floors
 above are hidden. Robots in a room sit on its tile. Habitats open on their
-first apartment floor; Q goes down to the stores. A panel on the right lists
-the floor's rooms and who is in them.
+first apartment floor; Q goes down to the stores. The **Inspector** window
+then lists the floor's rooms with who is in them, with a floor slider.
 
-- Click a room for its kind, opening hours, price, and the robots inside
-  with when each will leave.
-- Click a robot, inside a room or walking in the street, for what it is
-  doing and until when, its four needs, credits, home, job and shift, and
-  its recent events.
+- Click a room, in the city or in the inspector, for its kind, opening
+  hours, price, occupancy, and the robots inside with when each will leave.
+- Click a robot, in the city or by its name in the inspector, for what it
+  is doing and until when, its four needs as bars, credits and rent owed,
+  home, job, shift and days off, and its recent events.
+- Names of rooms in the inspector are links: clicking one moves the view to
+  that building and floor with the room selected.
 
-Recent events are kept while the game runs and are not saved, so the list
-starts empty after loading.
+Clicks, drags and scrolling over a window stay in the window. Recent events
+are kept while the game runs and are not saved, so the list starts empty
+after loading.
 
 Walking robots are drawn as yellow spheres moving along their route; robots
 in an apartment, workspace or venue are inside their building. Habitats are

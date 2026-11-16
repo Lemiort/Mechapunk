@@ -70,8 +70,6 @@ GameRenderer::GameRenderer(int width, int height) {
     directionalLightShader_ =
         LoadShader({{"shaders/DSDirectionalLight.vsh", ShaderType::Vertex},
                     {"shaders/DSDirectionalLight.fsh", ShaderType::Fragment}});
-    textShader_ = LoadShader({{"shaders/text2d.vsh", ShaderType::Vertex},
-                              {"shaders/text2d.fsh", ShaderType::Fragment}});
 
     gBuffer_ = std::make_shared<GBuffer>(width, height);
     forwardPipeline_ =
@@ -94,16 +92,6 @@ GameRenderer::GameRenderer(int width, int height) {
             .spotLightMaterial = passMaterial(spotLightShader_),
             .directionalLightMaterial =
                 passMaterial(directionalLightShader_)});
-
-    font_ = std::make_shared<Font2d>();
-    if (!font_->Load("fonts/MagistralIC_UTF-8.fnt")) {
-        throw std::runtime_error("Unable to load the interface font");
-    }
-    textRenderer_ =
-        std::make_unique<TextRenderer>(gsl_lite::not_null{textShader_});
-    if (!textRenderer_->RegisterFont(*font_)) {
-        throw std::runtime_error("Unable to register the interface font");
-    }
 
     const auto flatNormal = LoadTexture("textures/normal_up.jpg");
     const auto matte = LoadTexture("textures/mp_specular_low.png");
@@ -148,30 +136,11 @@ void GameRenderer::Resize(int width, int height) {
     }
 }
 
-void GameRenderer::Render(const Scene& scene, RenderQueue& queue,
+void GameRenderer::Render(const Scene& scene, const RenderQueue& queue,
                           const Camera& camera) {
     const SceneView view = scene.CreateView(camera, queue);
     deferredPipeline_->Render(view, *forwardPipeline_);
-
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    textRenderer_->Render(queue.GetText(), camera);
-    glDisable(GL_BLEND);
-    glDepthMask(GL_TRUE);
-    glEnable(GL_DEPTH_TEST);
-}
-
-FontLine2d GameRenderer::MakeText(std::string text, float x, float y,
-                                  float size) const {
-    FontLine2d line;
-    line.SetFont(font_);
-    line.SetText(std::move(text));
-    line.SetPosition(x, y);
-    line.SetFontSize(size);
-    return line;
 }
 
 }  // namespace mechapunk

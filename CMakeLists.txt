@@ -11,6 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(glfw3 REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(glaze CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 include(CTest)
 
@@ -46,3 +47,7 @@ foreach(dir shaders fonts models textures)
              DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
     endif()
 endforeach()
+
+# UI font from the imgui package (Roboto, Apache License 2.0).
+file(COPY "${NEE_IMGUI_BACKEND_DIR}/../fonts/Roboto-Medium.ttf"
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fonts)

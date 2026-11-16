@@ -15,8 +15,6 @@
 #include "RenderQueue.hpp"
 #include "Scene.hpp"
 #include "Shader.hpp"
-#include "Text2D.hpp"
-#include "TextRenderer.hpp"
 #include "mechapunk/sim/City.hpp"
 
 namespace mechapunk {
@@ -52,12 +50,10 @@ public:
     [[nodiscard]] RenderAssets& Assets() noexcept { return assets_; }
 
     void Resize(int width, int height);
-    // Draws the queued meshes lit by the scene's lights, then the overlay
-    // text lines on top.
-    void Render(const Scene& scene, RenderQueue& queue, const Camera& camera);
-    // A text line for the overlay; positions are in [-1, 1] screen units.
-    [[nodiscard]] FontLine2d MakeText(std::string text, float x, float y,
-                                      float size) const;
+    // Draws the queued meshes lit by the scene's lights into the window's
+    // framebuffer, which stays bound for UI drawn on top.
+    void Render(const Scene& scene, const RenderQueue& queue,
+                const Camera& camera);
 
 private:
     std::shared_ptr<Shader> meshShader_;
@@ -66,12 +62,9 @@ private:
     std::shared_ptr<Shader> pointLightShader_;
     std::shared_ptr<Shader> spotLightShader_;
     std::shared_ptr<Shader> directionalLightShader_;
-    std::shared_ptr<Shader> textShader_;
     std::shared_ptr<GBuffer> gBuffer_;
     std::unique_ptr<ForwardPipeline> forwardPipeline_;
     std::unique_ptr<DeferredPipeline> deferredPipeline_;
-    std::shared_ptr<Font2d> font_;
-    std::unique_ptr<TextRenderer> textRenderer_;
     RenderAssets assets_;
 };
 
