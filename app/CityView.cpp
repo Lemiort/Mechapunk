@@ -185,10 +185,12 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
         // A sign high on the street side, and one per store at street level
         // above its door.
         const float front = shape.turned ? -1.0F : 1.0F;
-        neonSigns_.emplace_back(
-            centerOnGround + vec3{0.0F, height * 0.6F,
-                                  front * ((kBuildingDepth * 0.5F) + (0.6F * kS))},
-            habitat ? kHabitatNeon : kWorkplaceNeon);
+        neonSigns_.push_back(
+            {.position = centerOnGround +
+                         vec3{0.0F, height * 0.6F,
+                              front * ((kBuildingDepth * 0.5F) + (0.6F * kS))},
+             .color = habitat ? kHabitatNeon : kWorkplaceNeon,
+             .building = building.id});
         std::vector<const sim::Room*> stores;
         for (const sim::Room& room : building.rooms) {
             if (room.floor == 0 && sim::IsVenue(room.kind)) {
@@ -199,9 +201,11 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
             21.0F / static_cast<float>(std::max<std::size_t>(stores.size(), 1));
         for (std::size_t index = 0; index < stores.size(); ++index) {
             const float x = -8.0F + (storeWidth * (static_cast<float>(index) + 0.5F));
-            neonSigns_.emplace_back(
-                ToWorld(shape, 0, {x, 2.9F, (kFootprintDepthMeters * 0.5F) + 0.8F}),
-                StoreNeon(stores[index]->kind));
+            neonSigns_.push_back(
+                {.position = ToWorld(shape, 0,
+                                     {x, 2.9F, (kFootprintDepthMeters * 0.5F) + 0.8F}),
+                 .color = StoreNeon(stores[index]->kind),
+                 .building = building.id});
         }
     }
     for (const sim::Building& building : city_.buildings) {
@@ -239,11 +243,13 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                                 .material = assets_.tower});
             AddFacade(position, width, depth, floors);
             if (random.UniformInt(1, 100) <= kTowerNeonChance) {
-                neonSigns_.emplace_back(
-                    position - (vec3{quadrant.x * width, 0.0F, quadrant.y * depth} *
-                                0.55F) +
-                        vec3{0.0F, height * 0.7F, 0.0F},
-                    kTowerNeon);
+                neonSigns_.push_back(
+                    {.position = position -
+                                 (vec3{quadrant.x * width, 0.0F, quadrant.y * depth} *
+                                  0.55F) +
+                                 vec3{0.0F, height * 0.7F, 0.0F},
+                     .color = kTowerNeon,
+                     .building = {}});
             }
         }
     }
@@ -297,11 +303,13 @@ void CityView::AddLights(Scene& scene) {
                                                0.0F));  // sky fill
     scene.AddDirectionalLight(DirectionalLight(-0.3F, -1.0F, -0.4F, 0.0F, 0.0F,
                                                0.0F));  // inspection
-    for (const auto& [position, color] : neonSigns_) {
+    for (const NeonSign& sign : neonSigns_) {
         neons_.push_back({.lightIndex = scene.GetPointLights().size(),
-                          .color = color});
-        scene.AddPointLight(PointLight(position.x, position.y, position.z,
-                                       color.r, color.g, color.b, kNeonPower));
+                          .color = sign.color,
+                          .building = sign.building});
+        scene.AddPointLight(PointLight(sign.position.x, sign.position.y,
+                                       sign.position.z, sign.color.r,
+                                       sign.color.g, sign.color.b, kNeonPower));
     }
 }
 
@@ -320,15 +328,21 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
             -glm::normalize(vec3{horizontal, std::max(sunHeight, 0.05F), 0.35F}));
         directional[0].SetColor(kSunColor * std::max(sunHeight, 0.0F) * 1.1F);
         directional[1].SetColor(glm::mix(kNightSky, kDaySky, daylight));
-        directional[2].SetColor(selection.building.IsValid() ? kInspectionLight
-                                                             : vec3(0.0F));
+        // Brighter at night, when the sky no longer lights the rooms.
+        directional[2].SetColor(selection.building.IsValid()
+                                    ? kInspectionLight * (1.8F - (0.8F * daylight))
+                                    : vec3(0.0F));
     }
-    // Neon dims in daylight but never goes out.
+    // Neon dims in daylight but never goes out. Lights shine through walls,
+    // so the open building's own signs are off while it is inspected.
     const float neon = 1.0F - (0.75F * daylight);
     const auto points = scene.GetPointLights();
     for (const Neon& sign : neons_) {
         if (sign.lightIndex < points.size()) {
-            points[sign.lightIndex].SetColor(sign.color * neon);
+            const bool inspected = selection.building.IsValid() &&
+                                   sign.building == selection.building;
+            points[sign.lightIndex].SetColor(inspected ? vec3(0.0F)
+                                                       : sign.color * neon);
         }
     }
 }

@@ -169,12 +169,14 @@ PropModel Make(PropKind kind) {
                  Box(0, 0.72F, 0, 1.2F, 0.05F, 0.7F, kWood)};
             break;
         case PropKind::ChargingPod:
+            // An open charging post: the robot stands on the plate, backed
+            // up to the column, with a low rail on each side.
             m = {Box(0, 0, 0, 0.9F, 0.1F, 0.9F, kDarkMetal),
-                 Box(0, 0, -0.4F, 0.9F, 2.1F, 0.1F, kMetal),
-                 Box(-0.42F, 0, -0.2F, 0.06F, 2.1F, 0.4F, kMetal),
-                 Box(0.42F, 0, -0.2F, 0.06F, 2.1F, 0.4F, kMetal),
+                 Box(0, 0, -0.4F, 0.3F, 1.9F, 0.1F, kMetal),
                  Box(0, 1.0F, -0.34F, 0.12F, 0.6F, 0.03F, kGreen),
-                 Box(0, 2.1F, -0.2F, 0.9F, 0.06F, 0.5F, kGreen)};
+                 Box(0, 1.9F, -0.4F, 0.36F, 0.06F, 0.16F, kGreen),
+                 Box(-0.42F, 0, -0.1F, 0.06F, 0.9F, 0.6F, kMetal),
+                 Box(0.42F, 0, -0.1F, 0.06F, 0.9F, 0.6F, kMetal)};
             break;
         case PropKind::Workbench:
             m = {Box(0, 0.9F, 0, 2.0F, 0.06F, 0.8F, kWood),

@@ -60,14 +60,31 @@ aside to `FILE.broken` instead of being overwritten.
 The interface is drawn with [Dear ImGui](https://github.com/ocornut/imgui)
 through NEE's `ImGuiOverlay`. The **City** window shows the day and time,
 pause and step, speed, how many robots are resting, working, out and
-walking, and buttons to save and take a screenshot. Window positions are
+walking, the frame rate, and buttons to save and take a screenshot. Window positions are
 kept in `mechapunk-ui.ini` next to the game.
 
 Click a building to open it as a cutaway: the floors below are solid, the
-floor you are looking at shows every room as a colored tile, and the floors
-above are hidden. Robots in a room sit on its tile. Habitats open on their
-first apartment floor; Q goes down to the stores. The **Inspector** window
-then lists the floor's rooms with who is in them, with a floor slider.
+floor you are looking at is drawn room by room at real scale, and the floors
+above are hidden. The open building's own signs switch off and a lamp lights
+the floor, brighter at night.
+
+- Apartment floors have a stairwell, an elevator and a corridor with six
+  apartments. Each has a bathroom, a bedroom and a living room with a
+  kitchen, behind doors, with windows in the outer walls.
+- Stores on a habitat's ground floor and workplace rooms are furnished for
+  what they are: bar counters and booths, diner tables, charging posts,
+  repair lifts and workbenches, arcade cabinets, shop shelves, furnaces and
+  conveyors, server racks, office desks.
+- Robots are drawn where they are: asleep in bed at night, on the sofa in
+  the evening, on a stool at the bar, standing at a machine at work.
+
+Furniture and robots are built from boxes in `app/Props.cpp`, one catalog
+entry per kind, so each can later be replaced by a model. Floor plans are
+laid out in `app/Interior.cpp`.
+
+Habitats open on their first apartment floor; Q goes down to the stores. The
+**Inspector** window then lists the floor's rooms with who is in them, with a
+floor slider.
 
 - Click a room, in the city or in the inspector, for its kind, opening
   hours, price, occupancy, and the robots inside with when each will leave.
@@ -81,8 +98,9 @@ Clicks, drags and scrolling over a window stay in the window. Recent events
 are kept while the game runs and are not saved, so the list starts empty
 after loading.
 
-Walking robots are drawn as yellow spheres moving along their route; robots
-in an apartment, workspace or venue are inside their building. Habitats are
+Walking robots stride along their route, drawn larger the further out the
+camera is so they stay visible; robots in an apartment, workspace or venue
+are inside their building. Habitats are
 cyan towers with colored store signs at street level, workplaces are
 magenta, and the dark towers are decoration. Building height follows the
 number of floors. Sunlight follows the time of day, and neon lights the

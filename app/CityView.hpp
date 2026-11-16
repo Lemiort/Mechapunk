@@ -106,9 +106,15 @@ private:
         glm::vec3 minimum;
         glm::vec3 maximum;
     };
+    struct NeonSign {
+        glm::vec3 position;
+        glm::vec3 color;
+        sim::EntityId building;  // None for decorative towers.
+    };
     struct Neon {
         std::size_t lightIndex;
         glm::vec3 color;
+        sim::EntityId building;
     };
     struct Marker {
         sim::EntityId id;
@@ -149,7 +155,7 @@ private:
     std::map<std::pair<std::uint64_t, std::uint32_t>, FloorPlan> plans_;
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<glm::vec3>>
         routeCache_;
-    std::vector<std::pair<glm::vec3, glm::vec3>> neonSigns_;  // position, color
+    std::vector<NeonSign> neonSigns_;
     std::vector<Neon> neons_;
     std::size_t lampIndex_{};
     glm::vec3 center_{0.0F};

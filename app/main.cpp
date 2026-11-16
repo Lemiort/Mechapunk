@@ -494,6 +494,7 @@ private:
                             frame->resting, frame->working, frame->visiting,
                             frame->walking);
             }
+            ImGui::TextDisabled("%.0f fps", ImGui::GetIO().Framerate);
             if (ImGui::Button("Save")) {
                 auto saved = host_.Save(savePath_);
                 ShowMessage(saved ? std::format("Saved {}", savePath_.string())
