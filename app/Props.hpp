@@ -80,6 +80,9 @@ enum class PropKind : std::uint8_t {
     // Stairs down to the metro under a glass canopy, with an M sign; the
     // stairs run along z.
     MetroEntrance,
+    // Parks.
+    Tree,
+    Bench,
 };
 
 [[nodiscard]] const PropModel& Prop(PropKind kind);

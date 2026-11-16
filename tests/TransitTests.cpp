@@ -19,12 +19,16 @@ sim::World Load(sim::WorldState state) {
 }
 }  // namespace
 
-// Stations sit at every third intersection, so every street node is a
+// Stations sit at every second intersection, so every street node is a
 // short walk from one.
 TEST(Transit, StationsCoverTheCity) {
-    sim::World world = sim::World::Generate({.seed = 3, .robots = 120});
+    sim::World world = sim::World::Generate({.seed = 3, .robots = 1000});
     const sim::City& city = world.State().city;
-    ASSERT_EQ(city.stations.size(), 9U);
+    std::uint32_t size = 0;
+    while ((size + 1) * (size + 1) <= city.nodes.size()) {
+        ++size;
+    }
+    ASSERT_EQ(city.stations.size(), (size / 2) * (size / 2));
     std::set<std::uint32_t> nodes;
     std::set<std::string> names;
     for (const sim::Station& station : city.stations) {
@@ -38,15 +42,15 @@ TEST(Transit, StationsCoverTheCity) {
             nearest = std::min(nearest,
                                routes.DistanceMeters(node.id, station.node).value_or(UINT32_MAX));
         }
-        // Two blocks each way, plus a detour round a missing street.
-        EXPECT_LE(nearest, 4U * 120U) << "node " << node.id.value;
+        // A block each way, plus a detour round a missing street.
+        EXPECT_LE(nearest, 4U * 80U) << "node " << node.id.value;
     }
 }
 
 // The metro is taken only when it is faster than walking, never inside one
 // building, and its parts add up to the whole trip.
 TEST(Transit, TripsTakeTheMetroOnlyWhenFaster) {
-    sim::World world = sim::World::Generate({.seed = 3, .robots = 120});
+    sim::World world = sim::World::Generate({.seed = 3, .robots = 1000});
     const auto& apartments = world.Rooms().RoomsOfKind(sim::RoomKind::Apartment);
     const auto& workspaces = world.Rooms().RoomsOfKind(sim::RoomKind::Workspace);
     std::uint32_t byMetro = 0;
@@ -60,7 +64,8 @@ TEST(Transit, TripsTakeTheMetroOnlyWhenFaster) {
                 ++byMetro;
                 EXPECT_LT(trip.minutes, walk.minutes);
                 EXPECT_NE(trip.fromStation, trip.toStation);
-                EXPECT_LT(trip.minutesToStation + trip.minutesUnderground, trip.minutes);
+                // The walk on can take no time when the station is at the door.
+                EXPECT_LE(trip.minutesToStation + trip.minutesUnderground, trip.minutes);
             }
         }
         const sim::RoomRef& neighbour = apartments.front();
@@ -74,15 +79,16 @@ TEST(Transit, TripsTakeTheMetroOnlyWhenFaster) {
 // Riders pay the fare and are underground between boarding and alighting;
 // a robot that cannot spare the fare walks instead.
 TEST(Transit, RidersPayAndBrokeRobotsWalk) {
-    sim::World start = sim::World::Generate({.seed = 9, .robots = 300});
+    sim::World start = sim::World::Generate({.seed = 9, .robots = 2000});
     start.RunFor(60);  // Day 1, 01:00: everyone at home.
     sim::WorldState state = start.State();
-    // Of the robots with a commute ahead, half keep their credits and the
-    // other half have none.
+    // Of the robots whose commute is fastest by metro, half keep their
+    // credits and the other half have none.
     std::set<std::uint64_t> broke;
     std::set<std::uint64_t> commuters;
     for (sim::Robot& robot : state.robots) {
-        if (!robot.workspace.IsValid() || robot.commuteAt == sim::kNoCommute) {
+        if (!robot.workspace.IsValid() || robot.commuteAt == sim::kNoCommute ||
+            !start.PlanTrip(robot.apartment, robot.workspace).metro) {
             continue;
         }
         commuters.insert(robot.id.value);
@@ -91,6 +97,7 @@ TEST(Transit, RidersPayAndBrokeRobotsWalk) {
             broke.insert(robot.id.value);
         }
     }
+    ASSERT_GE(commuters.size(), 4U);
     sim::World world = Load(std::move(state));
     std::uint64_t paidRides = 0;
     std::uint64_t brokeRides = 0;

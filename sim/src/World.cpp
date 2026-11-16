@@ -294,6 +294,10 @@ void World::Step() {
         UpdateNeeds();
         Socialize();
     }
+    // Last, once tonight's new memories have pushed out old ones.
+    if (MinuteOfDay(state_.tick) == 0) {
+        ForgetDeparted();
+    }
     // Robots act in id order, so random draws happen in a fixed order.
     for (Robot& robot : state_.robots) {
         if (robot.nextActionAt <= state_.tick) {

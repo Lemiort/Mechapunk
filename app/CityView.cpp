@@ -44,10 +44,6 @@ constexpr float kRobotSpread = 3.0F * kS;
 constexpr float kNeonPower = 2.5F;
 constexpr float kGlassOpacity = 0.3F;
 constexpr float kHighlightOpacity = 0.3F;
-// Chance, in percent, that a free corner of a block gets a filler tower and
-// that such a tower carries a neon sign.
-constexpr std::uint32_t kTowerChance = 60;
-constexpr std::uint32_t kTowerNeonChance = 15;
 // Separate random stream so decoration never affects the simulation.
 constexpr std::uint64_t kDecorationStream = 100;
 // Robots in apartments sleep in this part of the day, else sit on the sofa.
@@ -56,7 +52,8 @@ constexpr double kWakeUp = 7.0 * 60.0;
 
 constexpr vec3 kHabitatNeon{0.1F, 0.9F, 1.0F};
 constexpr vec3 kWorkplaceNeon{1.0F, 0.2F, 0.8F};
-constexpr vec3 kTowerNeon{1.0F, 0.6F, 0.1F};
+constexpr vec3 kGrass{0.16F, 0.32F, 0.17F};
+constexpr vec3 kPavement{0.36F, 0.36F, 0.38F};
 constexpr vec3 kFacadeGlass{0.13F, 0.17F, 0.24F};
 constexpr vec3 kConcrete{0.3F, 0.31F, 0.35F};
 constexpr vec3 kGlassColor{0.6F, 0.8F, 0.92F};
@@ -233,10 +230,8 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
         AddFacade(shape.center, kBuildingWidth, kBuildingDepth, shape.floors);
     }
 
-    // Decorative towers fill the remaining corners for a denser skyline.
+    // Corners without a building are small parks.
     sim::Pcg32 random = sim::Pcg32::FromSeed(seed, kDecorationStream);
-    const float maxCoordinate = extent_;
-    const std::size_t buildingItems = statics_.size();
     for (const sim::CityNode& node : city_.nodes) {
         const vec3 corner = NodePosition(node.id);
         for (std::size_t slot = 0; slot < kQuadrants.size(); ++slot) {
@@ -245,35 +240,44 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                 corner + vec3{quadrant.x * kQuadrantOffset.x, 0.0F,
                               quadrant.y * kQuadrantOffset.y};
             const bool insideCity =
-                position.x > 0.0F && position.z > 0.0F &&
-                position.x < maxCoordinate && position.z < maxCoordinate;
-            if (!insideCity || occupied[node.id.value].at(slot) ||
-                random.UniformInt(1, 100) > kTowerChance) {
-                continue;
-            }
-            const std::uint32_t floors = random.UniformInt(3, 14);
-            const float height = static_cast<float>(floors) * kFloorHeight;
-            const float width =
-                kBuildingWidth * (0.6F + (static_cast<float>(random.UniformInt(0, 4)) * 0.1F));
-            const float depth = kBuildingDepth * 0.9F;
-            statics_.push_back({.mesh = assets_.cube.get(),
-                                .transform = {.position = position,
-                                              .rotationDegrees = vec3(0.0F),
-                                              .scale = {width, height, depth}},
-                                .material = assets_.tower});
-            AddFacade(position, width, depth, floors);
-            if (random.UniformInt(1, 100) <= kTowerNeonChance) {
-                neonSigns_.push_back(
-                    {.position = position -
-                                 (vec3{quadrant.x * width, 0.0F, quadrant.y * depth} *
-                                  0.55F) +
-                                 vec3{0.0F, height * 0.7F, 0.0F},
-                     .color = kTowerNeon,
-                     .building = {}});
+                position.x > minimum.x && position.z > minimum.z &&
+                position.x < maximum.x && position.z < maximum.z;
+            if (insideCity && !occupied[node.id.value].at(slot)) {
+                AddPark(position, random);
             }
         }
     }
-    (void)buildingItems;
+}
+
+void CityView::AddPark(vec3 center, sim::Pcg32& random) {
+    const std::shared_ptr<const Material> grass = assets_.palette->Get(kGrass);
+    const std::shared_ptr<const Material> path = assets_.palette->Get(kPavement);
+    statics_.push_back({.mesh = assets_.cube.get(),
+                        .transform = {.position = center,
+                                      .rotationDegrees = vec3(0.0F),
+                                      .scale = {kBuildingWidth * 0.95F, 0.15F * kS,
+                                                kBuildingDepth * 0.95F}},
+                        .material = grass});
+    statics_.push_back({.mesh = assets_.cube.get(),
+                        .transform = {.position = center,
+                                      .rotationDegrees = vec3(0.0F),
+                                      .scale = {kBuildingWidth * 0.95F, 0.17F * kS,
+                                                2.0F * kS}},
+                        .material = path});
+    // A few trees, and benches along the path.
+    const int trees = static_cast<int>(random.UniformInt(4, 7));
+    for (int tree = 0; tree < trees; ++tree) {
+        const float x = (static_cast<float>(random.UniformInt(0, 100)) / 100.0F - 0.5F) *
+                        (kFootprintWidthMeters - 4.0F);
+        const float side = tree % 2 == 0 ? 1.0F : -1.0F;
+        const float z = side * (3.0F + (static_cast<float>(random.UniformInt(0, 100)) /
+                                        100.0F * (kFootprintDepthMeters * 0.5F - 5.0F)));
+        AddStaticModel(Prop(PropKind::Tree), center + (vec3{x, 0.0F, z} * kS),
+                       static_cast<float>(random.UniformInt(0, 359)));
+    }
+    for (const float x : {-6.0F, 6.0F}) {
+        AddStaticModel(Prop(PropKind::Bench), center + (vec3{x, 0.0F, 1.6F} * kS), 180.0F);
+    }
 }
 
 void CityView::AddFacade(vec3 center, float width, float depth,

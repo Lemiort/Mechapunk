@@ -113,9 +113,10 @@ private:
 };
 
 struct CityParams {
-    // Intersections per side of the square street grid.
-    std::uint32_t gridSize{8};
-    std::uint32_t blockMeters{120};
+    // Intersections per side of the square street grid; 0 sizes the grid to
+    // the population, so buildings fill about half of the street corners.
+    std::uint32_t gridSize{0};
+    std::uint32_t blockMeters{80};
     // Apartments and workspaces are added until both hold this many.
     std::uint32_t residents{100};
 };
@@ -128,7 +129,8 @@ struct EntityIdAllocator {
 };
 
 // Builds a connected street grid with a few missing segments, and a metro
-// station at every third intersection each way. Habitats,
+// station at every second intersection each way. Every intersection has
+// room for four buildings, one on each corner. Habitats,
 // concentrated in the west, have stores on the ground floor and apartments
 // above; workplaces in the east are split into workspaces over their floors.
 [[nodiscard]] City GenerateCity(const CityParams& params, Pcg32& random,

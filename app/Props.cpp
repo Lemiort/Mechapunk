@@ -223,6 +223,16 @@ PropModel Make(PropKind kind) {
                  Box(0.85F, 2.8F, 1.3F, 0.55F, 0.55F, 0.12F, kNeonCyan),
                  Box(0.85F, 2.92F, 1.37F, 0.3F, 0.3F, 0.02F, kWhite)};
             break;
+        case PropKind::Tree:
+            m = {Box(0, 0, 0, 0.35F, 2.4F, 0.35F, kDarkWood),
+                 Box(0, 2.0F, 0, 2.6F, 2.2F, 2.6F, kLeaf),
+                 Box(0.2F, 3.6F, -0.1F, 1.6F, 1.2F, 1.6F, kLeaf)};
+            break;
+        case PropKind::Bench:
+            m = {Box(0, 0.42F, 0, 1.6F, 0.06F, 0.45F, kWood),
+                 Box(0, 0.48F, -0.2F, 1.6F, 0.4F, 0.05F, kWood)};
+            Legs(m, 1.5F, 0.4F, 0.42F, kDarkMetal, 0.06F);
+            break;
         case PropKind::Crate:
             m = {Box(0, 0, 0, 0.7F, 0.6F, 0.7F, kWood),
                  Box(0, 0.6F, 0, 0.72F, 0.04F, 0.72F, kDarkWood)};

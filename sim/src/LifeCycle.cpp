@@ -76,7 +76,6 @@ void World::AgeRobots() {
     for (std::size_t newcomer = 0; newcomer < wornOut.size(); ++newcomer) {
         AddNewcomer();
     }
-    ForgetDeparted();
 }
 
 void World::Scrap(EntityId id) {

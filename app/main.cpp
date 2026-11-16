@@ -72,7 +72,7 @@ constexpr float kUiFontSize = 17.0F;
 struct Options {
     bool startNew{false};
     std::uint64_t seed{1};
-    std::uint32_t robots{300};
+    std::uint32_t robots{2000};
     std::filesystem::path savePath{"mechapunk-save.json"};
 };
 

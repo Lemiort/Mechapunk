@@ -1,6 +1,7 @@
 #include "mechapunk/sim/City.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -30,7 +31,7 @@ constexpr std::uint32_t kApartmentsPerFloor = 6;
 // more.
 constexpr std::uint32_t kMinBaseRent = 25;
 constexpr std::uint32_t kMaxBaseRent = 40;
-constexpr std::uint32_t kMinStores = 1;
+constexpr std::uint32_t kMinStores = 2;
 constexpr std::uint32_t kMaxStores = 3;
 constexpr std::uint32_t kMinWorkplaceJobs = 15;
 constexpr std::uint32_t kMaxWorkplaceJobs = 40;
@@ -99,12 +100,38 @@ bool IsConnected(std::uint32_t nodeCount, const std::vector<CityEdge>& edges,
     return reached == nodeCount;
 }
 
+// An intersection in the given columns with a free corner, if one can be
+// found in a few tries; its corner is then taken.
 NodeId RandomNodeInColumns(const CityParams& params, Pcg32& random,
-                           std::uint32_t firstColumn,
-                           std::uint32_t lastColumn) {
-    const std::uint32_t column = random.UniformInt(firstColumn, lastColumn);
-    const std::uint32_t row = random.UniformInt(0, params.gridSize - 1);
-    return NodeId{(row * params.gridSize) + column};
+                           std::uint32_t firstColumn, std::uint32_t lastColumn,
+                           std::vector<std::uint32_t>& buildingsAt) {
+    constexpr std::uint32_t kCorners = 4;
+    constexpr int kTries = 32;
+    NodeId node;
+    for (int attempt = 0; attempt < kTries; ++attempt) {
+        const std::uint32_t column = random.UniformInt(firstColumn, lastColumn);
+        const std::uint32_t row = random.UniformInt(0, params.gridSize - 1);
+        node = NodeId{(row * params.gridSize) + column};
+        if (buildingsAt.at(node.value) < kCorners) {
+            break;
+        }
+    }
+    ++buildingsAt.at(node.value);
+    return node;
+}
+
+// The smallest grid of at least kMinGridSize on which the buildings for
+// `residents` take about kBuildingsPerNode of every intersection's corners.
+std::uint32_t GridSizeFor(std::uint32_t residents) {
+    constexpr std::uint32_t kMinGridSize = 4;
+    constexpr double kAverageApartments = (kMinApartments + kMaxApartments) / 2.0;
+    constexpr double kAverageJobs = (kMinWorkplaceJobs + kMaxWorkplaceJobs) / 2.0;
+    constexpr double kBuildingsPerNode = 3.0;
+    const double buildings = std::ceil(residents / kAverageApartments) +
+                             std::ceil(residents / kAverageJobs);
+    const auto size =
+        static_cast<std::uint32_t>(std::ceil(std::sqrt(buildings / kBuildingsPerNode)));
+    return std::max(kMinGridSize, size);
 }
 
 template <typename T>
@@ -112,7 +139,7 @@ const T& Pick(std::span<const T> items, Pcg32& random) {
     return items[random.UniformInt(0, static_cast<std::uint32_t>(items.size() - 1))];
 }
 
-constexpr std::uint32_t kStationSpacing = 3;
+constexpr std::uint32_t kStationSpacing = 2;
 constexpr std::uint32_t kStationOffset = 1;
 constexpr std::array<std::string_view, 12> kStationNames{
     "Neon Square",  "Foundry Gate", "Old Grid",     "Chrome Market",
@@ -129,13 +156,15 @@ constexpr std::array kStoreOrder{
 // Ground-floor stores and apartments above. Store kinds rotate through every
 // venue kind so each city has some of each.
 Building MakeHabitat(const CityParams& params, Pcg32& random,
+                     std::vector<std::uint32_t>& buildingsAt,
                      EntityIdAllocator& ids, std::uint32_t number,
                      std::uint32_t& storeRotation) {
     Building building{.id = ids.Allocate(),
                       .name = std::format("Hab Block {}", number),
                       .kind = BuildingKind::Habitat,
                       .entrance = RandomNodeInColumns(params, random, 0,
-                                                      params.gridSize / 2),
+                                                      params.gridSize / 2,
+                                                      buildingsAt),
                       .floors = 1,
                       .shift = {},
                       .rooms = {}};
@@ -170,6 +199,7 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
 }
 
 Building MakeWorkplace(const CityParams& params, Pcg32& random,
+                       std::vector<std::uint32_t>& buildingsAt,
                        EntityIdAllocator& ids,
                        std::array<std::uint32_t, kWorkplaceTypes.size()>& counts) {
     const std::uint32_t typeIndex = random.UniformInt(
@@ -180,7 +210,7 @@ Building MakeWorkplace(const CityParams& params, Pcg32& random,
         .name = std::format("{} {}", type.name, ++counts.at(typeIndex)),
         .kind = BuildingKind::Workplace,
         .entrance = RandomNodeInColumns(params, random, params.gridSize / 2,
-                                        params.gridSize - 1),
+                                        params.gridSize - 1, buildingsAt),
         .floors = 1,
         .shift = type.shift,
         .rooms = {}};
@@ -235,8 +265,12 @@ const std::vector<RoomRef>& RoomIndex::RoomsOfKind(RoomKind kind) const {
     return found != byKind_.end() ? found->second : kNone;
 }
 
-City GenerateCity(const CityParams& params, Pcg32& random,
+City GenerateCity(const CityParams& requested, Pcg32& random,
                   EntityIdAllocator& ids) {
+    CityParams params = requested;
+    if (params.gridSize == 0) {
+        params.gridSize = GridSizeFor(params.residents);
+    }
     if (params.gridSize < 2 || params.blockMeters == 0) {
         throw std::invalid_argument(
             "A city needs at least a 2x2 grid and non-zero block length");
@@ -253,7 +287,7 @@ City GenerateCity(const CityParams& params, Pcg32& random,
         }
     }
 
-    // Stations at every third intersection, one in from the edge, so no
+    // Stations at every second intersection, one in from the edge, so no
     // corner of the city is far from one.
     for (std::uint32_t row = kStationOffset; row < size; row += kStationSpacing) {
         for (std::uint32_t column = kStationOffset; column < size;
@@ -303,9 +337,10 @@ City GenerateCity(const CityParams& params, Pcg32& random,
     std::uint32_t apartments = 0;
     std::uint32_t habitats = 0;
     std::uint32_t storeRotation = 0;
+    std::vector<std::uint32_t> buildingsAt(city.nodes.size(), 0);
     while (apartments < params.residents) {
         Building habitat =
-            MakeHabitat(params, random, ids, ++habitats, storeRotation);
+            MakeHabitat(params, random, buildingsAt, ids, ++habitats, storeRotation);
         apartments += static_cast<std::uint32_t>(std::ranges::count(
             habitat.rooms, RoomKind::Apartment, &Room::kind));
         city.buildings.push_back(std::move(habitat));
@@ -314,7 +349,8 @@ City GenerateCity(const CityParams& params, Pcg32& random,
     std::array<std::uint32_t, kWorkplaceTypes.size()> typeCounts{};
     std::uint32_t jobs = 0;
     while (jobs < params.residents) {
-        Building workplace = MakeWorkplace(params, random, ids, typeCounts);
+        Building workplace =
+            MakeWorkplace(params, random, buildingsAt, ids, typeCounts);
         for (const Room& room : workplace.rooms) {
             jobs += room.capacity;
         }

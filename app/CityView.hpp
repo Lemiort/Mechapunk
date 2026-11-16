@@ -23,6 +23,7 @@
 #include "SimulationHost.hpp"
 #include "Transform.hpp"
 #include "mechapunk/sim/City.hpp"
+#include "mechapunk/sim/Random.hpp"
 
 namespace mechapunk {
 
@@ -170,6 +171,8 @@ private:
     void AddStaticModel(const PropModel& model, glm::vec3 origin,
                         float yawDegrees);
     void AddStreetLamps();
+    // Grass, trees and benches on a corner without a building.
+    void AddPark(glm::vec3 center, sim::Pcg32& random);
     void SubmitBox(RenderQueue& queue, glm::vec3 minimum, glm::vec3 maximum,
                    glm::vec3 color, bool glass);
     void SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
