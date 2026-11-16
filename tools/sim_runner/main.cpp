@@ -135,6 +135,8 @@ struct DayStats {
     std::uint64_t rent{};
     std::uint64_t behindOnRent{};
     std::uint64_t talks{};
+    std::uint64_t scrapped{};
+    std::uint64_t arrived{};
     std::uint64_t arguments{};
     std::map<sim::MemoryKind, std::uint64_t> memories;
     std::map<std::string, std::uint64_t> visitsByKind;
@@ -177,6 +179,12 @@ struct DayStats {
                 break;
             case sim::EventKind::Remembered:
                 ++memories[event.memory];
+                break;
+            case sim::EventKind::Scrapped:
+                ++scrapped;
+                break;
+            case sim::EventKind::Arrived:
+                ++arrived;
                 break;
         }
     }
@@ -262,6 +270,18 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
         memories(sim::MemoryKind::FoundJob), memories(sim::MemoryKind::MovedUp),
         memories(sim::MemoryKind::Evicted), levels[0], levels[1], levels[2],
         levels[3], outOfWork);
+    std::int64_t age = 0;
+    std::int64_t wear = 0;
+    for (const sim::Robot& robot : world.State().robots) {
+        age += robot.age;
+        wear += robot.wear;
+    }
+    std::println(
+        "   {} scrapped, {} arrived, {} friends lost, {} dodgy parts; {} "
+        "robots, average age {} days, average wear {}",
+        stats.scrapped, stats.arrived, memories(sim::MemoryKind::LostFriend),
+        memories(sim::MemoryKind::GotBadPart), world.State().robots.size(),
+        age / count, wear / count);
 }
 
 

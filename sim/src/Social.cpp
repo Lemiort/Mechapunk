@@ -196,6 +196,12 @@ std::string MemoryText(MemoryKind kind, std::string_view other,
             return at("moved up", "to");
         case MemoryKind::Evicted:
             return at("was evicted", "from");
+        case MemoryKind::LostFriend:
+            return std::format("lost {}, who was scrapped", other);
+        case MemoryKind::ArrivedInCity:
+            return at("moved to the city", "into");
+        case MemoryKind::GotBadPart:
+            return at("got a dodgy part", "at");
     }
     return "remembered something";
 }
@@ -425,6 +431,24 @@ std::expected<void, std::string> ValidateSocial(const WorldState& state) {
                                                     std::less{}, &Robot::id);
         return found != state.robots.end() && found->id == id;
     };
+    // Memories may name robots that have since been scrapped.
+    const auto remembered = [&](EntityId id) {
+        const auto found = std::ranges::lower_bound(
+            state.departed, id, std::less{}, &DepartedRobot::id);
+        return exists(id) ||
+               (found != state.departed.end() && found->id == id);
+    };
+    EntityId previousDeparted;
+    for (const DepartedRobot& departed : state.departed) {
+        if (departed.id <= previousDeparted || exists(departed.id) ||
+            departed.id.value >= state.ids.next) {
+            return std::unexpected(std::format(
+                "Scrapped robot '{}' has an invalid, repeated or out-of-order "
+                "id",
+                departed.name));
+        }
+        previousDeparted = departed.id;
+    }
     const RoomIndex rooms(state.city);
     for (const Robot& robot : state.robots) {
         if (robot.bonds.size() > kMaxBonds ||
@@ -447,7 +471,7 @@ std::expected<void, std::string> ValidateSocial(const WorldState& state) {
         }
         for (const Memory& memory : robot.memories) {
             if (memory.tick > state.tick ||
-                (memory.robot.IsValid() && !exists(memory.robot)) ||
+                (memory.robot.IsValid() && !remembered(memory.robot)) ||
                 (memory.room.IsValid() && !rooms.Find(memory.room))) {
                 return std::unexpected(std::format(
                     "Robot '{}' has a memory of a missing robot or room",

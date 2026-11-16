@@ -237,4 +237,25 @@ std::expected<void, std::string> V4ToV5(SaveDocument& world) try {
         std::format("the version 4 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V5ToV6(SaveDocument& world) try {
+    // Ages from 30 to 329 days spread by robot id, and the wear of a robot
+    // that age: 2 a day plus a day for every 300 days of age.
+    constexpr std::uint64_t kMinAge = 30;
+    constexpr std::uint64_t kAgeSpread = 300;
+    constexpr std::uint64_t kMaxWear = 1000;
+    for (SaveDocument& robot : world["robots"].get_array()) {
+        const std::uint64_t id = robot["id"].as<std::uint64_t>();
+        const std::uint64_t age = kMinAge + ((id * 7919) % kAgeSpread);
+        const std::uint64_t wear =
+            std::min(kMaxWear, (2 * age) + ((age * age) / 600));
+        robot["age"] = age;
+        robot["wear"] = static_cast<std::int64_t>(wear);
+    }
+    world["departed"] = Array{};
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 5 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

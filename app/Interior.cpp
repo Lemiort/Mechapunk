@@ -505,6 +505,38 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
                   f.Dir(-1, 0));
             break;
         }
+        case sim::RoomKind::Clinic: {
+            // Repair cradles in two rows, patients lying on them, and a
+            // reception desk by the door.
+            const int perRow = std::max(1, static_cast<int>((width - 1.0F) / 2.4F));
+            for (int row = 0; row < 2; ++row) {
+                for (int cradle = 0; cradle < perRow; ++cradle) {
+                    const float x = 1.4F + (2.4F * static_cast<float>(cradle));
+                    const float u = 3.0F + (6.0F * static_cast<float>(row));
+                    Place(plan, PropKind::RepairCradle, f.At(x, u), f.Dir(0, 1));
+                    spots.push_back(MakeSpot(f, x, u + 0.6F, {0, -1}, Pose::Lying, 0.95F));
+                }
+            }
+            Place(plan, PropKind::Desk, f.At(middle, kDepth - 3.0F), f.Dir(0, 1));
+            Place(plan, PropKind::Plant, f.At(0.5F, kDepth - 0.6F), f.Dir(0, -1));
+            break;
+        }
+        case sim::RoomKind::BlackMarket: {
+            // Stalls down both walls with crates between them.
+            const int stalls = std::max(1, static_cast<int>((kDepth - 6.0F) / 3.2F));
+            for (int stall = 0; stall < stalls; ++stall) {
+                const float u = 1.5F + (3.2F * static_cast<float>(stall));
+                for (const float side : {0.0F, 1.0F}) {
+                    const float x = side == 0.0F ? 0.8F : width - 0.8F;
+                    const vec2 facing = side == 0.0F ? vec2{1, 0} : vec2{-1, 0};
+                    Place(plan, PropKind::MarketStall, f.At(x, u), f.Dir(facing.x, facing.y));
+                    spots.push_back(MakeSpot(f, x + (facing.x * 1.1F), u,
+                                             {-facing.x, 0}, Pose::Standing));
+                }
+                Place(plan, PropKind::Crate, f.At(middle, u + 1.6F), f.Dir(0, 1));
+            }
+            break;
+        }
         default:
             break;
     }

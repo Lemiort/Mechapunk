@@ -26,6 +26,19 @@ sim::World Copy(const sim::World& world) {
     EXPECT_TRUE(copy.has_value()) << copy.error();
     return std::move(*copy);
 }
+
+// A generated city whose robots are all brand new, so nobody wears out and
+// the population stays the same while a test looks at daily routines.
+sim::World YoungCity(const sim::WorldParams& params) {
+    sim::WorldState state = sim::World::Generate(params).State();
+    for (sim::Robot& robot : state.robots) {
+        robot.age = 0;
+        robot.wear = 0;
+    }
+    auto world = sim::World::FromState(std::move(state));
+    EXPECT_TRUE(world.has_value()) << world.error();
+    return std::move(*world);
+}
 }  // namespace
 
 TEST(World, GeneratesPopulationAtHome) {
@@ -54,7 +67,7 @@ TEST(World, SameSeedRunsIdentically) {
 }
 
 TEST(World, RobotsWorkEveryDayOnTime) {
-    sim::World world = sim::World::Generate({.seed = 8, .robots = 150});
+    sim::World world = YoungCity({.seed = 8, .robots = 150});
     std::map<std::uint64_t, std::uint32_t> shifts;
     std::uint64_t late = 0;
     std::uint64_t wrongLengths = 0;
@@ -177,8 +190,12 @@ TEST(World, RobotsKeepABudgetForRent) {
             return;
         }
         // The price is already paid on arrival; what is left must cover
-        // tonight's rent and anything owed.
+        // tonight's rent and anything owed. A walk across midnight paid the
+        // night's rent on the way, so the budget was for that.
         const sim::Robot* robot = world.FindRobot(event.robot);
+        if (sim::StartOfDay(robot->departedAt) != sim::StartOfDay(event.tick)) {
+            return;
+        }
         const std::int64_t rent =
             world.Rooms().Find(robot->apartment)->room->rent;
         EXPECT_GE(robot->credits, rent + robot->rentOwed) << robot->name;
@@ -187,7 +204,7 @@ TEST(World, RobotsKeepABudgetForRent) {
 }
 
 TEST(World, NobodyWorksOnTheirDaysOff) {
-    sim::World world = sim::World::Generate({.seed = 15, .robots = 150});
+    sim::World world = YoungCity({.seed = 15, .robots = 150});
     std::map<std::uint64_t, std::uint32_t> shifts;
     world.SetEventSink([&](const sim::SimEvent& event) {
         if (event.kind != sim::EventKind::ClockedIn) {
@@ -276,7 +293,7 @@ TEST(World, RobotsGoOutAgainAfterGettingHomeFromWork) {
 // Venues and rest keep needs up: after two weeks only a few robots have run
 // out of anything.
 TEST(World, FewRobotsRunOutOfAnyNeed) {
-    sim::World world = sim::World::Generate({.seed = 9, .robots = 300});
+    sim::World world = YoungCity({.seed = 9, .robots = 300});
     world.RunFor((14 * sim::kMinutesPerDay) + (20 * 60));  // 20:00.
     std::uint32_t empty = 0;
     for (const sim::Robot& robot : world.State().robots) {

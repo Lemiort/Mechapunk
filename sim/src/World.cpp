@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "Names.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk::sim {
@@ -57,6 +58,17 @@ constexpr std::uint64_t kPopulationStream = 2;
 constexpr std::uint64_t kRuntimeStream = 3;
 constexpr std::uint64_t kInterestStream = 4;
 constexpr std::uint64_t kCareerStream = 5;
+constexpr std::uint64_t kAgeStream = 6;
+// Robots in a new city are up to about a year old.
+constexpr std::uint32_t kMaxStartingAge = 360;
+// A robot at a clinic loses this much wear every ten minutes, and values a
+// clinic visit by a third of its wear.
+constexpr std::int32_t kClinicWearRepair = 2;
+constexpr std::int64_t kWearPerClinicPoint = 3;
+// Chance in percent that a black market part turns out dodgy, and the wear
+// it causes.
+constexpr std::uint32_t kBadPartPercent = 10;
+constexpr std::int32_t kBadPartWear = 60;
 // Robots start somewhere between junior and senior.
 constexpr std::uint32_t kHighestStartingLevel = 2;
 // Arriving late costs this much performance.
@@ -147,6 +159,15 @@ EntityId AssignRoom(const RoomIndex& rooms, RoomKind kind,
 }
 }  // namespace
 
+std::string RandomRobotName(Pcg32& random) {
+    const auto prefix = kModelPrefixes.at(random.UniformInt(
+        0, static_cast<std::uint32_t>(kModelPrefixes.size() - 1)));
+    const auto serial = random.UniformInt(kMinSerialNumber, kMaxSerialNumber);
+    const auto given = kGivenNames.at(random.UniformInt(
+        0, static_cast<std::uint32_t>(kGivenNames.size() - 1)));
+    return std::format("{}-{} {}", prefix, serial, given);
+}
+
 World::World(WorldState state)
     : state_(std::move(state)), routes_(state_.city), rooms_(state_.city) {
     for (const Robot& robot : state_.robots) {
@@ -177,15 +198,9 @@ World World::Generate(const WorldParams& params) {
             kMinStartingNeed, kMaxStartingNeed));
     };
     for (std::uint32_t index = 0; index < params.robots; ++index) {
-        const auto prefix = kModelPrefixes.at(population.UniformInt(
-            0, static_cast<std::uint32_t>(kModelPrefixes.size() - 1)));
-        const auto serial =
-            population.UniformInt(kMinSerialNumber, kMaxSerialNumber);
-        const auto given = kGivenNames.at(population.UniformInt(
-            0, static_cast<std::uint32_t>(kGivenNames.size() - 1)));
         Robot robot;
+        robot.name = RandomRobotName(population);
         robot.id = state.ids.Allocate();
-        robot.name = std::format("{}-{} {}", prefix, serial, given);
         robot.apartment =
             AssignRoom(rooms, RoomKind::Apartment, used, population);
         robot.workspace =
@@ -213,6 +228,14 @@ World World::Generate(const WorldParams& params) {
             robot.interests = static_cast<std::uint8_t>(
                 robot.interests | (1U << tastes.UniformInt(0, kInterestCount - 1)));
         }
+    }
+
+    Pcg32 ages = Pcg32::FromSeed(params.seed, kAgeStream);
+    for (Robot& robot : state.robots) {
+        robot.age = ages.UniformInt(0, kMaxStartingAge);
+        robot.wear = WearAtAge(robot.age);
+        robot.needs.condition =
+            std::min(robot.needs.condition, kMaxWear - robot.wear);
     }
 
     Pcg32 careers = Pcg32::FromSeed(params.seed, kCareerStream);
@@ -289,6 +312,7 @@ void World::Step() {
     ++state_.tick;
     if (MinuteOfDay(state_.tick) == 0) {
         CollectRent();
+        AgeRobots();
         ReviewHomes();
         ReviewJobs();
         FadeBonds();
@@ -338,10 +362,16 @@ void World::UpdateNeeds() {
                             rules->socialPerGuest,
                         rules->socialGuestCap);
                     Apply(robot.needs, effects);
+                    if (venue->room->kind == RoomKind::Clinic) {
+                        robot.wear = std::max(robot.wear - kClinicWearRepair, 0);
+                    }
                 }
                 break;
             }
         }
+        // Wear limits how good a robot's condition can get.
+        robot.needs.condition =
+            std::min(robot.needs.condition, kMaxWear - robot.wear);
     }
 }
 
@@ -391,6 +421,7 @@ void World::Arrive(Robot& robot) {
         if (late > 0) {
             robot.performance -= kLatePerformance;
         }
+        ScoreArrivalAtWork(robot);
         Emit({.tick = now,
               .kind = EventKind::ClockedIn,
               .robot = robot.id,
@@ -418,6 +449,11 @@ void World::Arrive(Robot& robot) {
     robot.activity = RobotActivity::Visiting;
     ++guests_[robot.location.value];
     robot.credits -= std::min<std::int64_t>(rules->price, robot.credits);
+    if (venue->room->kind == RoomKind::BlackMarket &&
+        state_.random.UniformInt(1, 100) <= kBadPartPercent) {
+        robot.wear = std::min(robot.wear + kBadPartWear, kMaxWear);
+        Remember(robot, MemoryKind::GotBadPart, {}, robot.location);
+    }
 
     // Stay a while, but leave by closing time and in time to rest.
     const Tick latestLeave = LatestHomeTick(robot) -
@@ -489,6 +525,7 @@ void World::Decide(Robot& robot) {
                 (kWalkCostPerMinute * walk) -
                 (kPriceCostPerCredit * rules.price) -
                 (kind == hereKind ? kSameKindPenalty : 0) +
+                (kind == RoomKind::Clinic ? robot.wear / kWearPerClinicPoint : 0) +
                 CompanyAt(robot, room.id) +
                 state_.random.UniformInt(0, kMaxWhim);
             if (score > bestScore) {
@@ -676,9 +713,7 @@ std::string World::DescribeRoom(EntityId room) const {
 }
 
 std::string World::Describe(const SimEvent& event) const {
-    const Robot* robot = FindRobot(event.robot);
-    const std::string_view who =
-        robot != nullptr ? std::string_view{robot->name} : "unknown robot";
+    const std::string_view who = NameOf(event.robot);
     const std::string when = FormatTime(event.tick);
     const std::string room = DescribeRoom(event.room);
     switch (event.kind) {
@@ -709,22 +744,23 @@ std::string World::Describe(const SimEvent& event) const {
             return std::format("{}  {} is behind on rent, owes {} cr", when,
                                who, event.credits);
         case EventKind::Talked: {
-            const Robot* other = FindRobot(event.otherRobot);
             return std::format(
                 "{}  {} {} {} about {} at {}", when, who,
                 event.change < 0 ? "argued with" : "chatted with",
-                other != nullptr ? std::string_view{other->name} : "someone",
-                InterestName(event.topic), room);
+                NameOf(event.otherRobot), InterestName(event.topic), room);
         }
         case EventKind::Remembered: {
-            const Robot* other = FindRobot(event.otherRobot);
             return std::format(
                 "{}  {} {}", when, who,
-                MemoryText(event.memory,
-                           other != nullptr ? std::string_view{other->name}
-                                            : "someone",
+                MemoryText(event.memory, NameOf(event.otherRobot),
                            event.room.IsValid() ? room : std::string{}));
         }
+        case EventKind::Scrapped:
+            return std::format("{}  {} broke down for good and was scrapped",
+                               when, who);
+        case EventKind::Arrived:
+            return std::format("{}  {} moved to the city, into {}", when, who,
+                               room);
     }
     return std::format("{}  {}: unknown event", when, who);
 }
@@ -874,7 +910,8 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
         };
         if (!inRange(robot.needs.charge) || !inRange(robot.needs.condition) ||
             !inRange(robot.needs.social) || !inRange(robot.needs.fun) ||
-            robot.credits < 0 || robot.rentOwed < 0) {
+            robot.credits < 0 || robot.rentOwed < 0 || robot.wear < 0 ||
+            robot.wear > kMaxWear) {
             return fail(std::format("Robot '{}' has needs or credits out of "
                                     "range",
                                     robot.name));

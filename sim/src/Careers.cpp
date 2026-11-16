@@ -30,9 +30,9 @@ constexpr std::int32_t kPromotionStep = 10;
 constexpr std::uint32_t kBestShift = 2;
 constexpr std::int32_t kWornDownPenalty = 3;
 constexpr std::int32_t kMiserablePenalty = 1;
-constexpr std::int32_t kFitCondition = 250;
+constexpr std::int32_t kFitCondition = 300;
 constexpr std::int32_t kFitCharge = 150;
-constexpr std::int32_t kContentNeed = 100;
+constexpr std::int32_t kContentNeed = 200;
 
 // Chance in percent that a robot out of work is hired on a given night, if
 // there is an opening.
@@ -63,15 +63,24 @@ std::uint32_t World::WageOf(const Robot& robot) const {
     return WageAtLevel(WorkplaceOf(robot).shift.wage, robot.jobLevel);
 }
 
-void World::EndShift(Robot& robot) {
+void World::ScoreArrivalAtWork(Robot& robot) {
     const Needs& needs = robot.needs;
-    auto score = static_cast<std::int32_t>(state_.random.UniformInt(0, kBestShift));
-    if (needs.condition < kFitCondition || needs.charge < kFitCharge) {
-        score -= kWornDownPenalty;
+    // An old robot cannot be in better condition than its wear allows; it
+    // is worn down only when below half of that, as well as below the bar.
+    const std::int32_t reachable = kMaxWear - robot.wear;
+    const bool neglected =
+        needs.condition < kFitCondition && needs.condition < reachable / 2;
+    if (neglected || needs.charge < kFitCharge) {
+        robot.performance -= kWornDownPenalty;
     }
     if (needs.fun < kContentNeed || needs.social < kContentNeed) {
-        score -= kMiserablePenalty;
+        robot.performance -= kMiserablePenalty;
     }
+}
+
+void World::EndShift(Robot& robot) {
+    const auto score =
+        static_cast<std::int32_t>(state_.random.UniformInt(0, kBestShift));
     robot.performance = std::clamp(robot.performance + score, kFiringPerformance,
                                    PromotionTarget(robot.jobLevel));
     if (robot.performance >= PromotionTarget(robot.jobLevel) &&

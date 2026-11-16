@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
@@ -33,12 +34,6 @@ SimulationHost::SimulationHost(sim::World world)
       city_(world_.State().city),
       seed_(world_.State().seed),
       baseTick_(world_.CurrentTick()) {
-    for (const sim::Robot& robot : world_.State().robots) {
-        robotInfo_.emplace(robot.id.value,
-                           RobotInfo{.name = robot.name,
-                                     .daysOff = robot.daysOff,
-                                     .interests = robot.interests});
-    }
     // Runs on the worker inside World::Step, where reading the world is safe.
     world_.SetEventSink([this](const sim::SimEvent& event) { Record(event); });
     Publish();
@@ -50,9 +45,13 @@ SimulationHost::SimulationHost(sim::World world)
 
 SimulationHost::~SimulationHost() { Stop(); }
 
-const RobotInfo* SimulationHost::FindRobotInfo(sim::EntityId robot) const {
-    const auto found = robotInfo_.find(robot.value);
-    return found != robotInfo_.end() ? &found->second : nullptr;
+const RobotInfo* SimulationHost::FindRobotInfo(const WorldFrame& frame,
+                                               sim::EntityId robot) {
+    if (frame.directory == nullptr) {
+        return nullptr;
+    }
+    const auto found = frame.directory->find(robot.value);
+    return found != frame.directory->end() ? &found->second : nullptr;
 }
 
 const RobotFrame* SimulationHost::FindRobot(const WorldFrame& frame,
@@ -88,11 +87,9 @@ std::vector<std::string> SimulationHost::RecentEvents(sim::EntityId robot,
 void SimulationHost::Record(const sim::SimEvent& event) {
     std::string text = world_.Describe(event);
     // The inspector already shows whose history this is.
-    if (const RobotInfo* info = FindRobotInfo(event.robot)) {
-        if (const auto name = text.find(info->name);
-            name != std::string::npos) {
-            text.erase(name, info->name.size() + 1);
-        }
+    const std::string_view who = world_.NameOf(event.robot);
+    if (const auto name = text.find(who); name != std::string::npos) {
+        text.erase(name, who.size() + 1);
     }
     const std::scoped_lock lock(logMutex_);
     std::deque<std::string>& events = log_[event.robot.value];
@@ -195,6 +192,23 @@ void SimulationHost::Publish() {
         social_ = std::move(social);
     }
     frame.social = social_;
+    if (directory_ == nullptr ||
+        directoryVersion_ != world_.PopulationVersion()) {
+        auto directory = std::make_shared<RobotDirectory>();
+        for (const sim::Robot& robot : world_.State().robots) {
+            directory->emplace(robot.id.value,
+                               RobotInfo{.name = robot.name,
+                                         .daysOff = robot.daysOff,
+                                         .interests = robot.interests});
+        }
+        for (const sim::DepartedRobot& robot : world_.State().departed) {
+            directory->emplace(robot.id.value,
+                               RobotInfo{.name = robot.name, .departed = true});
+        }
+        directory_ = std::move(directory);
+        directoryVersion_ = world_.PopulationVersion();
+    }
+    frame.directory = directory_;
     frame.robots.reserve(world_.State().robots.size());
     for (const sim::Robot& robot : world_.State().robots) {
         RobotFrame robotFrame{.id = robot.id,
@@ -210,7 +224,9 @@ void SimulationHost::Publish() {
                               .apartment = robot.apartment,
                               .workspace = robot.workspace,
                               .jobLevel = robot.jobLevel,
-                              .performance = robot.performance};
+                              .performance = robot.performance,
+                              .age = robot.age,
+                              .wear = robot.wear};
         switch (robot.activity) {
             case sim::RobotActivity::Resting:
                 ++frame.resting;

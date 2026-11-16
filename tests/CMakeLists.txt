@@ -4,6 +4,7 @@ include(GoogleTest)
 add_executable(sim_tests
     CareersTests.cpp
     CityTests.cpp
+    LifeCycleTests.cpp
     RandomTests.cpp
     SaveTests.cpp
     SocialTests.cpp

@@ -45,7 +45,7 @@ struct glz::meta<mechapunk::sim::RoomKind> {
     static constexpr auto value = enumerate(
         "apartment", Apartment, "workspace", Workspace, "bar", Bar, "diner",
         Diner, "chargingBay", ChargingBay, "repairShop", RepairShop, "arcade",
-        Arcade, "shop", Shop);
+        Arcade, "shop", Shop, "clinic", Clinic, "blackMarket", BlackMarket);
 };
 template <>
 struct glz::meta<mechapunk::sim::RobotActivity> {
@@ -71,7 +71,8 @@ struct glz::meta<mechapunk::sim::MemoryKind> {
         BecameRivals, "madePeace", MadePeace, "fellBehindOnRent",
         FellBehindOnRent, "paidOffDebt", PaidOffDebt, "promoted", Promoted,
         "lostJob", LostJob, "foundJob", FoundJob, "movedUp", MovedUp,
-        "evicted", Evicted);
+        "evicted", Evicted, "lostFriend", LostFriend, "arrivedInCity",
+        ArrivedInCity, "gotBadPart", GotBadPart);
 };
 
 namespace mechapunk::sim {
@@ -95,6 +96,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 4,
               .summary = "job levels and performance",
               .apply = &migrations::V4ToV5},
+    Migration{.fromVersion = 5,
+              .summary = "age, wear and scrapped robots",
+              .apply = &migrations::V5ToV6},
 };
 }  // namespace
 

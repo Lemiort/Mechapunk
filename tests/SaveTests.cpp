@@ -176,17 +176,19 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v5-city.json";
+        kFixtureDirectory / "saves" / "v6-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
-    // The fixture has a robot out of work.
+    // The fixture has a robot out of work, and scrapped robots that others
+    // still remember.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
         return !robot.workspace.IsValid();
     }));
+    EXPECT_FALSE(state->departed.empty());
     // The fixture carries friendships and memories.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
         return !robot.bonds.empty() && !robot.memories.empty();
@@ -234,7 +236,7 @@ TEST(Save, Version1FixtureMigratesAndRuns) {
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(visits, 0U);
     // Saving the migrated world writes the current version.
-    EXPECT_NE(Serialize(world->State()).find("\"version\": 5"),
+    EXPECT_NE(Serialize(world->State()).find("\"version\": 6"),
               std::string::npos);
 }
 
@@ -332,4 +334,36 @@ TEST(Save, Version4FixtureMigratesAndRuns) {
     world->RunFor(3 * sim::kMinutesPerDay);
     EXPECT_GT(shifts, 0U);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 5 save (careers, no aging) loads through one migration: robots
+// get an age and the wear that goes with it, nobody has been scrapped yet,
+// and the city goes on aging.
+TEST(Save, Version5FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v5-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_TRUE(state->departed.empty());
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_GE(robot.age, 30U) << robot.name;
+        EXPECT_LT(robot.age, 330U) << robot.name;
+        EXPECT_EQ(robot.wear, sim::WearAtAge(robot.age)) << robot.name;
+    }
+    // The youngest robot is the least likely to be scrapped in three days.
+    const sim::Robot& youngest = *std::ranges::min_element(
+        state->robots, std::less{}, &sim::Robot::age);
+    const sim::EntityId id = youngest.id;
+    const std::uint32_t age = youngest.age;
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(3 * sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+    const sim::Robot* older = world->FindRobot(id);
+    ASSERT_NE(older, nullptr);
+    EXPECT_EQ(older->age, age + 3);
 }

@@ -26,4 +26,8 @@ namespace mechapunk::sim::migrations {
 // Version 4 to 5: robots start as juniors with no record at work yet.
 [[nodiscard]] std::expected<void, std::string> V4ToV5(SaveDocument& world);
 
+// Version 5 to 6: robots get an age and the wear that comes with it, and the
+// world a list of scrapped robots, empty so far.
+[[nodiscard]] std::expected<void, std::string> V5ToV6(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

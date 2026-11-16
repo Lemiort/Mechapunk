@@ -1,0 +1,203 @@
+// Robots age and wear out. Clinics undo some of the wear; a robot worn out
+// completely is scrapped, its friends remember losing it, and a newcomer
+// moves into the city to take its place.
+#include <algorithm>
+#include <bit>
+#include <cstdint>
+#include <functional>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+#include "Names.hpp"
+#include "mechapunk/sim/World.hpp"
+
+namespace mechapunk::sim {
+
+namespace {
+// Wear added every night: a base amount, more with age, more for a robot
+// left run down.
+constexpr std::int32_t kBaseWearPerDay = 2;
+constexpr std::uint32_t kDaysPerExtraWear = 300;
+constexpr std::int32_t kNeglectWear = 5;
+constexpr std::int32_t kNeglectedCondition = 150;
+// Robots moving to the city are fairly new.
+constexpr std::uint32_t kMinNewcomerAge = 10;
+constexpr std::uint32_t kMaxNewcomerAge = 120;
+constexpr std::int32_t kMinNewcomerNeed = 550;
+constexpr std::int32_t kMaxNewcomerNeed = 950;
+constexpr std::uint32_t kMinNewcomerCredits = 40;
+constexpr std::uint32_t kMaxNewcomerCredits = 200;
+constexpr std::uint32_t kMinPunctuality = 5;
+constexpr std::uint32_t kMaxPunctuality = 20;
+constexpr std::uint32_t kNewcomerInterests = 2;
+}  // namespace
+
+std::int32_t WearAtAge(std::uint32_t days) noexcept {
+    // The nightly wear summed over a life of `days`.
+    const auto age = static_cast<std::int64_t>(days);
+    const std::int64_t wear =
+        (kBaseWearPerDay * age) + ((age * age) / (2 * kDaysPerExtraWear));
+    return static_cast<std::int32_t>(std::min<std::int64_t>(wear, kMaxWear));
+}
+
+std::string_view World::NameOf(EntityId robot) const {
+    if (const Robot* living = FindRobot(robot)) {
+        return living->name;
+    }
+    const auto found = std::ranges::lower_bound(state_.departed, robot,
+                                                std::less{}, &DepartedRobot::id);
+    if (found != state_.departed.end() && found->id == robot) {
+        return found->name;
+    }
+    return "unknown robot";
+}
+
+void World::AgeRobots() {
+    std::vector<EntityId> wornOut;
+    for (Robot& robot : state_.robots) {
+        ++robot.age;
+        std::int32_t wear =
+            kBaseWearPerDay + static_cast<std::int32_t>(robot.age / kDaysPerExtraWear);
+        if (robot.needs.condition < kNeglectedCondition) {
+            wear += kNeglectWear;
+        }
+        robot.wear = std::min(robot.wear + wear, kMaxWear);
+        robot.needs.condition = std::min(robot.needs.condition, kMaxWear - robot.wear);
+        if (robot.wear >= kMaxWear) {
+            wornOut.push_back(robot.id);
+        }
+    }
+    for (const EntityId id : wornOut) {
+        Scrap(id);
+    }
+    for (std::size_t newcomer = 0; newcomer < wornOut.size(); ++newcomer) {
+        AddNewcomer();
+    }
+    ForgetDeparted();
+}
+
+void World::Scrap(EntityId id) {
+    const auto found =
+        std::ranges::lower_bound(state_.robots, id, std::less{}, &Robot::id);
+    if (found == state_.robots.end() || found->id != id) {
+        return;
+    }
+    Robot& robot = *found;
+    // Free its place at a venue, or the one it was heading to.
+    if (robot.activity == RobotActivity::Visiting) {
+        --reserved_[robot.location.value];
+        --guests_[robot.location.value];
+    } else if (robot.activity == RobotActivity::Walking) {
+        const auto destination = rooms_.Find(robot.destination);
+        if (destination && IsVenue(destination->room->kind)) {
+            --reserved_[robot.destination.value];
+        }
+    }
+    Emit({.tick = state_.tick,
+          .kind = EventKind::Scrapped,
+          .robot = robot.id,
+          .room = robot.apartment});
+    const auto departed = std::ranges::lower_bound(
+        state_.departed, id, std::less{}, &DepartedRobot::id);
+    state_.departed.insert(
+        departed, {.id = robot.id, .name = robot.name, .scrappedAt = state_.tick});
+    state_.robots.erase(found);
+    ++populationVersion_;
+
+    // Friends remember; everyone forgets the bond.
+    for (Robot& other : state_.robots) {
+        const auto bond =
+            std::ranges::find(other.bonds, id, &Bond::robot);
+        if (bond == other.bonds.end()) {
+            continue;
+        }
+        const bool friends = bond->level == BondLevel::Friend ||
+                             bond->level == BondLevel::CloseFriend;
+        other.bonds.erase(bond);
+        if (friends) {
+            Remember(other, MemoryKind::LostFriend, id, {});
+        }
+    }
+}
+
+void World::AddNewcomer() {
+    std::unordered_set<std::uint64_t> homes;
+    std::unordered_map<std::uint64_t, std::uint32_t> staff;
+    for (const Robot& robot : state_.robots) {
+        homes.insert(robot.apartment.value);
+        if (robot.workspace.IsValid()) {
+            ++staff[robot.workspace.value];
+        }
+    }
+    std::vector<EntityId> freeHomes;
+    for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+        if (!homes.contains(apartment.room->id.value)) {
+            freeHomes.push_back(apartment.room->id);
+        }
+    }
+    if (freeHomes.empty()) {
+        return;  // Nowhere to live: nobody moves in.
+    }
+    std::vector<EntityId> openings;
+    for (const RoomRef& workspace : rooms_.RoomsOfKind(RoomKind::Workspace)) {
+        if (staff[workspace.room->id.value] < workspace.room->capacity) {
+            openings.push_back(workspace.room->id);
+        }
+    }
+
+    Pcg32& random = state_.random;
+    const auto pick = [&](const std::vector<EntityId>& from) {
+        return from.at(random.UniformInt(0, static_cast<std::uint32_t>(from.size() - 1)));
+    };
+    const auto need = [&] {
+        return static_cast<std::int32_t>(
+            random.UniformInt(kMinNewcomerNeed, kMaxNewcomerNeed));
+    };
+    Robot robot;
+    robot.id = state_.ids.Allocate();
+    robot.name = RandomRobotName(random);
+    robot.apartment = pick(freeHomes);
+    robot.workspace = openings.empty() ? EntityId{} : pick(openings);
+    robot.location = robot.apartment;
+    robot.punctualityMinutes = random.UniformInt(kMinPunctuality, kMaxPunctuality);
+    robot.needs = {.charge = need(), .condition = need(), .social = need(), .fun = need()};
+    robot.credits = random.UniformInt(kMinNewcomerCredits, kMaxNewcomerCredits);
+    const std::uint32_t firstDayOff = random.UniformInt(0, kDaysPerWeek - 1);
+    robot.daysOff = static_cast<std::uint8_t>((1U << firstDayOff) |
+                                              (1U << ((firstDayOff + 1) % kDaysPerWeek)));
+    while (std::popcount(robot.interests) < static_cast<int>(kNewcomerInterests)) {
+        robot.interests = static_cast<std::uint8_t>(
+            robot.interests | (1U << random.UniformInt(0, kInterestCount - 1)));
+    }
+    robot.age = random.UniformInt(kMinNewcomerAge, kMaxNewcomerAge);
+    robot.wear = WearAtAge(robot.age);
+    // Ids only grow, so the newcomer goes last and robots stay sorted.
+    state_.robots.push_back(std::move(robot));
+    ++populationVersion_;
+    Robot& arrived = state_.robots.back();
+    Emit({.tick = state_.tick,
+          .kind = EventKind::Arrived,
+          .robot = arrived.id,
+          .room = arrived.apartment});
+    Remember(arrived, MemoryKind::ArrivedInCity, {}, arrived.apartment);
+    ScheduleNextCommute(arrived);
+}
+
+void World::ForgetDeparted() {
+    // Keep a scrapped robot's name only while someone still remembers it.
+    std::unordered_set<std::uint64_t> remembered;
+    for (const Robot& robot : state_.robots) {
+        for (const Memory& memory : robot.memories) {
+            remembered.insert(memory.robot.value);
+        }
+    }
+    if (std::erase_if(state_.departed, [&](const DepartedRobot& departed) {
+            return !remembered.contains(departed.id.value);
+        }) > 0) {
+        ++populationVersion_;
+    }
+}
+
+}  // namespace mechapunk::sim

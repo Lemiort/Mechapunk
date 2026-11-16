@@ -27,6 +27,7 @@ constexpr float kPanelWidth = 430.0F;
 constexpr float kMargin = 10.0F;
 constexpr float kNeedLabelWidth = 90.0F;
 constexpr std::int32_t kLowNeed = 250;
+constexpr std::int32_t kFailingWear = 750;
 constexpr std::size_t kRecentEvents = 30;
 constexpr ImVec4 kTitle{1.0F, 0.85F, 0.3F, 1.0F};
 constexpr ImVec4 kWarning{1.0F, 0.45F, 0.35F, 1.0F};
@@ -66,8 +67,8 @@ std::string Clock(sim::Tick tick) {
     return sim::FormatClock(sim::MinuteOfDay(tick));
 }
 
-std::string Name(const SimulationHost& host, sim::EntityId robot) {
-    const RobotInfo* info = host.FindRobotInfo(robot);
+std::string Name(const WorldFrame& frame, sim::EntityId robot) {
+    const RobotInfo* info = SimulationHost::FindRobotInfo(frame, robot);
     return info != nullptr ? info->name : "unknown robot";
 }
 
@@ -193,7 +194,7 @@ std::optional<InspectorRequest> DrawBonds(const RobotSocial& social,
         ImGui::PushID(static_cast<int>(bond->robot.value));
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
-        const std::string name = Name(host, bond->robot);
+        const std::string name = Name(frame, bond->robot);
         if (auto link = RobotLink(name, ShowRobot(frame, city, bond->robot))) {
             result = link;
         }
@@ -226,6 +227,28 @@ std::optional<InspectorRequest> DrawBonds(const RobotSocial& social,
     return result;
 }
 
+// How worn the robot is: wear caps its condition, and at the end of the bar
+// it is scrapped.
+void DrawWear(const RobotFrame& robot) {
+    ImGui::TextUnformatted("Wear");
+    ImGui::SameLine(kNeedLabelWidth);
+    const bool failing = robot.wear > kFailingWear;
+    if (failing) {
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, kLowBar);
+    }
+    const std::string text = std::format("{}, {} days old", robot.wear, robot.age);
+    ImGui::ProgressBar(static_cast<float>(robot.wear) /
+                           static_cast<float>(sim::kMaxWear),
+                       ImVec2{-1.0F, 0.0F}, text.c_str());
+    if (failing) {
+        ImGui::PopStyleColor();
+    }
+    ImGui::SetItemTooltip(
+        "Lasting damage. Condition can't go above %d; clinics take some wear "
+        "away, and at %d the robot is scrapped.",
+        sim::kMaxWear - robot.wear, sim::kMaxWear);
+}
+
 // How the robot is doing at work: a bar toward the next promotion, red
 // when it is on thin ice.
 void DrawPerformance(const RobotFrame& robot) {
@@ -252,8 +275,8 @@ void DrawPerformance(const RobotFrame& robot) {
 }
 
 // What the robot remembers, newest first.
-void DrawMemories(const RobotSocial& social, const CityView& city,
-                  const SimulationHost& host) {
+void DrawMemories(const RobotSocial& social, const WorldFrame& frame,
+                  const CityView& city) {
     if (social.memories.empty()) {
         ImGui::TextDisabled("Nothing memorable yet");
         return;
@@ -262,7 +285,7 @@ void DrawMemories(const RobotSocial& social, const CityView& city,
         const std::string text = std::format(
             "{}  {}", sim::FormatTime(memory.tick),
             sim::MemoryText(memory.kind,
-                            memory.robot.IsValid() ? Name(host, memory.robot)
+                            memory.robot.IsValid() ? Name(frame, memory.robot)
                                                    : std::string{},
                             memory.room.IsValid() ? RoomLabel(city, memory.room)
                                                   : std::string{}));
@@ -281,8 +304,8 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
             result = InspectorRequest{.selection = *link};
         }
     };
-    Title(Name(host, robot.id));
-    if (const RobotInfo* info = host.FindRobotInfo(robot.id)) {
+    Title(Name(frame, robot.id));
+    if (const RobotInfo* info = SimulationHost::FindRobotInfo(frame, robot.id)) {
         ImGui::TextDisabled("Likes %s",
                             sim::InterestList(info->interests).c_str());
     }
@@ -327,13 +350,14 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
     NeedBar("Condition", robot.needs.condition);
     NeedBar("Social", robot.needs.social);
     NeedBar("Fun", robot.needs.fun);
+    DrawWear(robot);
     ImGui::Text("Credits: %lld", static_cast<long long>(robot.credits));
     if (robot.rentOwed > 0) {
         ImGui::TextColored(kWarning, "Behind on rent: owes %lld cr",
                            static_cast<long long>(robot.rentOwed));
     }
 
-    if (const RobotInfo* info = host.FindRobotInfo(robot.id)) {
+    if (const RobotInfo* info = SimulationHost::FindRobotInfo(frame, robot.id)) {
         ImGui::SeparatorText("Home and work");
         follow(RoomLink(city, robot.apartment, "Home: "));
         if (const auto home = city.Rooms().Find(robot.apartment)) {
@@ -368,7 +392,7 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
             result = link;
         }
         ImGui::SeparatorText("Memories");
-        DrawMemories(*social, city, host);
+        DrawMemories(*social, frame, city);
     }
 
     ImGui::SeparatorText("Recent");
@@ -437,7 +461,7 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
             ImGui::PushID(static_cast<int>(robot->id.value));
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            const std::string name = Name(host, robot->id);
+            const std::string name = Name(frame, robot->id);
             Selection next = selection;
             next.robot = robot->id;
             next.room = {};
@@ -521,7 +545,7 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
                     ImGui::TextDisabled("nobody home");
                 } else {
                     const RobotFrame* robot = inside->second.front();
-                    const std::string name = Name(host, robot->id);
+                    const std::string name = Name(frame, robot->id);
                     Selection next = selection;
                     next.robot = robot->id;
                     next.room = {};

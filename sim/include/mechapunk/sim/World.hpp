@@ -5,6 +5,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -24,6 +25,13 @@ enum class RobotActivity : std::uint8_t {
     Working,   // In its workspace.
     Visiting,  // In a venue.
 };
+
+// Lasting damage at which a robot is scrapped. A robot's condition can
+// never be better than kMaxWear minus its wear.
+inline constexpr std::int32_t kMaxWear = 1000;
+
+// The wear a robot has gathered by `days` old, never fixed.
+[[nodiscard]] std::int32_t WearAtAge(std::uint32_t days) noexcept;
 
 struct Robot {
     EntityId id;
@@ -61,6 +69,17 @@ struct Robot {
     std::uint8_t jobLevel{};
     // How the robot has done at work since it was hired or last promoted.
     std::int32_t performance{};
+    // Days since the robot was built.
+    std::uint32_t age{};
+    // Lasting damage from 0 to kMaxWear; clinics take some of it away.
+    std::int32_t wear{};
+};
+
+// A robot that was scrapped, kept while others still remember it.
+struct DepartedRobot {
+    EntityId id;
+    std::string name;
+    Tick scrappedAt{};
 };
 
 // Everything that defines a running world. This is exactly what a save
@@ -73,6 +92,8 @@ struct WorldState {
     Pcg32 random;
     City city;
     std::vector<Robot> robots;
+    // Scrapped robots someone remembers, sorted by id.
+    std::vector<DepartedRobot> departed;
 };
 
 struct WorldParams {
@@ -101,6 +122,10 @@ enum class EventKind : std::uint8_t {
     Talked,
     // memory: what; otherRobot and room: who with and where, if anyone.
     Remembered,
+    // The robot wore out and was scrapped; room: the apartment it left.
+    Scrapped,
+    // A newcomer moved to the city; room: its apartment.
+    Arrived,
 };
 
 // Something that happened during a step, for logs and observers. Events are
@@ -156,6 +181,12 @@ public:
     [[nodiscard]] const WorldState& State() const noexcept { return state_; }
     [[nodiscard]] Tick CurrentTick() const noexcept { return state_.tick; }
     [[nodiscard]] const Robot* FindRobot(EntityId id) const noexcept;
+    // Name of a living robot or a remembered scrapped one.
+    [[nodiscard]] std::string_view NameOf(EntityId robot) const;
+    // Changes whenever robots are scrapped, arrive, or are forgotten.
+    [[nodiscard]] std::uint64_t PopulationVersion() const noexcept {
+        return populationVersion_;
+    }
     [[nodiscard]] const RoomIndex& Rooms() const noexcept { return rooms_; }
     // Robots in a venue right now, not counting those still on their way.
     [[nodiscard]] std::uint32_t GuestsIn(EntityId room) const;
@@ -192,12 +223,19 @@ private:
     void CollectRent();
     // Work and money, in Careers.cpp.
     [[nodiscard]] std::uint32_t WageOf(const Robot& robot) const;
+    // Costs performance for turning up worn down or miserable.
+    void ScoreArrivalAtWork(Robot& robot);
     // Scores the shift just worked; promotes or fires.
     void EndShift(Robot& robot);
     // At night: robots out of work may be hired.
     void ReviewJobs();
     // At night: evictions, and robots with savings moving to nicer places.
     void ReviewHomes();
+    // Robots aging and wearing out, in LifeCycle.cpp.
+    void AgeRobots();
+    void Scrap(EntityId id);
+    void AddNewcomer();
+    void ForgetDeparted();
     // Relationships, in Social.cpp.
     void Socialize();
     void Talk(Robot& first, Robot& second);
@@ -227,6 +265,7 @@ private:
     std::unordered_map<std::uint64_t, std::uint32_t> reserved_;
     // Robots inside each venue room.
     std::unordered_map<std::uint64_t, std::uint32_t> guests_;
+    std::uint64_t populationVersion_{};
     EventSink sink_;
 };
 

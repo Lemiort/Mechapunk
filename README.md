@@ -143,14 +143,16 @@ The simulation advances in steps of one game minute and models the city
 down to single rooms:
 
 - Habitats have stores on the ground floor (bars, noodle diners, charging
-  bays, repair shops, arcades and parts shops, each with a name, opening
-  hours, capacity and prices) and apartments above.
+  bays, repair shops, repair clinics, arcades, parts shops and black
+  markets, each with a name, opening hours, capacity and prices) and
+  apartments above.
 - Workplaces are split into workspaces over their floors and pay a wage per
   shift.
 - Every robot has its own apartment and, unless it is out of work, a
   workspace, and is always in a known room or walking between two.
-- Habitats get their stores in a fixed order, repair shops and charging
-  bays first, so even a small city can keep its robots running.
+- Habitats get their stores in a fixed order: repair shops, charging bays,
+  diners and clinics first, so even a small city can keep its robots
+  running.
 
 Robots have four needs from 0 to 1000: charge, condition, social and fun.
 They change every ten minutes with what the robot is doing, and venues
@@ -205,9 +207,11 @@ end up with a rival.
 ### Work and money
 
 Robots hold a job level: junior, regular, senior or lead. Each level pays
-15% more than the one below. Every shift adds 0 to 2 points of performance;
-a robot that turns up worn down (low condition or charge) loses 3, and one
-that is miserable (no fun or company) loses 1, and arriving late costs 3.
+15% more than the one below. Every shift adds 0 to 2 points of performance.
+A robot that clocks in worn down loses 3: its charge is below 150, or its
+condition is below 300 and below half of what its wear allows, so a
+well-kept old robot is not punished for its age. One that clocks in
+miserable (fun or social below 200) loses 1, and arriving late costs 3.
 Enough points earn a promotion (15 for a junior, 10 more for each level up).
 At -12 the robot is fired: it lives as if every day were its day off, and
 each night has an even chance of being hired into a workspace with an
@@ -219,6 +223,25 @@ saved sometimes (one night in ten) moves to the priciest free apartment it
 could pay for twelve nights. Robots at home walk over to their new place
 that night. Promotions, firings, new jobs, moves and evictions are all
 memories.
+
+### Aging, clinics and newcomers
+
+Robots age a day every night and gather wear, lasting damage from 0 to 1000:
+2 a night, a little more every 300 days of age, and 5 more for a robot left
+in poor condition. A robot's condition can never be better than 1000 minus
+its wear, so old robots run down sooner. Repair clinics (open 08:00-20:00,
+100 cr) repair condition quickly and take wear away while the robot stays,
+and robots value them more the more worn they are. Black markets (open
+22:00-05:00, 12 cr) are cheap repairs and good company, but one part in
+ten is dodgy and adds 60 wear.
+
+A robot whose wear reaches 1000 breaks down for good that night and is
+scrapped. Its friends remember losing it, and a newcomer moves into the
+city to take its place: a young robot with a free apartment and, if there
+is an opening, a job. Scrapped robots are kept by name only while someone
+still remembers them. The robot panel shows age and wear. In a city of 300,
+a few robots are scrapped each week at first, fewer once the oldest are
+gone; robots that can afford clinics live long.
 
 Runs are deterministic: the same save or seed always produces the same
 states and events, on every platform. All simulation state is integral, and

@@ -38,6 +38,8 @@ enum class RoomKind : std::uint8_t {
     RepairShop,
     Arcade,
     Shop,
+    Clinic,       // Major repairs; also undoes wear.
+    BlackMarket,  // Cheap repairs at night, sometimes with a dodgy part.
 };
 
 // One room on one floor. Ids come from the world's entity counter, so a room

@@ -105,19 +105,25 @@ TEST(Careers, GoodWorkIsPromoted) {
     EXPECT_TRUE(Remembers(after, sim::MemoryKind::Promoted));
 }
 
-// A worn-down robot on its last chance loses its job, lives off work for a
-// while, and is hired again; it never works while out of work.
+// A robot on its last chance that turns up worn down loses its job at the
+// end of the shift, lives off work for a while, and is hired again; it
+// never works while out of work.
 TEST(Careers, WornDownWorkersAreFiredAndHiredAgain) {
     const sim::World city = WorkingCity();
     sim::WorldState state = city.State();
     const auto index = FindIndex(state, [](const sim::Robot& robot) {
-        return robot.activity == sim::RobotActivity::Working;
+        return robot.activity == sim::RobotActivity::Resting &&
+               robot.commuteAt != sim::kNoCommute;
     });
     ASSERT_TRUE(index);
     sim::Robot& robot = state.robots[*index];
     robot.performance = sim::kFiringPerformance + 1;
     robot.needs.condition = 0;
-    const sim::Tick shiftEnd = robot.nextActionAt;
+    robot.wear = 0;
+    const auto workspace = city.Rooms().Find(robot.workspace);
+    ASSERT_TRUE(workspace.has_value());
+    const sim::Tick shiftEnd =
+        robot.shiftStartsAt + workspace->building->shift.lengthMinutes;
     const sim::EntityId id = robot.id;
 
     sim::World world = Load(std::move(state));

@@ -114,9 +114,10 @@ const T& Pick(std::span<const T> items, Pcg32& random) {
 
 // Store kinds in the order habitats get them, the ones robots cannot do
 // without first, so even a small city can repair and charge its robots.
-constexpr std::array kStoreOrder{RoomKind::RepairShop, RoomKind::ChargingBay,
-                                 RoomKind::Diner,      RoomKind::Bar,
-                                 RoomKind::Arcade,     RoomKind::Shop};
+constexpr std::array kStoreOrder{
+    RoomKind::RepairShop, RoomKind::ChargingBay, RoomKind::Diner,
+    RoomKind::Clinic,     RoomKind::Bar,         RoomKind::Arcade,
+    RoomKind::Shop,       RoomKind::BlackMarket};
 
 // Ground-floor stores and apartments above. Store kinds rotate through every
 // venue kind so each city has some of each.

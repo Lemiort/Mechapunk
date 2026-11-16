@@ -459,6 +459,12 @@ private:
             io.MouseDoubleClicked[ImGuiMouseButton_Left] = false;
         }
         DrawStatusWindow(frame.get(), renderTick);
+        // A selected robot that was scrapped is gone.
+        if (frame != nullptr && selection_.robot.IsValid() &&
+            SimulationHost::FindRobot(*frame, selection_.robot) == nullptr) {
+            selection_.robot = {};
+            following_ = false;
+        }
         if (frame != nullptr) {
             if (const auto next = DrawInspector(selection_, *frame, city_,
                                                 host_, following_)) {

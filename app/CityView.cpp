@@ -80,6 +80,10 @@ vec3 StoreNeon(sim::RoomKind kind) {
             return {0.7F, 0.2F, 1.0F};
         case sim::RoomKind::Shop:
             return {1.0F, 0.9F, 0.2F};
+        case sim::RoomKind::Clinic:
+            return {0.6F, 1.0F, 0.9F};
+        case sim::RoomKind::BlackMarket:
+            return {0.9F, 0.08F, 0.08F};
         default:
             return {1.0F, 1.0F, 1.0F};
     }

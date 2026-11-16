@@ -4,6 +4,7 @@ add_library(mechapunk_sim STATIC
     src/Careers.cpp
     src/City.cpp
     src/GameTime.cpp
+    src/LifeCycle.cpp
     src/Migrations.cpp
     src/Random.cpp
     src/Save.cpp

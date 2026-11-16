@@ -87,9 +87,35 @@ constexpr VenueRules kShop{.label = "parts shop",
                            .minCapacity = 6,
                            .maxCapacity = 14};
 
+constexpr VenueRules kClinic{.label = "repair clinic",
+                             .opensAt = Hour(8),
+                             .closesAt = Hour(20),
+                             .price = 100,
+                             .effects = {.charge = 0, .condition = 150,
+                                         .social = 2, .fun = -2},
+                             .socialPerGuest = 0,
+                             .socialGuestCap = 0,
+                             .minVisitMinutes = 60,
+                             .maxVisitMinutes = 120,
+                             .minCapacity = 6,
+                             .maxCapacity = 12};
+constexpr VenueRules kBlackMarket{.label = "black market",
+                                  .opensAt = Hour(22),
+                                  .closesAt = Hour(5),
+                                  .price = 12,
+                                  .effects = {.charge = 0, .condition = 40,
+                                              .social = 6, .fun = 20},
+                                  .socialPerGuest = 1,
+                                  .socialGuestCap = 6,
+                                  .minVisitMinutes = 20,
+                                  .maxVisitMinutes = 60,
+                                  .minCapacity = 6,
+                                  .maxCapacity = 14};
+
 constexpr std::array kVenueKinds{RoomKind::Bar,         RoomKind::Diner,
                                  RoomKind::ChargingBay, RoomKind::RepairShop,
-                                 RoomKind::Arcade,      RoomKind::Shop};
+                                 RoomKind::Arcade,      RoomKind::Shop,
+                                 RoomKind::Clinic,      RoomKind::BlackMarket};
 
 constexpr std::array<std::string_view, 8> kBarNames{
     "The Rusty Diode", "Chrome Lounge",  "Byte & Brew",   "The Overclock",
@@ -107,6 +133,10 @@ constexpr std::array<std::string_view, 5> kArcadeNames{
 constexpr std::array<std::string_view, 5> kShopNames{
     "Parts Bazaar", "Chrome Goods", "Circuit Mart", "Spare Me",
     "Gear Exchange"};
+constexpr std::array<std::string_view, 4> kClinicNames{
+    "Chassis General", "Mercy Mechanics", "St. Solder's", "Overhaul Ward"};
+constexpr std::array<std::string_view, 4> kBlackMarketNames{
+    "The Back Door", "Grey Parts", "Under the Bridge", "No Questions"};
 }  // namespace
 
 const VenueRules* FindVenueRules(RoomKind kind) noexcept {
@@ -123,6 +153,10 @@ const VenueRules* FindVenueRules(RoomKind kind) noexcept {
             return &kArcade;
         case RoomKind::Shop:
             return &kShop;
+        case RoomKind::Clinic:
+            return &kClinic;
+        case RoomKind::BlackMarket:
+            return &kBlackMarket;
         case RoomKind::Apartment:
         case RoomKind::Workspace:
             return nullptr;
@@ -167,6 +201,10 @@ std::span<const std::string_view> VenueNames(RoomKind kind) noexcept {
             return kArcadeNames;
         case RoomKind::Shop:
             return kShopNames;
+        case RoomKind::Clinic:
+            return kClinicNames;
+        case RoomKind::BlackMarket:
+            return kBlackMarketNames;
         case RoomKind::Apartment:
         case RoomKind::Workspace:
             return {};

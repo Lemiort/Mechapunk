@@ -43,14 +43,19 @@ struct RobotFrame {
     sim::EntityId workspace;  // None while out of work.
     std::uint8_t jobLevel{};
     std::int32_t performance{};
+    std::uint32_t age{};
+    std::int32_t wear{};
 };
 
-// What does not change while the game runs.
+// What does not change about a robot while it lives.
 struct RobotInfo {
     std::string name;
     std::uint8_t daysOff{};
     std::uint8_t interests{};
+    // Scrapped, but still remembered by someone.
+    bool departed{false};
 };
+using RobotDirectory = std::unordered_map<std::uint64_t, RobotInfo>;
 
 // Who a robot knows and what it remembers.
 struct RobotSocial {
@@ -69,6 +74,9 @@ struct WorldFrame {
     // In the order of `robots`. Bonds and memories only change every ten
     // minutes, so frames in between share one copy.
     std::shared_ptr<const std::vector<RobotSocial>> social;
+    // Every living robot and every remembered scrapped one; shared by frames
+    // until the population changes.
+    std::shared_ptr<const RobotDirectory> directory;
 };
 
 // Runs a World on a SimulationThread. The world belongs to the worker while
@@ -91,7 +99,8 @@ public:
     // Seed the world was generated from; stable across saves.
     [[nodiscard]] std::uint64_t Seed() const noexcept { return seed_; }
 
-    [[nodiscard]] const RobotInfo* FindRobotInfo(sim::EntityId robot) const;
+    [[nodiscard]] static const RobotInfo* FindRobotInfo(const WorldFrame& frame,
+                                                         sim::EntityId robot);
     // Robots sorted by id, for lookups into WorldFrame::robots.
     [[nodiscard]] static const RobotFrame* FindRobot(const WorldFrame& frame,
                                                      sim::EntityId robot);
@@ -135,8 +144,9 @@ private:
     sim::Tick baseTick_;
     double speed_{1.0};
     SnapshotBuffer<WorldFrame> frames_;
-    std::unordered_map<std::uint64_t, RobotInfo> robotInfo_;
     std::shared_ptr<const std::vector<RobotSocial>> social_;
+    std::shared_ptr<const RobotDirectory> directory_;
+    std::uint64_t directoryVersion_{};
     // Written by the worker in its event sink, read by the render thread.
     mutable std::mutex logMutex_;
     std::unordered_map<std::uint64_t, std::deque<std::string>> log_;

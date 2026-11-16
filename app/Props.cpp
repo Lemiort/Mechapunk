@@ -193,6 +193,28 @@ PropModel Make(PropKind kind) {
                  Box(-0.42F, 0, -0.1F, 0.06F, 0.9F, 0.6F, kMetal),
                  Box(0.42F, 0, -0.1F, 0.06F, 0.9F, 0.6F, kMetal)};
             break;
+        case PropKind::RepairCradle:
+            m = {Box(0, 0, 0, 0.9F, 0.72F, 2.1F, kWhite),
+                 Box(0, 0.72F, 0, 0.8F, 0.06F, 2.0F, kTile),
+                 Box(0.75F, 0, -0.8F, 0.16F, 2.3F, 0.16F, kMetal),
+                 Box(0.4F, 2.2F, -0.8F, 0.7F, 0.1F, 0.1F, kMetal),
+                 Box(0.05F, 1.7F, -0.8F, 0.08F, 0.5F, 0.08F, kMetal),
+                 Box(0.05F, 1.6F, -0.8F, 0.25F, 0.12F, 0.25F, kNeonCyan),
+                 Box(-0.75F, 0, 0.8F, 0.4F, 1.3F, 0.3F, kDarkMetal),
+                 Box(-0.75F, 1.0F, 0.96F, 0.36F, 0.25F, 0.02F, kGreen)};
+            break;
+        case PropKind::MarketStall:
+            m = {Box(0, 0.85F, 0, 2.0F, 0.05F, 0.8F, kDarkWood),
+                 Box(-0.4F, 0.9F, 0, 0.5F, 0.25F, 0.5F, kGoods.at(0)),
+                 Box(0.2F, 0.9F, 0.1F, 0.4F, 0.15F, 0.4F, kGoods.at(2)),
+                 Box(0.7F, 0.9F, -0.1F, 0.3F, 0.35F, 0.3F, kDarkMetal),
+                 Box(0, 0.3F, 0.41F, 1.9F, 0.04F, 0.02F, kNeonPink)};
+            Legs(m, 2.0F, 0.8F, 0.85F, kDarkWood, 0.06F);
+            break;
+        case PropKind::Crate:
+            m = {Box(0, 0, 0, 0.7F, 0.6F, 0.7F, kWood),
+                 Box(0, 0.6F, 0, 0.72F, 0.04F, 0.72F, kDarkWood)};
+            break;
         case PropKind::Workbench:
             m = {Box(0, 0.9F, 0, 2.0F, 0.06F, 0.8F, kWood),
                  Box(0.7F, 0.96F, 0.25F, 0.2F, 0.15F, 0.2F, kDarkMetal),

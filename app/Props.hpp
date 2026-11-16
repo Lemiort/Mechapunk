@@ -72,6 +72,11 @@ enum class PropKind : std::uint8_t {
     // head reaches 1.6 m out over +z at 6 m.
     CeilingLamp,
     StreetLamp,
+    // Clinic: a table a robot lies on under a repair arm.
+    RepairCradle,
+    // Black market: a trestle stall with goods, and a crate of parts.
+    MarketStall,
+    Crate,
 };
 
 [[nodiscard]] const PropModel& Prop(PropKind kind);
