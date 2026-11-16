@@ -211,17 +211,15 @@ PropModel Make(PropKind kind) {
                  Box(0, 0.3F, 0.41F, 1.9F, 0.04F, 0.02F, kNeonPink)};
             Legs(m, 2.0F, 0.8F, 0.85F, kDarkWood, 0.06F);
             break;
-        case PropKind::MetroEntrance:
-            m = {Box(0, 0, 0, 1.3F, 0.03F, 2.6F, kBlack),
-                 Box(-0.62F, 0, 0, 0.06F, 1.0F, 2.6F, kMetal),
-                 Box(0.62F, 0, 0, 0.06F, 1.0F, 2.6F, kMetal),
-                 Box(0, 0, -1.27F, 1.3F, 1.0F, 0.06F, kMetal),
-                 Box(-0.62F, 1.0F, -1.27F, 0.06F, 1.2F, 0.06F, kDarkMetal),
-                 Box(0.62F, 1.0F, -1.27F, 0.06F, 1.2F, 0.06F, kDarkMetal),
-                 Glass(0, 2.2F, -0.4F, 1.4F, 0.05F, 1.9F),
-                 Box(0.85F, 0, 1.3F, 0.1F, 2.8F, 0.1F, kDarkMetal),
-                 Box(0.85F, 2.8F, 1.3F, 0.55F, 0.55F, 0.12F, kNeonCyan),
-                 Box(0.85F, 2.92F, 1.37F, 0.3F, 0.3F, 0.02F, kWhite)};
+        case PropKind::TrainCar:
+            m = {Box(0, 0.2F, 0, 2.8F, 2.9F, 13.0F, kDarkMetal),
+                 Box(0, 3.1F, 0, 2.6F, 0.15F, 12.6F, kMetal),
+                 Glass(-1.41F, 1.4F, 0, 0.04F, 1.0F, 12.0F),
+                 Glass(1.41F, 1.4F, 0, 0.04F, 1.0F, 12.0F),
+                 Box(-1.42F, 0.9F, 0, 0.03F, 0.08F, 12.6F, kNeonCyan),
+                 Box(1.42F, 0.9F, 0, 0.03F, 0.08F, 12.6F, kNeonCyan),
+                 Box(0, 0, -4.5F, 2.2F, 0.25F, 1.6F, kBlack),
+                 Box(0, 0, 4.5F, 2.2F, 0.25F, 1.6F, kBlack)};
             break;
         case PropKind::Tree:
             m = {Box(0, 0, 0, 0.35F, 2.4F, 0.35F, kDarkWood),

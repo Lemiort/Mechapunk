@@ -350,8 +350,13 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
                             stations[robot.rideFrom].name.c_str(),
                             stations[robot.rideTo].name.c_str(),
                             Clock(robot.nextActionAt).c_str());
+            } else if (frame.tick < robot.boardsAt + sim::kMetroWaitMinutes) {
+                ImGui::Text("Waiting for the train at %s, to %s, arrives %s",
+                            stations[robot.rideFrom].name.c_str(),
+                            stations[robot.rideTo].name.c_str(),
+                            Clock(robot.nextActionAt).c_str());
             } else if (frame.tick < robot.alightsAt) {
-                ImGui::Text("On the metro from %s to %s, arrives %s",
+                ImGui::Text("On the train from %s to %s, arrives %s",
                             stations[robot.rideFrom].name.c_str(),
                             stations[robot.rideTo].name.c_str(),
                             Clock(robot.nextActionAt).c_str());

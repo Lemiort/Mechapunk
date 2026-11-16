@@ -143,8 +143,16 @@ private:
     [[nodiscard]] glm::vec3 NodePosition(sim::NodeId node) const;
     const std::vector<glm::vec3>& Route(sim::EntityId from, sim::EntityId to);
     // Position along the route and the direction of travel.
-    // Where the entrance of a station stands, on the pavement by its corner.
-    [[nodiscard]] glm::vec3 StationEntrance(std::uint32_t station) const;
+    // A station: its platform over the intersection, and the stairs up to
+    // it from the pavement.
+    [[nodiscard]] glm::vec3 StationPlatform(std::uint32_t station) const;
+    [[nodiscard]] glm::vec3 StationStairsBottom(std::uint32_t station) const;
+    [[nodiscard]] glm::vec3 StationStairsTop(std::uint32_t station) const;
+    void AddElevatedLines();
+    void AddStaticBox(glm::vec3 minimum, glm::vec3 maximum, glm::vec3 color);
+    // Trains carrying the riders on board in `frame`.
+    void SubmitTrains(RenderQueue& queue, const WorldFrame& frame,
+                      double renderTick);
     // A walk between a building and a station entrance, either way.
     const std::vector<glm::vec3>& StationRoute(sim::EntityId building,
                                                std::uint32_t station,

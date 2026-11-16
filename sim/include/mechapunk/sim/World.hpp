@@ -94,6 +94,8 @@ struct Trip {
 
 // Fare of a metro ride; a robot that cannot pay it all pays what it has.
 inline constexpr std::uint32_t kMetroFare = 4;
+// Minutes a rider waits on the platform before its train leaves.
+inline constexpr std::uint32_t kMetroWaitMinutes = 3;
 
 // A robot that was scrapped, kept while others still remember it.
 struct DepartedRobot {

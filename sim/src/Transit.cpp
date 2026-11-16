@@ -14,10 +14,8 @@ namespace mechapunk::sim {
 namespace {
 constexpr std::uint32_t kWalkingMetersPerMinute = 75;
 constexpr std::uint32_t kFloorsPerMinute = 3;
-// Trains run at 30 km/h station to station, and a robot waits a few minutes
-// for one.
+// Trains run at 30 km/h along the elevated lines.
 constexpr double kRideMetersPerMinute = 500.0;
-constexpr std::uint32_t kWaitMinutes = 3;
 
 std::uint32_t WalkMinutes(std::uint32_t meters) {
     return (meters + kWalkingMetersPerMinute - 1) / kWalkingMetersPerMinute;
@@ -51,11 +49,12 @@ std::uint32_t World::RideMinutes(std::uint32_t fromStation,
                                  std::uint32_t toStation) const {
     const CityNode& from = state_.city.nodes.at(state_.city.stations.at(fromStation).node.value);
     const CityNode& to = state_.city.nodes.at(state_.city.stations.at(toStation).node.value);
-    const double dx = static_cast<double>(to.x - from.x);
-    const double dz = static_cast<double>(to.z - from.z);
-    return kWaitMinutes + static_cast<std::uint32_t>(
-                              std::ceil(std::sqrt((dx * dx) + (dz * dz)) /
-                                        kRideMetersPerMinute));
+    // Lines run over the station rows and columns: along the row, turning
+    // at the station where it meets the destination's column.
+    const double meters = std::abs(static_cast<double>(to.x - from.x)) +
+                          std::abs(static_cast<double>(to.z - from.z));
+    return kMetroWaitMinutes +
+           static_cast<std::uint32_t>(std::ceil(meters / kRideMetersPerMinute));
 }
 
 Trip World::PlanTrip(EntityId fromRoom, EntityId toRoom, bool metroAllowed) {

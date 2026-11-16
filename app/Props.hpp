@@ -77,9 +77,8 @@ enum class PropKind : std::uint8_t {
     // Black market: a trestle stall with goods, and a crate of parts.
     MarketStall,
     Crate,
-    // Stairs down to the metro under a glass canopy, with an M sign; the
-    // stairs run along z.
-    MetroEntrance,
+    // An elevated metro car, its length along z, base on the track deck.
+    TrainCar,
     // Parks.
     Tree,
     Bench,

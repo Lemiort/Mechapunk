@@ -9,6 +9,8 @@
 #include <map>
 #include <numbers>
 #include <optional>
+#include <set>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -53,6 +55,16 @@ constexpr double kWakeUp = 7.0 * 60.0;
 constexpr vec3 kHabitatNeon{0.1F, 0.9F, 1.0F};
 constexpr vec3 kWorkplaceNeon{1.0F, 0.2F, 0.8F};
 constexpr vec3 kGrass{0.16F, 0.32F, 0.17F};
+// The elevated metro: deck top 8 m over the street, a platform over each
+// station's intersection, and stairs up from the pavement.
+constexpr float kTrackHeight = 8.0F * kS;
+constexpr float kPlatformHalf = 6.5F * kS;
+constexpr float kStairsRun = 12.0F * kS;
+constexpr float kStairsAcross = (kStreetWidth * 0.5F) + (0.8F * kS);
+constexpr vec3 kTrackSteel{0.22F, 0.23F, 0.27F};
+constexpr vec3 kRail{0.55F, 0.56F, 0.6F};
+constexpr vec3 kCanopy{0.3F, 0.34F, 0.4F};
+constexpr vec3 kStationSign{0.1F, 0.85F, 1.0F};
 constexpr vec3 kPavement{0.36F, 0.36F, 0.38F};
 constexpr vec3 kFacadeGlass{0.13F, 0.17F, 0.24F};
 constexpr vec3 kConcrete{0.3F, 0.31F, 0.35F};
@@ -163,6 +175,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     }
 
     AddStreetLamps();
+    AddElevatedLines();
     AddStations();
 
     // Simulated buildings take the corners next to their entrance first.
@@ -351,19 +364,158 @@ void CityView::AddStreetLamps() {
     }
 }
 
-vec3 CityView::StationEntrance(std::uint32_t station) const {
-    // On the pavement just past the intersection, beside the street that
-    // runs along x.
-    constexpr float kAlong = (kStreetWidth * 0.5F) + (2.2F * kS);
-    constexpr float kAcross = (kStreetWidth * 0.5F) + (0.8F * kS);
+vec3 CityView::StationPlatform(std::uint32_t station) const {
     return NodePosition(city_.stations.at(station).node) +
-           vec3{kAlong, kStreetHeight, kAcross};
+           vec3{0.0F, kTrackHeight, 0.0F};
+}
+
+vec3 CityView::StationStairsBottom(std::uint32_t station) const {
+    // On the pavement beside the street that runs along x.
+    return NodePosition(city_.stations.at(station).node) +
+           vec3{kStairsRun + kPlatformHalf, kStreetHeight, kStairsAcross};
+}
+
+vec3 CityView::StationStairsTop(std::uint32_t station) const {
+    return NodePosition(city_.stations.at(station).node) +
+           vec3{kPlatformHalf, kTrackHeight, kStairsAcross};
+}
+
+void CityView::AddStaticBox(vec3 minimum, vec3 maximum, vec3 color) {
+    statics_.push_back(
+        {.mesh = assets_.cube.get(),
+         .transform = {.position = {(minimum.x + maximum.x) * 0.5F, minimum.y,
+                                    (minimum.z + maximum.z) * 0.5F},
+                       .rotationDegrees = vec3(0.0F),
+                       .scale = maximum - minimum},
+         .material = assets_.palette->Get(color)});
 }
 
 void CityView::AddStations() {
+    const float deck = 0.7F * kS;
     for (std::uint32_t station = 0; station < city_.stations.size(); ++station) {
-        // The stairs run along the street, down towards the intersection.
-        AddStaticModel(Prop(PropKind::MetroEntrance), StationEntrance(station), -90.0F);
+        const vec3 platform = StationPlatform(station);
+        // The platform deck, on four columns, under a canopy.
+        AddStaticBox(platform - vec3{kPlatformHalf, deck, kPlatformHalf},
+                     platform + vec3{kPlatformHalf, 0.0F, kPlatformHalf}, kTrackSteel);
+        for (const float x : {-1.0F, 1.0F}) {
+            for (const float z : {-1.0F, 1.0F}) {
+                const vec3 column = NodePosition(city_.stations[station].node) +
+                                    vec3{x * (kPlatformHalf - kS), 0.0F,
+                                         z * (kPlatformHalf - kS)};
+                AddStaticBox(column - vec3{0.45F * kS, 0.0F, 0.45F * kS},
+                             column + vec3{0.45F * kS, kTrackHeight - deck, 0.45F * kS},
+                             kTrackSteel);
+            }
+        }
+        // A shelter over the crossing; the corners stay open to the sky.
+        AddStaticBox(platform + vec3{-2.4F * kS, 3.2F * kS, -2.4F * kS},
+                     platform + vec3{2.4F * kS, 3.4F * kS, 2.4F * kS}, kCanopy);
+        // Stairs up from the pavement, and the M sign at their foot.
+        const vec3 bottom = StationStairsBottom(station);
+        const vec3 top = StationStairsTop(station);
+        constexpr int kSteps = 16;
+        for (int step = 0; step < kSteps; ++step) {
+            const float t = static_cast<float>(step + 1) / static_cast<float>(kSteps);
+            const vec3 at = glm::mix(bottom, top, t);
+            AddStaticBox(vec3{at.x - (kStairsRun / kSteps), bottom.y, at.z - (0.8F * kS)},
+                         vec3{at.x, at.y, at.z + (0.8F * kS)}, kTrackSteel);
+        }
+        AddStaticBox(bottom + vec3{1.0F * kS, 0.0F, -1.2F * kS},
+                     bottom + vec3{1.15F * kS, 3.0F * kS, -1.05F * kS}, kTrackSteel);
+        AddStaticBox(bottom + vec3{0.8F * kS, 3.0F * kS, -1.3F * kS},
+                     bottom + vec3{1.35F * kS, 3.6F * kS, -0.95F * kS}, kStationSign);
+    }
+}
+
+void CityView::AddElevatedLines() {
+    // Lines run over the streets of the station rows and columns, from the
+    // first station to the last, on columns between intersections.
+    std::map<std::int32_t, std::pair<std::int32_t, std::int32_t>> rows;
+    std::map<std::int32_t, std::pair<std::int32_t, std::int32_t>> columns;
+    for (const sim::Station& station : city_.stations) {
+        const sim::CityNode& node = city_.nodes.at(station.node.value);
+        auto [row, newRow] = rows.try_emplace(node.z, node.x, node.x);
+        row->second = {std::min(row->second.first, node.x), std::max(row->second.second, node.x)};
+        auto [column, newColumn] = columns.try_emplace(node.x, node.z, node.z);
+        column->second = {std::min(column->second.first, node.z),
+                          std::max(column->second.second, node.z)};
+    }
+    const float deck = 0.7F * kS;
+    const float halfWidth = 2.0F * kS;
+    const auto line = [&](vec3 from, vec3 to) {
+        const vec3 span = glm::abs(to - from);
+        const vec3 half = span.x > span.z ? vec3{0.0F, 0.0F, halfWidth}
+                                          : vec3{halfWidth, 0.0F, 0.0F};
+        const vec3 lift{0.0F, kTrackHeight, 0.0F};
+        AddStaticBox(glm::min(from, to) - half + lift - vec3{0.0F, deck, 0.0F},
+                     glm::max(from, to) + half + lift, kTrackSteel);
+        // Two rails on the deck.
+        const vec3 rail = half * 0.4F;
+        for (const float side : {-1.0F, 1.0F}) {
+            const vec3 offset = rail * side;
+            const vec3 thin = span.x > span.z ? vec3{0.0F, 0.0F, 0.08F * kS}
+                                              : vec3{0.08F * kS, 0.0F, 0.0F};
+            AddStaticBox(glm::min(from, to) + offset - thin + lift,
+                         glm::max(from, to) + offset + thin + lift + vec3{0.0F, 0.2F * kS, 0.0F},
+                         kRail);
+        }
+        // Columns every half block, in the middle of the street.
+        const float length = glm::distance(from, to);
+        const int count = static_cast<int>(length / (40.0F * kS));
+        for (int index = 1; index < count; index += 2) {
+            const vec3 at = glm::mix(from, to, static_cast<float>(index) / static_cast<float>(count));
+            AddStaticBox(at - vec3{0.45F * kS, 0.0F, 0.45F * kS},
+                         at + vec3{0.45F * kS, kTrackHeight - deck, 0.45F * kS}, kTrackSteel);
+        }
+    };
+    for (const auto& [z, extent] : rows) {
+        line(vec3{static_cast<float>(extent.first) * kS, 0.0F, static_cast<float>(z) * kS},
+             vec3{static_cast<float>(extent.second) * kS, 0.0F, static_cast<float>(z) * kS});
+    }
+    for (const auto& [x, extent] : columns) {
+        line(vec3{static_cast<float>(x) * kS, 0.0F, static_cast<float>(extent.first) * kS},
+             vec3{static_cast<float>(x) * kS, 0.0F, static_cast<float>(extent.second) * kS});
+    }
+}
+
+void CityView::SubmitTrains(RenderQueue& queue, const WorldFrame& frame,
+                            double renderTick) {
+    // Riders who boarded together share a train.
+    std::set<std::tuple<std::uint32_t, std::uint32_t, sim::Tick>> trains;
+    for (const RobotFrame& robot : frame.robots) {
+        if (robot.alightsAt <= robot.boardsAt ||
+            robot.rideFrom >= city_.stations.size() ||
+            robot.rideTo >= city_.stations.size()) {
+            continue;
+        }
+        const double departs = static_cast<double>(robot.boardsAt + sim::kMetroWaitMinutes);
+        const double arrives = static_cast<double>(robot.alightsAt);
+        if (renderTick < departs || renderTick >= arrives ||
+            !trains.insert({robot.rideFrom, robot.rideTo, robot.boardsAt}).second) {
+            continue;
+        }
+        // Along the row of the first station, then the column of the last.
+        const vec3 from = StationPlatform(robot.rideFrom);
+        const vec3 to = StationPlatform(robot.rideTo);
+        const vec3 turn{to.x, from.y, from.z};
+        const float first = glm::distance(from, turn);
+        const float total = first + glm::distance(turn, to);
+        const float travelled =
+            static_cast<float>((renderTick - departs) / std::max(arrives - departs, 1e-6)) *
+            total;
+        const bool alongRow = travelled < first;
+        const vec3 position = alongRow
+                                  ? glm::mix(from, turn, first > 0.0F ? travelled / first : 1.0F)
+                                  : glm::mix(turn, to, (travelled - first) /
+                                                           std::max(total - first, 1e-6F));
+        const vec3 direction = alongRow ? turn - from : to - turn;
+        const float yaw = glm::degrees(std::atan2(direction.x, direction.z));
+        const vec3 forward = glm::length(direction) > 0.0F ? glm::normalize(direction)
+                                                           : vec3{0.0F, 0.0F, 1.0F};
+        for (const float car : {-6.8F, 6.8F}) {
+            SubmitModel(queue, Prop(PropKind::TrainCar),
+                        position + (forward * (car * kS)), yaw, 0.0F, vec3(1.0F), kS);
+        }
     }
 }
 
@@ -382,7 +534,10 @@ const std::vector<vec3>& CityView::StationRoute(sim::EntityId building,
              routes_.Path(found->entrance, city_.stations[station].node)) {
             points.push_back(NodePosition(node));
         }
-        points.push_back(StationEntrance(station));
+        // Up the stairs to the platform.
+        points.push_back(StationStairsBottom(station));
+        points.push_back(StationStairsTop(station));
+        points.push_back(StationPlatform(station));
         if (!toStation) {
             std::ranges::reverse(points);
         }
@@ -621,6 +776,7 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
              .position = position + vec3{0.0F, 1.0F * figureScale, 0.0F},
              .radius = kWalkerPickRadius * streetFigureScale});
     }
+    SubmitTrains(queue, frame, renderTick);
     if (open != shapes_.end()) {
         SubmitInterior(queue, frame, renderTick, selection);
     }
@@ -856,11 +1012,24 @@ std::optional<std::pair<vec3, vec3>> CityView::RobotPosition(
     double start = static_cast<double>(robot.departedAt);
     double end = static_cast<double>(robot.arrivesAt);
     if (robot.alightsAt > robot.boardsAt) {
+        const double departs = static_cast<double>(robot.boardsAt + sim::kMetroWaitMinutes);
         if (renderTick < static_cast<double>(robot.boardsAt)) {
             walk = &StationRoute(robot.from, robot.rideFrom, true);
             end = static_cast<double>(robot.boardsAt);
+        } else if (renderTick < departs) {
+            // Waiting in one of the platform's open corners, clear of the
+            // tracks that cross it.
+            const std::uint64_t hash = robot.id.value * 2654435761ULL;
+            const auto corner = [&](unsigned shift) {
+                const float side = ((hash >> (shift + 8U)) & 1U) != 0U ? 1.0F : -1.0F;
+                const float along = static_cast<float>((hash >> shift) & 0xFFU) / 255.0F;
+                return side * ((2.8F * kS) + (along * (kPlatformHalf - (3.6F * kS))));
+            };
+            const vec3 spot{corner(0U), 0.0F, corner(16U)};
+            return std::make_pair(StationPlatform(robot.rideFrom) + spot,
+                                  vec3{0.0F, 0.0F, 1.0F});
         } else if (renderTick < static_cast<double>(robot.alightsAt)) {
-            return std::nullopt;
+            return std::nullopt;  // On the train.
         } else {
             walk = &StationRoute(robot.to, robot.rideTo, false);
             start = static_cast<double>(robot.alightsAt);
