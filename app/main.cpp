@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <chrono>
@@ -23,8 +24,14 @@
 #include <system_error>
 #include <utility>
 
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/vector_float4.hpp>
+#include <glm/geometric.hpp>
+#include <glm/matrix.hpp>
+
 #include "CityView.hpp"
 #include "GameRenderer.hpp"
+#include "Inspector.hpp"
 #include "OrbitCamera.hpp"
 #include "RenderQueue.hpp"
 #include "Scene.hpp"
@@ -45,6 +52,10 @@ constexpr std::array<double, 5> kSpeeds{1.0, 10.0, 60.0, 300.0, 1200.0};
 constexpr double kOrbitDegreesPerPixel = 0.25;
 constexpr float kPanPerSecond = 40.0F;
 constexpr double kMessageSeconds = 3.0;
+// Pixels the cursor may move between press and release for a click.
+constexpr double kClickTolerance = 6.0;
+constexpr float kInteriorDistance = 6.0F;
+constexpr float kInspectorTextSize = 20.0F;
 
 struct Options {
     bool startNew{false};
@@ -203,7 +214,19 @@ private:
             return;
         }
         if (key == GLFW_KEY_ESCAPE) {
-            glfwSetWindowShouldClose(&window_, GLFW_TRUE);
+            // Step back out of the selection before quitting.
+            if (selection_.robot.IsValid() || selection_.room.IsValid()) {
+                selection_.robot = {};
+                selection_.room = {};
+            } else if (selection_.building.IsValid()) {
+                selection_ = {};
+            } else {
+                glfwSetWindowShouldClose(&window_, GLFW_TRUE);
+            }
+        } else if (key == GLFW_KEY_E || key == GLFW_KEY_PAGE_UP) {
+            ChangeFloor(1);
+        } else if (key == GLFW_KEY_Q || key == GLFW_KEY_PAGE_DOWN) {
+            ChangeFloor(-1);
         } else if (key == GLFW_KEY_SPACE) {
             host_.SetPaused(!host_.IsPaused());
         } else if (key >= GLFW_KEY_1 &&
@@ -256,9 +279,87 @@ private:
                 static_cast<float>(-(x - lastCursorX_) * kOrbitDegreesPerPixel),
                 static_cast<float>((y - lastCursorY_) * kOrbitDegreesPerPixel));
         }
+        // A left press and release with little movement is a click, not a
+        // drag.
+        const bool leftDown =
+            glfwGetMouseButton(&window_, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+        if (leftDown && !leftWasDown_) {
+            clickTravel_ = 0.0;
+        } else if (leftDown) {
+            clickTravel_ +=
+                std::abs(x - lastCursorX_) + std::abs(y - lastCursorY_);
+        } else if (leftWasDown_ && clickTravel_ < kClickTolerance) {
+            Click(x, y);
+        }
+        leftWasDown_ = leftDown;
         wasDragging_ = dragging;
         lastCursorX_ = x;
         lastCursorY_ = y;
+    }
+
+    void Click(double cursorX, double cursorY) {
+        int windowWidth = 0;
+        int windowHeight = 0;
+        glfwGetWindowSize(&window_, &windowWidth, &windowHeight);
+        if (windowWidth <= 0 || windowHeight <= 0) {
+            return;
+        }
+        // Unproject the cursor to a ray through the scene.
+        const Camera camera = camera_.MakeCamera(width_, height_);
+        const glm::mat4 inverse =
+            glm::inverse(camera.GetViewProjectionMatrix());
+        const auto ndcX =
+            static_cast<float>((2.0 * cursorX / windowWidth) - 1.0);
+        const auto ndcY =
+            static_cast<float>(1.0 - (2.0 * cursorY / windowHeight));
+        glm::vec4 nearPoint = inverse * glm::vec4{ndcX, ndcY, -1.0F, 1.0F};
+        glm::vec4 farPoint = inverse * glm::vec4{ndcX, ndcY, 1.0F, 1.0F};
+        nearPoint /= nearPoint.w;
+        farPoint /= farPoint.w;
+        const Ray ray{.origin = glm::vec3(nearPoint),
+                      .direction = glm::normalize(glm::vec3(farPoint) -
+                                                  glm::vec3(nearPoint))};
+
+        const auto pick = city_.PickAt(ray);
+        if (!pick) {
+            selection_ = {};
+        } else if (pick->robot.IsValid()) {
+            selection_.robot = pick->robot;
+            selection_.room = {};
+        } else if (pick->room.IsValid()) {
+            selection_.room = pick->room;
+            selection_.robot = {};
+        } else if (pick->building != selection_.building) {
+            OpenBuilding(pick->building);
+        } else {
+            selection_.room = {};
+            selection_.robot = {};
+        }
+    }
+
+    void OpenBuilding(sim::EntityId building) {
+        // Habitats open on their first apartment floor, above the stores.
+        const sim::Building* found = city_.City().FindBuilding(building);
+        const bool habitat =
+            found != nullptr && found->kind == sim::BuildingKind::Habitat;
+        selection_ = {.building = building,
+                      .floor = habitat && found->floors > 1 ? 1U : 0U};
+        camera_.Focus(city_.FloorCenter(building, selection_.floor),
+                      kInteriorDistance);
+    }
+
+    void ChangeFloor(int delta) {
+        if (!selection_.building.IsValid()) {
+            return;
+        }
+        const auto floors = static_cast<int>(city_.Floors(selection_.building));
+        const int floor = std::clamp(
+            static_cast<int>(selection_.floor) + delta, 0, floors - 1);
+        selection_.floor = static_cast<std::uint32_t>(floor);
+        // The selected room may be on another floor now.
+        selection_.room = {};
+        camera_.FocusTarget(
+            city_.FloorCenter(selection_.building, selection_.floor));
     }
 
     void RenderFrame() {
@@ -266,11 +367,12 @@ private:
         const double renderTick = host_.RenderTick();
         queue_.Clear();
         if (frame != nullptr) {
-            city_.Submit(queue_, *frame, renderTick);
+            city_.Submit(queue_, *frame, renderTick, selection_);
         }
         city_.UpdateLights(
             scene_,
-            std::fmod(renderTick, static_cast<double>(sim::kMinutesPerDay)));
+            std::fmod(renderTick, static_cast<double>(sim::kMinutesPerDay)),
+            selection_);
         SubmitOverlay(frame.get(), renderTick);
         renderer_.Render(scene_, queue_, camera_.MakeCamera(width_, height_));
     }
@@ -295,10 +397,36 @@ private:
             queue_.SubmitText(
                 renderer_.MakeText(message_, -0.98F, 0.78F, 24.0F));
         }
+        if (frame != nullptr) {
+            SubmitInspector(*frame);
+        }
         queue_.SubmitText(renderer_.MakeText(
-            "Drag: orbit   Wheel: zoom   WASD: move   Space: pause   N: step "
-            "  1-5: speed   F5: save   F12: screenshot   Esc: save and quit",
+            "Click: inspect   Q/E: floor   Drag: orbit   Wheel: zoom   WASD: "
+            "move   Space: pause   N: step   1-5: speed   F5: save   F12: "
+            "screenshot   Esc: close / quit",
             -0.98F, -0.96F, 20.0F));
+    }
+
+    void SubmitInspector(const WorldFrame& frame) {
+        constexpr float kLeft = 0.30F;
+        constexpr float kTop = 0.91F;
+        // Roughly half the font size per character, in pixels.
+        const auto maxChars = static_cast<std::size_t>(
+            ((1.0F - kLeft) * 0.5F * static_cast<float>(width_)) /
+            (kInspectorTextSize * 0.5F));
+        float y = kTop;
+        for (const InspectorLine& line :
+             DescribeSelection(selection_, frame, city_, host_, maxChars)) {
+            FontLine2d text =
+                renderer_.MakeText(line.text, kLeft, y, line.size);
+            text.SetColor(line.color);
+            queue_.SubmitText(std::move(text));
+            // Line height in screen units follows the font size.
+            y -= (line.size * 1.25F) / (static_cast<float>(height_) * 0.5F);
+            if (y < -0.9F) {
+                break;
+            }
+        }
     }
 
     void TakeScreenshot() {
@@ -339,11 +467,14 @@ private:
     CityView city_;
     OrbitCamera camera_;
     bool wasDragging_{false};
+    bool leftWasDown_{false};
+    double clickTravel_{};
     double lastCursorX_{};
     double lastCursorY_{};
     std::string message_;
     double messageUntil_{};
     bool screenshotRequested_{false};
+    Selection selection_;
 };
 
 int RunGame(GLFWwindow& window, const Options& options) {

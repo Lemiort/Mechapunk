@@ -2,6 +2,7 @@
 
 #include <glad/gl.h>
 
+#include <array>
 #include <filesystem>
 #include <initializer_list>
 #include <memory>
@@ -115,6 +116,21 @@ GameRenderer::GameRenderer(int width, int height) {
     assets_.workplace = surface("textures/mp_workplace.png");
     assets_.tower = surface("textures/mp_tower.png");
     assets_.robot = surface("textures/mp_robot.png");
+    assets_.slab = surface("textures/mp_slab.png");
+    assets_.highlight = surface("textures/mp_highlight.png");
+    const std::array<std::pair<sim::RoomKind, const char*>, 8> roomTextures{{
+        {sim::RoomKind::Apartment, "textures/mp_room_apartment.png"},
+        {sim::RoomKind::Workspace, "textures/mp_room_workspace.png"},
+        {sim::RoomKind::Bar, "textures/mp_room_bar.png"},
+        {sim::RoomKind::Diner, "textures/mp_room_diner.png"},
+        {sim::RoomKind::ChargingBay, "textures/mp_room_charging.png"},
+        {sim::RoomKind::RepairShop, "textures/mp_room_repair.png"},
+        {sim::RoomKind::Arcade, "textures/mp_room_arcade.png"},
+        {sim::RoomKind::Shop, "textures/mp_room_shop.png"},
+    }};
+    for (const auto& [kind, texture] : roomTextures) {
+        assets_.rooms.emplace(kind, surface(texture));
+    }
     assets_.cube = std::make_unique<Mesh>(gsl_lite::not_null{assets_.ground},
                                           "models/cube.obj");
     assets_.plane = std::make_unique<Mesh>(gsl_lite::not_null{assets_.ground},

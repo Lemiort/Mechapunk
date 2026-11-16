@@ -5,6 +5,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <optional>
 #include <map>
 #include <numbers>
 #include <utility>
@@ -21,7 +23,16 @@ namespace mechapunk {
 
 namespace {
 constexpr float kStreetWidth = 0.5F;
-constexpr float kFloorHeight = 0.38F;
+constexpr float kSlabThickness = 0.04F;
+constexpr float kRoomWallHeight = 0.12F;
+constexpr float kRoomInset = 0.06F;
+constexpr float kInteriorRobotRadius = 0.05F;
+// Walking robots are small on screen; accept clicks a little around them.
+constexpr float kWalkerPickRadius = 0.35F;
+constexpr float kInteriorPickRadius = 0.09F;
+constexpr glm::vec3 kLampColor{0.9F, 0.9F, 1.0F};
+constexpr float kLampPower = 4.0F;
+constexpr float kLampHeight = 1.2F;
 constexpr float kStoreSignHeight = 0.3F;
 constexpr float kStoreSignSpacing = 0.65F;
 constexpr float kStreetHeight = 0.03F;
@@ -85,7 +96,7 @@ float SunHeight(double minuteOfDay) {
 
 CityView::CityView(const sim::City& city, std::uint64_t seed,
                    RenderAssets& assets)
-    : city_(city), routes_(city_), assets_(assets) {
+    : city_(city), rooms_(city_), routes_(city_), assets_(assets) {
     glm::vec3 minimum{0.0F};
     glm::vec3 maximum{0.0F};
     for (const sim::CityNode& node : city_.nodes) {
@@ -135,14 +146,25 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
         const bool habitat = building.kind == sim::BuildingKind::Habitat;
         const float height =
             0.3F + (static_cast<float>(building.floors) * kFloorHeight);
-        buildingCenters_[building.id.value] = centerOnGround;
-        statics_.push_back(
-            {.mesh = assets_.cube.get(),
-             .transform = {.position = centerOnGround,
-                           .rotationDegrees = glm::vec3(0.0F),
-                           .scale = {kBuildingFootprint, height,
-                                     kBuildingFootprint}},
-             .material = habitat ? assets_.habitat : assets_.workplace});
+        BuildingShape& shape = shapes_[building.id.value];
+        shape.center = centerOnGround;
+        shape.height = height;
+        shape.floors = building.floors;
+        shape.floorRooms.resize(building.floors);
+        for (const sim::Room& room : building.rooms) {
+            if (room.floor < building.floors) {
+                shape.floorRooms[room.floor].push_back(&room);
+            }
+        }
+        buildingBlocks_.emplace(
+            building.id.value,
+            StaticItem{.mesh = assets_.cube.get(),
+                       .transform = {.position = centerOnGround,
+                                     .rotationDegrees = glm::vec3(0.0F),
+                                     .scale = {kBuildingFootprint, height,
+                                               kBuildingFootprint}},
+                       .material = habitat ? assets_.habitat
+                                           : assets_.workplace});
         // Sign on the corner facing the street, halfway up.
         const glm::vec3 sign =
             centerOnGround -
@@ -217,9 +239,14 @@ void CityView::AddLights(Scene& scene) {
         scene.AddPointLight(PointLight(position.x, position.y, position.z,
                                        color.r, color.g, color.b, kNeonPower));
     }
+    // Lights the open floor of an inspected building; dark until then.
+    lampIndex_ = scene.GetPointLights().size();
+    scene.AddPointLight(
+        PointLight(0.0F, -10.0F, 0.0F, 0.0F, 0.0F, 0.0F, kLampPower));
 }
 
-void CityView::UpdateLights(Scene& scene, double minuteOfDay) const {
+void CityView::UpdateLights(Scene& scene, double minuteOfDay,
+                            const Selection& selection) const {
     const float sunHeight = SunHeight(minuteOfDay);
     const float daylight = Smoothstep(-0.1F, 0.25F, sunHeight);
     const auto directional = scene.GetDirectionalLights();
@@ -243,25 +270,264 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay) const {
             points[sign.lightIndex].SetColor(sign.color * neon);
         }
     }
+    if (lampIndex_ < points.size()) {
+        PointLight& lamp = points[lampIndex_];
+        if (selection.building.IsValid()) {
+            lamp.SetPos(FloorCenter(selection.building, selection.floor) +
+                        glm::vec3{0.0F, kLampHeight, 0.0F});
+            lamp.SetColor(kLampColor);
+        } else {
+            lamp.SetColor(glm::vec3(0.0F));
+        }
+    }
 }
 
 void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
-                      double renderTick) {
+                      double renderTick, const Selection& selection) {
+    robotMarkers_.clear();
+    roomTiles_.clear();
+    openBuilding_ = selection.building;
+    openFloor_ = selection.floor;
     for (const StaticItem& item : statics_) {
         queue.SubmitOpaqueMesh(*item.mesh, item.transform, item.material);
+    }
+    for (const auto& [id, block] : buildingBlocks_) {
+        if (id != selection.building.value) {
+            queue.SubmitOpaqueMesh(*block.mesh, block.transform,
+                                   block.material);
+        }
     }
     for (const RobotFrame& robot : frame.robots) {
         if (robot.activity != sim::RobotActivity::Walking ||
             !robot.from.IsValid()) {
             continue;
         }
+        const glm::vec3 position = RobotPosition(robot, renderTick);
+        const bool selected = robot.id == selection.robot;
         queue.SubmitOpaqueMesh(
             *assets_.sphere,
-            Transform{.position = RobotPosition(robot, renderTick),
+            Transform{.position = position,
                       .rotationDegrees = glm::vec3(0.0F),
-                      .scale = glm::vec3(kRobotRadius)},
-            assets_.robot);
+                      .scale = glm::vec3(kRobotRadius *
+                                         (selected ? 1.6F : 1.0F))},
+            selected ? assets_.highlight : assets_.robot);
+        robotMarkers_.push_back({.id = robot.id,
+                                 .position = position,
+                                 .radius = kWalkerPickRadius});
     }
+    if (selection.building.IsValid()) {
+        SubmitInterior(queue, frame, selection);
+    }
+}
+
+void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
+                              const Selection& selection) {
+    const auto found = shapes_.find(selection.building.value);
+    if (found == shapes_.end()) {
+        return;
+    }
+    const BuildingShape& shape = found->second;
+    const std::uint32_t current = std::min(selection.floor, shape.floors - 1);
+
+    // Floors below are solid; the one being looked at is an open slab.
+    if (current > 0) {
+        queue.SubmitOpaqueMesh(
+            *assets_.cube,
+            Transform{.position = shape.center,
+                      .rotationDegrees = glm::vec3(0.0F),
+                      .scale = {kBuildingFootprint,
+                                static_cast<float>(current) * kFloorHeight,
+                                kBuildingFootprint}},
+            assets_.tower);
+    }
+    const float floorBase = static_cast<float>(current) * kFloorHeight;
+    queue.SubmitOpaqueMesh(
+        *assets_.cube,
+        Transform{.position = shape.center + glm::vec3{0.0F, floorBase, 0.0F},
+                  .rotationDegrees = glm::vec3(0.0F),
+                  .scale = {kBuildingFootprint, kSlabThickness,
+                            kBuildingFootprint}},
+        assets_.slab);
+
+    // Robots inside rooms, in id order per room.
+    std::map<std::uint64_t, std::vector<sim::EntityId>> occupants;
+    for (const RobotFrame& robot : frame.robots) {
+        if (robot.activity != sim::RobotActivity::Walking) {
+            occupants[robot.location.value].push_back(robot.id);
+        }
+    }
+
+    for (const sim::Room* room : shape.floorRooms[current]) {
+        const Box box = RoomBox(shape, *room);
+        const glm::vec3 size = box.maximum - box.minimum;
+        const bool selected = room->id == selection.room;
+        queue.SubmitOpaqueMesh(
+            *assets_.cube,
+            Transform{.position = {(box.minimum.x + box.maximum.x) * 0.5F,
+                                   box.minimum.y,
+                                   (box.minimum.z + box.maximum.z) * 0.5F},
+                      .rotationDegrees = glm::vec3(0.0F),
+                      .scale = size},
+            selected ? assets_.highlight : RoomMaterial(room->kind));
+        roomTiles_.push_back({.room = room->id, .box = box});
+
+        // Seat robots on a grid over the room, as many as it can hold.
+        const auto seated = occupants.find(room->id.value);
+        if (seated == occupants.end()) {
+            continue;
+        }
+        const auto columns = static_cast<std::uint32_t>(
+            std::ceil(std::sqrt(static_cast<float>(room->capacity))));
+        const float stepX = size.x / static_cast<float>(columns);
+        const float stepZ =
+            size.z / std::ceil(static_cast<float>(room->capacity) /
+                               static_cast<float>(columns));
+        for (std::size_t index = 0; index < seated->second.size(); ++index) {
+            const auto column = static_cast<float>(index % columns);
+            const auto row = static_cast<float>(index / columns);
+            const glm::vec3 position{
+                box.minimum.x + ((column + 0.5F) * stepX),
+                box.maximum.y + kInteriorRobotRadius,
+                box.minimum.z + ((row + 0.5F) * stepZ)};
+            const bool robotSelected = seated->second[index] == selection.robot;
+            queue.SubmitOpaqueMesh(
+                *assets_.sphere,
+                Transform{.position = position,
+                          .rotationDegrees = glm::vec3(0.0F),
+                          .scale = glm::vec3(kInteriorRobotRadius *
+                                             (robotSelected ? 1.5F : 1.0F))},
+                robotSelected ? assets_.highlight : assets_.robot);
+            robotMarkers_.push_back({.id = seated->second[index],
+                                     .position = position,
+                                     .radius = kInteriorPickRadius});
+        }
+    }
+}
+
+CityView::Box CityView::RoomBox(const BuildingShape& shape,
+                                const sim::Room& room) const {
+    const std::vector<const sim::Room*>& rooms = shape.floorRooms[room.floor];
+    const auto index = static_cast<std::uint32_t>(
+        std::ranges::find(rooms, &room) - rooms.begin());
+    const auto count = static_cast<std::uint32_t>(rooms.size());
+    const auto columns = static_cast<std::uint32_t>(
+        std::ceil(std::sqrt(static_cast<float>(count))));
+    const std::uint32_t rows = (count + columns - 1) / columns;
+    const float inner = kBuildingFootprint - (2.0F * kRoomInset);
+    const float width = inner / static_cast<float>(columns);
+    const float depth = inner / static_cast<float>(rows);
+    const float gap = 0.04F;
+    const glm::vec3 corner =
+        shape.center +
+        glm::vec3{-inner * 0.5F,
+                  (static_cast<float>(room.floor) * kFloorHeight) +
+                      kSlabThickness,
+                  -inner * 0.5F};
+    const glm::vec3 minimum =
+        corner +
+        glm::vec3{(static_cast<float>(index % columns) * width) + gap, 0.0F,
+                  (static_cast<float>(index / columns) * depth) + gap};
+    return {.minimum = minimum,
+            .maximum = minimum + glm::vec3{width - (2.0F * gap),
+                                           kRoomWallHeight,
+                                           depth - (2.0F * gap)}};
+}
+
+std::shared_ptr<const Material> CityView::RoomMaterial(
+    sim::RoomKind kind) const {
+    const auto found = assets_.rooms.find(kind);
+    return found != assets_.rooms.end() ? found->second : assets_.tower;
+}
+
+std::optional<Pick> CityView::PickAt(const Ray& ray) const {
+    float nearest = std::numeric_limits<float>::max();
+    std::optional<Pick> result;
+    const auto consider = [&](float distance, Pick pick) {
+        if (distance >= 0.0F && distance < nearest) {
+            nearest = distance;
+            result = pick;
+        }
+    };
+    // Slab test: distance along the ray to where it enters `box`.
+    const auto hitBox = [&](const Box& box) -> std::optional<float> {
+        float enter = 0.0F;
+        float exit = std::numeric_limits<float>::max();
+        for (int axis = 0; axis < 3; ++axis) {
+            const float origin = ray.origin[axis];
+            const float direction = ray.direction[axis];
+            if (std::abs(direction) < 1e-6F) {
+                if (origin < box.minimum[axis] || origin > box.maximum[axis]) {
+                    return std::nullopt;
+                }
+                continue;
+            }
+            float nearSide = (box.minimum[axis] - origin) / direction;
+            float farSide = (box.maximum[axis] - origin) / direction;
+            if (nearSide > farSide) {
+                std::swap(nearSide, farSide);
+            }
+            enter = std::max(enter, nearSide);
+            exit = std::min(exit, farSide);
+            if (enter > exit) {
+                return std::nullopt;
+            }
+        }
+        return enter;
+    };
+
+    for (const Marker& marker : robotMarkers_) {
+        const glm::vec3 offset = ray.origin - marker.position;
+        const float b = glm::dot(offset, ray.direction);
+        const float c =
+            glm::dot(offset, offset) - (marker.radius * marker.radius);
+        const float discriminant = (b * b) - c;
+        if (discriminant >= 0.0F) {
+            consider(-b - std::sqrt(discriminant), {.robot = marker.id});
+        }
+    }
+    for (const Tile& tile : roomTiles_) {
+        if (const auto distance = hitBox(tile.box)) {
+            const auto room = rooms_.Find(tile.room);
+            consider(*distance,
+                     {.building = room ? room->building->id : sim::EntityId{},
+                      .room = tile.room});
+        }
+    }
+    for (const auto& [id, shape] : shapes_) {
+        const glm::vec3 half{kBuildingFootprint * 0.5F, 0.0F,
+                             kBuildingFootprint * 0.5F};
+        // The open building is cut away above the floor being viewed, so its
+        // rooms and robots are not hidden behind its full height.
+        const float height =
+            id == openBuilding_.value
+                ? (static_cast<float>(openFloor_) * kFloorHeight) +
+                      kSlabThickness
+                : shape.height;
+        const Box box{.minimum = shape.center - half,
+                      .maximum = shape.center + half +
+                                 glm::vec3{0.0F, height, 0.0F}};
+        if (const auto distance = hitBox(box)) {
+            // Rooms and robots of the open building sit inside its box;
+            // prefer them by nudging the building hit back a little.
+            consider(*distance + 0.01F, {.building = sim::EntityId{id}});
+        }
+    }
+    return result;
+}
+
+std::uint32_t CityView::Floors(sim::EntityId building) const {
+    const auto found = shapes_.find(building.value);
+    return found != shapes_.end() ? found->second.floors : 0;
+}
+
+glm::vec3 CityView::FloorCenter(sim::EntityId building,
+                                std::uint32_t floor) const {
+    const auto found = shapes_.find(building.value);
+    if (found == shapes_.end()) {
+        return center_;
+    }
+    return found->second.center +
+           glm::vec3{0.0F, static_cast<float>(floor) * kFloorHeight, 0.0F};
 }
 
 glm::vec3 CityView::NodePosition(sim::NodeId node) const {
@@ -281,12 +547,12 @@ const std::vector<glm::vec3>& CityView::Route(sim::EntityId from,
     const sim::Building* origin = city_.FindBuilding(from);
     const sim::Building* destination = city_.FindBuilding(to);
     if (origin != nullptr && destination != nullptr) {
-        points.push_back(buildingCenters_[from.value]);
+        points.push_back(shapes_.at(from.value).center);
         for (const sim::NodeId node :
              routes_.Path(origin->entrance, destination->entrance)) {
             points.push_back(NodePosition(node));
         }
-        points.push_back(buildingCenters_[to.value]);
+        points.push_back(shapes_.at(to.value).center);
     }
     return routeCache_.emplace(key, std::move(points)).first->second;
 }

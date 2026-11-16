@@ -29,6 +29,7 @@ endif()
 add_executable(mechapunk
     app/CityView.cpp
     app/GameRenderer.cpp
+    app/Inspector.cpp
     app/SimulationHost.cpp
     app/main.cpp
 )

@@ -20,7 +20,7 @@ public:
     static constexpr float kFar = 500.0F;
     static constexpr float kMinPitch = 10.0F;
     static constexpr float kMaxPitch = 85.0F;
-    static constexpr float kMinDistance = 3.0F;
+    static constexpr float kMinDistance = 1.5F;
     static constexpr float kMaxDistance = 150.0F;
 
     OrbitCamera(glm::vec3 target, float distance)
@@ -36,6 +36,13 @@ public:
         distance_ = std::clamp(distance_ * std::pow(0.9F, steps), kMinDistance,
                                kMaxDistance);
     }
+
+    // Looks at `target` from `distance`, keeping the viewing angle.
+    void Focus(glm::vec3 target, float distance) {
+        target_ = target;
+        distance_ = std::clamp(distance, kMinDistance, kMaxDistance);
+    }
+    void FocusTarget(glm::vec3 target) { target_ = target; }
 
     // Moves the target in the camera's ground plane; units scale with zoom.
     void Pan(float right, float forward) {

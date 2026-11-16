@@ -1,11 +1,15 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <exception>
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "SimulationThread.hpp"
@@ -19,11 +23,26 @@ namespace mechapunk {
 struct RobotFrame {
     sim::EntityId id;
     sim::RobotActivity activity{};
+    // Room the robot is in, or has just left while walking.
+    sim::EntityId location;
+    // Room the robot is walking to; none unless walking.
+    sim::EntityId destination;
     // Buildings walked between; set while walking.
     sim::EntityId from;
     sim::EntityId to;
     sim::Tick departedAt{};
     sim::Tick arrivesAt{};
+    sim::Tick nextActionAt{};
+    sim::Tick shiftStartsAt{};
+    sim::Needs needs;
+    std::int64_t credits{};
+};
+
+// What does not change while the game runs.
+struct RobotInfo {
+    std::string name;
+    sim::EntityId apartment;
+    sim::EntityId workspace;
 };
 
 // Immutable copy of the world's visible state, published after every step.
@@ -55,6 +74,14 @@ public:
     // Seed the world was generated from; stable across saves.
     [[nodiscard]] std::uint64_t Seed() const noexcept { return seed_; }
 
+    [[nodiscard]] const RobotInfo* FindRobotInfo(sim::EntityId robot) const;
+    // Robots sorted by id, for lookups into WorldFrame::robots.
+    [[nodiscard]] static const RobotFrame* FindRobot(const WorldFrame& frame,
+                                                     sim::EntityId robot);
+    // The robot's latest events, newest last, as "Day 2 19:41  text".
+    [[nodiscard]] std::vector<std::string> RecentEvents(sim::EntityId robot,
+                                                        std::size_t count) const;
+
     [[nodiscard]] std::shared_ptr<const WorldFrame> LatestFrame() const;
     // Current simulation time in minutes, with a fractional part, for smooth
     // movement between steps.
@@ -81,6 +108,7 @@ public:
 private:
     void Step();
     void Publish();
+    void Record(const sim::SimEvent& event);
 
     sim::World world_;
     sim::City city_;
@@ -88,6 +116,10 @@ private:
     sim::Tick baseTick_;
     double speed_{1.0};
     SnapshotBuffer<WorldFrame> frames_;
+    std::unordered_map<std::uint64_t, RobotInfo> robotInfo_;
+    // Written by the worker in its event sink, read by the render thread.
+    mutable std::mutex logMutex_;
+    std::unordered_map<std::uint64_t, std::deque<std::string>> log_;
     // Declared last: joined before the world it steps is destroyed.
     std::unique_ptr<SimulationThread> thread_;
 };

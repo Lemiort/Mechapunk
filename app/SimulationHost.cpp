@@ -1,6 +1,10 @@
 #include "SimulationHost.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <functional>
+#include <mutex>
 #include <cstdint>
 #include <exception>
 #include <expected>
@@ -21,6 +25,7 @@ namespace {
 // wakes (Windows timers can oversleep by ~15 ms).
 constexpr std::uint32_t kMaxStepsPerWake = 4000;
 constexpr auto kPauseTimeout = std::chrono::seconds(2);
+constexpr std::size_t kEventsPerRobot = 40;
 }  // namespace
 
 SimulationHost::SimulationHost(sim::World world)
@@ -28,6 +33,14 @@ SimulationHost::SimulationHost(sim::World world)
       city_(world_.State().city),
       seed_(world_.State().seed),
       baseTick_(world_.CurrentTick()) {
+    for (const sim::Robot& robot : world_.State().robots) {
+        robotInfo_.emplace(robot.id.value,
+                           RobotInfo{.name = robot.name,
+                                     .apartment = robot.apartment,
+                                     .workspace = robot.workspace});
+    }
+    // Runs on the worker inside World::Step, where reading the world is safe.
+    world_.SetEventSink([this](const sim::SimEvent& event) { Record(event); });
     Publish();
     thread_ = std::make_unique<SimulationThread>(
         FixedStepClockSettings{.stepSeconds = kSecondsPerMinute,
@@ -36,6 +49,48 @@ SimulationHost::SimulationHost(sim::World world)
 }
 
 SimulationHost::~SimulationHost() { Stop(); }
+
+const RobotInfo* SimulationHost::FindRobotInfo(sim::EntityId robot) const {
+    const auto found = robotInfo_.find(robot.value);
+    return found != robotInfo_.end() ? &found->second : nullptr;
+}
+
+const RobotFrame* SimulationHost::FindRobot(const WorldFrame& frame,
+                                            sim::EntityId robot) {
+    const auto found = std::ranges::lower_bound(frame.robots, robot,
+                                                std::less{}, &RobotFrame::id);
+    return found != frame.robots.end() && found->id == robot ? &*found
+                                                             : nullptr;
+}
+
+std::vector<std::string> SimulationHost::RecentEvents(sim::EntityId robot,
+                                                      std::size_t count) const {
+    const std::scoped_lock lock(logMutex_);
+    const auto found = log_.find(robot.value);
+    if (found == log_.end()) {
+        return {};
+    }
+    const std::deque<std::string>& events = found->second;
+    const std::size_t first = events.size() > count ? events.size() - count : 0;
+    return {events.begin() + static_cast<std::ptrdiff_t>(first), events.end()};
+}
+
+void SimulationHost::Record(const sim::SimEvent& event) {
+    std::string text = world_.Describe(event);
+    // The inspector already shows whose history this is.
+    if (const RobotInfo* info = FindRobotInfo(event.robot)) {
+        if (const auto name = text.find(info->name);
+            name != std::string::npos) {
+            text.erase(name, info->name.size() + 1);
+        }
+    }
+    const std::scoped_lock lock(logMutex_);
+    std::deque<std::string>& events = log_[event.robot.value];
+    events.push_back(std::move(text));
+    if (events.size() > kEventsPerRobot) {
+        events.pop_front();
+    }
+}
 
 std::shared_ptr<const WorldFrame> SimulationHost::LatestFrame() const {
     const auto sample = frames_.SampleAt(0.0);
@@ -122,7 +177,14 @@ void SimulationHost::Publish() {
     frame.tick = world_.CurrentTick();
     frame.robots.reserve(world_.State().robots.size());
     for (const sim::Robot& robot : world_.State().robots) {
-        RobotFrame robotFrame{.id = robot.id, .activity = robot.activity};
+        RobotFrame robotFrame{.id = robot.id,
+                              .activity = robot.activity,
+                              .location = robot.location,
+                              .destination = robot.destination,
+                              .nextActionAt = robot.nextActionAt,
+                              .shiftStartsAt = robot.shiftStartsAt,
+                              .needs = robot.needs,
+                              .credits = robot.credits};
         switch (robot.activity) {
             case sim::RobotActivity::Resting:
                 ++frame.resting;

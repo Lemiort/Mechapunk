@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <span>
 #include <string>
@@ -16,6 +17,7 @@
 #include "Shader.hpp"
 #include "Text2D.hpp"
 #include "TextRenderer.hpp"
+#include "mechapunk/sim/City.hpp"
 
 namespace mechapunk {
 
@@ -30,6 +32,10 @@ struct RenderAssets {
     std::shared_ptr<Material> workplace;
     std::shared_ptr<Material> tower;
     std::shared_ptr<Material> robot;
+    // Inside an open building.
+    std::shared_ptr<Material> slab;
+    std::shared_ptr<Material> highlight;
+    std::map<sim::RoomKind, std::shared_ptr<Material>> rooms;
 };
 
 // Owns NEE's deferred pipeline and the game's render assets. Must be created

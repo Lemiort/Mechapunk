@@ -43,6 +43,8 @@ aside to `FILE.broken` instead of being overwritten.
 
 | Input             | Action                                         |
 | ----------------- | ---------------------------------------------- |
+| Click             | Open a building; select a room or robot inside |
+| Q / E, PgDn / PgUp | Floor down / up in an open building          |
 | Drag (either button) | Orbit the camera                            |
 | Wheel             | Zoom                                           |
 | WASD / arrows     | Move the camera                                |
@@ -51,7 +53,24 @@ aside to `FILE.broken` instead of being overwritten.
 | 1–5               | Speed: 1, 10, 60, 300 or 1200 game minutes per second |
 | F5                | Save now                                       |
 | F12               | Screenshot to `screenshots/`                   |
-| Esc               | Save and quit                                  |
+| Esc               | Close the selection, then save and quit        |
+
+### Inspecting
+
+Click a building to open it as a cutaway: the floors below are solid, the
+floor you are looking at shows every room as a colored tile, and the floors
+above are hidden. Robots in a room sit on its tile. Habitats open on their
+first apartment floor; Q goes down to the stores. A panel on the right lists
+the floor's rooms and who is in them.
+
+- Click a room for its kind, opening hours, price, and the robots inside
+  with when each will leave.
+- Click a robot, inside a room or walking in the street, for what it is
+  doing and until when, its four needs, credits, home, job and shift, and
+  its recent events.
+
+Recent events are kept while the game runs and are not saved, so the list
+starts empty after loading.
 
 Walking robots are drawn as yellow spheres moving along their route; robots
 in an apartment, workspace or venue are inside their building. Habitats are
