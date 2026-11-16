@@ -18,6 +18,11 @@ add_subdirectory(sim)
 add_executable(mechapunk-sim tools/sim_runner/main.cpp)
 target_link_libraries(mechapunk-sim PRIVATE mechapunk::sim)
 
+# Floor plans and prop models: geometry only, shared by the game and tests.
+add_library(mechapunk_layout STATIC app/Interior.cpp app/Props.cpp)
+target_include_directories(mechapunk_layout PUBLIC app)
+target_link_libraries(mechapunk_layout PUBLIC nee::nee mechapunk::sim)
+
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
@@ -26,12 +31,10 @@ add_executable(mechapunk
     app/CityView.cpp
     app/GameRenderer.cpp
     app/Inspector.cpp
-    app/Interior.cpp
-    app/Props.cpp
     app/SimulationHost.cpp
     app/main.cpp
 )
-target_link_libraries(mechapunk PRIVATE nee::nee mechapunk::sim)
+target_link_libraries(mechapunk PRIVATE mechapunk_layout nee::nee mechapunk::sim)
 
 # While the engine is the editable checkout in external/NEE, rebuild it
 # before the game, so engine edits reach the game in one build.

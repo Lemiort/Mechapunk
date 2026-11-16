@@ -16,3 +16,8 @@ target_compile_definitions(sim_tests PRIVATE
     MECHAPUNK_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
 )
 gtest_discover_tests(sim_tests)
+
+# The game's floor plans, without a window or renderer.
+add_executable(layout_tests LayoutTests.cpp)
+target_link_libraries(layout_tests PRIVATE mechapunk_layout GTest::gtest_main)
+gtest_discover_tests(layout_tests)

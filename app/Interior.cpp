@@ -38,6 +38,17 @@ constexpr float kFinish = 0.02F;  // Floor finish thickness.
 // Apartments: three per side of the corridor, 7 m wide and 9.8 m deep.
 constexpr float kUnitWidth = 7.0F;
 constexpr float kUnitDepth = kHalfDepth - kCorridorHalf;
+// The way through the core: in from the corridor, past the stairs, which
+// climb towards -z from their foot to the landing of the floor above, and
+// out of the lobby door to the pavement.
+constexpr vec3 kCorridorMouth{kCoreEdge + 0.4F, 0.0F, 0.0F};
+constexpr vec3 kCoreHall{-9.2F, 0.0F, 0.0F};
+constexpr vec3 kStairsFoot{-10.5F, 0.0F, 8.6F};
+constexpr vec3 kBesideFoot{-9.2F, 0.0F, 8.6F};
+constexpr vec3 kStairsLanding{-10.5F, 0.0F, 3.0F};
+constexpr vec3 kBesideLanding{-9.2F, 0.0F, 3.0F};
+constexpr vec3 kLobby{-10.5F, 0.0F, kHalfDepth - 0.8F};
+constexpr vec3 kLobbyOutside{-10.5F, 0.0F, kHalfDepth + 0.8F};
 
 constexpr vec3 kConcrete{0.42F, 0.44F, 0.48F};
 constexpr vec3 kPlaster{0.8F, 0.8F, 0.82F};
@@ -247,6 +258,12 @@ Spot WithItem(Spot spot, const Frame& frame, PropKind kind, float x, float u,
     return spot;
 }
 
+// `spot`, reached by way of `approach`.
+Spot Via(Spot spot, std::vector<vec3> approach) {
+    spot.approach = std::move(approach);
+    return spot;
+}
+
 // Standing spots on a grid, for rooms with more occupants than furniture.
 void FillStanding(RoomPlan& room, const Frame& frame, float x0, float x1,
                   float u0, float u1, std::size_t wanted) {
@@ -363,12 +380,17 @@ void Apartment(FloorPlan& plan, const Frame& f, const sim::Room* room) {
 
     RoomPlan area = AreaOf(*room, f, kUnitWidth, kUnitDepth);
     area.home = true;
+    area.entry = {kCorridorMouth, vec3{f.At(4.6F, 0.0F).x, 0.0F, 0.0F}, f.At(4.6F, 0.7F)};
     // Lying on the bed with the head on the pillow, then the sofa, then the
     // kitchen.
-    area.spots.push_back(MakeSpot(f, 1.5F, 7.75F, {0.0F, -1.0F}, Pose::Lying, 0.67F));
-    area.spots.push_back(MakeSpot(f, 6.45F, 8.2F, {-1.0F, 0.0F}, Pose::Sitting));
-    area.spots.push_back(WithItem(MakeSpot(f, 6.0F, 4.6F, {1.0F, 0.0F}, Pose::Standing), f,
-                                  PropKind::Meal, 6.55F, 4.3F, 0.92F));
+    area.spots.push_back(Via(MakeSpot(f, 1.5F, 7.75F, {0.0F, -1.0F}, Pose::Lying, 0.67F),
+                             {f.At(3.9F, 2.8F), f.At(3.9F, 4.25F), f.At(2.8F, 4.25F),
+                              f.At(1.5F, 6.9F)}));
+    area.spots.push_back(Via(MakeSpot(f, 6.45F, 8.2F, {-1.0F, 0.0F}, Pose::Sitting),
+                             {f.At(5.8F, 2.8F), f.At(5.8F, 7.2F)}));
+    area.spots.push_back(Via(WithItem(MakeSpot(f, 6.0F, 4.6F, {1.0F, 0.0F}, Pose::Standing),
+                                      f, PropKind::Meal, 6.55F, 4.3F, 0.92F),
+                             {f.At(5.8F, 2.8F)}));
     plan.rooms.push_back(std::move(area));
 }
 
@@ -421,6 +443,8 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
     RoomPlan area = AreaOf(room, f, width, kDepth);
     const vec3 fabric = Fabric(room.id.value);
     const float middle = width * 0.5F;
+    area.entry = {f.At(middle, kDepth + 0.8F), f.At(middle, kDepth - 1.0F)};
+    area.streetDoor = true;
     auto& spots = area.spots;
     switch (room.kind) {
         case sim::RoomKind::Bar:
@@ -429,14 +453,25 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
             Place(plan, bar ? PropKind::BottleShelf : PropKind::KitchenCounter,
                   f.At(middle, 0.6F), f.Dir(0, 1));
             Place(plan, PropKind::BarCounter, f.At(middle, 4.5F), f.Dir(0, 1));
+            const int columns = std::max(1, static_cast<int>((width - 1.0F) / 3.2F));
+            const float spacing = width / static_cast<float>(columns);
+            // The gap beside a column of tables that robots walk down.
+            const auto aisle = [&](int column) {
+                if (columns == 1) {
+                    return 0.7F;
+                }
+                const float x = spacing * (static_cast<float>(column) + 0.5F);
+                return column < columns - 1 ? x + (spacing * 0.5F) : x - (spacing * 0.5F);
+            };
+            const float inside = kDepth - 2.0F;
             for (int stool = 0; stool < 4; ++stool) {
                 const float x = middle - 1.2F + (0.8F * static_cast<float>(stool));
                 Place(plan, PropKind::Stool, f.At(x, 5.6F), f.Dir(0, -1), fabric);
-                spots.push_back(WithItem(MakeSpot(f, x, 5.6F, {0, -1}, Pose::Sitting, 0.31F),
-                                         f, bar ? PropKind::Drink : PropKind::Meal, x,
-                                         4.95F, 1.1F));
+                spots.push_back(
+                    Via(WithItem(MakeSpot(f, x, 5.6F, {0, -1}, Pose::Sitting, 0.31F), f,
+                                 bar ? PropKind::Drink : PropKind::Meal, x, 4.95F, 1.1F),
+                        {f.At(aisle(0), inside), f.At(aisle(0), 6.8F), f.At(x, 6.8F)}));
             }
-            const int columns = std::max(1, static_cast<int>((width - 1.0F) / 3.2F));
             for (int row = 0; row < 3; ++row) {
                 for (int column = 0; column < columns; ++column) {
                     const float x = (width / static_cast<float>(columns)) *
@@ -444,20 +479,25 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
                     const float u = 9.5F + (4.0F * static_cast<float>(row));
                     if (bar) {
                         Place(plan, PropKind::BarTable, f.At(x, u), f.Dir(0, 1));
-                        spots.push_back(WithItem(MakeSpot(f, x - 0.6F, u, {1, 0}, Pose::Standing),
-                                                 f, PropKind::Drink, x - 0.18F, u - 0.1F,
-                                                 1.04F));
-                        spots.push_back(WithItem(MakeSpot(f, x + 0.6F, u, {-1, 0}, Pose::Standing),
-                                                 f, PropKind::Drink, x + 0.18F, u + 0.1F,
-                                                 1.04F));
+                        for (const float side : {-1.0F, 1.0F}) {
+                            const float spotX = x + (side * 0.6F);
+                            spots.push_back(Via(
+                                WithItem(MakeSpot(f, spotX, u, {-side, 0}, Pose::Standing), f,
+                                         PropKind::Drink, x + (side * 0.18F), u + (side * 0.1F),
+                                         1.04F),
+                                {f.At(aisle(column), inside), f.At(aisle(column), u + 0.7F),
+                                 f.At(spotX, u + 0.7F)}));
+                        }
                     } else {
                         Place(plan, PropKind::Booth, f.At(x, u), f.Dir(0, 1), fabric);
-                        spots.push_back(WithItem(MakeSpot(f, x, u - 0.75F, {0, 1}, Pose::Sitting),
-                                                 f, PropKind::Meal, x - 0.2F, u - 0.18F,
-                                                 0.77F));
-                        spots.push_back(WithItem(MakeSpot(f, x, u + 0.75F, {0, -1}, Pose::Sitting),
-                                                 f, PropKind::Meal, x + 0.2F, u + 0.18F,
-                                                 0.77F));
+                        for (const float side : {-1.0F, 1.0F}) {
+                            const float spotU = u + (side * 0.75F);
+                            spots.push_back(Via(
+                                WithItem(MakeSpot(f, x, spotU, {0, -side}, Pose::Sitting), f,
+                                         PropKind::Meal, x + (side * 0.2F), u + (side * 0.18F),
+                                         0.77F),
+                                {f.At(aisle(column), inside), f.At(aisle(column), spotU)}));
+                        }
                     }
                 }
             }
@@ -594,6 +634,7 @@ void StoreFloor(FloorPlan& plan, const std::vector<const sim::Room*>& rooms) {
 void Workspace(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) {
     constexpr float kDepth = kFootprintDepthMeters;
     RoomPlan area = AreaOf(room, f, width, kDepth);
+    area.entry = {kCorridorMouth, f.At(0.8F, kDepth * 0.5F)};
     auto& spots = area.spots;
     const std::string_view name = room.name;
     const auto starts = [&](std::string_view prefix) {
@@ -692,6 +733,48 @@ void WorkplaceFloor(FloorPlan& plan, const std::vector<const sim::Room*>& rooms,
                                 : std::vector<Opening>{});
 }
 }  // namespace
+
+std::vector<NavPoint> WayOut(const RoomPlan& room, std::size_t spot,
+                             std::uint32_t floor) {
+    std::vector<NavPoint> way;
+    const auto add = [&](vec3 position, std::uint32_t level, bool outside = false) {
+        way.push_back({.position = position, .floor = level, .outside = outside});
+    };
+    if (spot < room.spots.size()) {
+        add(room.spots[spot].position, floor);
+        const std::vector<vec3>& approach = room.spots[spot].approach;
+        for (auto point = approach.rbegin(); point != approach.rend(); ++point) {
+            add(*point, floor);
+        }
+    }
+    for (std::size_t index = room.entry.size(); index-- > 0;) {
+        add(room.entry[index], floor, room.streetDoor && index == 0);
+    }
+    if (room.streetDoor) {
+        // Along the shop fronts to the lobby door.
+        add(kLobbyOutside, 0, true);
+        return way;
+    }
+    // Through the core and down one flight a floor: off each flight at its
+    // foot, round it to the landing, and down the next.
+    add(kCoreHall, floor);
+    if (floor == 0) {
+        add(kBesideFoot, 0);
+    } else {
+        add(kStairsLanding, floor);
+        for (std::uint32_t level = floor; level-- > 0;) {
+            add(kStairsFoot, level);
+            if (level > 0) {
+                add(kBesideFoot, level);
+                add(kBesideLanding, level);
+                add(kStairsLanding, level);
+            }
+        }
+    }
+    add(kLobby, 0);
+    add(kLobbyOutside, 0, true);
+    return way;
+}
 
 FloorPlan PlanFloor(const sim::Building& building, std::uint32_t floor) {
     std::vector<const sim::Room*> rooms;

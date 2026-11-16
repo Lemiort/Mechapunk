@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -139,10 +140,31 @@ private:
         glm::vec3 position;
         glm::vec3 color;
     };
+    // A point of a robot's walk. Indoor points belong to a building floor.
+    struct WalkPoint {
+        glm::vec3 position;
+        float spread;  // How far robots fan out across the street, 0 to 1.
+        sim::EntityId building;  // None outdoors.
+        std::uint32_t floor;
+    };
+    using Walk = std::vector<WalkPoint>;
+    // The ways out of a room to the pavement in front of its building.
+    struct RoomWays {
+        bool home{false};
+        std::vector<Walk> fromSpot;
+        Walk fromDoor;  // For a room without spots.
+    };
+    // Where a robot is this frame; inside a building, on which floor.
+    struct Placement {
+        glm::vec3 position;
+        glm::vec3 direction;
+        sim::EntityId building;  // None outdoors.
+        std::uint32_t floor{};
+    };
 
     [[nodiscard]] glm::vec3 NodePosition(sim::NodeId node) const;
+    // Intersections walked through between two buildings' doors.
     const std::vector<glm::vec3>& Route(sim::EntityId from, sim::EntityId to);
-    // Position along the route and the direction of travel.
     // A station: its platform over the intersection, and the stairs up to
     // it from the pavement.
     [[nodiscard]] glm::vec3 StationPlatform(std::uint32_t station) const;
@@ -153,15 +175,28 @@ private:
     // Trains carrying the riders on board in `frame`.
     void SubmitTrains(RenderQueue& queue, const WorldFrame& frame,
                       double renderTick);
-    // A walk between a building and a station entrance, either way.
+    // Intersections walked through from a building to a station.
     const std::vector<glm::vec3>& StationRoute(sim::EntityId building,
-                                               std::uint32_t station,
-                                               bool toStation);
+                                               std::uint32_t station);
     void AddStations();
-    // Position along the route and the direction of travel; nothing while
-    // the robot rides the metro underground.
-    [[nodiscard]] std::optional<std::pair<glm::vec3, glm::vec3>> RobotPosition(
-        const RobotFrame& robot, double renderTick);
+    // Where a robot waits for its train on the platform.
+    [[nodiscard]] glm::vec3 PlatformSpot(sim::EntityId robot,
+                                         std::uint32_t station) const;
+    // Position along the walk and the direction of travel; nothing while
+    // the robot rides the metro.
+    [[nodiscard]] std::optional<Placement> RobotPosition(const RobotFrame& robot,
+                                                         double renderTick);
+    // The ways out of a room, made once; nothing for an unknown room.
+    const RoomWays* WaysOf(sim::EntityId room);
+    // The spot a robot takes in a room with `count` spots at `tick`: at
+    // home the bed by night and the sofa by day, elsewhere the one assigned
+    // this frame when `assigned` and it has one, else its favourite.
+    [[nodiscard]] std::size_t SpotFor(sim::EntityId robot, bool home,
+                                      std::size_t count, double tick,
+                                      bool assigned) const;
+    // Gives the robots in or walking to the rooms of `plan` a spot each, in
+    // order of arrival, so nobody shares one while another is free.
+    void AssignSpots(const WorldFrame& frame, const FloorPlan& plan);
     const FloorPlan& PlanOf(sim::EntityId building, std::uint32_t floor);
     // Converts floor-plan meters to world units for a building and floor.
     [[nodiscard]] glm::vec3 ToWorld(const BuildingShape& shape,
@@ -198,8 +233,11 @@ private:
     std::map<std::pair<std::uint64_t, std::uint32_t>, FloorPlan> plans_;
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<glm::vec3>>
         routeCache_;
-    std::map<std::tuple<std::uint64_t, std::uint32_t, bool>, std::vector<glm::vec3>>
+    std::map<std::pair<std::uint64_t, std::uint32_t>, std::vector<glm::vec3>>
         stationRoutes_;
+    std::map<std::uint64_t, RoomWays> roomWays_;
+    std::unordered_map<std::uint64_t, std::size_t> assignedSpots_;
+    Walk walk_;  // Scratch for RobotPosition.
     std::vector<NeonSign> neonSigns_;
     std::vector<Neon> neons_;
     // Bulbs of the street lamps, which shine straight down.

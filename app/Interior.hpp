@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -39,6 +40,8 @@ struct Spot {
     Pose pose{Pose::Standing};
     // Shown while the spot is taken: a drink on the table, a basket in hand.
     std::optional<PlacedProp> item;
+    // Where a robot walks, after the room's entry, to reach the spot.
+    std::vector<glm::vec3> approach;
 };
 
 // A ceiling lamp. Lamps of a sim room light up while the room is in use;
@@ -56,6 +59,17 @@ struct RoomPlan {
     // first is the bed and the second the sofa.
     std::vector<Spot> spots;
     bool home{false};
+    // The way in, from the floor's corridor or, with `streetDoor`, from the
+    // pavement outside the room's own door.
+    std::vector<glm::vec3> entry;
+    bool streetDoor{false};
+};
+
+// A point on a robot's way through a building, in floor-plan meters.
+struct NavPoint {
+    glm::vec3 position{0.0F};
+    std::uint32_t floor{};
+    bool outside{false};  // On the pavement in front of the building.
 };
 
 // The interior of one floor: walls with doors and windows, furniture, and the
@@ -71,5 +85,11 @@ struct FloorPlan {
 
 [[nodiscard]] FloorPlan PlanFloor(const sim::Building& building,
                                   std::uint32_t floor);
+
+// The way from spot `spot` of `room`, on `floor`, out through its door, the
+// corridor and down the stairs to the pavement in front of the lobby door.
+// A spot past the last starts at the room's door.
+[[nodiscard]] std::vector<NavPoint> WayOut(const RoomPlan& room, std::size_t spot,
+                                           std::uint32_t floor);
 
 }  // namespace mechapunk
