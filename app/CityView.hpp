@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -62,10 +63,12 @@ public:
     CityView& operator=(CityView&&) = delete;
     ~CityView() = default;
 
-    // Adds the lights the city owns (sky, fill, neon signs and an inspection
-    // lamp) to `scene`.
+    // Adds the lights the city owns (sun, sky, a faint fill for open
+    // buildings, neon signs, street lamps and the lamps of an open floor) to
+    // `scene`.
     void AddLights(Scene& scene);
-    // Day-night cycle, and the lamp over the open building's current floor.
+    // Day-night cycle, street lamps at night, and the lamps switched on in
+    // the open floor as of the last Submit.
     void UpdateLights(Scene& scene, double minuteOfDay,
                       const Selection& selection) const;
 
@@ -76,6 +79,10 @@ public:
                 const Selection& selection, float streetFigureScale);
     // The closest robot, room or building along `ray` in the last frame.
     [[nodiscard]] std::optional<Pick> PickAt(const Ray& ray) const;
+    // Where a robot was drawn in the last frame; nothing when it was not
+    // drawn, being inside a building that is not open.
+    [[nodiscard]] std::optional<glm::vec3> DrawnRobotPosition(
+        sim::EntityId robot) const;
 
     [[nodiscard]] const sim::City& City() const noexcept { return city_; }
     [[nodiscard]] const sim::RoomIndex& Rooms() const noexcept {
@@ -125,6 +132,11 @@ private:
         sim::EntityId room;
         Box box;
     };
+    // A lamp of the open floor that is switched on.
+    struct LitLamp {
+        glm::vec3 position;
+        glm::vec3 color;
+    };
 
     [[nodiscard]] glm::vec3 NodePosition(sim::NodeId node) const;
     const std::vector<glm::vec3>& Route(sim::EntityId from, sim::EntityId to);
@@ -135,9 +147,19 @@ private:
     // Converts floor-plan meters to world units for a building and floor.
     [[nodiscard]] glm::vec3 ToWorld(const BuildingShape& shape,
                                     std::uint32_t floor, glm::vec3 meters) const;
+    // Calls `part` with the transform of every part of `model` placed at
+    // `origin`, turned by `yawDegrees` and tipped by `tiltDegrees`.
+    static void ForEachPart(
+        const PropModel& model, glm::vec3 origin, float yawDegrees,
+        float tiltDegrees, float scale,
+        const std::function<void(const PropPart&, const Transform&)>& part);
     void SubmitModel(RenderQueue& queue, const PropModel& model,
                      glm::vec3 origin, float yawDegrees, float tiltDegrees,
                      glm::vec3 tint, float scale);
+    // Adds a model that never moves, such as a street lamp, to the statics.
+    void AddStaticModel(const PropModel& model, glm::vec3 origin,
+                        float yawDegrees);
+    void AddStreetLamps();
     void SubmitBox(RenderQueue& queue, glm::vec3 minimum, glm::vec3 maximum,
                    glm::vec3 color, bool glass);
     void SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
@@ -157,7 +179,11 @@ private:
         routeCache_;
     std::vector<NeonSign> neonSigns_;
     std::vector<Neon> neons_;
-    std::size_t lampIndex_{};
+    // Bulbs of the street lamps, which shine straight down.
+    std::vector<glm::vec3> streetLamps_;
+    // Point lights reserved for the lamps of the open floor.
+    std::size_t lampPoolStart_{};
+    std::vector<LitLamp> litLamps_;
     glm::vec3 center_{0.0F};
     float extent_{1.0F};
     // Where things were drawn in the last frame, for picking.

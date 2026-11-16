@@ -205,6 +205,32 @@ struct Frame {
     }
 };
 
+// A pendant lamp hanging into the room at `position` (meters on the floor).
+void HangLamp(FloorPlan& plan, vec3 position, sim::EntityId room) {
+    constexpr float kShadeBottom = 2.3F;
+    position.y = kShadeBottom;
+    Place(plan, PropKind::CeilingLamp, position, {0.0F, 1.0F});
+    plan.lamps.push_back({.position = position - vec3{0.0F, 0.05F, 0.0F},
+                          .room = room});
+}
+
+// Lamps on a grid of roughly one per `spacing` meters over a room.
+void LampGrid(FloorPlan& plan, const Frame& f, float width, float depth,
+              sim::EntityId room, float spacing) {
+    const int columns = std::max(1, static_cast<int>(std::round(width / spacing)));
+    const int rows = std::max(1, static_cast<int>(std::round(depth / spacing)));
+    for (int row = 0; row < rows; ++row) {
+        for (int column = 0; column < columns; ++column) {
+            HangLamp(plan,
+                     f.At(width * (static_cast<float>(column) + 0.5F) /
+                              static_cast<float>(columns),
+                          depth * (static_cast<float>(row) + 0.5F) /
+                              static_cast<float>(rows)),
+                     room);
+        }
+    }
+}
+
 Spot MakeSpot(const Frame& frame, float x, float u, vec2 facing, Pose pose,
               float y = 0.0F) {
     return {.position = frame.At(x, u, y),
@@ -254,6 +280,7 @@ void Core(FloorPlan& plan) {
                           .maximum = {-8.6F, kWallHeightMeters, -1.75F},
                           .color = kShaft});
     Place(plan, PropKind::ElevatorDoors, {-10.5F, 0.0F, -1.7F}, {0.0F, 1.0F});
+    HangLamp(plan, {-10.5F, 0.0F, 1.2F}, {});
     for (const float sign : {-1.0F, 1.0F}) {
         Wall(plan, {kCoreEdge, sign * kCorridorHalf}, {kCoreEdge, sign * kHalfDepth},
              kInteriorThickness, {}, kPlaster);
@@ -320,6 +347,10 @@ void Apartment(FloorPlan& plan, const Frame& f, const sim::Room* room) {
     Place(plan, PropKind::CoffeeTable, f.At(5.3F, 8.2F), f.Dir(1, 0));
     Place(plan, PropKind::WallScreen, f.At(3.5F, 8.2F), f.Dir(1, 0));
     Place(plan, PropKind::Plant, f.At(6.6F, 9.5F), f.Dir(0, 1));
+    // A lamp in the bathroom, the bedroom and the living room.
+    HangLamp(plan, f.At(1.3F, 1.6F), room->id);
+    HangLamp(plan, f.At(1.7F, 6.4F), room->id);
+    HangLamp(plan, f.At(5.2F, 6.6F), room->id);
 
     RoomPlan area = AreaOf(*room, f, kUnitWidth, kUnitDepth);
     area.home = true;
@@ -335,6 +366,12 @@ void ApartmentFloor(FloorPlan& plan, const std::vector<const sim::Room*>& rooms)
     Core(plan);
     FloorFinish(plan, {kCoreEdge, -kCorridorHalf}, {kHalfWidth, kCorridorHalf},
                 kCorridorFloor);
+    for (int lamp = 0; lamp < 3; ++lamp) {
+        HangLamp(plan,
+                 {kCoreEdge + (kUnitWidth * (static_cast<float>(lamp) + 0.5F)), 0.0F,
+                  0.0F},
+                 {});
+    }
     std::vector<float> cuts{kCoreEdge};
     std::array<std::vector<Opening>, 2> corridorDoors;
     for (int row = 0; row < 2; ++row) {
@@ -473,6 +510,7 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
     }
     FillStanding(area, f, 1.0F, width - 1.0F, kDepth - 6.0F, kDepth - 1.0F,
                  room.capacity);
+    LampGrid(plan, f, width, kDepth, room.id, 6.0F);
     plan.rooms.push_back(std::move(area));
 }
 
@@ -572,6 +610,7 @@ void Workspace(FloorPlan& plan, const sim::Room& room, const Frame& f, float wid
     }
     FillStanding(area, f, 1.0F, width - 1.0F, kDepth - 6.0F, kDepth - 1.0F,
                  room.capacity);
+    LampGrid(plan, f, width, kDepth, room.id, 6.0F);
     plan.rooms.push_back(std::move(area));
 }
 

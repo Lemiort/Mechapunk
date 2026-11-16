@@ -126,6 +126,20 @@ void Title(const std::string& text) {
     ImGui::PopStyleColor();
 }
 
+// A robot's name: a click selects `target`, a double-click also moves the
+// camera to the robot.
+std::optional<InspectorRequest> RobotLink(const std::string& name,
+                                          const Selection& target,
+                                          ImGuiSelectableFlags flags = 0) {
+    if (!ImGui::Selectable(name.c_str(), false,
+                           flags | ImGuiSelectableFlags_AllowDoubleClick)) {
+        return std::nullopt;
+    }
+    return InspectorRequest{
+        .selection = target,
+        .jumpToRobot = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)};
+}
+
 void NeedBar(const char* name, std::int32_t value) {
     ImGui::TextUnformatted(name);
     ImGui::SameLine(kNeedLabelWidth);
@@ -143,11 +157,11 @@ void NeedBar(const char* name, std::int32_t value) {
 }
 
 // Who the robot knows, warmest first; clicking a name selects that robot.
-std::optional<Selection> DrawBonds(const RobotSocial& social,
+std::optional<InspectorRequest> DrawBonds(const RobotSocial& social,
                                    const WorldFrame& frame,
                                    const CityView& city,
                                    const SimulationHost& host) {
-    std::optional<Selection> result;
+    std::optional<InspectorRequest> result;
     std::vector<const sim::Bond*> bonds;
     for (const sim::Bond& bond : social.bonds) {
         bonds.push_back(&bond);
@@ -179,10 +193,11 @@ std::optional<Selection> DrawBonds(const RobotSocial& social,
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         const std::string name = Name(host, bond->robot);
-        if (ImGui::Selectable(name.c_str())) {
-            result = ShowRobot(frame, city, bond->robot);
+        if (auto link = RobotLink(name, ShowRobot(frame, city, bond->robot))) {
+            result = link;
         }
-        ImGui::SetItemTooltip("%u talks, last %s", bond->talks,
+        ImGui::SetItemTooltip("%u talks, last %s. Double-click to look at.",
+                              bond->talks,
                               sim::FormatTime(bond->lastTalk).c_str());
         ImGui::TableNextColumn();
         const std::string_view level = sim::BondLevelName(bond->level);
@@ -231,14 +246,15 @@ void DrawMemories(const RobotSocial& social, const CityView& city,
     }
 }
 
-std::optional<Selection> DrawRobot(const RobotFrame& robot,
-                                   const WorldFrame& frame,
-                                   const CityView& city,
-                                   const SimulationHost& host) {
-    std::optional<Selection> result;
+std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
+                                          const WorldFrame& frame,
+                                          const CityView& city,
+                                          const SimulationHost& host,
+                                          bool& following) {
+    std::optional<InspectorRequest> result;
     const auto follow = [&](std::optional<Selection> link) {
         if (link) {
-            result = link;
+            result = InspectorRequest{.selection = *link};
         }
     };
     Title(Name(host, robot.id));
@@ -246,6 +262,13 @@ std::optional<Selection> DrawRobot(const RobotFrame& robot,
         ImGui::TextDisabled("Likes %s",
                             sim::InterestList(info->interests).c_str());
     }
+    if (ImGui::SmallButton("Look at")) {
+        result = InspectorRequest{.selection = ShowRobot(frame, city, robot.id),
+                                  .jumpToRobot = true};
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Follow (F)", &following);
+    ImGui::SetItemTooltip("Keep the camera on this robot wherever it goes");
 
     switch (robot.activity) {
         case sim::RobotActivity::Resting: {
@@ -309,7 +332,9 @@ std::optional<Selection> DrawRobot(const RobotFrame& robot,
 
     if (const RobotSocial* social = SimulationHost::FindSocial(frame, robot.id)) {
         ImGui::SeparatorText("Relationships");
-        follow(DrawBonds(*social, frame, city, host));
+        if (auto link = DrawBonds(*social, frame, city, host)) {
+            result = link;
+        }
         ImGui::SeparatorText("Memories");
         DrawMemories(*social, city, host);
     }
@@ -332,11 +357,11 @@ std::optional<Selection> DrawRobot(const RobotFrame& robot,
     return result;
 }
 
-std::optional<Selection> DrawRoom(const Selection& selection,
-                                  const WorldFrame& frame,
-                                  const CityView& city,
-                                  const SimulationHost& host) {
-    std::optional<Selection> result;
+std::optional<InspectorRequest> DrawRoom(const Selection& selection,
+                                         const WorldFrame& frame,
+                                         const CityView& city,
+                                         const SimulationHost& host) {
+    std::optional<InspectorRequest> result;
     const auto found = city.Rooms().Find(selection.room);
     if (!found) {
         return result;
@@ -381,12 +406,12 @@ std::optional<Selection> DrawRoom(const Selection& selection,
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             const std::string name = Name(host, robot->id);
-            if (ImGui::Selectable(name.c_str(), false,
-                                  ImGuiSelectableFlags_SpanAllColumns)) {
-                Selection next = selection;
-                next.robot = robot->id;
-                next.room = {};
-                result = next;
+            Selection next = selection;
+            next.robot = robot->id;
+            next.room = {};
+            if (auto link = RobotLink(name, next,
+                                      ImGuiSelectableFlags_SpanAllColumns)) {
+                result = link;
             }
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(Clock(robot->nextActionAt).c_str());
@@ -397,11 +422,11 @@ std::optional<Selection> DrawRoom(const Selection& selection,
     return result;
 }
 
-std::optional<Selection> DrawBuilding(const Selection& selection,
-                                      const WorldFrame& frame,
-                                      const CityView& city,
-                                      const SimulationHost& host) {
-    std::optional<Selection> result;
+std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
+                                             const WorldFrame& frame,
+                                             const CityView& city,
+                                             const SimulationHost& host) {
+    std::optional<InspectorRequest> result;
     const sim::Building* building =
         city.City().FindBuilding(selection.building);
     if (building == nullptr) {
@@ -429,7 +454,7 @@ std::optional<Selection> DrawBuilding(const Selection& selection,
         Selection next = selection;
         next.floor = static_cast<std::uint32_t>(floor);
         next.room = {};
-        result = next;
+        result = InspectorRequest{.selection = next};
     }
     ImGui::SetItemTooltip("Q / E change floors too");
 
@@ -456,7 +481,7 @@ std::optional<Selection> DrawBuilding(const Selection& selection,
                 Selection next = selection;
                 next.room = room.id;
                 next.robot = {};
-                result = next;
+                result = InspectorRequest{.selection = next};
             }
             ImGui::TableNextColumn();
             if (room.kind == sim::RoomKind::Apartment) {
@@ -465,11 +490,11 @@ std::optional<Selection> DrawBuilding(const Selection& selection,
                 } else {
                     const RobotFrame* robot = inside->second.front();
                     const std::string name = Name(host, robot->id);
-                    if (ImGui::Selectable(name.c_str())) {
-                        Selection next = selection;
-                        next.robot = robot->id;
-                        next.room = {};
-                        result = next;
+                    Selection next = selection;
+                    next.robot = robot->id;
+                    next.room = {};
+                    if (auto link = RobotLink(name, next)) {
+                        result = link;
                     }
                 }
                 ImGui::TableNextColumn();
@@ -487,10 +512,11 @@ std::optional<Selection> DrawBuilding(const Selection& selection,
 }
 }  // namespace
 
-std::optional<Selection> DrawInspector(const Selection& selection,
-                                       const WorldFrame& frame,
-                                       const CityView& city,
-                                       const SimulationHost& host) {
+std::optional<InspectorRequest> DrawInspector(const Selection& selection,
+                                              const WorldFrame& frame,
+                                              const CityView& city,
+                                              const SimulationHost& host,
+                                              bool& following) {
     if (!selection.building.IsValid() && !selection.robot.IsValid() &&
         !selection.room.IsValid()) {
         return std::nullopt;
@@ -505,7 +531,7 @@ std::optional<Selection> DrawInspector(const Selection& selection,
         ImGuiCond_FirstUseEver);
 
     bool open = true;
-    std::optional<Selection> result;
+    std::optional<InspectorRequest> result;
     if (ImGui::Begin("Inspector", &open)) {
         if ((selection.robot.IsValid() || selection.room.IsValid()) &&
             selection.building.IsValid()) {
@@ -513,14 +539,14 @@ std::optional<Selection> DrawInspector(const Selection& selection,
                 Selection next = selection;
                 next.robot = {};
                 next.room = {};
-                result = next;
+                result = InspectorRequest{.selection = next};
             }
         }
-        std::optional<Selection> clicked;
+        std::optional<InspectorRequest> clicked;
         if (selection.robot.IsValid()) {
             if (const RobotFrame* robot =
                     SimulationHost::FindRobot(frame, selection.robot)) {
-                clicked = DrawRobot(*robot, frame, city, host);
+                clicked = DrawRobot(*robot, frame, city, host, following);
             }
         } else if (selection.room.IsValid()) {
             clicked = DrawRoom(selection, frame, city, host);
@@ -533,7 +559,7 @@ std::optional<Selection> DrawInspector(const Selection& selection,
     }
     ImGui::End();
     if (!open) {
-        return Selection{};
+        return InspectorRequest{};
     }
     return result;
 }

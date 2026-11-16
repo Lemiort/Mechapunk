@@ -49,8 +49,8 @@ using namespace mechapunk;
 
 constexpr int kWindowWidth = 1600;
 constexpr int kWindowHeight = 900;
-// Simulated minutes per real second for keys 1 to 5.
-constexpr std::array<double, 5> kSpeeds{1.0, 10.0, 60.0, 300.0, 1200.0};
+// Speeds for keys 1 to 6; at x1 a game minute takes two real seconds.
+constexpr std::array<double, 6> kSpeeds{0.5, 1.0, 10.0, 60.0, 300.0, 1200.0};
 constexpr double kOrbitDegreesPerPixel = 0.25;
 constexpr float kPanPerSecond = 40.0F;
 constexpr double kMessageSeconds = 3.0;
@@ -59,6 +59,9 @@ constexpr double kClickTolerance = 6.0;
 // Looking into a building: close and steep, so walls hide little.
 constexpr float kInteriorDistance = 2.2F;
 constexpr float kInteriorPitch = 58.0F;
+// Looking at one robot.
+constexpr float kRobotViewDistance = 0.8F;
+constexpr double kWorldDoubleClickSeconds = 0.4;
 // Robots outdoors grow with camera distance to stay visible.
 constexpr float kFigureScalePerUnit = 0.12F;
 constexpr float kMaxFigureScale = 6.0F;
@@ -251,6 +254,8 @@ private:
                    key < GLFW_KEY_1 + static_cast<int>(kSpeeds.size())) {
             host_.SetSpeed(
                 kSpeeds.at(static_cast<std::size_t>(key - GLFW_KEY_1)));
+        } else if (key == GLFW_KEY_F) {
+            following_ = !following_ && selection_.robot.IsValid();
         } else if (key == GLFW_KEY_F12) {
             screenshotRequested_ = true;
         } else if (key == GLFW_KEY_F5) {
@@ -283,6 +288,7 @@ private:
         }
         if (right != 0.0F || forward != 0.0F) {
             camera_.Pan(right, forward);
+            following_ = false;  // Moving the camera away stops following.
         }
 
         double x = 0.0;
@@ -349,6 +355,12 @@ private:
         if (!pick) {
             selection_ = {};
         } else if (pick->robot.IsValid()) {
+            // Clicking the selected robot again quickly looks at it.
+            if (pick->robot == selection_.robot &&
+                glfwGetTime() - worldClickAt_ < kWorldDoubleClickSeconds) {
+                jumpTo_ = pick->robot;
+            }
+            worldClickAt_ = glfwGetTime();
             selection_.robot = pick->robot;
             selection_.room = {};
         } else if (pick->room.IsValid()) {
@@ -406,17 +418,62 @@ private:
             city_.FloorCenter(selection_.building, selection_.floor));
     }
 
+    // Opens the building and floor the followed robot is in, or closes the
+    // open building while it walks the streets.
+    void KeepFollowedRobotInView(const WorldFrame& frame) {
+        const RobotFrame* robot = SimulationHost::FindRobot(frame, selection_.robot);
+        if (robot == nullptr) {
+            following_ = false;
+            return;
+        }
+        if (robot->activity == sim::RobotActivity::Walking) {
+            if (selection_.building.IsValid()) {
+                selection_ = {.robot = selection_.robot};
+            }
+            return;
+        }
+        const auto room = city_.Rooms().Find(robot->location);
+        if (room && (selection_.building != room->building->id ||
+                     selection_.floor != room->room->floor)) {
+            selection_ = {.building = room->building->id,
+                          .floor = room->room->floor,
+                          .robot = selection_.robot};
+        }
+    }
+
     void RenderFrame() {
         const auto frame = host_.LatestFrame();
         const double renderTick = host_.RenderTick();
 
         overlay_->BeginFrame();
+        // The first click on a robot's name opens its page in the inspector,
+        // so the second click of a double-click lands on whatever is there
+        // now. Take it as "look at" and keep it from reaching that widget.
+        ImGuiIO& io = ImGui::GetIO();
+        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+            overlay_->WantsMouse() && selection_.robot.IsValid() &&
+            selection_.robot == pickedRobot_ &&
+            ImGui::GetTime() - pickedAt_ < io.MouseDoubleClickTime) {
+            jumpTo_ = selection_.robot;
+            io.MouseClicked[ImGuiMouseButton_Left] = false;
+            io.MouseDoubleClicked[ImGuiMouseButton_Left] = false;
+        }
         DrawStatusWindow(frame.get(), renderTick);
         if (frame != nullptr) {
-            if (const auto next =
-                    DrawInspector(selection_, *frame, city_, host_)) {
-                ApplySelection(*next);
+            if (const auto next = DrawInspector(selection_, *frame, city_,
+                                                host_, following_)) {
+                ApplySelection(next->selection);
+                if (next->jumpToRobot) {
+                    jumpTo_ = next->selection.robot;
+                } else if (next->selection.robot.IsValid()) {
+                    pickedRobot_ = next->selection.robot;
+                    pickedAt_ = ImGui::GetTime();
+                }
             }
+        }
+        following_ = following_ && selection_.robot.IsValid();
+        if (following_ && frame != nullptr) {
+            KeepFollowedRobotInView(*frame);
         }
 
         queue_.Clear();
@@ -425,6 +482,18 @@ private:
                 std::clamp(camera_.Distance() * kFigureScalePerUnit, 1.0F,
                            kMaxFigureScale);
             city_.Submit(queue_, *frame, renderTick, selection_, figureScale);
+        }
+        // Robots are placed by Submit, so the camera moves to them after it.
+        if (jumpTo_.IsValid()) {
+            if (const auto position = city_.DrawnRobotPosition(jumpTo_)) {
+                camera_.Focus(*position, kRobotViewDistance);
+            }
+            jumpTo_ = {};
+        }
+        if (following_) {
+            if (const auto position = city_.DrawnRobotPosition(selection_.robot)) {
+                camera_.FocusTarget(*position);
+            }
         }
         city_.UpdateLights(
             scene_,
@@ -512,7 +581,9 @@ private:
                 ImGui::BulletText("Click a building, room or robot to inspect");
                 ImGui::BulletText("Q / E: floor down / up");
                 ImGui::BulletText("Drag: orbit   Wheel: zoom   WASD: move");
-                ImGui::BulletText("Space: pause   N: step   1-5: speed");
+                ImGui::BulletText("Space: pause   N: step   1-6: speed");
+                ImGui::BulletText("Double-click a robot or its name: look at it");
+                ImGui::BulletText("F: follow the selected robot");
                 ImGui::BulletText("F5: save   F12: screenshot");
                 ImGui::BulletText("Esc: close the selection, then quit");
             }
@@ -566,6 +637,15 @@ private:
     double lastCursorY_{};
     std::string message_;
     double messageUntil_{};
+    // When a robot was last picked in the inspector, and when the world was
+    // last clicked, to tell double-clicks.
+    sim::EntityId pickedRobot_;
+    double pickedAt_{-1.0};
+    double worldClickAt_{-1.0};
+    // The camera stays on the selected robot.
+    bool following_{false};
+    // Robot to move the camera to once it has been drawn.
+    sim::EntityId jumpTo_;
     bool screenshotRequested_{false};
     Selection selection_;
 };

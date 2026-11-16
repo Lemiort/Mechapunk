@@ -29,6 +29,8 @@ constexpr vec3 kYellow{0.95F, 0.75F, 0.1F};
 constexpr vec3 kLeaf{0.15F, 0.48F, 0.2F};
 constexpr vec3 kPot{0.5F, 0.3F, 0.25F};
 constexpr vec3 kChrome{0.7F, 0.72F, 0.76F};
+constexpr vec3 kLampShade{0.85F, 0.78F, 0.6F};
+constexpr vec3 kBulb{1.0F, 0.95F, 0.8F};
 constexpr std::array<vec3, 6> kGoods{
     vec3{0.85F, 0.2F, 0.2F}, vec3{0.2F, 0.5F, 0.9F}, vec3{0.95F, 0.8F, 0.2F},
     vec3{0.3F, 0.8F, 0.4F},  vec3{0.8F, 0.4F, 0.9F}, vec3{0.9F, 0.55F, 0.2F}};
@@ -133,6 +135,19 @@ PropModel Make(PropKind kind) {
         case PropKind::Plant:
             m = {Box(0, 0, 0, 0.35F, 0.35F, 0.35F, kPot),
                  Box(0, 0.35F, 0, 0.5F, 0.7F, 0.5F, kLeaf)};
+            break;
+        case PropKind::CeilingLamp:
+            // Base at the bottom of the shade; the cord runs up to the ceiling.
+            m = {Box(0, 0, 0, 0.45F, 0.1F, 0.45F, kLampShade),
+                 Box(0, -0.02F, 0, 0.3F, 0.02F, 0.3F, kBulb),
+                 Box(0, 0.1F, 0, 0.02F, 0.4F, 0.02F, kBlack)};
+            break;
+        case PropKind::StreetLamp:
+            m = {Box(0, 0, 0, 0.3F, 0.3F, 0.3F, kDarkMetal),
+                 Box(0, 0.3F, 0, 0.14F, 5.9F, 0.14F, kDarkMetal),
+                 Box(0, 6.0F, 0.75F, 0.1F, 0.1F, 1.6F, kDarkMetal),
+                 Box(0, 5.85F, 1.45F, 0.35F, 0.15F, 0.6F, kDarkMetal),
+                 Box(0, 5.83F, 1.45F, 0.28F, 0.02F, 0.5F, kBulb)};
             break;
         case PropKind::BarCounter:
             m = {Box(0, 0, 0, 3.0F, 1.05F, 0.6F, kDarkWood),

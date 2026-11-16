@@ -24,6 +24,10 @@ namespace {
 // High enough that fast-forward is never limited by how often the worker
 // wakes (Windows timers can oversleep by ~15 ms).
 constexpr std::uint32_t kMaxStepsPerWake = 4000;
+// The worker sleeps until the next step is due, up to two steps' time at
+// x0.5. The clock must count all of that sleep, or slow speeds run slower
+// than they say.
+constexpr double kMaxWakeSeconds = 4.0 * SimulationHost::kSecondsPerMinute;
 constexpr auto kPauseTimeout = std::chrono::seconds(2);
 constexpr std::size_t kEventsPerRobot = 40;
 }  // namespace
@@ -46,7 +50,8 @@ SimulationHost::SimulationHost(sim::World world)
     Publish();
     thread_ = std::make_unique<SimulationThread>(
         FixedStepClockSettings{.stepSeconds = kSecondsPerMinute,
-                               .maxStepsPerAdvance = kMaxStepsPerWake},
+                               .maxStepsPerAdvance = kMaxStepsPerWake,
+                               .maxFrameSeconds = kMaxWakeSeconds},
         [this](const SimulationStep&) { Step(); });
 }
 

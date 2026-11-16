@@ -87,9 +87,22 @@ vec3 StoreNeon(sim::RoomKind kind) {
 constexpr vec3 kSunColor{1.0F, 0.86F, 0.7F};
 constexpr vec3 kDaySky{0.45F, 0.47F, 0.55F};
 constexpr vec3 kNightSky{0.04F, 0.04F, 0.1F};
-// Extra light from above while a building is open, so interiors read at
-// night too.
-constexpr vec3 kInspectionLight{0.5F, 0.5F, 0.55F};
+// Faint light from above while a building is open, so dark rooms still read.
+constexpr vec3 kInspectionLight{0.18F, 0.18F, 0.21F};
+// Room lamps: warm at home and in venues, cool at work. Lamps beyond the
+// pool stay dark.
+constexpr std::size_t kLampPool = 32;
+constexpr float kLampPower = 0.009F;
+constexpr vec3 kWarmLamp{1.0F, 0.82F, 0.6F};
+constexpr vec3 kCoolLamp{0.85F, 0.92F, 1.0F};
+// Where unused lights wait, far under the city.
+constexpr float kHiddenDepth = -1000.0F;
+// Street lamps: one every 60 m along each street, alternating sides, a
+// 6 m pole and a downward cone.
+constexpr float kStreetLampSpacing = 60.0F * kS;
+constexpr float kStreetLampCutoff = 62.0F;
+constexpr vec3 kStreetLampColor{1.2F, 0.94F, 0.6F};
+constexpr vec3 kStreetLampBulb{0.0F, 5.82F * kS, 1.45F * kS};
 
 // Quadrants around an intersection: (+x,+z), (-x,+z), (+x,-z), (-x,-z).
 constexpr std::array<vec2, 4> kQuadrants{vec2{1.0F, 1.0F}, vec2{-1.0F, 1.0F},
@@ -147,6 +160,8 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                                      std::max(span.z, kStreetWidth)}},
              .material = assets_.street});
     }
+
+    AddStreetLamps();
 
     // Simulated buildings take the corners next to their entrance first.
     std::map<std::uint32_t, std::uint32_t> usedSlots;
@@ -296,6 +311,57 @@ void CityView::AddFacade(vec3 center, float width, float depth,
     side(depth, false, -width * 0.5F);
 }
 
+void CityView::AddStreetLamps() {
+    const PropModel& lamp = Prop(PropKind::StreetLamp);
+    for (const sim::CityEdge& edge : city_.edges) {
+        const vec3 from = NodePosition(edge.from);
+        const vec3 to = NodePosition(edge.to);
+        const float length = glm::length(to - from);
+        if (length <= 0.0F) {
+            continue;
+        }
+        const vec3 along = (to - from) / length;
+        const vec3 across{-along.z, 0.0F, along.x};
+        const int count =
+            std::max(1, static_cast<int>(length / kStreetLampSpacing));
+        for (int index = 0; index < count; ++index) {
+            // Between intersections, on alternating pavements, the head
+            // reaching out over the road.
+            const float side = index % 2 == 0 ? 1.0F : -1.0F;
+            const vec3 facing = -across * side;
+            const vec3 base =
+                from + (along * (length * (static_cast<float>(index) + 0.5F) /
+                                 static_cast<float>(count))) +
+                (across * side * ((kStreetWidth * 0.5F) + (0.6F * kS))) +
+                vec3{0.0F, kStreetHeight, 0.0F};
+            const float yaw = glm::degrees(std::atan2(facing.x, facing.z));
+            AddStaticModel(lamp, base, yaw);
+            streetLamps_.push_back(base + (facing * kStreetLampBulb.z) +
+                                   vec3{0.0F, kStreetLampBulb.y, 0.0F});
+        }
+    }
+}
+
+void CityView::AddStaticModel(const PropModel& model, vec3 origin,
+                              float yawDegrees) {
+    ForEachPart(model, origin, yawDegrees, 0.0F, kS,
+                [&](const PropPart& part, const Transform& transform) {
+                    statics_.push_back(
+                        {.mesh = assets_.cube.get(),
+                         .transform = transform,
+                         .material = assets_.palette->Get(part.color)});
+                });
+}
+
+std::optional<vec3> CityView::DrawnRobotPosition(sim::EntityId robot) const {
+    for (const Marker& marker : robotMarkers_) {
+        if (marker.id == robot) {
+            return marker.position;
+        }
+    }
+    return std::nullopt;
+}
+
 void CityView::AddLights(Scene& scene) {
     scene.AddDirectionalLight(DirectionalLight(0.0F, -1.0F, 0.0F, 0.0F, 0.0F,
                                                0.0F));  // sun
@@ -310,6 +376,15 @@ void CityView::AddLights(Scene& scene) {
         scene.AddPointLight(PointLight(sign.position.x, sign.position.y,
                                        sign.position.z, sign.color.r,
                                        sign.color.g, sign.color.b, kNeonPower));
+    }
+    lampPoolStart_ = scene.GetPointLights().size();
+    for (std::size_t lamp = 0; lamp < kLampPool; ++lamp) {
+        scene.AddPointLight(PointLight(0.0F, kHiddenDepth, 0.0F, 0.0F, 0.0F,
+                                       0.0F, kLampPower));
+    }
+    for (const vec3& bulb : streetLamps_) {
+        scene.AddSpotLight(SpotLight(bulb.x, 0.0F, bulb.z, 0.0F, 0.0F, 0.0F,
+                                     bulb.x, bulb.y, bulb.z, kStreetLampCutoff));
     }
 }
 
@@ -330,7 +405,7 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
         directional[1].SetColor(glm::mix(kNightSky, kDaySky, daylight));
         // Brighter at night, when the sky no longer lights the rooms.
         directional[2].SetColor(selection.building.IsValid()
-                                    ? kInspectionLight * (1.8F - (0.8F * daylight))
+                                    ? kInspectionLight * (2.0F - daylight)
                                     : vec3(0.0F));
     }
     // Neon dims in daylight but never goes out. Lights shine through walls,
@@ -344,6 +419,28 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
             points[sign.lightIndex].SetColor(inspected ? vec3(0.0F)
                                                        : sign.color * neon);
         }
+    }
+    for (std::size_t lamp = 0; lamp < kLampPool; ++lamp) {
+        const std::size_t index = lampPoolStart_ + lamp;
+        if (index >= points.size()) {
+            break;
+        }
+        if (lamp < litLamps_.size()) {
+            points[index].SetPos(litLamps_[lamp].position);
+            points[index].SetColor(litLamps_[lamp].color);
+        } else {
+            points[index].SetPos({0.0F, kHiddenDepth, 0.0F});
+            points[index].SetColor(vec3(0.0F));
+        }
+    }
+    // Street lamps come on at dusk. By day they point nowhere, which the
+    // renderer skips.
+    const vec3 street = kStreetLampColor * (1.0F - daylight);
+    const bool lit = daylight < 1.0F;
+    for (SpotLight& lamp : scene.GetSpotLights()) {
+        const vec3 bulb = lamp.GetPos();
+        lamp.SetColor(street);
+        lamp.SetTarget(lit ? vec3{bulb.x, 0.0F, bulb.z} : bulb);
     }
 }
 
@@ -369,30 +466,41 @@ const FloorPlan& CityView::PlanOf(sim::EntityId building, std::uint32_t floor) {
     return found->second;
 }
 
-void CityView::SubmitModel(RenderQueue& queue, const PropModel& model,
-                           vec3 origin, float yawDegrees, float tiltDegrees,
-                           vec3 tint, float scale) {
+void CityView::ForEachPart(
+    const PropModel& model, vec3 origin, float yawDegrees, float tiltDegrees,
+    float scale,
+    const std::function<void(const PropPart&, const Transform&)>& part) {
     const glm::mat4 base =
         glm::rotate(glm::rotate(glm::translate(glm::mat4(1.0F), origin),
                                 glm::radians(yawDegrees), vec3{0.0F, 1.0F, 0.0F}),
                     glm::radians(tiltDegrees), vec3{1.0F, 0.0F, 0.0F});
-    for (const PropPart& part : model) {
+    for (const PropPart& piece : model) {
         const glm::mat4 joint =
-            glm::rotate(glm::translate(base, part.pivot * scale),
-                        glm::radians(part.angleX), vec3{1.0F, 0.0F, 0.0F});
-        const Transform transform{
-            .position = vec3(joint * glm::vec4(part.base * scale, 1.0F)),
-            .rotationDegrees = {tiltDegrees + part.angleX, yawDegrees, 0.0F},
-            .scale = part.size * scale};
-        const auto material =
-            assets_.palette->Get(part.tinted ? tint : part.color);
-        if (part.glass) {
-            queue.SubmitTransparentMesh(*assets_.cube, transform, material,
-                                        kGlassOpacity);
-        } else {
-            queue.SubmitOpaqueMesh(*assets_.cube, transform, material);
-        }
+            glm::rotate(glm::translate(base, piece.pivot * scale),
+                        glm::radians(piece.angleX), vec3{1.0F, 0.0F, 0.0F});
+        part(piece,
+             Transform{.position = vec3(joint * glm::vec4(piece.base * scale, 1.0F)),
+                       .rotationDegrees = {tiltDegrees + piece.angleX, yawDegrees,
+                                           0.0F},
+                       .scale = piece.size * scale});
     }
+}
+
+void CityView::SubmitModel(RenderQueue& queue, const PropModel& model,
+                           vec3 origin, float yawDegrees, float tiltDegrees,
+                           vec3 tint, float scale) {
+    ForEachPart(model, origin, yawDegrees, tiltDegrees, scale,
+                [&](const PropPart& part, const Transform& transform) {
+                    const auto material =
+                        assets_.palette->Get(part.tinted ? tint : part.color);
+                    if (part.glass) {
+                        queue.SubmitTransparentMesh(*assets_.cube, transform,
+                                                    material, kGlassOpacity);
+                    } else {
+                        queue.SubmitOpaqueMesh(*assets_.cube, transform,
+                                               material);
+                    }
+                });
 }
 
 void CityView::SubmitBox(RenderQueue& queue, vec3 minimum, vec3 maximum,
@@ -416,6 +524,7 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
                       float streetFigureScale) {
     robotMarkers_.clear();
     roomTiles_.clear();
+    litLamps_.clear();
     openBuilding_ = selection.building;
     openFloor_ = selection.floor;
     const auto open = shapes_.find(selection.building.value);
@@ -512,6 +621,32 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
     }
     const double minute = std::fmod(renderTick, static_cast<double>(sim::kMinutesPerDay));
     const bool night = minute >= kBedtime || minute < kWakeUp;
+
+    // Lamps are on where they would be: in corridors always, at home while
+    // someone is up, in venues while open or busy, at work while working.
+    for (const Lamp& lamp : plan.lamps) {
+        if (litLamps_.size() >= kLampPool) {
+            break;
+        }
+        bool on = true;
+        vec3 color = kWarmLamp;
+        if (const auto room = rooms_.Find(lamp.room)) {
+            const bool occupied = occupants.contains(lamp.room.value);
+            if (const sim::VenueRules* rules = sim::FindVenueRules(room->room->kind)) {
+                on = occupied ||
+                     sim::IsOpen(*rules, static_cast<std::uint32_t>(minute));
+            } else if (room->room->kind == sim::RoomKind::Apartment) {
+                on = occupied && !night;
+            } else {
+                on = occupied;
+                color = kCoolLamp;
+            }
+        }
+        if (on) {
+            litLamps_.push_back(
+                {.position = ToWorld(shape, current, lamp.position), .color = color});
+        }
+    }
     for (const RoomPlan& room : plan.rooms) {
         const auto [minimum, maximum] = worldBox(room.minimum, room.maximum);
         roomTiles_.push_back({.room = room.room, .box = {minimum, maximum}});

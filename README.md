@@ -44,13 +44,15 @@ aside to `FILE.broken` instead of being overwritten.
 | Input             | Action                                         |
 | ----------------- | ---------------------------------------------- |
 | Click             | Open a building; select a room or robot inside |
+| Double-click a robot or its name | Move the camera to the robot  |
+| F                 | Follow the selected robot with the camera      |
 | Q / E, PgDn / PgUp | Floor down / up in an open building          |
 | Drag (either button) | Orbit the camera                            |
 | Wheel             | Zoom                                           |
-| WASD / arrows     | Move the camera                                |
+| WASD / arrows     | Move the camera (stops following)              |
 | Space             | Pause or resume                                |
 | N                 | One minute forward while paused (hold to repeat) |
-| 1–5               | Speed: 1, 10, 60, 300 or 1200 game minutes per second |
+| 1–6               | Speed x0.5, x1, x10, x60, x300 or x1200; at x1 a game minute takes two seconds |
 | F5                | Save now                                       |
 | F12               | Screenshot to `screenshots/`                   |
 | Esc               | Close the selection, then save and quit        |
@@ -65,8 +67,11 @@ kept in `mechapunk-ui.ini` next to the game.
 
 Click a building to open it as a cutaway: the floors below are solid, the
 floor you are looking at is drawn room by room at real scale, and the floors
-above are hidden. The open building's own signs switch off and a lamp lights
-the floor, brighter at night.
+above are hidden. The open building's own signs switch off; pendant lamps
+light its rooms, and a faint light from above keeps dark rooms readable.
+Lamps are on where they would be: corridors always, apartments while the
+resident is home and awake, venues while open or busy, workspaces while
+someone works there.
 
 - Apartment floors have a stairwell, an elevator and a corridor with six
   apartments. Each has a bathroom, a bedroom and a living room with a
@@ -107,8 +112,13 @@ camera is so they stay visible; robots in an apartment, workspace or venue
 are inside their building. Habitats are
 cyan towers with colored store signs at street level, workplaces are
 magenta, and the dark towers are decoration. Building height follows the
-number of floors. Sunlight follows the time of day, and neon lights the
-streets at night.
+number of floors. Sunlight follows the time of day; at night neon signs
+glow and street lamps along every street cast pools of light on the road.
+
+The robot panel has **Look at** and **Follow**. Following keeps the camera
+on the robot: it opens the building and floor the robot is in and closes it
+again when the robot steps outside. Moving the camera with the keys, or
+deselecting the robot, stops following.
 
 The simulation steps once per game minute on its own thread and publishes a
 snapshot after each step. The renderer places walking robots from their

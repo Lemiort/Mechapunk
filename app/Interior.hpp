@@ -38,6 +38,13 @@ struct Spot {
     Pose pose{Pose::Standing};
 };
 
+// A ceiling lamp. Lamps of a sim room light up while the room is in use;
+// lamps of corridors and the core (no room) are always on.
+struct Lamp {
+    glm::vec3 position{0.0F};  // The bulb, just under the shade.
+    sim::EntityId room;
+};
+
 struct RoomPlan {
     sim::EntityId room;
     glm::vec3 minimum{0.0F};
@@ -56,6 +63,7 @@ struct FloorPlan {
     std::vector<WallBox> boxes;
     std::vector<PlacedProp> props;
     std::vector<RoomPlan> rooms;
+    std::vector<Lamp> lamps;
 };
 
 [[nodiscard]] FloorPlan PlanFloor(const sim::Building& building,

@@ -68,6 +68,10 @@ enum class PropKind : std::uint8_t {
     Stairs,
     ElevatorDoors,
     Door,
+    // Lighting: a pendant hanging from the ceiling, and a street lamp whose
+    // head reaches 1.6 m out over +z at 6 m.
+    CeilingLamp,
+    StreetLamp,
 };
 
 [[nodiscard]] const PropModel& Prop(PropKind kind);
