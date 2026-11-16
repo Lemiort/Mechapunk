@@ -48,7 +48,8 @@ Run the tests with `ctest --test-dir build/build/Release --output-on-failure`.
 
 `mechapunk` continues `mechapunk-save.json` from the working directory when
 it exists, and otherwise starts a new city. It saves there when you quit.
-Start over with `--new`, or pick a city with `--seed N --robots N`; use
+Start over with `--new`, or pick a city with `--seed N --robots N` (2000
+robots by default; the street grid grows with the population); use
 `--save FILE` for another save file. A save that cannot be read is moved
 aside to `FILE.broken` instead of being overwritten.
 
@@ -92,11 +93,15 @@ someone works there.
   repair lifts and workbenches, arcade cabinets, shop shelves, furnaces and
   conveyors, server racks, office desks.
 - Robots are drawn where they are: asleep in bed at night, on the sofa in
-  the evening, on a stool at the bar, standing at a machine at work.
+  the evening, on a stool at the bar, standing at a machine at work. What
+  they have in front of them shows too: a bottle and a glass at the bar, a
+  plate and a cup at the diner or in their kitchen, a mug on the office
+  desk, a basket in hand at the shop shelves.
 
 Furniture and robots are built from boxes in `app/Props.cpp`, one catalog
 entry per kind, so each can later be replaced by a model. Floor plans are
-laid out in `app/Interior.cpp`.
+laid out in `app/Interior.cpp`, with the way into every room and to every
+spot in it; `layout_tests` checks that none of them goes through a wall.
 
 Habitats open on their first apartment floor; Q goes down to the stores. The
 **Inspector** window then lists the floor's rooms with who is in them, with a
@@ -119,12 +124,19 @@ Clicks, drags and scrolling over a window stay in the window. Recent events
 are kept while the game runs and are not saved, so the list starts empty
 after loading.
 
-Walking robots stride along their route, drawn larger the further out the
-camera is so they stay visible; robots in an apartment, workspace or venue
-are inside their building. Habitats are
-cyan towers with colored store signs at street level, workplaces are
-magenta, and the dark towers are decoration. Building height follows the
-number of floors. Sunlight follows the time of day; at night neon signs
+Walking robots go the way a person would: from their spot out of the room's
+door, along the corridor, down the stairs one flight a floor and out of the
+lobby door, then along the streets and in the same way to their spot at the
+other end. Shops open straight onto the pavement. Indoors a walker shows on
+the open floor of an open building; outdoors robots are drawn larger the
+further out the camera is so they stay visible. A robot keeps its spot in a
+room while it is free, and one walking in heads for the spot it will take.
+Robots coming out of a shop carry a paper bag, and black market customers a
+parcel under the arm.
+
+Habitats are cyan towers with colored store signs at street level,
+workplaces are magenta, and street corners without a building are small
+parks with trees and benches. Building height follows the number of floors. Sunlight follows the time of day; at night neon signs
 glow and street lamps along every street cast pools of light on the road.
 
 The robot panel has **Look at** and **Follow**. Following keeps the camera
@@ -227,17 +239,22 @@ memories.
 
 ### Metro
 
-Every third intersection each way has a metro station; their entrances
-stand on the pavement by the corner, with a cyan M sign. A trip between two
+Every second intersection each way has a metro station. The lines are
+elevated, 8 m over the streets of the station rows and columns on steel
+columns; each station is a platform over its intersection with stairs up
+from the pavement and a cyan M sign at their foot. A trip between two
 buildings takes the metro when walking to the nearest station, waiting a few
-minutes, riding (30 km/h, station to station) and walking on from the
-station nearest the destination beats walking all the way. A ride costs
-4 cr; robots budget for the fare home, and a robot that cannot spare the
-fare without missing tonight's rent walks instead. In a city of 300, about a
-third of all trips use the metro. Riders walk to the entrance and vanish
-underground until they come up at the far station; the robot panel says
-which part of the trip they are on, and following one keeps the camera at
-the entrance while it rides.
+minutes, riding (30 km/h along the lines, first the row and then the
+column) and walking on from the station nearest the destination beats
+walking all the way. A ride costs 4 cr; robots budget for the fare home,
+and a robot that cannot spare the fare without missing tonight's rent walks
+instead. In a city of 2000, about one trip in eight is by metro.
+
+Riders climb the stairs, wait in the open corners of the platform, and
+ride a two-car train with everyone who boarded with them; the train runs
+along the row and turns down the column to their stop, where they climb
+down. The robot panel says which part of the trip they are on, and
+following one keeps the camera at the platform while it rides.
 
 ### Aging, clinics and newcomers
 

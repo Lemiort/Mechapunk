@@ -119,7 +119,7 @@ private:
     struct NeonSign {
         glm::vec3 position;
         glm::vec3 color;
-        sim::EntityId building;  // None for decorative towers.
+        sim::EntityId building;
     };
     struct Neon {
         std::size_t lightIndex;
