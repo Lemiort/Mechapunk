@@ -45,6 +45,12 @@ struct RobotFrame {
     std::int32_t performance{};
     std::uint32_t age{};
     std::int32_t wear{};
+    // A metro ride on this walk: underground from boardsAt to alightsAt,
+    // between stations (indices into City::stations). Zero when on foot.
+    std::uint32_t rideFrom{};
+    std::uint32_t rideTo{};
+    sim::Tick boardsAt{};
+    sim::Tick alightsAt{};
 };
 
 // What does not change about a robot while it lives.

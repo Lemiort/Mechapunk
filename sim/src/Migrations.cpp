@@ -258,4 +258,47 @@ std::expected<void, std::string> V5ToV6(SaveDocument& world) try {
         std::format("the version 5 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V6ToV7(SaveDocument& world) try {
+    constexpr std::uint64_t kSpacing = 3;
+    constexpr std::uint64_t kOffset = 1;
+    constexpr std::array<std::string_view, 12> kNames{
+        "Neon Square",  "Foundry Gate", "Old Grid",     "Chrome Market",
+        "Circuit Park", "Signal Hill",  "Rust Docks",   "Ion Plaza",
+        "Coil Street",  "Relay Yard",   "Static Cross", "Diode Row"};
+    SaveDocument& city = world["city"];
+    const std::uint64_t nodes = city["nodes"].get_array().size();
+    std::uint64_t size = 0;
+    while ((size + 1) * (size + 1) <= nodes) {
+        ++size;
+    }
+    if (size * size != nodes) {
+        return std::unexpected("the street grid is not square");
+    }
+    SaveDocument stations = Array{};
+    for (std::uint64_t row = kOffset; row < size; row += kSpacing) {
+        for (std::uint64_t column = kOffset; column < size; column += kSpacing) {
+            const std::uint64_t number = stations.get_array().size();
+            std::string name{kNames.at(number % kNames.size())};
+            if (number >= kNames.size()) {
+                name += std::format(" {}", (number / kNames.size()) + 1);
+            }
+            SaveDocument station = Object{};
+            station["node"] = (row * size) + column;
+            station["name"] = std::move(name);
+            stations.get_array().push_back(std::move(station));
+        }
+    }
+    city["stations"] = std::move(stations);
+    for (SaveDocument& robot : world["robots"].get_array()) {
+        robot["rideFrom"] = std::uint64_t{0};
+        robot["rideTo"] = std::uint64_t{0};
+        robot["boardsAt"] = std::uint64_t{0};
+        robot["alightsAt"] = std::uint64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 6 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

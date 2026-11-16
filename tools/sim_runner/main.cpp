@@ -128,6 +128,8 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
 
 struct DayStats {
     std::uint64_t walks{};
+    std::uint64_t metroRides{};
+    std::uint64_t fares{};
     std::uint64_t walkMinutes{};
     std::uint64_t lateArrivals{};
     std::uint64_t wages{};
@@ -146,6 +148,8 @@ struct DayStats {
             case sim::EventKind::Departed:
                 ++walks;
                 walkMinutes += event.minutes;
+                metroRides += event.metro ? 1 : 0;
+                fares += static_cast<std::uint64_t>(event.credits);
                 break;
             case sim::EventKind::ClockedIn:
                 lateArrivals += event.minutes > 0 ? 1 : 0;
@@ -277,9 +281,10 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
         wear += robot.wear;
     }
     std::println(
-        "   {} scrapped, {} arrived, {} friends lost, {} dodgy parts; {} "
-        "robots, average age {} days, average wear {}",
-        stats.scrapped, stats.arrived, memories(sim::MemoryKind::LostFriend),
+        "   {} trips by metro ({} cr fares); {} scrapped, {} arrived, {} "
+        "friends lost, {} dodgy parts; {} robots, average age {} days, "
+        "average wear {}",
+        stats.metroRides, stats.fares, stats.scrapped, stats.arrived, memories(sim::MemoryKind::LostFriend),
         memories(sim::MemoryKind::GotBadPart), world.State().robots.size(),
         age / count, wear / count);
 }

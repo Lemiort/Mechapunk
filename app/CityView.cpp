@@ -166,6 +166,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     }
 
     AddStreetLamps();
+    AddStations();
 
     // Simulated buildings take the corners next to their entrance first.
     std::map<std::uint32_t, std::uint32_t> usedSlots;
@@ -344,6 +345,45 @@ void CityView::AddStreetLamps() {
                                    vec3{0.0F, kStreetLampBulb.y, 0.0F});
         }
     }
+}
+
+vec3 CityView::StationEntrance(std::uint32_t station) const {
+    // On the pavement just past the intersection, beside the street that
+    // runs along x.
+    constexpr float kAlong = (kStreetWidth * 0.5F) + (2.2F * kS);
+    constexpr float kAcross = (kStreetWidth * 0.5F) + (0.8F * kS);
+    return NodePosition(city_.stations.at(station).node) +
+           vec3{kAlong, kStreetHeight, kAcross};
+}
+
+void CityView::AddStations() {
+    for (std::uint32_t station = 0; station < city_.stations.size(); ++station) {
+        // The stairs run along the street, down towards the intersection.
+        AddStaticModel(Prop(PropKind::MetroEntrance), StationEntrance(station), -90.0F);
+    }
+}
+
+const std::vector<vec3>& CityView::StationRoute(sim::EntityId building,
+                                                std::uint32_t station,
+                                                bool toStation) {
+    const auto key = std::make_tuple(building.value, station, toStation);
+    if (const auto cached = stationRoutes_.find(key); cached != stationRoutes_.end()) {
+        return cached->second;
+    }
+    std::vector<vec3> points;
+    const sim::Building* found = city_.FindBuilding(building);
+    if (found != nullptr && station < city_.stations.size()) {
+        points.push_back(shapes_.at(building.value).center);
+        for (const sim::NodeId node :
+             routes_.Path(found->entrance, city_.stations[station].node)) {
+            points.push_back(NodePosition(node));
+        }
+        points.push_back(StationEntrance(station));
+        if (!toStation) {
+            std::ranges::reverse(points);
+        }
+    }
+    return stationRoutes_.emplace(key, std::move(points)).first->second;
 }
 
 void CityView::AddStaticModel(const PropModel& model, vec3 origin,
@@ -557,7 +597,11 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
             !robot.from.IsValid()) {
             continue;
         }
-        const auto [position, direction] = RobotPosition(robot, renderTick);
+        const auto placed = RobotPosition(robot, renderTick);
+        if (!placed) {
+            continue;  // Underground on the metro.
+        }
+        const auto [position, direction] = *placed;
         const bool selected = robot.id == selection.robot;
         // Legs swing once per 1.5 m walked.
         const float walked = static_cast<float>(
@@ -800,9 +844,25 @@ const std::vector<vec3>& CityView::Route(sim::EntityId from, sim::EntityId to) {
     return routeCache_.emplace(key, std::move(points)).first->second;
 }
 
-std::pair<vec3, vec3> CityView::RobotPosition(const RobotFrame& robot,
-                                              double renderTick) {
-    const std::vector<vec3>& route = Route(robot.from, robot.to);
+std::optional<std::pair<vec3, vec3>> CityView::RobotPosition(
+    const RobotFrame& robot, double renderTick) {
+    // On foot the whole way, or to a station, underground, and on from the
+    // other station.
+    const std::vector<vec3>* walk = &Route(robot.from, robot.to);
+    double start = static_cast<double>(robot.departedAt);
+    double end = static_cast<double>(robot.arrivesAt);
+    if (robot.alightsAt > robot.boardsAt) {
+        if (renderTick < static_cast<double>(robot.boardsAt)) {
+            walk = &StationRoute(robot.from, robot.rideFrom, true);
+            end = static_cast<double>(robot.boardsAt);
+        } else if (renderTick < static_cast<double>(robot.alightsAt)) {
+            return std::nullopt;
+        } else {
+            walk = &StationRoute(robot.to, robot.rideTo, false);
+            start = static_cast<double>(robot.alightsAt);
+        }
+    }
+    const std::vector<vec3>& route = *walk;
     // Spread robots sharing a street so they do not overlap exactly.
     const std::uint64_t hash = robot.id.value * 2654435761ULL;
     const vec3 spread{
@@ -810,14 +870,11 @@ std::pair<vec3, vec3> CityView::RobotPosition(const RobotFrame& robot,
         kStreetHeight,
         ((static_cast<float>((hash >> 8U) & 0xFFU) / 255.0F) - 0.5F) * kRobotSpread};
     if (route.size() < 2) {
-        return {spread, vec3{0.0F, 0.0F, 1.0F}};
+        return std::make_pair(spread, vec3{0.0F, 0.0F, 1.0F});
     }
-    const double duration = static_cast<double>(robot.arrivesAt - robot.departedAt);
+    const double duration = end - start;
     const double progress =
-        duration > 0.0
-            ? std::clamp((renderTick - static_cast<double>(robot.departedAt)) / duration,
-                         0.0, 1.0)
-            : 1.0;
+        duration > 0.0 ? std::clamp((renderTick - start) / duration, 0.0, 1.0) : 1.0;
     float total = 0.0F;
     for (std::size_t index = 1; index < route.size(); ++index) {
         total += glm::distance(route[index - 1], route[index]);
@@ -827,15 +884,16 @@ std::pair<vec3, vec3> CityView::RobotPosition(const RobotFrame& robot,
         const vec3 segment = route[index] - route[index - 1];
         const float length = glm::length(segment);
         if (remaining <= length && length > 0.0F) {
-            return {glm::mix(route[index - 1], route[index], remaining / length) + spread,
-                    segment / length};
+            return std::make_pair(
+                glm::mix(route[index - 1], route[index], remaining / length) + spread,
+                segment / length);
         }
         remaining -= length;
     }
     const vec3 last = route.back() - route[route.size() - 2];
     const float length = glm::length(last);
-    return {route.back() + spread,
-            length > 0.0F ? last / length : vec3{0.0F, 0.0F, 1.0F}};
+    return std::make_pair(route.back() + spread,
+                          length > 0.0F ? last / length : vec3{0.0F, 0.0F, 1.0F});
 }
 
 }  // namespace mechapunk

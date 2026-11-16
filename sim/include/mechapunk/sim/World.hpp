@@ -73,7 +73,27 @@ struct Robot {
     std::uint32_t age{};
     // Lasting damage from 0 to kMaxWear; clinics take some of it away.
     std::int32_t wear{};
+    // A metro ride on the walk under way: underground from boardsAt to
+    // alightsAt, between stations (indices into City::stations). All zero
+    // when walking the whole way.
+    std::uint32_t rideFrom{};
+    std::uint32_t rideTo{};
+    Tick boardsAt{};
+    Tick alightsAt{};
 };
+
+// How to get from one room to another: on foot, or partly by metro.
+struct Trip {
+    std::uint32_t minutes{};  // Door to door.
+    bool metro{false};
+    std::uint32_t fromStation{};  // Indices into City::stations.
+    std::uint32_t toStation{};
+    std::uint32_t minutesToStation{};    // Walk and stairs to the station.
+    std::uint32_t minutesUnderground{};  // Waiting for and riding the train.
+};
+
+// Fare of a metro ride; a robot that cannot pay it all pays what it has.
+inline constexpr std::uint32_t kMetroFare = 4;
 
 // A robot that was scrapped, kept while others still remember it.
 struct DepartedRobot {
@@ -110,7 +130,9 @@ struct Walk {
 };
 
 enum class EventKind : std::uint8_t {
-    Departed,        // room: left; otherRoom: heading to; minutes: walk.
+    // room: left; otherRoom: heading to; minutes: the trip; metro and
+    // stations when riding; credits: the fare paid.
+    Departed,
     ClockedIn,       // room: workspace; minutes: late by.
     ShiftEnded,      // room: workspace; credits: wage earned.
     ArrivedAtVenue,  // room: venue; credits: price; minutes: planned stay.
@@ -144,6 +166,9 @@ struct SimEvent {
     Interest topic{};
     std::int32_t change{};
     MemoryKind memory{};
+    bool metro{false};
+    std::uint32_t fromStation{};
+    std::uint32_t toStation{};
 };
 
 // Deterministic simulation of the city. The same WorldState always produces
@@ -193,9 +218,13 @@ public:
 
     // The walk a robot is on; nothing unless it is walking.
     [[nodiscard]] static std::optional<Walk> WalkOf(const Robot& robot);
-    // Walking time between two rooms, in whole minutes, including stairs.
-    [[nodiscard]] std::uint32_t WalkingMinutes(EntityId fromRoom,
-                                               EntityId toRoom);
+    // The fastest way between two rooms: walking, or walking to a station,
+    // riding the metro and walking on. Includes stairs.
+    [[nodiscard]] Trip PlanTrip(EntityId fromRoom, EntityId toRoom,
+                                bool metroAllowed = true);
+    // Minutes door to door between two rooms, the fastest way.
+    [[nodiscard]] std::uint32_t TravelMinutes(EntityId fromRoom,
+                                              EntityId toRoom);
 
     // Receives every event produced by later steps.
     void SetEventSink(EventSink sink) { sink_ = std::move(sink); }
@@ -221,6 +250,10 @@ private:
     void ScheduleNextCommute(Robot& robot);
     [[nodiscard]] Tick LatestHomeTick(const Robot& robot);
     void CollectRent();
+    // Metro, in Transit.cpp.
+    void IndexStations();
+    [[nodiscard]] std::uint32_t RideMinutes(std::uint32_t fromStation,
+                                            std::uint32_t toStation) const;
     // Work and money, in Careers.cpp.
     [[nodiscard]] std::uint32_t WageOf(const Robot& robot) const;
     // Costs performance for turning up worn down or miserable.
@@ -266,6 +299,9 @@ private:
     // Robots inside each venue room.
     std::unordered_map<std::uint64_t, std::uint32_t> guests_;
     std::uint64_t populationVersion_{};
+    // For every street node, its nearest station and the walk there.
+    std::vector<std::uint32_t> nearestStation_;
+    std::vector<std::uint32_t> metersToStation_;
     EventSink sink_;
 };
 

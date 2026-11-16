@@ -38,7 +38,8 @@ std::int32_t WearAtAge(std::uint32_t days) noexcept {
     // The nightly wear summed over a life of `days`.
     const auto age = static_cast<std::int64_t>(days);
     const std::int64_t wear =
-        (kBaseWearPerDay * age) + ((age * age) / (2 * kDaysPerExtraWear));
+        (kBaseWearPerDay * age) +
+        ((age * age) / (2 * static_cast<std::int64_t>(kDaysPerExtraWear)));
     return static_cast<std::int32_t>(std::min<std::int64_t>(wear, kMaxWear));
 }
 

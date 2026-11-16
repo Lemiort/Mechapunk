@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -141,7 +142,16 @@ private:
     [[nodiscard]] glm::vec3 NodePosition(sim::NodeId node) const;
     const std::vector<glm::vec3>& Route(sim::EntityId from, sim::EntityId to);
     // Position along the route and the direction of travel.
-    [[nodiscard]] std::pair<glm::vec3, glm::vec3> RobotPosition(
+    // Where the entrance of a station stands, on the pavement by its corner.
+    [[nodiscard]] glm::vec3 StationEntrance(std::uint32_t station) const;
+    // A walk between a building and a station entrance, either way.
+    const std::vector<glm::vec3>& StationRoute(sim::EntityId building,
+                                               std::uint32_t station,
+                                               bool toStation);
+    void AddStations();
+    // Position along the route and the direction of travel; nothing while
+    // the robot rides the metro underground.
+    [[nodiscard]] std::optional<std::pair<glm::vec3, glm::vec3>> RobotPosition(
         const RobotFrame& robot, double renderTick);
     const FloorPlan& PlanOf(sim::EntityId building, std::uint32_t floor);
     // Converts floor-plan meters to world units for a building and floor.
@@ -177,6 +187,8 @@ private:
     std::map<std::pair<std::uint64_t, std::uint32_t>, FloorPlan> plans_;
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<glm::vec3>>
         routeCache_;
+    std::map<std::tuple<std::uint64_t, std::uint32_t, bool>, std::vector<glm::vec3>>
+        stationRoutes_;
     std::vector<NeonSign> neonSigns_;
     std::vector<Neon> neons_;
     // Bulbs of the street lamps, which shine straight down.

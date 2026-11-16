@@ -3,6 +3,7 @@
 #include <bit>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -67,7 +68,13 @@ TEST(World, SameSeedRunsIdentically) {
 }
 
 TEST(World, RobotsWorkEveryDayOnTime) {
-    sim::World world = YoungCity({.seed = 8, .robots = 150});
+    // With money for every fare, so nobody has to walk a commute planned
+    // by metro.
+    sim::WorldState rich = YoungCity({.seed = 8, .robots = 150}).State();
+    for (sim::Robot& robot : rich.robots) {
+        robot.credits = 10000;
+    }
+    sim::World world = std::move(*sim::World::FromState(std::move(rich)));
     std::map<std::uint64_t, std::uint32_t> shifts;
     std::uint64_t late = 0;
     std::uint64_t wrongLengths = 0;
@@ -148,7 +155,7 @@ TEST(World, EveningsAreSpentInOpenVenuesWithinCapacity) {
 }
 
 TEST(World, CreditsAreWagesMinusPricesAndRent) {
-    sim::World world = sim::World::Generate({.seed = 11, .robots = 100});
+    sim::World world = YoungCity({.seed = 11, .robots = 100});
     std::map<std::uint64_t, std::int64_t> expected;
     std::map<std::uint64_t, std::int64_t> rentDue;
     for (const sim::Robot& robot : world.State().robots) {
@@ -157,11 +164,20 @@ TEST(World, CreditsAreWagesMinusPricesAndRent) {
             world.Rooms().Find(robot.apartment)->room->rent;
     }
     std::map<std::uint64_t, std::int64_t> rentPaid;
+    // Moving changes the rent, and eviction writes off the debt.
+    std::set<std::uint64_t> moved;
     std::uint64_t nights = 0;
     world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::Remembered &&
+            (event.memory == sim::MemoryKind::MovedUp ||
+             event.memory == sim::MemoryKind::Evicted)) {
+            moved.insert(event.robot.value);
+        }
         if (event.kind == sim::EventKind::ShiftEnded) {
             expected[event.robot.value] += event.credits;
-        } else if (event.kind == sim::EventKind::ArrivedAtVenue) {
+        } else if (event.kind == sim::EventKind::ArrivedAtVenue ||
+                   event.kind == sim::EventKind::Departed) {
+            // Venue prices, and metro fares.
             expected[event.robot.value] -= event.credits;
         } else if (event.kind == sim::EventKind::RentPaid) {
             EXPECT_EQ(sim::MinuteOfDay(event.tick), 0U);
@@ -177,6 +193,9 @@ TEST(World, CreditsAreWagesMinusPricesAndRent) {
         EXPECT_EQ(robot.credits, expected[robot.id.value]) << robot.name;
         EXPECT_GE(robot.credits, 0) << robot.name;
         // Every night's rent is either paid or still owed.
+        if (moved.contains(robot.id.value)) {
+            continue;
+        }
         EXPECT_EQ(rentPaid[robot.id.value] + robot.rentOwed,
                   rentDue[robot.id.value] * static_cast<std::int64_t>(nights))
             << robot.name;

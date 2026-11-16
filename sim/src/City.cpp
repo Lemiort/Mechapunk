@@ -112,6 +112,13 @@ const T& Pick(std::span<const T> items, Pcg32& random) {
     return items[random.UniformInt(0, static_cast<std::uint32_t>(items.size() - 1))];
 }
 
+constexpr std::uint32_t kStationSpacing = 3;
+constexpr std::uint32_t kStationOffset = 1;
+constexpr std::array<std::string_view, 12> kStationNames{
+    "Neon Square",  "Foundry Gate", "Old Grid",     "Chrome Market",
+    "Circuit Park", "Signal Hill",  "Rust Docks",   "Ion Plaza",
+    "Coil Street",  "Relay Yard",   "Static Cross", "Diode Row"};
+
 // Store kinds in the order habitats get them, the ones robots cannot do
 // without first, so even a small city can repair and charge its robots.
 constexpr std::array kStoreOrder{
@@ -243,6 +250,21 @@ City GenerateCity(const CityParams& params, Pcg32& random,
                 {.id = NodeId{(row * size) + column},
                  .x = static_cast<std::int32_t>(column * params.blockMeters),
                  .z = static_cast<std::int32_t>(row * params.blockMeters)});
+        }
+    }
+
+    // Stations at every third intersection, one in from the edge, so no
+    // corner of the city is far from one.
+    for (std::uint32_t row = kStationOffset; row < size; row += kStationSpacing) {
+        for (std::uint32_t column = kStationOffset; column < size;
+             column += kStationSpacing) {
+            const auto number = static_cast<std::uint32_t>(city.stations.size());
+            std::string name{kStationNames.at(number % kStationNames.size())};
+            if (number >= kStationNames.size()) {
+                name += std::format(" {}", (number / kStationNames.size()) + 1);
+            }
+            city.stations.push_back(
+                {.node = NodeId{(row * size) + column}, .name = std::move(name)});
         }
     }
 

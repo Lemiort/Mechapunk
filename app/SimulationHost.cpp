@@ -226,7 +226,11 @@ void SimulationHost::Publish() {
                               .jobLevel = robot.jobLevel,
                               .performance = robot.performance,
                               .age = robot.age,
-                              .wear = robot.wear};
+                              .wear = robot.wear,
+                              .rideFrom = robot.rideFrom,
+                              .rideTo = robot.rideTo,
+                              .boardsAt = robot.boardsAt,
+                              .alightsAt = robot.alightsAt};
         switch (robot.activity) {
             case sim::RobotActivity::Resting:
                 ++frame.resting;

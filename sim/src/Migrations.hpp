@@ -30,4 +30,8 @@ namespace mechapunk::sim::migrations {
 // world a list of scrapped robots, empty so far.
 [[nodiscard]] std::expected<void, std::string> V5ToV6(SaveDocument& world);
 
+// Version 6 to 7: the city gets metro stations at every third intersection
+// of its square street grid, and robots are not riding yet.
+[[nodiscard]] std::expected<void, std::string> V6ToV7(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

@@ -99,6 +99,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 5,
               .summary = "age, wear and scrapped robots",
               .apply = &migrations::V5ToV6},
+    Migration{.fromVersion = 6,
+              .summary = "metro stations and rides",
+              .apply = &migrations::V6ToV7},
 };
 }  // namespace
 

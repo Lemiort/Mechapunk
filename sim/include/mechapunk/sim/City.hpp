@@ -26,6 +26,13 @@ struct CityEdge {
     std::uint32_t lengthMeters{};
 };
 
+// An entrance to the underground metro at a street corner. Trains run
+// between every pair of stations.
+struct Station {
+    NodeId node;
+    std::string name;
+};
+
 enum class BuildingKind : std::uint8_t { Habitat, Workplace };
 
 enum class RoomKind : std::uint8_t {
@@ -80,6 +87,7 @@ struct City {
     std::vector<CityNode> nodes;
     std::vector<CityEdge> edges;
     std::vector<Building> buildings;
+    std::vector<Station> stations;
 
     [[nodiscard]] const Building* FindBuilding(EntityId id) const noexcept;
 };
@@ -119,7 +127,8 @@ struct EntityIdAllocator {
     EntityId Allocate() noexcept { return EntityId{next++}; }
 };
 
-// Builds a connected street grid with a few missing segments. Habitats,
+// Builds a connected street grid with a few missing segments, and a metro
+// station at every third intersection each way. Habitats,
 // concentrated in the west, have stores on the ground floor and apartments
 // above; workplaces in the east are split into workspaces over their floors.
 [[nodiscard]] City GenerateCity(const CityParams& params, Pcg32& random,

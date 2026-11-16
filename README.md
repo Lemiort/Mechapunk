@@ -176,7 +176,8 @@ going home, stays a while, and decides again. A robot that is home by the
 evening rests for half an hour to an hour and a half, then weighs going out
 again, until 22:00. It always gets home early enough for six
 hours of rest before its next shift, and every night ends at home by 03:30.
-Walking times come from shortest routes over the street graph plus stairs.
+Travel times come from shortest routes over the street graph plus stairs,
+or the metro where it is faster.
 
 ### Relationships and memories
 
@@ -223,6 +224,20 @@ saved sometimes (one night in ten) moves to the priciest free apartment it
 could pay for twelve nights. Robots at home walk over to their new place
 that night. Promotions, firings, new jobs, moves and evictions are all
 memories.
+
+### Metro
+
+Every third intersection each way has a metro station; their entrances
+stand on the pavement by the corner, with a cyan M sign. A trip between two
+buildings takes the metro when walking to the nearest station, waiting a few
+minutes, riding (30 km/h, station to station) and walking on from the
+station nearest the destination beats walking all the way. A ride costs
+4 cr; robots budget for the fare home, and a robot that cannot spare the
+fare without missing tonight's rent walks instead. In a city of 300, about a
+third of all trips use the metro. Riders walk to the entrance and vanish
+underground until they come up at the far station; the robot panel says
+which part of the trip they are on, and following one keeps the camera at
+the entrance while it rides.
 
 ### Aging, clinics and newcomers
 

@@ -211,6 +211,18 @@ PropModel Make(PropKind kind) {
                  Box(0, 0.3F, 0.41F, 1.9F, 0.04F, 0.02F, kNeonPink)};
             Legs(m, 2.0F, 0.8F, 0.85F, kDarkWood, 0.06F);
             break;
+        case PropKind::MetroEntrance:
+            m = {Box(0, 0, 0, 1.3F, 0.03F, 2.6F, kBlack),
+                 Box(-0.62F, 0, 0, 0.06F, 1.0F, 2.6F, kMetal),
+                 Box(0.62F, 0, 0, 0.06F, 1.0F, 2.6F, kMetal),
+                 Box(0, 0, -1.27F, 1.3F, 1.0F, 0.06F, kMetal),
+                 Box(-0.62F, 1.0F, -1.27F, 0.06F, 1.2F, 0.06F, kDarkMetal),
+                 Box(0.62F, 1.0F, -1.27F, 0.06F, 1.2F, 0.06F, kDarkMetal),
+                 Glass(0, 2.2F, -0.4F, 1.4F, 0.05F, 1.9F),
+                 Box(0.85F, 0, 1.3F, 0.1F, 2.8F, 0.1F, kDarkMetal),
+                 Box(0.85F, 2.8F, 1.3F, 0.55F, 0.55F, 0.12F, kNeonCyan),
+                 Box(0.85F, 2.92F, 1.37F, 0.3F, 0.3F, 0.02F, kWhite)};
+            break;
         case PropKind::Crate:
             m = {Box(0, 0, 0, 0.7F, 0.6F, 0.7F, kWood),
                  Box(0, 0.6F, 0, 0.72F, 0.04F, 0.72F, kDarkWood)};

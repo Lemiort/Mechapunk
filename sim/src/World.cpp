@@ -281,33 +281,6 @@ std::optional<Walk> World::WalkOf(const Robot& robot) {
                 .arrivesAt = robot.nextActionAt};
 }
 
-std::uint32_t World::WalkingMinutes(EntityId fromRoom, EntityId toRoom) {
-    const auto from = rooms_.Find(fromRoom);
-    const auto to = rooms_.Find(toRoom);
-    if (!from || !to) {
-        throw std::logic_error("Walk between unknown rooms");
-    }
-    std::uint32_t minutes = 0;
-    std::uint32_t floors = 0;
-    if (from->building == to->building) {
-        floors = from->room->floor > to->room->floor
-                     ? from->room->floor - to->room->floor
-                     : to->room->floor - from->room->floor;
-    } else {
-        const auto meters = routes_.DistanceMeters(from->building->entrance,
-                                                   to->building->entrance);
-        if (!meters) {
-            throw std::logic_error("No route between buildings");
-        }
-        minutes = (*meters + kWalkingMetersPerMinute - 1) /
-                  kWalkingMetersPerMinute;
-        floors = from->room->floor + to->room->floor;
-    }
-    minutes += (floors + kFloorsPerMinute - 1) / kFloorsPerMinute;
-    // Even next door takes a minute.
-    return std::max<std::uint32_t>(1, minutes);
-}
-
 void World::Step() {
     ++state_.tick;
     if (MinuteOfDay(state_.tick) == 0) {
@@ -411,6 +384,10 @@ void World::Arrive(Robot& robot) {
     const Tick now = state_.tick;
     robot.location = robot.destination;
     robot.destination = EntityId{};
+    robot.rideFrom = 0;
+    robot.rideTo = 0;
+    robot.boardsAt = 0;
+    robot.alightsAt = 0;
     if (robot.workspace.IsValid() && robot.location == robot.workspace) {
         robot.activity = RobotActivity::Working;
         // A late robot still leaves at the regular end of its shift.
@@ -457,7 +434,7 @@ void World::Arrive(Robot& robot) {
 
     // Stay a while, but leave by closing time and in time to rest.
     const Tick latestLeave = LatestHomeTick(robot) -
-                             WalkingMinutes(robot.location, robot.apartment);
+                             TravelMinutes(robot.location, robot.apartment);
     Tick stay = state_.random.UniformInt(rules->minVisitMinutes,
                                          rules->maxVisitMinutes);
     stay = std::min<Tick>(stay, MinutesUntilClose(*rules, MinuteOfDay(now)));
@@ -476,7 +453,7 @@ void World::Arrive(Robot& robot) {
 void World::Decide(Robot& robot) {
     const Tick now = state_.tick;
     const Tick latestHome = LatestHomeTick(robot);
-    const std::uint32_t walkHome = WalkingMinutes(robot.location,
+    const std::uint32_t walkHome = TravelMinutes(robot.location,
                                                   robot.apartment);
 
     std::int64_t bestScore =
@@ -486,8 +463,10 @@ void World::Decide(Robot& robot) {
     }
     EntityId best = robot.apartment;
 
-    // Keep enough for tonight's rent and anything already owed.
-    const std::int64_t reserve = RentOf(robot) + robot.rentOwed;
+    // Keep enough for tonight's rent, anything already owed, and a fare
+    // home.
+    const std::int64_t reserve =
+        RentOf(robot) + robot.rentOwed + static_cast<std::int64_t>(kMetroFare);
     const auto here = rooms_.Find(robot.location);
     const RoomKind hereKind = here ? here->room->kind : RoomKind::Apartment;
     for (const RoomKind kind : VenueKinds()) {
@@ -502,10 +481,10 @@ void World::Decide(Robot& robot) {
                 reserved_[room.id.value] >= room.capacity) {
                 continue;
             }
-            const std::uint32_t walk = WalkingMinutes(robot.location, room.id);
+            const std::uint32_t walk = TravelMinutes(robot.location, room.id);
             const Tick arrival = now + walk;
             const std::uint32_t arrivalMinute = MinuteOfDay(arrival);
-            const Tick walkBack = WalkingMinutes(room.id, robot.apartment);
+            const Tick walkBack = TravelMinutes(room.id, robot.apartment);
             if (!IsOpen(rules, arrivalMinute) ||
                 MinutesUntilClose(rules, arrivalMinute) <
                     rules.minVisitMinutes ||
@@ -542,11 +521,30 @@ void World::Decide(Robot& robot) {
 }
 
 void World::StartWalk(Robot& robot, EntityId destination) {
-    const std::uint32_t walk = WalkingMinutes(robot.location, destination);
+    Trip trip = PlanTrip(robot.location, destination);
+    // A robot walks rather than miss tonight's rent for a fare.
+    if (trip.metro && robot.credits - static_cast<std::int64_t>(kMetroFare) <
+                          RentOf(robot) + robot.rentOwed) {
+        trip = PlanTrip(robot.location, destination, false);
+    }
     robot.activity = RobotActivity::Walking;
     robot.destination = destination;
     robot.departedAt = state_.tick;
-    robot.nextActionAt = state_.tick + walk;
+    robot.nextActionAt = state_.tick + trip.minutes;
+    std::int64_t fare = 0;
+    if (trip.metro) {
+        robot.rideFrom = trip.fromStation;
+        robot.rideTo = trip.toStation;
+        robot.boardsAt = state_.tick + trip.minutesToStation;
+        robot.alightsAt = robot.boardsAt + trip.minutesUnderground;
+        fare = std::min<std::int64_t>(kMetroFare, robot.credits);
+        robot.credits -= fare;
+    } else {
+        robot.rideFrom = 0;
+        robot.rideTo = 0;
+        robot.boardsAt = 0;
+        robot.alightsAt = 0;
+    }
     const auto room = rooms_.Find(destination);
     if (room && IsVenue(room->room->kind)) {
         ++reserved_[destination.value];
@@ -556,7 +554,11 @@ void World::StartWalk(Robot& robot, EntityId destination) {
           .robot = robot.id,
           .room = robot.location,
           .otherRoom = destination,
-          .minutes = walk});
+          .minutes = trip.minutes,
+          .credits = fare,
+          .metro = trip.metro,
+          .fromStation = trip.fromStation,
+          .toStation = trip.toStation});
 }
 
 void World::ScheduleNextCommute(Robot& robot) {
@@ -566,7 +568,7 @@ void World::ScheduleNextCommute(Robot& robot) {
         return;
     }
     const Tick now = state_.tick;
-    const Tick lead = WalkingMinutes(robot.apartment, robot.workspace) +
+    const Tick lead = TravelMinutes(robot.apartment, robot.workspace) +
                       robot.punctualityMinutes +
                       state_.random.UniformInt(0, kMaxDailyExtraMinutes);
     // The next working day's shift whose departure time is still ahead.
@@ -628,7 +630,7 @@ Tick World::NextShiftStart(const Robot& robot, Tick after) const {
 }
 
 Tick World::MaxCommuteLead(const Robot& robot) {
-    return WalkingMinutes(robot.apartment, robot.workspace) +
+    return TravelMinutes(robot.apartment, robot.workspace) +
            robot.punctualityMinutes + kMaxDailyExtraMinutes;
 }
 
@@ -718,6 +720,14 @@ std::string World::Describe(const SimEvent& event) const {
     const std::string room = DescribeRoom(event.room);
     switch (event.kind) {
         case EventKind::Departed:
+            if (event.metro) {
+                const auto& stations = state_.city.stations;
+                return std::format(
+                    "{}  {} left {} for {} ({} min, by metro from {} to {})",
+                    when, who, room, DescribeRoom(event.otherRoom),
+                    event.minutes, stations.at(event.fromStation).name,
+                    stations.at(event.toStation).name);
+            }
             return std::format("{}  {} left {} for {} ({} min walk)", when, who,
                                room, DescribeRoom(event.otherRoom),
                                event.minutes);
@@ -831,6 +841,15 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
         }
     }
 
+    std::unordered_set<std::uint32_t> stationNodes;
+    for (const Station& station : city.stations) {
+        if (station.node.value >= nodeCount ||
+            !stationNodes.insert(station.node.value).second) {
+            return fail(std::format("Station '{}' is not at a street node of its own",
+                                    station.name));
+        }
+    }
+
     RoutePlanner routes(city);
     if (!city.buildings.empty()) {
         const NodeId origin = city.buildings.front().entrance;
@@ -896,10 +915,20 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                     return IsVenue(location->room->kind);
                 case RobotActivity::Walking:
                     return rooms.Find(robot.destination).has_value() &&
-                           robot.departedAt <= robot.nextActionAt;
+                           robot.departedAt <= robot.nextActionAt &&
+                           (robot.alightsAt == 0 ||
+                            (robot.departedAt <= robot.boardsAt &&
+                             robot.boardsAt <= robot.alightsAt &&
+                             robot.alightsAt <= robot.nextActionAt &&
+                             robot.rideFrom < city.stations.size() &&
+                             robot.rideTo < city.stations.size()));
             }
             return false;
         }();
+        if (robot.activity != RobotActivity::Walking && robot.alightsAt != 0) {
+            return fail(std::format("Robot '{}' rides the metro without walking",
+                                    robot.name));
+        }
         if (!consistent) {
             return fail(std::format("Robot '{}' is in a room that does not "
                                     "match what it is doing",

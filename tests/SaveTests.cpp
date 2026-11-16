@@ -176,13 +176,17 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v6-city.json";
+        kFixtureDirectory / "saves" / "v7-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
+    // Saved during the morning commute, with robots on the metro.
+    EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
+        return robot.alightsAt != 0;
+    }));
     // The fixture has a robot out of work, and scrapped robots that others
     // still remember.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
@@ -236,7 +240,7 @@ TEST(Save, Version1FixtureMigratesAndRuns) {
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(visits, 0U);
     // Saving the migrated world writes the current version.
-    EXPECT_NE(Serialize(world->State()).find("\"version\": 6"),
+    EXPECT_NE(Serialize(world->State()).find("\"version\": 7"),
               std::string::npos);
 }
 
@@ -366,4 +370,35 @@ TEST(Save, Version5FixtureMigratesAndRuns) {
     const sim::Robot* older = world->FindRobot(id);
     ASSERT_NE(older, nullptr);
     EXPECT_EQ(older->age, age + 3);
+}
+
+// A version 6 save (aging, no metro) loads through one migration: the city
+// gets a station at every third intersection, nobody is riding yet, and
+// robots start taking the metro.
+TEST(Save, Version6FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v6-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    // An 8 by 8 grid: rows and columns 1, 4 and 7.
+    ASSERT_EQ(state->city.stations.size(), 9U);
+    EXPECT_EQ(state->city.stations.front().node.value, 9U);
+    EXPECT_EQ(state->city.stations.back().node.value, 63U);
+    EXPECT_EQ(state->city.stations.front().name, "Neon Square");
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_EQ(robot.alightsAt, 0U) << robot.name;
+    }
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    std::uint64_t rides = 0;
+    world->SetEventSink([&](const sim::SimEvent& event) {
+        rides += event.kind == sim::EventKind::Departed && event.metro ? 1 : 0;
+    });
+    world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_GT(rides, 0U);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

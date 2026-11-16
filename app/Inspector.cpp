@@ -338,11 +338,31 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
                         Clock(robot.nextActionAt).c_str());
             follow(RoomLink(city, robot.location, "at "));
             break;
-        case sim::RobotActivity::Walking:
-            ImGui::Text("Walking, arrives %s",
-                        Clock(robot.nextActionAt).c_str());
+        case sim::RobotActivity::Walking: {
+            const auto& stations = city.City().stations;
+            const bool metro = robot.alightsAt > robot.boardsAt &&
+                               robot.rideFrom < stations.size() &&
+                               robot.rideTo < stations.size();
+            if (!metro) {
+                ImGui::Text("Walking, arrives %s", Clock(robot.nextActionAt).c_str());
+            } else if (frame.tick < robot.boardsAt) {
+                ImGui::Text("Walking to %s station, metro to %s, arrives %s",
+                            stations[robot.rideFrom].name.c_str(),
+                            stations[robot.rideTo].name.c_str(),
+                            Clock(robot.nextActionAt).c_str());
+            } else if (frame.tick < robot.alightsAt) {
+                ImGui::Text("On the metro from %s to %s, arrives %s",
+                            stations[robot.rideFrom].name.c_str(),
+                            stations[robot.rideTo].name.c_str(),
+                            Clock(robot.nextActionAt).c_str());
+            } else {
+                ImGui::Text("Walking from %s station, arrives %s",
+                            stations[robot.rideTo].name.c_str(),
+                            Clock(robot.nextActionAt).c_str());
+            }
             follow(RoomLink(city, robot.destination, "to "));
             break;
+        }
     }
 
     ImGui::SeparatorText("Needs");
