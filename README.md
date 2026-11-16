@@ -23,10 +23,21 @@ evenings in a 3D city that you observe. Built on the
 
 ```bash
 git clone --recurse-submodules https://github.com/Lemiort/Mechapunk.git
-conan install . --output-folder=build --build=missing -s build_type=Release -s compiler.cppstd=23
+cd Mechapunk
+conan editable add external/NEE
+conan install . --output-folder=build --build=missing --build=editable -s build_type=Release -s compiler.cppstd=23
 cmake --preset conan-release
 cmake --build --preset conan-release
 ```
+
+The engine is the Conan package `nee/0.1.0`. `conan editable add` (once per
+machine) makes that package the submodule in `external/NEE`, and
+`--build=editable` builds it in place, in `external/NEE/build/Release`. The
+game's build then rebuilds that tree first, so engine edits reach the game
+in one build. The engine brings GLFW, spdlog, GLM, GLAD, gsl-lite and Dear
+ImGui; the game itself only adds glaze for saves and GoogleTest. Use the
+same Conan profile for both (for example `-pr:a mingw` instead of the `-s`
+settings with LLVM-MinGW).
 
 Run `mechapunk` from the build directory so it finds the copied assets.
 Requires an OpenGL 4.6 core driver.
@@ -248,4 +259,8 @@ without breaking existing saves.
 git -C external/NEE fetch
 git -C external/NEE checkout <commit or origin/master>
 git add external/NEE
+conan install . --output-folder=build --build=missing --build=editable -s build_type=Release -s compiler.cppstd=23
 ```
+
+Re-run `conan install` after moving the submodule when the engine's
+`conanfile.py` changed, so its dependencies and build tree are up to date.
