@@ -31,6 +31,8 @@ add_executable(mechapunk
     app/CityView.cpp
     app/GameRenderer.cpp
     app/Inspector.cpp
+    app/Interior.cpp
+    app/Props.cpp
     app/SimulationHost.cpp
     app/main.cpp
 )

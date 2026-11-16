@@ -56,7 +56,12 @@ constexpr float kPanPerSecond = 40.0F;
 constexpr double kMessageSeconds = 3.0;
 // Pixels the cursor may move between press and release for a click.
 constexpr double kClickTolerance = 6.0;
-constexpr float kInteriorDistance = 6.0F;
+// Looking into a building: close and steep, so walls hide little.
+constexpr float kInteriorDistance = 2.2F;
+constexpr float kInteriorPitch = 58.0F;
+// Robots outdoors grow with camera distance to stay visible.
+constexpr float kFigureScalePerUnit = 0.12F;
+constexpr float kMaxFigureScale = 6.0F;
 // UI font shipped with the imgui package, copied next to the game.
 constexpr const char* kUiFont = "fonts/Roboto-Medium.ttf";
 constexpr float kUiFontSize = 17.0F;
@@ -366,6 +371,7 @@ private:
                       .floor = habitat && found->floors > 1 ? 1U : 0U};
         camera_.Focus(city_.FloorCenter(building, selection_.floor),
                       kInteriorDistance);
+        camera_.SetPitch(kInteriorPitch);
     }
 
     void ChangeFloor(int delta) {
@@ -415,7 +421,10 @@ private:
 
         queue_.Clear();
         if (frame != nullptr) {
-            city_.Submit(queue_, *frame, renderTick, selection_);
+            const float figureScale =
+                std::clamp(camera_.Distance() * kFigureScalePerUnit, 1.0F,
+                           kMaxFigureScale);
+            city_.Submit(queue_, *frame, renderTick, selection_, figureScale);
         }
         city_.UpdateLights(
             scene_,

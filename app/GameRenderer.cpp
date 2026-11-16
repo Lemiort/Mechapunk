@@ -2,7 +2,9 @@
 
 #include <glad/gl.h>
 
+#include <algorithm>
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <initializer_list>
 #include <memory>
@@ -50,7 +52,48 @@ std::shared_ptr<Material> MakeSurface(
     material->SetSpecularTexture(specular);
     return material;
 }
+// A 1x1 texture of one color.
+std::shared_ptr<Texture2D> SolidTexture(glm::vec3 color) {
+    const std::array<std::uint8_t, 4> pixel{
+        static_cast<std::uint8_t>(std::clamp(color.r, 0.0F, 1.0F) * 255.0F),
+        static_cast<std::uint8_t>(std::clamp(color.g, 0.0F, 1.0F) * 255.0F),
+        static_cast<std::uint8_t>(std::clamp(color.b, 0.0F, 1.0F) * 255.0F),
+        255};
+    GLuint texture = 0;
+    glCreateTextures(GL_TEXTURE_2D, 1, &texture);
+    glTextureStorage2D(texture, 1, GL_RGBA8, 1, 1);
+    glTextureSubImage2D(texture, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                        pixel.data());
+    glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    return std::make_shared<Texture2D>(texture);
+}
 }  // namespace
+
+MaterialPalette::MaterialPalette(std::shared_ptr<Shader> shader,
+                                 std::shared_ptr<Texture2D> flatNormal,
+                                 std::shared_ptr<Texture2D> specular)
+    : shader_(std::move(shader)),
+      flatNormal_(std::move(flatNormal)),
+      specular_(std::move(specular)) {}
+
+std::shared_ptr<const Material> MaterialPalette::Get(glm::vec3 color) {
+    // Colors are shared at 8 bits per channel.
+    const auto channel = [](float value) {
+        return static_cast<std::uint32_t>(std::clamp(value, 0.0F, 1.0F) * 255.0F);
+    };
+    const std::uint32_t key = (channel(color.r) << 16U) |
+                              (channel(color.g) << 8U) | channel(color.b);
+    auto found = cache_.find(key);
+    if (found == cache_.end()) {
+        auto material = std::make_shared<Material>(gsl_lite::not_null{shader_});
+        material->SetColorTexture(SolidTexture(color));
+        material->SetNormalTexture(flatNormal_);
+        material->SetSpecularTexture(specular_);
+        found = cache_.emplace(key, std::move(material)).first;
+    }
+    return found->second;
+}
 
 GameRenderer::GameRenderer(int width, int height) {
     meshShader_ = LoadShader({{"shaders/vertexShader.vsh", ShaderType::Vertex},
@@ -104,21 +147,9 @@ GameRenderer::GameRenderer(int width, int height) {
     assets_.workplace = surface("textures/mp_workplace.png");
     assets_.tower = surface("textures/mp_tower.png");
     assets_.robot = surface("textures/mp_robot.png");
-    assets_.slab = surface("textures/mp_slab.png");
     assets_.highlight = surface("textures/mp_highlight.png");
-    const std::array<std::pair<sim::RoomKind, const char*>, 8> roomTextures{{
-        {sim::RoomKind::Apartment, "textures/mp_room_apartment.png"},
-        {sim::RoomKind::Workspace, "textures/mp_room_workspace.png"},
-        {sim::RoomKind::Bar, "textures/mp_room_bar.png"},
-        {sim::RoomKind::Diner, "textures/mp_room_diner.png"},
-        {sim::RoomKind::ChargingBay, "textures/mp_room_charging.png"},
-        {sim::RoomKind::RepairShop, "textures/mp_room_repair.png"},
-        {sim::RoomKind::Arcade, "textures/mp_room_arcade.png"},
-        {sim::RoomKind::Shop, "textures/mp_room_shop.png"},
-    }};
-    for (const auto& [kind, texture] : roomTextures) {
-        assets_.rooms.emplace(kind, surface(texture));
-    }
+    assets_.palette =
+        std::make_unique<MaterialPalette>(meshShader_, flatNormal, matte);
     assets_.cube = std::make_unique<Mesh>(gsl_lite::not_null{assets_.ground},
                                           "models/cube.obj");
     assets_.plane = std::make_unique<Mesh>(gsl_lite::not_null{assets_.ground},

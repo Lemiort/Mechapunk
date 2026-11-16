@@ -16,11 +16,13 @@ namespace mechapunk {
 class OrbitCamera {
 public:
     static constexpr float kFieldOfView = 45.0F;
-    static constexpr float kNear = 0.1F;
+    static constexpr float kNear = 0.01F;
+    // Near plane grows with distance so far streets do not z-fight.
+    static constexpr float kNearPerUnit = 0.01F;
     static constexpr float kFar = 500.0F;
     static constexpr float kMinPitch = 10.0F;
     static constexpr float kMaxPitch = 85.0F;
-    static constexpr float kMinDistance = 1.5F;
+    static constexpr float kMinDistance = 0.2F;
     static constexpr float kMaxDistance = 150.0F;
 
     OrbitCamera(glm::vec3 target, float distance)
@@ -43,6 +45,10 @@ public:
         distance_ = std::clamp(distance, kMinDistance, kMaxDistance);
     }
     void FocusTarget(glm::vec3 target) { target_ = target; }
+    void SetPitch(float degrees) {
+        pitch_ = std::clamp(degrees, kMinPitch, kMaxPitch);
+    }
+    [[nodiscard]] float Distance() const noexcept { return distance_; }
 
     // Moves the target in the camera's ground plane; units scale with zoom.
     void Pan(float right, float forward) {
@@ -61,7 +67,7 @@ public:
                                std::cos(yaw) * std::cos(pitch)};
         const glm::vec3 position = target_ + (offset * distance_);
         return {width,    height,         kFieldOfView,
-                kNear,    kFar,           position,
+                std::max(kNear, distance_ * kNearPerUnit), kFar, position,
                 -offset,  {0.0F, 1.0F, 0.0F}};
     }
 

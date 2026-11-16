@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <span>
@@ -15,9 +16,27 @@
 #include "RenderQueue.hpp"
 #include "Scene.hpp"
 #include "Shader.hpp"
+#include "Texture.hpp"
 #include "mechapunk/sim/City.hpp"
 
+#include <glm/ext/vector_float3.hpp>
+
 namespace mechapunk {
+
+// Solid-color matte surfaces, made on first use and shared by color.
+class MaterialPalette {
+public:
+    MaterialPalette(std::shared_ptr<Shader> shader,
+                    std::shared_ptr<Texture2D> flatNormal,
+                    std::shared_ptr<Texture2D> specular);
+    [[nodiscard]] std::shared_ptr<const Material> Get(glm::vec3 color);
+
+private:
+    std::shared_ptr<Shader> shader_;
+    std::shared_ptr<Texture2D> flatNormal_;
+    std::shared_ptr<Texture2D> specular_;
+    std::map<std::uint32_t, std::shared_ptr<Material>> cache_;
+};
 
 // Meshes and surface materials shared by everything the game draws.
 struct RenderAssets {
@@ -30,10 +49,9 @@ struct RenderAssets {
     std::shared_ptr<Material> workplace;
     std::shared_ptr<Material> tower;
     std::shared_ptr<Material> robot;
-    // Inside an open building.
-    std::shared_ptr<Material> slab;
     std::shared_ptr<Material> highlight;
-    std::map<sim::RoomKind, std::shared_ptr<Material>> rooms;
+    // Colors of walls, furniture and robots.
+    std::unique_ptr<MaterialPalette> palette;
 };
 
 // Owns NEE's deferred pipeline and the game's render assets. Must be created
