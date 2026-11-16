@@ -38,13 +38,16 @@ struct RobotFrame {
     sim::Needs needs;
     std::int64_t credits{};
     std::int64_t rentOwed{};
+    // Robots move house and change jobs, so these come with every frame.
+    sim::EntityId apartment;
+    sim::EntityId workspace;  // None while out of work.
+    std::uint8_t jobLevel{};
+    std::int32_t performance{};
 };
 
 // What does not change while the game runs.
 struct RobotInfo {
     std::string name;
-    sim::EntityId apartment;
-    sim::EntityId workspace;
     std::uint8_t daysOff{};
     std::uint8_t interests{};
 };

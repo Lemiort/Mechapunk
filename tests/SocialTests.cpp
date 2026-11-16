@@ -239,8 +239,13 @@ TEST(Social, CloseFriendsDrawEachOtherToVenues) {
                 continue;
             }
             const auto venue = base.Rooms().Find(b.location);
+            // At most three per venue, with seats to spare for robots
+            // already on their way there.
+            constexpr std::uint32_t kPerVenue = 3;
             std::uint32_t& count = joining[b.location.value];
-            if (base.GuestsIn(b.location) + count + 2 > venue->room->capacity) {
+            if (count >= kPerVenue ||
+                base.GuestsIn(b.location) + count + kPerVenue >
+                    venue->room->capacity) {
                 continue;
             }
             ++count;

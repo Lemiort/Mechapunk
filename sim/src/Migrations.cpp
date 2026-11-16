@@ -226,4 +226,15 @@ std::expected<void, std::string> V3ToV4(SaveDocument& world) try {
         std::format("the version 3 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V4ToV5(SaveDocument& world) try {
+    for (SaveDocument& robot : world["robots"].get_array()) {
+        robot["jobLevel"] = std::uint64_t{0};
+        robot["performance"] = std::int64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 4 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

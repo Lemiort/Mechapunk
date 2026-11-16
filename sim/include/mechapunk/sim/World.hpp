@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "mechapunk/sim/Careers.hpp"
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Ids.hpp"
@@ -28,7 +29,7 @@ struct Robot {
     EntityId id;
     std::string name;
     EntityId apartment;  // Room the robot lives in.
-    EntityId workspace;  // Room the robot works in.
+    EntityId workspace;  // Room the robot works in; none while out of work.
     RobotActivity activity{RobotActivity::Resting};
     // Room the robot is in, or has just left while walking.
     EntityId location;
@@ -56,6 +57,10 @@ struct Robot {
     std::vector<Bond> bonds;
     // Moments it remembers, oldest first.
     std::vector<Memory> memories;
+    // 0 (junior) to kMaxJobLevel (lead); higher levels earn more.
+    std::uint8_t jobLevel{};
+    // How the robot has done at work since it was hired or last promoted.
+    std::int32_t performance{};
 };
 
 // Everything that defines a running world. This is exactly what a save
@@ -185,6 +190,14 @@ private:
     void ScheduleNextCommute(Robot& robot);
     [[nodiscard]] Tick LatestHomeTick(const Robot& robot);
     void CollectRent();
+    // Work and money, in Careers.cpp.
+    [[nodiscard]] std::uint32_t WageOf(const Robot& robot) const;
+    // Scores the shift just worked; promotes or fires.
+    void EndShift(Robot& robot);
+    // At night: robots out of work may be hired.
+    void ReviewJobs();
+    // At night: evictions, and robots with savings moving to nicer places.
+    void ReviewHomes();
     // Relationships, in Social.cpp.
     void Socialize();
     void Talk(Robot& first, Robot& second);

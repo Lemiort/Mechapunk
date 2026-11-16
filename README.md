@@ -95,7 +95,8 @@ floor slider.
   hours, price, occupancy, and the robots inside with when each will leave.
 - Click a robot, in the city or by its name in the inspector, for what it
   likes, what it is doing and until when, its four needs as bars, credits
-  and rent owed, home, job, shift and days off, who it knows and how it
+  and rent owed, home, job level, wage, shift and progress toward the next
+  promotion (or how close it is to being fired), days off, who it knows and how it
   feels about them, what it remembers, and its recent events, including
   who it talked to and about what.
 - Names of robots in a robot's relationships are links too: clicking one
@@ -135,8 +136,10 @@ down to single rooms:
   hours, capacity and prices) and apartments above.
 - Workplaces are split into workspaces over their floors and pay a wage per
   shift.
-- Every robot has its own apartment and workspace, and is always in a known
-  room or walking between two.
+- Every robot has its own apartment and, unless it is out of work, a
+  workspace, and is always in a known room or walking between two.
+- Habitats get their stores in a fixed order, repair shops and charging
+  bays first, so even a small city can keep its robots running.
 
 Robots have four needs from 0 to 1000: charge, condition, social and fun.
 They change every ten minutes with what the robot is doing, and venues
@@ -187,6 +190,24 @@ ones where friends are or are heading, and more strongly to close friends;
 they stay away from rivals. In a city of 300, most robots have a friend
 after a week or two, close friendships take a few weeks, and a fifth or so
 end up with a rival.
+
+### Work and money
+
+Robots hold a job level: junior, regular, senior or lead. Each level pays
+15% more than the one below. Every shift adds 0 to 2 points of performance;
+a robot that turns up worn down (low condition or charge) loses 3, and one
+that is miserable (no fun or company) loses 1, and arriving late costs 3.
+Enough points earn a promotion (15 for a junior, 10 more for each level up).
+At -12 the robot is fired: it lives as if every day were its day off, and
+each night has an even chance of being hired into a workspace with an
+opening, starting again as a junior.
+
+Each night after rent, a robot owing five nights' rent is evicted to the
+cheapest free apartment and its debt written off. A robot with 500 credits
+saved sometimes (one night in ten) moves to the priciest free apartment it
+could pay for twelve nights. Robots at home walk over to their new place
+that night. Promotions, firings, new jobs, moves and evictions are all
+memories.
 
 Runs are deterministic: the same save or seed always produces the same
 states and events, on every platform. All simulation state is integral, and

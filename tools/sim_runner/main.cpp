@@ -246,6 +246,22 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
         memories(sim::MemoryKind::BecameRivals),
         memories(sim::MemoryKind::MadePeace), withFriend, withCloseFriend,
         withRival);
+    std::array<std::uint64_t, sim::kMaxJobLevel + 1> levels{};
+    std::uint64_t outOfWork = 0;
+    for (const sim::Robot& robot : world.State().robots) {
+        if (robot.workspace.IsValid()) {
+            ++levels.at(robot.jobLevel);
+        } else {
+            ++outOfWork;
+        }
+    }
+    std::println(
+        "   {} promoted, {} lost their job, {} found one, {} moved up, {} "
+        "evicted; {} junior, {} regular, {} senior, {} lead, {} out of work",
+        memories(sim::MemoryKind::Promoted), memories(sim::MemoryKind::LostJob),
+        memories(sim::MemoryKind::FoundJob), memories(sim::MemoryKind::MovedUp),
+        memories(sim::MemoryKind::Evicted), levels[0], levels[1], levels[2],
+        levels[3], outOfWork);
 }
 
 

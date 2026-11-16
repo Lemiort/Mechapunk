@@ -69,7 +69,9 @@ struct glz::meta<mechapunk::sim::MemoryKind> {
         "becameFriends", BecameFriends, "becameCloseFriends",
         BecameCloseFriends, "driftedApart", DriftedApart, "becameRivals",
         BecameRivals, "madePeace", MadePeace, "fellBehindOnRent",
-        FellBehindOnRent, "paidOffDebt", PaidOffDebt);
+        FellBehindOnRent, "paidOffDebt", PaidOffDebt, "promoted", Promoted,
+        "lostJob", LostJob, "foundJob", FoundJob, "movedUp", MovedUp,
+        "evicted", Evicted);
 };
 
 namespace mechapunk::sim {
@@ -90,6 +92,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 3,
               .summary = "interests, relationships and memories",
               .apply = &migrations::V3ToV4},
+    Migration{.fromVersion = 4,
+              .summary = "job levels and performance",
+              .apply = &migrations::V4ToV5},
 };
 }  // namespace
 

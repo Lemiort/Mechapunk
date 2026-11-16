@@ -64,6 +64,11 @@ enum class MemoryKind : std::uint8_t {
     MadePeace,  // A rival became an acquaintance again.
     FellBehindOnRent,
     PaidOffDebt,
+    Promoted,
+    LostJob,
+    FoundJob,
+    MovedUp,   // Moved to a nicer apartment; room: the new one.
+    Evicted,   // room: the apartment it had to leave.
 };
 
 struct Memory {
@@ -81,9 +86,11 @@ struct Memory {
 // What a robot remembers about a bond changing from one level to another.
 [[nodiscard]] std::optional<MemoryKind> MemoryOfChange(BondLevel from,
                                                        BondLevel to) noexcept;
-// "became friends with KX-417 Vera", "fell behind on rent". `other` is the
-// name of the other robot, if any.
-[[nodiscard]] std::string MemoryText(MemoryKind kind, std::string_view other);
+// "became friends with KX-417 Vera at Neon Wok", "got promoted at Smelting
+// Bay 2, Foundry 1". `other` names the other robot, if any, and `place` the
+// room, if any.
+[[nodiscard]] std::string MemoryText(MemoryKind kind, std::string_view other,
+                                     std::string_view place = {});
 
 struct WorldState;
 // Checks every robot's bonds and memories; part of ValidateWorldState.

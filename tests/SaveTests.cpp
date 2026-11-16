@@ -176,13 +176,17 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v4-city.json";
+        kFixtureDirectory / "saves" / "v5-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
+    // The fixture has a robot out of work.
+    EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
+        return !robot.workspace.IsValid();
+    }));
     // The fixture carries friendships and memories.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
         return !robot.bonds.empty() && !robot.memories.empty();
@@ -230,7 +234,7 @@ TEST(Save, Version1FixtureMigratesAndRuns) {
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(visits, 0U);
     // Saving the migrated world writes the current version.
-    EXPECT_NE(Serialize(world->State()).find("\"version\": 4"),
+    EXPECT_NE(Serialize(world->State()).find("\"version\": 5"),
               std::string::npos);
 }
 
@@ -301,4 +305,31 @@ TEST(Save, Version3FixtureMigratesAndRuns) {
     });
     world->RunFor(5 * sim::kMinutesPerDay);
     EXPECT_GT(friendships, 0U);
+}
+
+// A version 4 save (relationships, no careers) loads through one migration:
+// every robot starts as a junior with a clean record, and keeps working.
+TEST(Save, Version4FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v4-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_EQ(robot.jobLevel, 0) << robot.name;
+        EXPECT_EQ(robot.performance, 0) << robot.name;
+        EXPECT_TRUE(robot.workspace.IsValid()) << robot.name;
+    }
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    std::uint64_t shifts = 0;
+    world->SetEventSink([&](const sim::SimEvent& event) {
+        shifts += event.kind == sim::EventKind::ShiftEnded ? 1 : 0;
+    });
+    world->RunFor(3 * sim::kMinutesPerDay);
+    EXPECT_GT(shifts, 0U);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

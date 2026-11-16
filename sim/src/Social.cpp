@@ -163,22 +163,39 @@ std::optional<MemoryKind> MemoryOfChange(BondLevel from, BondLevel to) noexcept 
     return std::nullopt;  // A close friend cooling to a friend is no event.
 }
 
-std::string MemoryText(MemoryKind kind, std::string_view other) {
+std::string MemoryText(MemoryKind kind, std::string_view other,
+                       std::string_view place) {
+    const auto at = [&](std::string text, std::string_view preposition) {
+        if (!place.empty()) {
+            text += std::format(" {} {}", preposition, place);
+        }
+        return text;
+    };
     switch (kind) {
         case MemoryKind::BecameFriends:
-            return std::format("became friends with {}", other);
+            return at(std::format("became friends with {}", other), "at");
         case MemoryKind::BecameCloseFriends:
-            return std::format("grew close to {}", other);
+            return at(std::format("grew close to {}", other), "at");
         case MemoryKind::DriftedApart:
             return std::format("drifted apart from {}", other);
         case MemoryKind::BecameRivals:
-            return std::format("started a rivalry with {}", other);
+            return at(std::format("started a rivalry with {}", other), "at");
         case MemoryKind::MadePeace:
             return std::format("made peace with {}", other);
         case MemoryKind::FellBehindOnRent:
             return "fell behind on rent";
         case MemoryKind::PaidOffDebt:
             return "paid off the rent owed";
+        case MemoryKind::Promoted:
+            return at("got promoted", "at");
+        case MemoryKind::LostJob:
+            return at("lost the job", "at");
+        case MemoryKind::FoundJob:
+            return at("found a job", "at");
+        case MemoryKind::MovedUp:
+            return at("moved up", "to");
+        case MemoryKind::Evicted:
+            return at("was evicted", "from");
     }
     return "remembered something";
 }

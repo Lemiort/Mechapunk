@@ -56,6 +56,11 @@ constexpr std::uint64_t kCityStream = 1;
 constexpr std::uint64_t kPopulationStream = 2;
 constexpr std::uint64_t kRuntimeStream = 3;
 constexpr std::uint64_t kInterestStream = 4;
+constexpr std::uint64_t kCareerStream = 5;
+// Robots start somewhere between junior and senior.
+constexpr std::uint32_t kHighestStartingLevel = 2;
+// Arriving late costs this much performance.
+constexpr std::int32_t kLatePerformance = 3;
 constexpr std::uint32_t kInterestsPerRobot = 2;
 
 // Need changes per ten minutes of each activity; visits add venue effects.
@@ -210,6 +215,12 @@ World World::Generate(const WorldParams& params) {
         }
     }
 
+    Pcg32 careers = Pcg32::FromSeed(params.seed, kCareerStream);
+    for (Robot& robot : state.robots) {
+        robot.jobLevel =
+            static_cast<std::uint8_t>(careers.UniformInt(0, kHighestStartingLevel));
+    }
+
     state.random = Pcg32::FromSeed(params.seed, kRuntimeStream);
     World world(std::move(state));
     for (Robot& robot : world.state_.robots) {
@@ -278,6 +289,8 @@ void World::Step() {
     ++state_.tick;
     if (MinuteOfDay(state_.tick) == 0) {
         CollectRent();
+        ReviewHomes();
+        ReviewJobs();
         FadeBonds();
     }
     if (state_.tick % kNeedPeriod == 0) {
@@ -345,13 +358,14 @@ void World::Act(Robot& robot) {
             Arrive(robot);
             break;
         case RobotActivity::Working: {
-            const std::uint32_t wage = WorkplaceOf(robot).shift.wage;
+            const std::uint32_t wage = WageOf(robot);
             robot.credits += wage;
             Emit({.tick = state_.tick,
                   .kind = EventKind::ShiftEnded,
                   .robot = robot.id,
                   .room = robot.workspace,
                   .credits = wage});
+            EndShift(robot);
             Decide(robot);
             break;
         }
@@ -367,17 +381,21 @@ void World::Arrive(Robot& robot) {
     const Tick now = state_.tick;
     robot.location = robot.destination;
     robot.destination = EntityId{};
-    if (robot.location == robot.workspace) {
+    if (robot.workspace.IsValid() && robot.location == robot.workspace) {
         robot.activity = RobotActivity::Working;
         // A late robot still leaves at the regular end of its shift.
         robot.nextActionAt = std::max(
             robot.shiftStartsAt + WorkplaceOf(robot).shift.lengthMinutes, now);
+        const auto late = static_cast<std::uint32_t>(
+            now > robot.shiftStartsAt ? now - robot.shiftStartsAt : 0);
+        if (late > 0) {
+            robot.performance -= kLatePerformance;
+        }
         Emit({.tick = now,
               .kind = EventKind::ClockedIn,
               .robot = robot.id,
               .room = robot.workspace,
-              .minutes = static_cast<std::uint32_t>(
-                  now > robot.shiftStartsAt ? now - robot.shiftStartsAt : 0)});
+              .minutes = late});
         return;
     }
     if (robot.location == robot.apartment) {
@@ -505,6 +523,11 @@ void World::StartWalk(Robot& robot, EntityId destination) {
 }
 
 void World::ScheduleNextCommute(Robot& robot) {
+    if (!robot.workspace.IsValid()) {
+        robot.commuteAt = kNoCommute;  // Out of work: every day is free.
+        PlanAtHome(robot);
+        return;
+    }
     const Tick now = state_.tick;
     const Tick lead = WalkingMinutes(robot.apartment, robot.workspace) +
                       robot.punctualityMinutes +
@@ -554,7 +577,8 @@ void World::PlanAtHome(Robot& robot) {
 }
 
 bool World::IsDayOff(const Robot& robot, Tick tick) noexcept {
-    return ((robot.daysOff >> DayOfWeek(tick)) & 1U) != 0;
+    return !robot.workspace.IsValid() ||
+           ((robot.daysOff >> DayOfWeek(tick)) & 1U) != 0;
 }
 
 Tick World::NextShiftStart(const Robot& robot, Tick after) const {
@@ -573,16 +597,19 @@ Tick World::MaxCommuteLead(const Robot& robot) {
 
 Tick World::LatestHomeTick(const Robot& robot) {
     const Tick now = state_.tick;
+    // Home by the end of every night, workday or not.
+    Tick bedtime = StartOfDay(now) + kBedtimeMinute;
+    if (bedtime <= now) {
+        bedtime += kMinutesPerDay;
+    }
+    if (!robot.workspace.IsValid()) {
+        return bedtime;
+    }
     // A full rest before the next working day's shift.
     const Tick lead = MaxCommuteLead(robot);
     const Tick nextShift = NextShiftStart(robot, now + lead);
     const Tick margin = lead + kRestMinutes;
     const Tick beforeWork = nextShift > margin ? nextShift - margin : 0;
-    // And home by the end of every night, workday or not.
-    Tick bedtime = StartOfDay(now) + kBedtimeMinute;
-    if (bedtime <= now) {
-        bedtime += kMinutesPerDay;
-    }
     return std::min(beforeWork, bedtime);
 }
 
@@ -693,9 +720,10 @@ std::string World::Describe(const SimEvent& event) const {
             const Robot* other = FindRobot(event.otherRobot);
             return std::format(
                 "{}  {} {}", when, who,
-                MemoryText(event.memory, other != nullptr
-                                             ? std::string_view{other->name}
-                                             : "someone"));
+                MemoryText(event.memory,
+                           other != nullptr ? std::string_view{other->name}
+                                            : "someone",
+                           event.room.IsValid() ? room : std::string{}));
         }
     }
     return std::format("{}  {}: unknown event", when, who);
@@ -802,13 +830,16 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
         }
         const Room* apartment = roomOfKind(robot.apartment, RoomKind::Apartment);
         const Room* workspace = roomOfKind(robot.workspace, RoomKind::Workspace);
-        if (apartment == nullptr || workspace == nullptr) {
+        if (apartment == nullptr ||
+            (robot.workspace.IsValid() && workspace == nullptr) ||
+            robot.jobLevel > kMaxJobLevel) {
             return fail(std::format("Robot '{}' has no valid apartment or "
                                     "workspace",
                                     robot.name));
         }
         if (++occupants[apartment->id.value] > apartment->capacity ||
-            ++occupants[workspace->id.value] > workspace->capacity) {
+            (workspace != nullptr &&
+             ++occupants[workspace->id.value] > workspace->capacity)) {
             return fail(std::format("Robot '{}' exceeds the capacity of its "
                                     "apartment or workspace",
                                     robot.name));
@@ -823,7 +854,8 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                 case RobotActivity::Resting:
                     return robot.location == robot.apartment;
                 case RobotActivity::Working:
-                    return robot.location == robot.workspace;
+                    return robot.workspace.IsValid() &&
+                           robot.location == robot.workspace;
                 case RobotActivity::Visiting:
                     return IsVenue(location->room->kind);
                 case RobotActivity::Walking:

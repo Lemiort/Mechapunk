@@ -112,6 +112,12 @@ const T& Pick(std::span<const T> items, Pcg32& random) {
     return items[random.UniformInt(0, static_cast<std::uint32_t>(items.size() - 1))];
 }
 
+// Store kinds in the order habitats get them, the ones robots cannot do
+// without first, so even a small city can repair and charge its robots.
+constexpr std::array kStoreOrder{RoomKind::RepairShop, RoomKind::ChargingBay,
+                                 RoomKind::Diner,      RoomKind::Bar,
+                                 RoomKind::Arcade,     RoomKind::Shop};
+
 // Ground-floor stores and apartments above. Store kinds rotate through every
 // venue kind so each city has some of each.
 Building MakeHabitat(const CityParams& params, Pcg32& random,
@@ -127,8 +133,7 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
                       .rooms = {}};
     const std::uint32_t stores = random.UniformInt(kMinStores, kMaxStores);
     for (std::uint32_t store = 0; store < stores; ++store) {
-        const RoomKind kind =
-            VenueKinds()[storeRotation++ % VenueKinds().size()];
+        const RoomKind kind = kStoreOrder.at(storeRotation++ % kStoreOrder.size());
         const VenueRules& rules = *FindVenueRules(kind);
         building.rooms.push_back(
             {.id = ids.Allocate(),
@@ -274,8 +279,7 @@ City GenerateCity(const CityParams& params, Pcg32& random,
 
     std::uint32_t apartments = 0;
     std::uint32_t habitats = 0;
-    std::uint32_t storeRotation = random.UniformInt(
-        0, static_cast<std::uint32_t>(VenueKinds().size() - 1));
+    std::uint32_t storeRotation = 0;
     while (apartments < params.residents) {
         Building habitat =
             MakeHabitat(params, random, ids, ++habitats, storeRotation);

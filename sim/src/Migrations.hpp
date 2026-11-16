@@ -23,4 +23,7 @@ namespace mechapunk::sim::migrations {
 // memories.
 [[nodiscard]] std::expected<void, std::string> V3ToV4(SaveDocument& world);
 
+// Version 4 to 5: robots start as juniors with no record at work yet.
+[[nodiscard]] std::expected<void, std::string> V4ToV5(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

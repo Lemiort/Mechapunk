@@ -1,6 +1,7 @@
 # Headless city simulation. Pure C++ with no engine or OpenGL dependency, so
 # it runs in tools and tests without a window.
 add_library(mechapunk_sim STATIC
+    src/Careers.cpp
     src/City.cpp
     src/GameTime.cpp
     src/Migrations.cpp

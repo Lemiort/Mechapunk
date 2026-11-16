@@ -15,6 +15,7 @@
 #include <string_view>
 #include <vector>
 
+#include "mechapunk/sim/Careers.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Social.hpp"
 #include "mechapunk/sim/Venues.hpp"
@@ -225,6 +226,31 @@ std::optional<InspectorRequest> DrawBonds(const RobotSocial& social,
     return result;
 }
 
+// How the robot is doing at work: a bar toward the next promotion, red
+// when it is on thin ice.
+void DrawPerformance(const RobotFrame& robot) {
+    if (robot.performance < 0) {
+        const float risk = static_cast<float>(-robot.performance) /
+                           static_cast<float>(-sim::kFiringPerformance);
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, kLowBar);
+        ImGui::ProgressBar(risk, ImVec2{-1.0F, 0.0F},
+                           std::format("doing poorly ({})", robot.performance).c_str());
+        ImGui::PopStyleColor();
+        ImGui::SetItemTooltip("Fired at %d", sim::kFiringPerformance);
+        return;
+    }
+    if (robot.jobLevel >= sim::kMaxJobLevel) {
+        ImGui::TextDisabled("Top of the ladder");
+        return;
+    }
+    const std::int32_t target = sim::PromotionTarget(robot.jobLevel);
+    ImGui::ProgressBar(static_cast<float>(robot.performance) /
+                           static_cast<float>(target),
+                       ImVec2{-1.0F, 0.0F},
+                       std::format("{} / {} to promotion", robot.performance, target)
+                           .c_str());
+}
+
 // What the robot remembers, newest first.
 void DrawMemories(const RobotSocial& social, const CityView& city,
                   const SimulationHost& host) {
@@ -233,15 +259,13 @@ void DrawMemories(const RobotSocial& social, const CityView& city,
         return;
     }
     for (const sim::Memory& memory : social.memories | std::views::reverse) {
-        std::string text = std::format(
+        const std::string text = std::format(
             "{}  {}", sim::FormatTime(memory.tick),
-            sim::MemoryText(memory.kind, memory.robot.IsValid()
-                                             ? Name(host, memory.robot)
-                                             : std::string{}));
-        const auto room = city.Rooms().Find(memory.room);
-        if (room && sim::IsVenue(room->room->kind)) {
-            text += std::format(" at {}", room->room->name);
-        }
+            sim::MemoryText(memory.kind,
+                            memory.robot.IsValid() ? Name(host, memory.robot)
+                                                   : std::string{},
+                            memory.room.IsValid() ? RoomLabel(city, memory.room)
+                                                  : std::string{}));
         ImGui::TextWrapped("%s", text.c_str());
     }
 }
@@ -272,6 +296,10 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
 
     switch (robot.activity) {
         case sim::RobotActivity::Resting: {
+            if (robot.nextActionAt == sim::kNoCommute) {
+                ImGui::TextUnformatted("Resting at home");
+                break;
+            }
             const bool goingOut = robot.nextActionAt < robot.commuteAt;
             ImGui::Text("Resting at home, %s at %s",
                         goingOut ? "going out" : "leaves for work",
@@ -307,18 +335,22 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
 
     if (const RobotInfo* info = host.FindRobotInfo(robot.id)) {
         ImGui::SeparatorText("Home and work");
-        follow(RoomLink(city, info->apartment, "Home: "));
-        if (const auto home = city.Rooms().Find(info->apartment)) {
+        follow(RoomLink(city, robot.apartment, "Home: "));
+        if (const auto home = city.Rooms().Find(robot.apartment)) {
             ImGui::TextDisabled("%u cr a night", home->room->rent);
         }
-        follow(RoomLink(city, info->workspace, "Work: "));
-        if (const auto work = city.Rooms().Find(info->workspace)) {
+        if (const auto work = city.Rooms().Find(robot.workspace)) {
+            follow(RoomLink(city, robot.workspace, "Work: "));
             const sim::Shift& shift = work->building->shift;
-            const std::string hours = std::format(
-                "{}-{}, {} cr a shift", sim::FormatClock(shift.startMinute),
+            const std::string job = std::format(
+                "{}, {}-{}, {} cr a shift", sim::JobTitle(robot.jobLevel),
+                sim::FormatClock(shift.startMinute),
                 sim::FormatClock(shift.startMinute + shift.lengthMinutes),
-                shift.wage);
-            ImGui::TextDisabled("%s", hours.c_str());
+                sim::WageAtLevel(shift.wage, robot.jobLevel));
+            ImGui::TextDisabled("%s", job.c_str());
+            DrawPerformance(robot);
+        } else {
+            ImGui::TextColored(kWarning, "Out of work, looking for a job");
         }
         std::string daysOff;
         for (std::uint32_t day = 0; day < sim::kDaysPerWeek; ++day) {

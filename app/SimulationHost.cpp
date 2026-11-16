@@ -36,8 +36,6 @@ SimulationHost::SimulationHost(sim::World world)
     for (const sim::Robot& robot : world_.State().robots) {
         robotInfo_.emplace(robot.id.value,
                            RobotInfo{.name = robot.name,
-                                     .apartment = robot.apartment,
-                                     .workspace = robot.workspace,
                                      .daysOff = robot.daysOff,
                                      .interests = robot.interests});
     }
@@ -208,7 +206,11 @@ void SimulationHost::Publish() {
                               .commuteAt = robot.commuteAt,
                               .needs = robot.needs,
                               .credits = robot.credits,
-                              .rentOwed = robot.rentOwed};
+                              .rentOwed = robot.rentOwed,
+                              .apartment = robot.apartment,
+                              .workspace = robot.workspace,
+                              .jobLevel = robot.jobLevel,
+                              .performance = robot.performance};
         switch (robot.activity) {
             case sim::RobotActivity::Resting:
                 ++frame.resting;
