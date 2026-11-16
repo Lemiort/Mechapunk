@@ -145,8 +145,10 @@ goes out again until the evening.
 A robot leaves home in time to arrive a little early for its shift (its own
 habit plus daily variation) and works it. After work it weighs each open
 venue it can afford and fit in: how much the visit would relieve its needs,
-the walk, the price and a little whim. It compares that with going home,
-stays a while, and decides again. It always gets home early enough for six
+the walk, the price, who is there and a little whim. It compares that with
+going home, stays a while, and decides again. A robot that is home by the
+evening rests for half an hour to an hour and a half, then weighs going out
+again, until 22:00. It always gets home early enough for six
 hours of rest before its next shift, and every night ends at home by 03:30.
 Walking times come from shortest routes over the street graph plus stairs.
 

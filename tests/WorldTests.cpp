@@ -241,6 +241,54 @@ TEST(World, DaysOffAreSpentOutAndNightsAtHome) {
     EXPECT_GT(dayOffVisits, 300U);
 }
 
+// A robot home from work early in the evening may still go out: after a
+// break it weighs its needs again instead of waiting for the next shift.
+TEST(World, RobotsGoOutAgainAfterGettingHomeFromWork) {
+    sim::World world = sim::World::Generate({.seed = 9, .robots = 200});
+    // Robots home on a working day before 21:00, by id.
+    std::map<std::uint64_t, sim::Tick> homeEarly;
+    std::uint64_t outAgain = 0;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        const sim::Robot* robot = world.FindRobot(event.robot);
+        const bool workday =
+            ((robot->daysOff >> sim::DayOfWeek(event.tick)) & 1U) == 0;
+        const std::uint32_t minute = sim::MinuteOfDay(event.tick);
+        if (event.kind == sim::EventKind::ArrivedHome) {
+            if (workday && minute >= 12 * 60 && minute < 21 * 60) {
+                homeEarly[event.robot.value] = event.tick;
+            } else {
+                homeEarly.erase(event.robot.value);
+            }
+        } else if (event.kind == sim::EventKind::Departed &&
+                   event.otherRoom != robot->workspace) {
+            const auto found = homeEarly.find(event.robot.value);
+            if (found != homeEarly.end() &&
+                sim::StartOfDay(found->second) == sim::StartOfDay(event.tick)) {
+                ++outAgain;
+            }
+            homeEarly.erase(event.robot.value);
+        }
+    });
+    world.RunFor(7 * sim::kMinutesPerDay);
+    EXPECT_GT(outAgain, 100U);
+}
+
+// Venues and rest keep needs up: after two weeks only a few robots have run
+// out of anything.
+TEST(World, FewRobotsRunOutOfAnyNeed) {
+    sim::World world = sim::World::Generate({.seed = 9, .robots = 300});
+    world.RunFor((14 * sim::kMinutesPerDay) + (20 * 60));  // 20:00.
+    std::uint32_t empty = 0;
+    for (const sim::Robot& robot : world.State().robots) {
+        const sim::Needs& needs = robot.needs;
+        empty += needs.charge == 0 || needs.condition == 0 ||
+                         needs.social == 0 || needs.fun == 0
+                     ? 1
+                     : 0;
+    }
+    EXPECT_LT(empty, 300U / 10) << empty << " robots have a need at zero";
+}
+
 TEST(World, NeedsStayInRangeOverWeeks) {
     sim::World world = sim::World::Generate({.seed = 12, .robots = 200});
     world.RunFor(21 * sim::kMinutesPerDay);

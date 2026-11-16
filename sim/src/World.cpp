@@ -37,10 +37,13 @@ constexpr std::int32_t kMaxStartingNeed = 950;
 constexpr Tick kOutingEarliestMinute = 9 * kMinutesPerHour;
 constexpr std::uint32_t kOutingSpreadMinutes = 120;
 // No new outings from home after this minute of the day.
-constexpr Tick kLastOutingMinute = 20 * kMinutesPerHour;
+constexpr Tick kLastOutingMinute = 22 * kMinutesPerHour;
 // A break at home between outings on a free day.
 constexpr std::uint32_t kMinHomeBreak = 90;
 constexpr std::uint32_t kMaxHomeBreak = 240;
+// A shorter break at home after work before thinking about going out.
+constexpr std::uint32_t kMinEveningBreak = 30;
+constexpr std::uint32_t kMaxEveningBreak = 90;
 // An outing needs at least this long before the robot must be back.
 constexpr Tick kMinOutingMinutes = 60;
 constexpr std::uint32_t kMinStartingCredits = 40;
@@ -56,12 +59,13 @@ constexpr std::uint64_t kInterestStream = 4;
 constexpr std::uint32_t kInterestsPerRobot = 2;
 
 // Need changes per ten minutes of each activity; visits add venue effects.
-constexpr NeedEffects kResting{.charge = 25, .condition = -1, .social = -3,
+// Resting at home does not wear a robot down.
+constexpr NeedEffects kResting{.charge = 25, .condition = 0, .social = -3,
                                .fun = -2};
 constexpr NeedEffects kWalking{.charge = -8, .condition = -1, .social = -5,
                                .fun = -3};
 constexpr NeedEffects kWorking{.charge = -12, .condition = -2, .social = -4,
-                               .fun = -5};
+                               .fun = -4};
 constexpr NeedEffects kVisiting{.charge = -3, .condition = -1, .social = -2,
                                 .fun = -1};
 
@@ -519,7 +523,8 @@ void World::PlanAtHome(Robot& robot) {
         robot.commuteAt > kRestMinutes ? robot.commuteAt - kRestMinutes : 0;
     const Tick today = StartOfDay(now);
     Tick outing = 0;
-    if (IsDayOff(robot, now) && MinuteOfDay(now) < kLastOutingMinute) {
+    const std::uint32_t minute = MinuteOfDay(now);
+    if (IsDayOff(robot, now) && minute < kLastOutingMinute) {
         // Back home on a free day: out again after a break, but not before
         // the morning.
         const Tick afterBreak =
@@ -527,6 +532,11 @@ void World::PlanAtHome(Robot& robot) {
         const Tick morning = today + kOutingEarliestMinute +
                              state_.random.UniformInt(0, kOutingSpreadMinutes);
         outing = std::max(afterBreak, morning);
+    } else if (minute >= kOutingEarliestMinute && minute < kLastOutingMinute) {
+        // Home during the day or evening of a working day: after a break,
+        // think again about going out.
+        outing = now + state_.random.UniformInt(kMinEveningBreak,
+                                                kMaxEveningBreak);
     } else {
         for (Tick day = 1; day <= kDaysPerWeek; ++day) {
             const Tick start = today + (day * kMinutesPerDay);
