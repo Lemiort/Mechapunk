@@ -134,6 +134,9 @@ struct DayStats {
     std::uint64_t spent{};
     std::uint64_t rent{};
     std::uint64_t behindOnRent{};
+    std::uint64_t talks{};
+    std::uint64_t arguments{};
+    std::map<sim::MemoryKind, std::uint64_t> memories;
     std::map<std::string, std::uint64_t> visitsByKind;
 
     void Add(const sim::World& world, const sim::SimEvent& event) {
@@ -165,6 +168,16 @@ struct DayStats {
             case sim::EventKind::RentMissed:
                 ++behindOnRent;
                 break;
+            case sim::EventKind::Talked:
+                // Both robots of a talk get an event; count the talk once.
+                if (event.robot < event.otherRobot) {
+                    ++talks;
+                    arguments += event.change < 0 ? 1 : 0;
+                }
+                break;
+            case sim::EventKind::Remembered:
+                ++memories[event.memory];
+                break;
         }
     }
 };
@@ -187,6 +200,26 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
     }
     const auto count = std::max<std::int64_t>(
         1, static_cast<std::int64_t>(world.State().robots.size()));
+    std::uint64_t withFriend = 0;
+    std::uint64_t withCloseFriend = 0;
+    std::uint64_t withRival = 0;
+    for (const sim::Robot& robot : world.State().robots) {
+        const auto has = [&](sim::BondLevel level) {
+            return std::ranges::any_of(robot.bonds, [&](const sim::Bond& bond) {
+                return bond.level == level;
+            });
+        };
+        withFriend += has(sim::BondLevel::Friend) ||
+                              has(sim::BondLevel::CloseFriend)
+                          ? 1
+                          : 0;
+        withCloseFriend += has(sim::BondLevel::CloseFriend) ? 1 : 0;
+        withRival += has(sim::BondLevel::Rival) ? 1 : 0;
+    }
+    const auto memories = [&](sim::MemoryKind kind) {
+        const auto found = stats.memories.find(kind);
+        return found != stats.memories.end() ? found->second : 0;
+    };
     std::string visits;
     for (const auto& [label, number] : stats.visitsByKind) {
         visits += std::format("{}{} {}", visits.empty() ? "" : ", ", number,
@@ -196,14 +229,23 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
         "== Day {} done: {} walks ({} min average), {} late, {} cr earned, {} "
         "cr spent, {} cr rent, {} behind on rent\n   visits: {}\n   now {} "
         "resting, {} working, {} visiting, {} walking; average charge {}, "
-        "condition {}, social {}, fun {}, credits {}",
+        "condition {}, social {}, fun {}, credits {}\n   {} talks ({} "
+        "arguments); {} new friendships, {} grew close, {} drifted apart, {} "
+        "new rivalries, {} made peace; {} robots have a friend, {} a close "
+        "friend, {} a rival",
         day, stats.walks,
         stats.walks == 0 ? 0 : stats.walkMinutes / stats.walks,
         stats.lateArrivals, stats.wages, stats.spent, stats.rent,
         stats.behindOnRent,
         visits.empty() ? "none" : visits, activities[0], activities[2],
         activities[3], activities[1], charge / count, condition / count,
-        social / count, fun / count, credits / count);
+        social / count, fun / count, credits / count, stats.talks,
+        stats.arguments, memories(sim::MemoryKind::BecameFriends),
+        memories(sim::MemoryKind::BecameCloseFriends),
+        memories(sim::MemoryKind::DriftedApart),
+        memories(sim::MemoryKind::BecameRivals),
+        memories(sim::MemoryKind::MadePeace), withFriend, withCloseFriend,
+        withRival);
 }
 
 

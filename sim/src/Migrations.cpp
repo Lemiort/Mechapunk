@@ -207,4 +207,23 @@ std::expected<void, std::string> V2ToV3(SaveDocument& world) try {
         std::format("the version 2 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V3ToV4(SaveDocument& world) try {
+    // Two different interests out of eight, spread by robot id.
+    constexpr std::uint64_t kInterests = 8;
+    for (SaveDocument& robot : world["robots"].get_array()) {
+        const std::uint64_t id = robot["id"].as<std::uint64_t>();
+        const std::uint64_t first = id % kInterests;
+        const std::uint64_t second =
+            (first + 1 + ((id / kInterests) % (kInterests - 1))) % kInterests;
+        robot["interests"] =
+            (std::uint64_t{1} << first) | (std::uint64_t{1} << second);
+        robot["bonds"] = Array{};
+        robot["memories"] = Array{};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 3 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

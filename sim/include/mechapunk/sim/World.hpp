@@ -12,6 +12,7 @@
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Ids.hpp"
 #include "mechapunk/sim/Random.hpp"
+#include "mechapunk/sim/Social.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk::sim {
@@ -49,6 +50,12 @@ struct Robot {
     std::int64_t credits{};
     // Rent not yet paid; collected from later credits first.
     std::int64_t rentOwed{};
+    // Bit n set: likes Interest n.
+    std::uint8_t interests{};
+    // Robots it has talked to, sorted by their id.
+    std::vector<Bond> bonds;
+    // Moments it remembers, oldest first.
+    std::vector<Memory> memories;
 };
 
 // Everything that defines a running world. This is exactly what a save
@@ -84,6 +91,11 @@ enum class EventKind : std::uint8_t {
     ArrivedHome,     // room: apartment.
     RentPaid,        // room: apartment; credits: paid.
     RentMissed,      // room: apartment; credits: now owed in total.
+    // room: where; otherRobot: who with; topic; change: affinity, an
+    // argument when negative. Each of the two robots gets one.
+    Talked,
+    // memory: what; otherRobot and room: who with and where, if anyone.
+    Remembered,
 };
 
 // Something that happened during a step, for logs and observers. Events are
@@ -98,6 +110,10 @@ struct SimEvent {
     std::int64_t credits{};
     // Other robots already in the room on arrival.
     std::uint32_t others{};
+    EntityId otherRobot;
+    Interest topic{};
+    std::int32_t change{};
+    MemoryKind memory{};
 };
 
 // Deterministic simulation of the city. The same WorldState always produces
@@ -105,8 +121,10 @@ struct SimEvent {
 // integral and randomness comes from the saved Pcg32.
 //
 // Each step is one game minute. Robots work fixed shifts; after work they
-// weigh their needs, credits, walking time and opening hours to pick a venue
-// or go home, and they head home in time to rest before the next shift.
+// weigh their needs, credits, walking time, opening hours and who is there
+// to pick a venue or go home, and they head home in time to rest before the
+// next shift. Robots sharing a venue or workspace talk, which makes friends
+// and rivals over time.
 class World {
 public:
     using EventSink = std::function<void(const SimEvent&)>;
@@ -167,6 +185,16 @@ private:
     void ScheduleNextCommute(Robot& robot);
     [[nodiscard]] Tick LatestHomeTick(const Robot& robot);
     void CollectRent();
+    // Relationships, in Social.cpp.
+    void Socialize();
+    void Talk(Robot& first, Robot& second);
+    void ChangeBond(Robot& robot, EntityId other, std::int32_t change);
+    void UpdateBondLevel(Robot& robot, Bond& bond, EntityId room);
+    void Remember(Robot& robot, MemoryKind kind, EntityId other, EntityId room);
+    void FadeBonds();
+    // How much friends at a venue draw the robot there, rivals keep it away.
+    [[nodiscard]] std::int64_t CompanyAt(const Robot& robot,
+                                         EntityId venue) const;
     // Sets when a robot at home next acts: an outing on a free day, or
     // leaving for work.
     void PlanAtHome(Robot& robot);

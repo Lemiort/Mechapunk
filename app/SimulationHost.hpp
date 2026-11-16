@@ -46,6 +46,13 @@ struct RobotInfo {
     sim::EntityId apartment;
     sim::EntityId workspace;
     std::uint8_t daysOff{};
+    std::uint8_t interests{};
+};
+
+// Who a robot knows and what it remembers.
+struct RobotSocial {
+    std::vector<sim::Bond> bonds;
+    std::vector<sim::Memory> memories;
 };
 
 // Immutable copy of the world's visible state, published after every step.
@@ -56,6 +63,9 @@ struct WorldFrame {
     std::uint32_t working{};
     std::uint32_t visiting{};
     std::uint32_t walking{};
+    // In the order of `robots`. Bonds and memories only change every ten
+    // minutes, so frames in between share one copy.
+    std::shared_ptr<const std::vector<RobotSocial>> social;
 };
 
 // Runs a World on a SimulationThread. The world belongs to the worker while
@@ -81,6 +91,8 @@ public:
     // Robots sorted by id, for lookups into WorldFrame::robots.
     [[nodiscard]] static const RobotFrame* FindRobot(const WorldFrame& frame,
                                                      sim::EntityId robot);
+    [[nodiscard]] static const RobotSocial* FindSocial(const WorldFrame& frame,
+                                                       sim::EntityId robot);
     // The robot's latest events, newest last, as "Day 2 19:41  text".
     [[nodiscard]] std::vector<std::string> RecentEvents(sim::EntityId robot,
                                                         std::size_t count) const;
@@ -120,6 +132,7 @@ private:
     double speed_{1.0};
     SnapshotBuffer<WorldFrame> frames_;
     std::unordered_map<std::uint64_t, RobotInfo> robotInfo_;
+    std::shared_ptr<const std::vector<RobotSocial>> social_;
     // Written by the worker in its event sink, read by the render thread.
     mutable std::mutex logMutex_;
     std::unordered_map<std::uint64_t, std::deque<std::string>> log_;

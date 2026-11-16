@@ -19,4 +19,8 @@ namespace mechapunk::sim::migrations {
 // week, a planned departure for work, and rent owed.
 [[nodiscard]] std::expected<void, std::string> V2ToV3(SaveDocument& world);
 
+// Version 3 to 4: robots get two interests, and start with no bonds and no
+// memories.
+[[nodiscard]] std::expected<void, std::string> V3ToV4(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

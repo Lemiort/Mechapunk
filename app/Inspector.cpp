@@ -5,14 +5,18 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <format>
+#include <functional>
 #include <map>
+#include <ranges>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "mechapunk/sim/GameTime.hpp"
+#include "mechapunk/sim/Social.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk {
@@ -26,6 +30,13 @@ constexpr std::size_t kRecentEvents = 30;
 constexpr ImVec4 kTitle{1.0F, 0.85F, 0.3F, 1.0F};
 constexpr ImVec4 kWarning{1.0F, 0.45F, 0.35F, 1.0F};
 constexpr ImVec4 kLowBar{0.85F, 0.25F, 0.2F, 1.0F};
+constexpr ImVec4 kFriendBar{0.3F, 0.75F, 0.45F, 1.0F};
+constexpr ImVec4 kRivalBar{0.85F, 0.3F, 0.25F, 1.0F};
+constexpr float kFeelingWidth = 120.0F;
+constexpr float kAffinityWidth = 90.0F;
+// Rows of relationships shown before the table scrolls.
+constexpr float kVisibleBonds = 6.0F;
+constexpr float kMinRecentHeight = 160.0F;
 
 std::string FloorName(std::uint32_t floor) {
     return floor == 0 ? "ground floor" : std::format("floor {}", floor);
@@ -96,6 +107,19 @@ std::optional<Selection> RoomLink(const CityView& city, sim::EntityId room,
     return result;
 }
 
+// Selects a robot and shows the room it is in, if it is in one.
+Selection ShowRobot(const WorldFrame& frame, const CityView& city,
+                    sim::EntityId robot) {
+    const RobotFrame* found = SimulationHost::FindRobot(frame, robot);
+    if (found == nullptr || found->activity == sim::RobotActivity::Walking) {
+        return {.robot = robot};
+    }
+    Selection next = ShowRoom(city, found->location);
+    next.room = {};
+    next.robot = robot;
+    return next;
+}
+
 void Title(const std::string& text) {
     ImGui::PushStyleColor(ImGuiCol_Text, kTitle);
     ImGui::TextUnformatted(text.c_str());
@@ -118,7 +142,97 @@ void NeedBar(const char* name, std::int32_t value) {
     }
 }
 
+// Who the robot knows, warmest first; clicking a name selects that robot.
+std::optional<Selection> DrawBonds(const RobotSocial& social,
+                                   const WorldFrame& frame,
+                                   const CityView& city,
+                                   const SimulationHost& host) {
+    std::optional<Selection> result;
+    std::vector<const sim::Bond*> bonds;
+    for (const sim::Bond& bond : social.bonds) {
+        bonds.push_back(&bond);
+    }
+    std::ranges::sort(bonds, std::greater{}, &sim::Bond::affinity);
+    if (bonds.empty()) {
+        ImGui::TextDisabled("Has not got to know anyone yet");
+        return result;
+    }
+    const float rows =
+        std::min(static_cast<float>(bonds.size()), kVisibleBonds) + 1.0F;
+    const ImVec2 size{0.0F, rows * ImGui::GetFrameHeightWithSpacing()};
+    if (!ImGui::BeginTable("bonds", 3,
+                           ImGuiTableFlags_RowBg |
+                               ImGuiTableFlags_BordersInnerV |
+                               ImGuiTableFlags_ScrollY,
+                           size)) {
+        return result;
+    }
+    ImGui::TableSetupScrollFreeze(0, 1);
+    ImGui::TableSetupColumn("Robot");
+    ImGui::TableSetupColumn("Feels", ImGuiTableColumnFlags_WidthFixed,
+                            kFeelingWidth);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                            kAffinityWidth);
+    ImGui::TableHeadersRow();
+    for (const sim::Bond* bond : bonds) {
+        ImGui::PushID(static_cast<int>(bond->robot.value));
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        const std::string name = Name(host, bond->robot);
+        if (ImGui::Selectable(name.c_str())) {
+            result = ShowRobot(frame, city, bond->robot);
+        }
+        ImGui::SetItemTooltip("%u talks, last %s", bond->talks,
+                              sim::FormatTime(bond->lastTalk).c_str());
+        ImGui::TableNextColumn();
+        const std::string_view level = sim::BondLevelName(bond->level);
+        if (bond->level == sim::BondLevel::Rival) {
+            ImGui::TextColored(kWarning, "%.*s",
+                               static_cast<int>(level.size()), level.data());
+        } else if (bond->level == sim::BondLevel::Acquaintance) {
+            ImGui::TextDisabled("%.*s", static_cast<int>(level.size()),
+                                level.data());
+        } else {
+            ImGui::Text("%.*s", static_cast<int>(level.size()), level.data());
+        }
+        ImGui::TableNextColumn();
+        // Liking fills the bar green, dislike red.
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
+                              bond->affinity < 0 ? kRivalBar : kFriendBar);
+        const std::string value = std::to_string(bond->affinity);
+        ImGui::ProgressBar(static_cast<float>(std::abs(bond->affinity)) /
+                               static_cast<float>(sim::Bond::kMaxAffinity),
+                           ImVec2{-1.0F, 0.0F}, value.c_str());
+        ImGui::PopStyleColor();
+        ImGui::PopID();
+    }
+    ImGui::EndTable();
+    return result;
+}
+
+// What the robot remembers, newest first.
+void DrawMemories(const RobotSocial& social, const CityView& city,
+                  const SimulationHost& host) {
+    if (social.memories.empty()) {
+        ImGui::TextDisabled("Nothing memorable yet");
+        return;
+    }
+    for (const sim::Memory& memory : social.memories | std::views::reverse) {
+        std::string text = std::format(
+            "{}  {}", sim::FormatTime(memory.tick),
+            sim::MemoryText(memory.kind, memory.robot.IsValid()
+                                             ? Name(host, memory.robot)
+                                             : std::string{}));
+        const auto room = city.Rooms().Find(memory.room);
+        if (room && sim::IsVenue(room->room->kind)) {
+            text += std::format(" at {}", room->room->name);
+        }
+        ImGui::TextWrapped("%s", text.c_str());
+    }
+}
+
 std::optional<Selection> DrawRobot(const RobotFrame& robot,
+                                   const WorldFrame& frame,
                                    const CityView& city,
                                    const SimulationHost& host) {
     std::optional<Selection> result;
@@ -128,6 +242,10 @@ std::optional<Selection> DrawRobot(const RobotFrame& robot,
         }
     };
     Title(Name(host, robot.id));
+    if (const RobotInfo* info = host.FindRobotInfo(robot.id)) {
+        ImGui::TextDisabled("Likes %s",
+                            sim::InterestList(info->interests).c_str());
+    }
 
     switch (robot.activity) {
         case sim::RobotActivity::Resting: {
@@ -189,8 +307,17 @@ std::optional<Selection> DrawRobot(const RobotFrame& robot,
         ImGui::TextDisabled("Days off: %s", daysOff.c_str());
     }
 
+    if (const RobotSocial* social = SimulationHost::FindSocial(frame, robot.id)) {
+        ImGui::SeparatorText("Relationships");
+        follow(DrawBonds(*social, frame, city, host));
+        ImGui::SeparatorText("Memories");
+        DrawMemories(*social, city, host);
+    }
+
     ImGui::SeparatorText("Recent");
-    if (ImGui::BeginChild("recent", ImVec2{0.0F, 0.0F},
+    const float recentHeight =
+        std::max(ImGui::GetContentRegionAvail().y, kMinRecentHeight);
+    if (ImGui::BeginChild("recent", ImVec2{0.0F, recentHeight},
                           ImGuiChildFlags_Borders)) {
         for (const std::string& event :
              host.RecentEvents(robot.id, kRecentEvents)) {
@@ -393,7 +520,7 @@ std::optional<Selection> DrawInspector(const Selection& selection,
         if (selection.robot.IsValid()) {
             if (const RobotFrame* robot =
                     SimulationHost::FindRobot(frame, selection.robot)) {
-                clicked = DrawRobot(*robot, city, host);
+                clicked = DrawRobot(*robot, frame, city, host);
             }
         } else if (selection.room.IsValid()) {
             clicked = DrawRoom(selection, frame, city, host);

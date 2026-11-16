@@ -6,6 +6,7 @@ add_library(mechapunk_sim STATIC
     src/Migrations.cpp
     src/Random.cpp
     src/Save.cpp
+    src/Social.cpp
     src/Venues.cpp
     src/World.cpp
 )

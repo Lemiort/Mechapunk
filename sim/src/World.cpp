@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstdint>
 #include <expected>
 #include <format>
@@ -51,6 +52,8 @@ constexpr Tick kNeedPeriod = 10;
 constexpr std::uint64_t kCityStream = 1;
 constexpr std::uint64_t kPopulationStream = 2;
 constexpr std::uint64_t kRuntimeStream = 3;
+constexpr std::uint64_t kInterestStream = 4;
+constexpr std::uint32_t kInterestsPerRobot = 2;
 
 // Need changes per ten minutes of each activity; visits add venue effects.
 constexpr NeedEffects kResting{.charge = 25, .condition = -1, .social = -3,
@@ -194,6 +197,15 @@ World World::Generate(const WorldParams& params) {
         state.robots.push_back(std::move(robot));
     }
 
+    Pcg32 tastes = Pcg32::FromSeed(params.seed, kInterestStream);
+    for (Robot& robot : state.robots) {
+        while (std::popcount(robot.interests) <
+               static_cast<int>(kInterestsPerRobot)) {
+            robot.interests = static_cast<std::uint8_t>(
+                robot.interests | (1U << tastes.UniformInt(0, kInterestCount - 1)));
+        }
+    }
+
     state.random = Pcg32::FromSeed(params.seed, kRuntimeStream);
     World world(std::move(state));
     for (Robot& robot : world.state_.robots) {
@@ -262,9 +274,11 @@ void World::Step() {
     ++state_.tick;
     if (MinuteOfDay(state_.tick) == 0) {
         CollectRent();
+        FadeBonds();
     }
     if (state_.tick % kNeedPeriod == 0) {
         UpdateNeeds();
+        Socialize();
     }
     // Robots act in id order, so random draws happen in a fixed order.
     for (Robot& robot : state_.robots) {
@@ -453,6 +467,7 @@ void World::Decide(Robot& robot) {
                 (kWalkCostPerMinute * walk) -
                 (kPriceCostPerCredit * rules.price) -
                 (kind == hereKind ? kSameKindPenalty : 0) +
+                CompanyAt(robot, room.id) +
                 state_.random.UniformInt(0, kMaxWhim);
             if (score > bestScore) {
                 bestScore = score;
@@ -568,10 +583,16 @@ std::int64_t World::RentOf(const Robot& robot) const {
 
 void World::CollectRent() {
     for (Robot& robot : state_.robots) {
+        const std::int64_t owedBefore = robot.rentOwed;
         const std::int64_t due = RentOf(robot) + robot.rentOwed;
         const std::int64_t paid = std::min(robot.credits, due);
         robot.credits -= paid;
         robot.rentOwed = due - paid;
+        if (owedBefore == 0 && robot.rentOwed > 0) {
+            Remember(robot, MemoryKind::FellBehindOnRent, {}, robot.apartment);
+        } else if (owedBefore > 0 && robot.rentOwed == 0) {
+            Remember(robot, MemoryKind::PaidOffDebt, {}, robot.apartment);
+        }
         if (paid > 0) {
             Emit({.tick = state_.tick,
                   .kind = EventKind::RentPaid,
@@ -650,6 +671,22 @@ std::string World::Describe(const SimEvent& event) const {
         case EventKind::RentMissed:
             return std::format("{}  {} is behind on rent, owes {} cr", when,
                                who, event.credits);
+        case EventKind::Talked: {
+            const Robot* other = FindRobot(event.otherRobot);
+            return std::format(
+                "{}  {} {} {} about {} at {}", when, who,
+                event.change < 0 ? "argued with" : "chatted with",
+                other != nullptr ? std::string_view{other->name} : "someone",
+                InterestName(event.topic), room);
+        }
+        case EventKind::Remembered: {
+            const Robot* other = FindRobot(event.otherRobot);
+            return std::format(
+                "{}  {} {}", when, who,
+                MemoryText(event.memory, other != nullptr
+                                             ? std::string_view{other->name}
+                                             : "someone"));
+        }
     }
     return std::format("{}  {}: unknown event", when, who);
 }
@@ -801,7 +838,7 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                                     robot.name));
         }
     }
-    return {};
+    return ValidateSocial(state);
 }
 
 }  // namespace mechapunk::sim

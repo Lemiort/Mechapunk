@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <set>
 #include <string>
 #include <string_view>
 
@@ -175,13 +176,17 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v3-city.json";
+        kFixtureDirectory / "saves" / "v4-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
+    // The fixture carries friendships and memories.
+    EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
+        return !robot.bonds.empty() && !robot.memories.empty();
+    }));
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -225,7 +230,7 @@ TEST(Save, Version1FixtureMigratesAndRuns) {
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(visits, 0U);
     // Saving the migrated world writes the current version.
-    EXPECT_NE(Serialize(world->State()).find("\"version\": 3"),
+    EXPECT_NE(Serialize(world->State()).find("\"version\": 4"),
               std::string::npos);
 }
 
@@ -262,4 +267,38 @@ TEST(Save, Version2FixtureMigratesAndRuns) {
     });
     world->RunFor(3 * sim::kMinutesPerDay);
     EXPECT_GT(rentPaid, 0U);
+}
+
+// A version 3 save (rent and days off, no relationships) loads through one
+// migration: every robot gets two interests and starts without bonds or
+// memories, and robots make friends once the city runs.
+TEST(Save, Version3FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v3-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    std::set<std::uint8_t> tastes;
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_EQ(std::popcount(static_cast<unsigned>(robot.interests)), 2)
+            << robot.name;
+        EXPECT_TRUE(robot.bonds.empty());
+        EXPECT_TRUE(robot.memories.empty());
+        tastes.insert(robot.interests);
+    }
+    EXPECT_GT(tastes.size(), 10U);
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    std::uint64_t friendships = 0;
+    world->SetEventSink([&](const sim::SimEvent& event) {
+        friendships += event.kind == sim::EventKind::Remembered &&
+                               event.memory == sim::MemoryKind::BecameFriends
+                           ? 1
+                           : 0;
+    });
+    world->RunFor(5 * sim::kMinutesPerDay);
+    EXPECT_GT(friendships, 0U);
 }

@@ -1,0 +1,444 @@
+// Relationships and memories: robots that share a venue or a workspace talk,
+// grow fond of each other or fall out, remember the moments that mattered,
+// and seek out their friends.
+#include "mechapunk/sim/Social.hpp"
+
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <expected>
+#include <format>
+#include <functional>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "mechapunk/sim/World.hpp"
+
+namespace mechapunk::sim {
+
+namespace {
+// Chance in percent that a robot starts a talk in ten minutes.
+constexpr std::uint32_t kVenueTalkPercent = 40;
+constexpr std::uint32_t kWorkTalkPercent = 5;
+// Affinity a talk adds: shared interests make talks go well; without any,
+// talks tend to turn into arguments.
+constexpr std::uint32_t kTalkSpread = 8;
+constexpr std::int32_t kSharedTalkBase = -3;
+constexpr std::int32_t kPerSharedInterest = 2;
+constexpr std::int32_t kStrangerTalkBase = -5;
+// Beyond friendship or rivalry, each talk moves feelings half as far.
+// A good talk lifts social, more with a friend; an argument costs fun.
+constexpr std::int32_t kTalkSocial = 6;
+constexpr std::int32_t kAffinityPerExtraSocial = 10;
+constexpr std::int32_t kArgumentFun = 4;
+// Partners are picked with weight kPartnerWeight plus affinity / 10.
+constexpr std::uint32_t kPartnerWeight = 2;
+constexpr std::int32_t kAffinityPerWeight = 10;
+
+// Bond levels: a bond rises at one affinity and falls back at a lower one.
+constexpr std::int32_t kBecomeFriends = 25;
+constexpr std::int32_t kStayFriends = 10;
+constexpr std::int32_t kBecomeClose = 70;
+constexpr std::int32_t kStayClose = 55;
+constexpr std::int32_t kBecomeRivals = -25;
+constexpr std::int32_t kStayRivals = -10;
+
+// A robot keeps this many bonds; to meet someone new it forgets its weakest
+// acquaintance, if that one is barely known.
+constexpr std::size_t kMaxBonds = 12;
+constexpr std::int32_t kForgettable = 10;
+constexpr std::size_t kMaxMemories = 12;
+// Bonds fade by kFadePerDay each night once the two have not talked for
+// kFadeAfter.
+constexpr Tick kFadeAfter = 2 * kMinutesPerDay;
+constexpr std::int32_t kFadePerDay = 2;
+
+// How much robots want to be where their friends are, or not where their
+// rivals are, when picking a venue.
+constexpr std::int64_t kFriendPull = 250;
+constexpr std::int64_t kCloseFriendPull = 500;
+constexpr std::int64_t kRivalPush = 200;
+
+constexpr std::array<std::string_view, kInterestCount> kInterestNames{
+    "drone racing", "circuit bending", "old films", "poetry",
+    "chess",        "scrap art",       "synth music", "gambling"};
+
+// The `index`th set bit of `bits`, counting from the lowest.
+std::uint32_t NthBit(std::uint8_t bits, std::uint32_t index) {
+    for (std::uint32_t bit = 0; bit < kInterestCount; ++bit) {
+        if (((bits >> bit) & 1U) != 0 && index-- == 0) {
+            return bit;
+        }
+    }
+    return 0;
+}
+
+std::int32_t AffinityOf(const Robot& robot, EntityId other) {
+    const auto found =
+        std::ranges::lower_bound(robot.bonds, other, std::less{}, &Bond::robot);
+    return found != robot.bonds.end() && found->robot == other
+               ? found->affinity
+               : 0;
+}
+}  // namespace
+
+std::string_view InterestName(Interest interest) noexcept {
+    const auto index = static_cast<std::size_t>(interest);
+    return index < kInterestNames.size() ? kInterestNames.at(index) : "?";
+}
+
+std::string InterestList(std::uint8_t interests) {
+    std::string list;
+    const auto count = static_cast<std::uint32_t>(std::popcount(interests));
+    for (std::uint32_t index = 0; index < count; ++index) {
+        if (index > 0) {
+            list += index + 1 == count ? " and " : ", ";
+        }
+        list += InterestName(static_cast<Interest>(NthBit(interests, index)));
+    }
+    return list.empty() ? "nothing in particular" : list;
+}
+
+std::string_view BondLevelName(BondLevel level) noexcept {
+    switch (level) {
+        case BondLevel::Acquaintance:
+            return "acquaintance";
+        case BondLevel::Friend:
+            return "friend";
+        case BondLevel::CloseFriend:
+            return "close friend";
+        case BondLevel::Rival:
+            return "rival";
+    }
+    return "?";
+}
+
+BondLevel NextBondLevel(BondLevel level, std::int32_t affinity) noexcept {
+    switch (level) {
+        case BondLevel::Acquaintance:
+            if (affinity >= kBecomeFriends) {
+                return BondLevel::Friend;
+            }
+            return affinity <= kBecomeRivals ? BondLevel::Rival
+                                             : BondLevel::Acquaintance;
+        case BondLevel::Friend:
+            if (affinity >= kBecomeClose) {
+                return BondLevel::CloseFriend;
+            }
+            return affinity < kStayFriends ? BondLevel::Acquaintance
+                                           : BondLevel::Friend;
+        case BondLevel::CloseFriend:
+            return affinity < kStayClose ? BondLevel::Friend
+                                         : BondLevel::CloseFriend;
+        case BondLevel::Rival:
+            return affinity > kStayRivals ? BondLevel::Acquaintance
+                                          : BondLevel::Rival;
+    }
+    return level;
+}
+
+std::optional<MemoryKind> MemoryOfChange(BondLevel from, BondLevel to) noexcept {
+    using enum BondLevel;
+    if (from == Acquaintance && to == Friend) {
+        return MemoryKind::BecameFriends;
+    }
+    if (from == Friend && to == CloseFriend) {
+        return MemoryKind::BecameCloseFriends;
+    }
+    if (from == Friend && to == Acquaintance) {
+        return MemoryKind::DriftedApart;
+    }
+    if (from == Acquaintance && to == Rival) {
+        return MemoryKind::BecameRivals;
+    }
+    if (from == Rival && to == Acquaintance) {
+        return MemoryKind::MadePeace;
+    }
+    return std::nullopt;  // A close friend cooling to a friend is no event.
+}
+
+std::string MemoryText(MemoryKind kind, std::string_view other) {
+    switch (kind) {
+        case MemoryKind::BecameFriends:
+            return std::format("became friends with {}", other);
+        case MemoryKind::BecameCloseFriends:
+            return std::format("grew close to {}", other);
+        case MemoryKind::DriftedApart:
+            return std::format("drifted apart from {}", other);
+        case MemoryKind::BecameRivals:
+            return std::format("started a rivalry with {}", other);
+        case MemoryKind::MadePeace:
+            return std::format("made peace with {}", other);
+        case MemoryKind::FellBehindOnRent:
+            return "fell behind on rent";
+        case MemoryKind::PaidOffDebt:
+            return "paid off the rent owed";
+    }
+    return "remembered something";
+}
+
+void World::Socialize() {
+    // Robots sharing a room, in id order within each room and rooms in id
+    // order, so random draws happen in a fixed order.
+    std::map<std::uint64_t, std::vector<std::size_t>> rooms;
+    for (std::size_t index = 0; index < state_.robots.size(); ++index) {
+        const Robot& robot = state_.robots[index];
+        if (robot.activity == RobotActivity::Visiting ||
+            robot.activity == RobotActivity::Working) {
+            rooms[robot.location.value].push_back(index);
+        }
+    }
+    std::vector<std::uint32_t> weights;
+    // A robot takes part in one talk at a time.
+    std::vector<bool> busy;
+    for (const auto& [room, present] : rooms) {
+        if (present.size() < 2) {
+            continue;
+        }
+        const bool venue =
+            state_.robots[present.front()].activity == RobotActivity::Visiting;
+        const std::uint32_t chance =
+            venue ? kVenueTalkPercent : kWorkTalkPercent;
+        busy.assign(present.size(), false);
+        for (std::size_t self = 0; self < present.size(); ++self) {
+            if (state_.random.UniformInt(1, 100) > chance || busy[self]) {
+                continue;
+            }
+            // Robots seek out those they like.
+            Robot& robot = state_.robots[present[self]];
+            weights.assign(present.size(), 0);
+            std::uint32_t total = 0;
+            for (std::size_t slot = 0; slot < present.size(); ++slot) {
+                if (slot == self || busy[slot]) {
+                    continue;
+                }
+                const std::int32_t affinity =
+                    AffinityOf(robot, state_.robots[present[slot]].id);
+                weights[slot] =
+                    kPartnerWeight + static_cast<std::uint32_t>(
+                                         std::max(affinity, 0) /
+                                         kAffinityPerWeight);
+                total += weights[slot];
+            }
+            if (total == 0) {
+                continue;  // Everyone else is already talking.
+            }
+            std::uint32_t pick = state_.random.UniformInt(0, total - 1);
+            std::size_t slot = 0;
+            while (pick >= weights[slot]) {
+                pick -= weights[slot];
+                ++slot;
+            }
+            busy[self] = true;
+            busy[slot] = true;
+            Talk(robot, state_.robots[present[slot]]);
+        }
+    }
+}
+
+void World::Talk(Robot& first, Robot& second) {
+    const auto shared = static_cast<std::uint8_t>(first.interests &
+                                                  second.interests);
+    const auto spread = static_cast<std::int32_t>(
+        state_.random.UniformInt(0, kTalkSpread));
+    const std::int32_t change =
+        shared != 0 ? spread + kSharedTalkBase +
+                          (kPerSharedInterest * std::popcount(shared))
+                    : spread + kStrangerTalkBase;
+    // About something they share, or failing that one of them likes.
+    std::uint8_t topics = shared != 0
+                              ? shared
+                              : static_cast<std::uint8_t>(first.interests |
+                                                          second.interests);
+    if (topics == 0) {
+        topics = 0xFF;
+    }
+    const auto topic = static_cast<Interest>(NthBit(
+        topics, state_.random.UniformInt(
+                    0, static_cast<std::uint32_t>(std::popcount(topics)) - 1)));
+
+    for (Robot* robot : {&first, &second}) {
+        Robot& other = robot == &first ? second : first;
+        if (change > 0) {
+            const std::int32_t extra =
+                std::max(AffinityOf(*robot, other.id), 0) /
+                kAffinityPerExtraSocial;
+            robot->needs.social =
+                std::min(robot->needs.social + kTalkSocial + extra, Needs::kMax);
+        } else if (change < 0) {
+            robot->needs.fun = std::max(robot->needs.fun - kArgumentFun, 0);
+        }
+        Emit({.tick = state_.tick,
+              .kind = EventKind::Talked,
+              .robot = robot->id,
+              .room = robot->location,
+              .otherRobot = other.id,
+              .topic = topic,
+              .change = change});
+    }
+    ChangeBond(first, second.id, change);
+    ChangeBond(second, first.id, change);
+}
+
+void World::ChangeBond(Robot& robot, EntityId other, std::int32_t change) {
+    auto found =
+        std::ranges::lower_bound(robot.bonds, other, std::less{}, &Bond::robot);
+    if (found == robot.bonds.end() || found->robot != other) {
+        if (robot.bonds.size() >= kMaxBonds) {
+            // Make room by forgetting the least known acquaintance.
+            const auto weakest = std::ranges::min_element(
+                robot.bonds, std::less{}, [](const Bond& bond) {
+                    return bond.level == BondLevel::Acquaintance
+                               ? std::abs(bond.affinity)
+                               : Bond::kMaxAffinity + 1;
+                });
+            if (weakest->level != BondLevel::Acquaintance ||
+                std::abs(weakest->affinity) > kForgettable) {
+                return;  // Everyone it knows matters more.
+            }
+            robot.bonds.erase(weakest);
+            found = std::ranges::lower_bound(robot.bonds, other, std::less{},
+                                             &Bond::robot);
+        }
+        found = robot.bonds.insert(found, Bond{.robot = other});
+    }
+    Bond& bond = *found;
+    const bool deeper = (change > 0 && bond.affinity >= kBecomeFriends) ||
+                        (change < 0 && bond.affinity <= kBecomeRivals);
+    const std::int32_t step = deeper ? change / 2 : change;
+    bond.affinity = std::clamp(bond.affinity + step, -Bond::kMaxAffinity,
+                               Bond::kMaxAffinity);
+    ++bond.talks;
+    bond.lastTalk = state_.tick;
+    UpdateBondLevel(robot, bond, robot.location);
+}
+
+void World::UpdateBondLevel(Robot& robot, Bond& bond, EntityId room) {
+    const BondLevel next = NextBondLevel(bond.level, bond.affinity);
+    if (next == bond.level) {
+        return;
+    }
+    const std::optional<MemoryKind> memory = MemoryOfChange(bond.level, next);
+    bond.level = next;
+    if (memory) {
+        Remember(robot, *memory, bond.robot, room);
+    }
+}
+
+void World::Remember(Robot& robot, MemoryKind kind, EntityId other,
+                     EntityId room) {
+    robot.memories.push_back(
+        {.tick = state_.tick, .kind = kind, .robot = other, .room = room});
+    if (robot.memories.size() > kMaxMemories) {
+        robot.memories.erase(robot.memories.begin());
+    }
+    Emit({.tick = state_.tick,
+          .kind = EventKind::Remembered,
+          .robot = robot.id,
+          .room = room,
+          .otherRobot = other,
+          .memory = kind});
+}
+
+void World::FadeBonds() {
+    for (Robot& robot : state_.robots) {
+        for (Bond& bond : robot.bonds) {
+            if (state_.tick - bond.lastTalk < kFadeAfter) {
+                continue;
+            }
+            // Feelings cool toward indifference.
+            if (bond.affinity > 0) {
+                bond.affinity = std::max(bond.affinity - kFadePerDay, 0);
+            } else {
+                bond.affinity = std::min(bond.affinity + kFadePerDay, 0);
+            }
+            UpdateBondLevel(robot, bond, EntityId{});
+        }
+        std::erase_if(robot.bonds, [](const Bond& bond) {
+            return bond.affinity == 0 && bond.level == BondLevel::Acquaintance;
+        });
+    }
+}
+
+std::int64_t World::CompanyAt(const Robot& robot, EntityId venue) const {
+    std::int64_t pull = 0;
+    for (const Bond& bond : robot.bonds) {
+        if (bond.level == BondLevel::Acquaintance) {
+            continue;
+        }
+        const Robot* other = FindRobot(bond.robot);
+        if (other == nullptr) {
+            continue;
+        }
+        // There now, or on the way.
+        const bool there =
+            (other->activity == RobotActivity::Visiting &&
+             other->location == venue) ||
+            (other->activity == RobotActivity::Walking &&
+             other->destination == venue);
+        if (!there) {
+            continue;
+        }
+        switch (bond.level) {
+            case BondLevel::Friend:
+                pull += kFriendPull;
+                break;
+            case BondLevel::CloseFriend:
+                pull += kCloseFriendPull;
+                break;
+            case BondLevel::Rival:
+                pull -= kRivalPush;
+                break;
+            case BondLevel::Acquaintance:
+                break;
+        }
+    }
+    return pull;
+}
+
+std::expected<void, std::string> ValidateSocial(const WorldState& state) {
+    const auto exists = [&](EntityId id) {
+        const auto found = std::ranges::lower_bound(state.robots, id,
+                                                    std::less{}, &Robot::id);
+        return found != state.robots.end() && found->id == id;
+    };
+    const RoomIndex rooms(state.city);
+    for (const Robot& robot : state.robots) {
+        if (robot.bonds.size() > kMaxBonds ||
+            robot.memories.size() > kMaxMemories) {
+            return std::unexpected(std::format(
+                "Robot '{}' has too many bonds or memories", robot.name));
+        }
+        EntityId previous;
+        for (const Bond& bond : robot.bonds) {
+            if (bond.robot <= previous || bond.robot == robot.id ||
+                !exists(bond.robot) ||
+                std::abs(bond.affinity) > Bond::kMaxAffinity ||
+                bond.lastTalk > state.tick) {
+                return std::unexpected(std::format(
+                    "Robot '{}' has an invalid, repeated or out-of-order bond "
+                    "with robot {}",
+                    robot.name, bond.robot.value));
+            }
+            previous = bond.robot;
+        }
+        for (const Memory& memory : robot.memories) {
+            if (memory.tick > state.tick ||
+                (memory.robot.IsValid() && !exists(memory.robot)) ||
+                (memory.room.IsValid() && !rooms.Find(memory.room))) {
+                return std::unexpected(std::format(
+                    "Robot '{}' has a memory of a missing robot or room",
+                    robot.name));
+            }
+        }
+    }
+    return {};
+}
+
+}  // namespace mechapunk::sim

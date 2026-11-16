@@ -17,6 +17,7 @@
 
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Ids.hpp"
+#include "mechapunk/sim/Social.hpp"
 #include "Migrations.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -54,6 +55,23 @@ struct glz::meta<mechapunk::sim::RobotActivity> {
                   "visiting", Visiting);
 };
 
+template <>
+struct glz::meta<mechapunk::sim::BondLevel> {
+    using enum mechapunk::sim::BondLevel;
+    static constexpr auto value =
+        enumerate("acquaintance", Acquaintance, "friend", Friend,
+                  "closeFriend", CloseFriend, "rival", Rival);
+};
+template <>
+struct glz::meta<mechapunk::sim::MemoryKind> {
+    using enum mechapunk::sim::MemoryKind;
+    static constexpr auto value = enumerate(
+        "becameFriends", BecameFriends, "becameCloseFriends",
+        BecameCloseFriends, "driftedApart", DriftedApart, "becameRivals",
+        BecameRivals, "madePeace", MadePeace, "fellBehindOnRent",
+        FellBehindOnRent, "paidOffDebt", PaidOffDebt);
+};
+
 namespace mechapunk::sim {
 
 namespace {
@@ -69,6 +87,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 2,
               .summary = "rent and days off",
               .apply = &migrations::V2ToV3},
+    Migration{.fromVersion = 3,
+              .summary = "interests, relationships and memories",
+              .apply = &migrations::V3ToV4},
 };
 }  // namespace
 

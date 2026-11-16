@@ -38,7 +38,8 @@ SimulationHost::SimulationHost(sim::World world)
                            RobotInfo{.name = robot.name,
                                      .apartment = robot.apartment,
                                      .workspace = robot.workspace,
-                                     .daysOff = robot.daysOff});
+                                     .daysOff = robot.daysOff,
+                                     .interests = robot.interests});
     }
     // Runs on the worker inside World::Step, where reading the world is safe.
     world_.SetEventSink([this](const sim::SimEvent& event) { Record(event); });
@@ -62,6 +63,16 @@ const RobotFrame* SimulationHost::FindRobot(const WorldFrame& frame,
                                                 std::less{}, &RobotFrame::id);
     return found != frame.robots.end() && found->id == robot ? &*found
                                                              : nullptr;
+}
+
+const RobotSocial* SimulationHost::FindSocial(const WorldFrame& frame,
+                                             sim::EntityId robot) {
+    const RobotFrame* found = FindRobot(frame, robot);
+    if (found == nullptr || frame.social == nullptr) {
+        return nullptr;
+    }
+    const auto index = static_cast<std::size_t>(found - frame.robots.data());
+    return index < frame.social->size() ? &(*frame.social)[index] : nullptr;
 }
 
 std::vector<std::string> SimulationHost::RecentEvents(sim::EntityId robot,
@@ -174,8 +185,18 @@ void SimulationHost::Step() {
 }
 
 void SimulationHost::Publish() {
+    constexpr sim::Tick kSocialPeriod = 10;
     WorldFrame frame;
     frame.tick = world_.CurrentTick();
+    if (social_ == nullptr || frame.tick % kSocialPeriod == 0) {
+        auto social = std::make_shared<std::vector<RobotSocial>>();
+        social->reserve(world_.State().robots.size());
+        for (const sim::Robot& robot : world_.State().robots) {
+            social->push_back({.bonds = robot.bonds, .memories = robot.memories});
+        }
+        social_ = std::move(social);
+    }
+    frame.social = social_;
     frame.robots.reserve(world_.State().robots.size());
     for (const sim::Robot& robot : world_.State().robots) {
         RobotFrame robotFrame{.id = robot.id,

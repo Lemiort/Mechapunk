@@ -89,8 +89,12 @@ floor slider.
 - Click a room, in the city or in the inspector, for its kind, opening
   hours, price, occupancy, and the robots inside with when each will leave.
 - Click a robot, in the city or by its name in the inspector, for what it
-  is doing and until when, its four needs as bars, credits and rent owed,
-  home, job, shift and days off, and its recent events.
+  likes, what it is doing and until when, its four needs as bars, credits
+  and rent owed, home, job, shift and days off, who it knows and how it
+  feels about them, what it remembers, and its recent events, including
+  who it talked to and about what.
+- Names of robots in a robot's relationships are links too: clicking one
+  selects that robot and shows the room it is in.
 - Names of rooms in the inspector are links: clicking one moves the view to
   that building and floor with the room selected.
 
@@ -145,6 +149,32 @@ the walk, the price and a little whim. It compares that with going home,
 stays a while, and decides again. It always gets home early enough for six
 hours of rest before its next shift, and every night ends at home by 03:30.
 Walking times come from shortest routes over the street graph plus stairs.
+
+### Relationships and memories
+
+Every robot has two interests out of eight: drone racing, circuit bending,
+old films, poetry, chess, scrap art, synth music and gambling. Every ten
+minutes, robots sharing a venue may start a talk, and coworkers sometimes do
+too; each robot is in at most one talk at a time and prefers robots it
+likes. A talk is about something both like, or failing that something one of
+them likes. Robots with an interest in common mostly get along; robots with
+none argue more often than not. A good talk lifts social, more so with a
+friend; an argument costs a little fun.
+
+Each robot keeps how it feels about up to twelve robots, from -100 to 100,
+as acquaintance, friend, close friend or rival. A bond falls back at a lower
+value than it rose, so small swings do not make and break friendships, and
+once two robots are friends (or rivals) each talk moves them half as far.
+Feelings fade toward indifference when two robots have not talked for two
+days, and a robot meeting someone new forgets its least known acquaintance.
+
+Robots remember the twelve latest moments that mattered: becoming friends,
+growing close, drifting apart, starting a rivalry, making peace, falling
+behind on rent and paying it off. When choosing a venue, robots are drawn to
+ones where friends are or are heading, and more strongly to close friends;
+they stay away from rivals. In a city of 300, most robots have a friend
+after a week or two, close friendships take a few weeks, and a fifth or so
+end up with a rival.
 
 Runs are deterministic: the same save or seed always produces the same
 states and events, on every platform. All simulation state is integral, and
