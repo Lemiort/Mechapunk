@@ -20,6 +20,7 @@ namespace mechapunk {
 
 namespace {
 constexpr float kExposure = 1.0F;
+constexpr float kBloomStrength = 0.4F;
 
 struct ShaderStage {
     std::filesystem::path path;
@@ -151,6 +152,13 @@ GameRenderer::GameRenderer(int width, int height) {
         LoadShader({{"shaders/tonemap.vsh", ShaderType::Vertex},
                     {"shaders/tonemap.fsh", ShaderType::Fragment}});
 
+    bloomDownsampleShader_ =
+        LoadShader({{"shaders/fullscreen.vsh", ShaderType::Vertex},
+                    {"shaders/bloom_downsample.fsh", ShaderType::Fragment}});
+    bloomUpsampleShader_ =
+        LoadShader({{"shaders/fullscreen.vsh", ShaderType::Vertex},
+                    {"shaders/bloom_upsample.fsh", ShaderType::Fragment}});
+
     gBuffer_ = std::make_shared<GBuffer>(width, height);
     forwardPipeline_ =
         std::make_unique<ForwardPipeline>(gsl_lite::not_null{meshShader_});
@@ -168,6 +176,8 @@ GameRenderer::GameRenderer(int width, int height) {
             .directionalLightShader =
                 gsl_lite::not_null{directionalLightShader_},
             .toneMapShader = gsl_lite::not_null{toneMapShader_},
+            .bloomDownsampleShader = gsl_lite::not_null{bloomDownsampleShader_},
+            .bloomUpsampleShader = gsl_lite::not_null{bloomUpsampleShader_},
             .stencilMaterial = passMaterial(stencilShader_),
             .pointLightMaterial = passMaterial(pointLightShader_),
             .spotLightMaterial = passMaterial(spotLightShader_),
@@ -176,6 +186,8 @@ GameRenderer::GameRenderer(int width, int height) {
     // Filmic: bright neon and lamps roll off instead of clipping flat.
     deferredPipeline_->SetToneMapping(
         {.op = ToneMapOperator::Aces, .exposure = kExposure});
+    // Neon and bulbs shine above 1 and spill a soft halo.
+    deferredPipeline_->SetBloom({.strength = kBloomStrength});
 
     const auto flatNormal = LoadTexture("textures/normal_up.jpg");
     const auto matte = LoadTexture("textures/mp_specular_low.png");

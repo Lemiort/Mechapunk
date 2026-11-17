@@ -72,6 +72,9 @@ constexpr vec3 kFacadeGlass{0.13F, 0.17F, 0.24F};
 // Light from a lit window at night, and the share of windows that are lit.
 constexpr vec3 kWindowLight{0.55F, 0.42F, 0.25F};
 constexpr std::uint32_t kLitWindowsInTen = 4;
+// Neon, bulbs and screens shine this many times their color: above 1, so
+// they bloom, while lit windows stay below and don't.
+constexpr float kGlow = 3.0F;
 constexpr vec3 kConcrete{0.3F, 0.31F, 0.35F};
 constexpr vec3 kGlassColor{0.6F, 0.8F, 0.92F};
 constexpr vec3 kSelected{1.0F, 1.0F, 1.0F};
@@ -228,7 +231,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                  .transform = {.position = base,
                                .rotationDegrees = vec3(0.0F),
                                .scale = {width, tall, 0.15F * kS}},
-                 .material = assets_.palette->GetGlowing(color, color)});
+                 .material = assets_.palette->GetGlowing(color, color * kGlow)});
         };
         signPanel(centerOnGround +
                       vec3{0.0F, (height * 0.6F) - (0.7F * kS),
@@ -429,7 +432,7 @@ void CityView::AddStaticBox(vec3 minimum, vec3 maximum, vec3 color, bool glows) 
                                     (minimum.z + maximum.z) * 0.5F},
                        .rotationDegrees = vec3(0.0F),
                        .scale = maximum - minimum},
-         .material = glows ? assets_.palette->GetGlowing(color, color)
+         .material = glows ? assets_.palette->GetGlowing(color, color * kGlow)
                            : assets_.palette->Get(color)});
 }
 
@@ -707,7 +710,7 @@ void CityView::AssignSpots(const WorldFrame& frame, const FloorPlan& plan) {
 std::shared_ptr<const Material> CityView::PartMaterial(const PropPart& part,
                                                        vec3 tint) const {
     const vec3 color = part.tinted ? tint : part.color;
-    return part.glows ? assets_.palette->GetGlowing(color, color)
+    return part.glows ? assets_.palette->GetGlowing(color, color * kGlow)
                       : assets_.palette->Get(color);
 }
 

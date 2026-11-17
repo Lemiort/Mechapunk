@@ -609,6 +609,16 @@ private:
                     toneMapping.op = static_cast<ToneMapOperator>(selected);
                     renderer_.SetToneMapping(toneMapping);
                 }
+                BloomSettings bloom = renderer_.GetBloom();
+                bool bloomChanged = ImGui::SliderFloat(
+                    "Bloom", &bloom.strength, 0.0F, 0.5F, "%.3f");
+                bloomChanged |= ImGui::SliderFloat(
+                    "Bloom threshold", &bloom.threshold, 0.0F, 4.0F, "%.2f");
+                bloomChanged |= ImGui::SliderFloat("Bloom radius", &bloom.radius,
+                                                   0.5F, 3.0F, "%.2f");
+                if (bloomChanged) {
+                    renderer_.SetBloom(bloom);
+                }
             }
         }
         ImGui::End();

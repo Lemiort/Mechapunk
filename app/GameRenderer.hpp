@@ -90,6 +90,13 @@ public:
     [[nodiscard]] const ToneMapping& GetToneMapping() const {
         return deferredPipeline_->GetToneMapping();
     }
+    // How much light spills around bright surfaces.
+    void SetBloom(const BloomSettings& bloom) {
+        deferredPipeline_->SetBloom(bloom);
+    }
+    [[nodiscard]] const BloomSettings& GetBloom() const {
+        return deferredPipeline_->GetBloom();
+    }
     // Draws the queued meshes lit by the scene's lights into the window's
     // framebuffer, which stays bound for UI drawn on top.
     void Render(const Scene& scene, const RenderQueue& queue,
@@ -103,6 +110,8 @@ private:
     std::shared_ptr<Shader> spotLightShader_;
     std::shared_ptr<Shader> directionalLightShader_;
     std::shared_ptr<Shader> toneMapShader_;
+    std::shared_ptr<Shader> bloomDownsampleShader_;
+    std::shared_ptr<Shader> bloomUpsampleShader_;
     std::shared_ptr<GBuffer> gBuffer_;
     std::unique_ptr<ForwardPipeline> forwardPipeline_;
     std::unique_ptr<DeferredPipeline> deferredPipeline_;
