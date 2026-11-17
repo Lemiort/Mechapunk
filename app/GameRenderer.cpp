@@ -19,6 +19,8 @@
 namespace mechapunk {
 
 namespace {
+constexpr float kExposure = 1.0F;
+
 struct ShaderStage {
     std::filesystem::path path;
     ShaderType type;
@@ -145,6 +147,10 @@ GameRenderer::GameRenderer(int width, int height) {
         LoadShader({{"shaders/DSDirectionalLight.vsh", ShaderType::Vertex},
                     {"shaders/DSDirectionalLight.fsh", ShaderType::Fragment}});
 
+    toneMapShader_ =
+        LoadShader({{"shaders/tonemap.vsh", ShaderType::Vertex},
+                    {"shaders/tonemap.fsh", ShaderType::Fragment}});
+
     gBuffer_ = std::make_shared<GBuffer>(width, height);
     forwardPipeline_ =
         std::make_unique<ForwardPipeline>(gsl_lite::not_null{meshShader_});
@@ -161,11 +167,15 @@ GameRenderer::GameRenderer(int width, int height) {
             .spotLightShader = gsl_lite::not_null{spotLightShader_},
             .directionalLightShader =
                 gsl_lite::not_null{directionalLightShader_},
+            .toneMapShader = gsl_lite::not_null{toneMapShader_},
             .stencilMaterial = passMaterial(stencilShader_),
             .pointLightMaterial = passMaterial(pointLightShader_),
             .spotLightMaterial = passMaterial(spotLightShader_),
             .directionalLightMaterial =
                 passMaterial(directionalLightShader_)});
+    // Filmic: bright neon and lamps roll off instead of clipping flat.
+    deferredPipeline_->SetToneMapping(
+        {.op = ToneMapOperator::Aces, .exposure = kExposure});
 
     const auto flatNormal = LoadTexture("textures/normal_up.jpg");
     const auto matte = LoadTexture("textures/mp_specular_low.png");

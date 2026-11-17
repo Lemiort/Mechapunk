@@ -52,7 +52,7 @@ The game build rebuilds `external/NEE/build/Release` first. Quit a running
 | M2 See it | Done: buildings and robots drawn, smooth movement, picking, inspector, time controls |
 | M3 Needs and the economy | Done: charge, condition, social, fun; wages, rent, debt, venues, evenings out, days off |
 | M4 Social life | Done: interests, talks, bonds (friend, close friend, rival), memories. The "chronicle" is only the inspector's recent events, which are not saved |
-| M5 Atmosphere | **Partly done**: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces. **Missing: HDR, bloom, tonemapping, rain** |
+| M5 Atmosphere | **Partly done**: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces, HDR and tone mapping. **Missing: bloom, rain** |
 | M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers). **Missing: simulation level of detail, corporations and factions, construction** |
 
 Also done since the plan was written:
@@ -78,7 +78,7 @@ Also done since the plan was written:
 | 7 | Versioned serialization | Done in the game (`sim/src/Save.cpp`: migrations, temp-file-then-rename write). Rotating autosaves are missing |
 | 8 | Dear ImGui overlay | Done (NEE #62) |
 | 9 | Keep the node hierarchy on model import, for rigid-part animation | Not done. Robots and furniture are box props in `app/Props.cpp` |
-| 10 | Look: emissive G-buffer channel, HDR, bloom, tonemapping, instanced light volumes or clustered lighting, particle fix (#29) for rain | Emissive done (NEE #65); the rest not done |
+| 10 | Look: emissive G-buffer channel, HDR, bloom, tonemapping, instanced light volumes or clustered lighting, particle fix (#29) for rain | Emissive (NEE #65), HDR and tone mapping (NEE #66) done; the rest not done |
 
 Also done in NEE beyond the plan: screenshots (#60), distance-field text
 (#61), the Conan package (#64), and skipping dark lights (#63).
@@ -88,8 +88,8 @@ The open NEE architecture-review issues are #20, #24, #27 and #29–#43.
 
 ## Recommended next: finish M5 (atmosphere)
 
-Surfaces now glow, but light still clips at full brightness and nothing
-blooms; this is the biggest visible gain left.
+Surfaces glow and light is kept above 1 and tone-mapped, but nothing
+blooms yet; this is the biggest visible gain left.
 Do it as separate NEE PRs, each generic and with tests, then use each one
 in the game:
 
@@ -105,9 +105,11 @@ in the game:
    sign. The game uses the color only, since each glowing part is its own
    box; an emissive map of the facade textures could later replace the
    window boxes.
-2. **HDR and tonemapping.** Light into a floating-point target, then
-   tonemap (ACES or Reinhard) with exposure. This may need to dim the
-   game's current light powers.
+2. **HDR and tonemapping.** Done (NEE #66): the light
+   target is RGBA16F and a fullscreen pass tone-maps it with exposure and
+   None, Reinhard or ACES (`DeferredPipeline::SetToneMapping`). The game
+   uses ACES at exposure 1, with a Display panel to change both live.
+   Light powers were left as they are.
 3. **Bloom.** Bright-pass, blur chain, composite, with a strength setting.
 4. **Rain.** Repair the particle system (#29), then add rain in the game
    with a weather state in the sim (saved, so it needs a migration). Wet

@@ -83,6 +83,13 @@ public:
     [[nodiscard]] RenderAssets& Assets() noexcept { return assets_; }
 
     void Resize(int width, int height);
+    // How the frame's HDR light maps to the screen.
+    void SetToneMapping(const ToneMapping& toneMapping) {
+        deferredPipeline_->SetToneMapping(toneMapping);
+    }
+    [[nodiscard]] const ToneMapping& GetToneMapping() const {
+        return deferredPipeline_->GetToneMapping();
+    }
     // Draws the queued meshes lit by the scene's lights into the window's
     // framebuffer, which stays bound for UI drawn on top.
     void Render(const Scene& scene, const RenderQueue& queue,
@@ -95,6 +102,7 @@ private:
     std::shared_ptr<Shader> pointLightShader_;
     std::shared_ptr<Shader> spotLightShader_;
     std::shared_ptr<Shader> directionalLightShader_;
+    std::shared_ptr<Shader> toneMapShader_;
     std::shared_ptr<GBuffer> gBuffer_;
     std::unique_ptr<ForwardPipeline> forwardPipeline_;
     std::unique_ptr<DeferredPipeline> deferredPipeline_;

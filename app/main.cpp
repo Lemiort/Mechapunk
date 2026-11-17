@@ -593,6 +593,23 @@ private:
                 ImGui::BulletText("F5: save   F12: screenshot");
                 ImGui::BulletText("Esc: close the selection, then quit");
             }
+            if (ImGui::CollapsingHeader("Display")) {
+                // How the frame's light maps to the screen.
+                ToneMapping toneMapping = renderer_.GetToneMapping();
+                constexpr std::array<const char*, 3> kOperators{
+                    "None (clamp)", "Reinhard", "ACES"};
+                int selected = static_cast<int>(toneMapping.op);
+                bool changed =
+                    ImGui::Combo("Tone mapping", &selected, kOperators.data(),
+                                 static_cast<int>(kOperators.size()));
+                changed |= ImGui::SliderFloat("Exposure", &toneMapping.exposure,
+                                              0.25F, 4.0F, "%.2f",
+                                              ImGuiSliderFlags_Logarithmic);
+                if (changed) {
+                    toneMapping.op = static_cast<ToneMapOperator>(selected);
+                    renderer_.SetToneMapping(toneMapping);
+                }
+            }
         }
         ImGui::End();
     }
