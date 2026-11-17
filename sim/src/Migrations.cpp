@@ -514,4 +514,19 @@ std::expected<void, std::string> V9ToV10(SaveDocument& world) try {
         std::format("the version 9 world is malformed ({})", error.what()));
 }
 
+
+std::expected<void, std::string> V10ToV11(SaveDocument& world) try {
+    for (SaveDocument& robot : world["robots"].get_array()) {
+        robot["spentToday"] = std::int64_t{0};
+    }
+    world["economy"]["supplyPercent"] = std::int64_t{60};
+    for (SaveDocument& day : world["history"].get_array()) {
+        day["supplyPercent"] = std::int64_t{60};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 10 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

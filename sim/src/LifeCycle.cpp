@@ -90,8 +90,7 @@ void World::Scrap(EntityId id) {
         --reserved_[robot.location.value];
         --guests_[robot.location.value];
     } else if (robot.activity == RobotActivity::Walking) {
-        const auto destination = rooms_.Find(robot.destination);
-        if (destination && IsVenue(destination->room->kind)) {
+        if (IsGuestTrip(robot, robot.destination)) {
             --reserved_[robot.destination.value];
         }
     }
@@ -126,12 +125,8 @@ void World::Scrap(EntityId id) {
 
 void World::AddNewcomer() {
     std::unordered_set<std::uint64_t> homes;
-    std::unordered_map<std::uint64_t, std::uint32_t> staff;
     for (const Robot& robot : state_.robots) {
         homes.insert(robot.apartment.value);
-        if (robot.workspace.IsValid()) {
-            ++staff[robot.workspace.value];
-        }
     }
     std::vector<EntityId> freeHomes;
     for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
@@ -141,12 +136,6 @@ void World::AddNewcomer() {
     }
     if (freeHomes.empty()) {
         return;  // Nowhere to live: nobody moves in.
-    }
-    std::vector<EntityId> openings;
-    for (const RoomRef& workspace : rooms_.RoomsOfKind(RoomKind::Workspace)) {
-        if (staff[workspace.room->id.value] < workspace.room->capacity) {
-            openings.push_back(workspace.room->id);
-        }
     }
 
     Pcg32& random = state_.random;
@@ -161,6 +150,7 @@ void World::AddNewcomer() {
     robot.id = state_.ids.Allocate();
     robot.name = RandomRobotName(random);
     robot.apartment = pick(freeHomes);
+    const std::vector<EntityId> openings = OpeningsFor(robot.id, StaffCounts());
     robot.workspace = openings.empty() ? EntityId{} : pick(openings);
     robot.location = robot.apartment;
     robot.punctualityMinutes = random.UniformInt(kMinPunctuality, kMaxPunctuality);

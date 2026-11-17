@@ -53,7 +53,7 @@ The game build rebuilds `external/NEE/build/Release` first. Quit a running
 | M3 Needs and the economy | Done: charge, condition, social, fun; wages, rent, debt, venues, evenings out, days off |
 | M4 Social life | Done: interests, talks, bonds (friend, close friend, rival), memories. The "chronicle" is only the inspector's recent events, which are not saved |
 | M5 Atmosphere | Done: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces, HDR, tone mapping, bloom, weather and rain |
-| M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers), a closed economy with banks, a central bank, corporations and property, and daily statistics. **Missing: venue staff, venues opening and closing with demand, gangs, simulation level of detail, construction** |
+| M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers), a closed economy with banks, a central bank, corporations, property, venue staff, daily budgets and a market price for supplies, and daily statistics. **Missing: venues opening and closing with demand, gangs, simulation level of detail, construction** |
 
 Also done since the plan was written:
 
@@ -65,6 +65,10 @@ Also done since the plan was written:
   when a bank runs short, or for a newcomer's savings, and logs every
   credit. Statistics of money, wealth, work, wellbeing, relationships and
   property are kept daily and charted in the Statistics window (T).
+  Venues have staff on shifts (a barman behind the bar, a cashier at the
+  till) paid from their takings. Robots spend on a daily budget from their
+  pay and from savings beyond a rainy-day target, and supplies have a
+  market price that follows industry's books.
 - Transit: an elevated metro on a timetable. Every station row and column
   is a line with two tracks, on two levels so lines cross. Two-ended trains
   turn back over a crossover in the tail track past each end station, run
@@ -145,9 +149,8 @@ game:
 
 ## Recommended next: M6 (scale and depth)
 
-- **Venue staff.** Every venue has workers (a barman, a cook) paid by its
-  corporation, and venues open and close, or workplaces turn into venues
-  and back, as demand changes.
+- **Demand.** Venues open and close, or workplaces turn into venues and
+  back, as demand changes; prices of venues and rents follow demand.
 - **Gangs.** Rival or friendly to each other, always rivals of the police;
   members rob robots outside their gang. Unions later.
 - **Construction.** The city grows: new buildings on park corners as the
@@ -180,8 +183,9 @@ game:
 - Not yet seen in the running game: bags, bar bottles, robots on the
   stairs.
 - Trains have no drivers yet, and no limit on riders.
-- The economy is not in balance yet: venue habits don't follow income, so
-  industry keeps cutting pay a little most days and some robots stay in
-  small debts. The Statistics window (T) shows the drift.
+- The economy settles with industry paying about three quarters of base
+  wages, but the housing trust keeps borrowing to buy homes from owners
+  who sell, and a third of robots carry small debts. Prices of venues and
+  rents are fixed. The Statistics window (T) shows it all.
 - From above, the upper deck of a station hides the lower level's trains.
 - Robots inside closed buildings aren't drawn (nobody can see them).

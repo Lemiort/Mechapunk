@@ -97,6 +97,8 @@ constexpr std::uint32_t kMaxWhim = 80;
 // Going straight from one venue to another of the same kind is less
 // appealing than trying something different.
 constexpr std::int64_t kSameKindPenalty = 150;
+// Below this condition a robot pays for repairs from its savings.
+constexpr std::int32_t kRepairUrgentCondition = 400;
 
 constexpr std::array<std::string_view, 8> kModelPrefixes{
     "KX", "VR", "NE", "TS", "OM", "ZR", "HK", "LU"};
@@ -157,6 +159,38 @@ EntityId AssignRoom(const RoomIndex& rooms, RoomKind kind,
     }
     throw std::logic_error("Generated city has too little capacity");
 }
+// A job for a new robot: a venue short of staff on the shift it would work,
+// or failing that a workspace with room. Venues are staffed first, so every
+// bar has its barman; workspaces take everyone else.
+EntityId AssignJob(const RoomIndex& rooms, EntityId robot,
+                   std::unordered_map<std::uint64_t, std::uint32_t>& staff, Pcg32& random) {
+    std::vector<const Room*> venues;
+    for (const RoomKind kind : VenueKinds()) {
+        for (const RoomRef& venue : rooms.RoomsOfKind(kind)) {
+            if (staff[JobKey(*venue.room, robot)] < StaffPerShift(*venue.room)) {
+                venues.push_back(venue.room);
+            }
+        }
+    }
+    if (!venues.empty()) {
+        const Room& venue = *venues.at(random.UniformInt(0, static_cast<std::uint32_t>(venues.size() - 1)));
+        ++staff[JobKey(venue, robot)];
+        return venue.id;
+    }
+    const std::vector<RoomRef>& workspaces = rooms.RoomsOfKind(RoomKind::Workspace);
+    if (workspaces.empty()) {
+        throw std::logic_error("Generated city has no workspace");
+    }
+    const auto start = random.UniformInt(0, static_cast<std::uint32_t>(workspaces.size() - 1));
+    for (std::size_t offset = 0; offset < workspaces.size(); ++offset) {
+        const Room& room = *workspaces[(start + offset) % workspaces.size()].room;
+        if (staff[JobKey(room, robot)] < room.capacity) {
+            ++staff[JobKey(room, robot)];
+            return room.id;
+        }
+    }
+    throw std::logic_error("Generated city has too few jobs");
+}
 }  // namespace
 
 std::string RandomRobotName(Pcg32& random) {
@@ -179,8 +213,7 @@ World::World(WorldState state)
             ++reserved_[robot.location.value];
             ++guests_[robot.location.value];
         } else if (robot.activity == RobotActivity::Walking) {
-            const auto destination = rooms_.Find(robot.destination);
-            if (destination && IsVenue(destination->room->kind)) {
+            if (IsGuestTrip(robot, robot.destination)) {
                 ++reserved_[robot.destination.value];
             }
         }
@@ -197,6 +230,7 @@ World World::Generate(const WorldParams& params) {
     const RoomIndex rooms(state.city);
     Pcg32 population = Pcg32::FromSeed(params.seed, kPopulationStream);
     std::unordered_map<std::uint64_t, std::uint32_t> used;
+    std::unordered_map<std::uint64_t, std::uint32_t> staff;
     const auto need = [&] {
         return static_cast<std::int32_t>(population.UniformInt(
             kMinStartingNeed, kMaxStartingNeed));
@@ -207,8 +241,7 @@ World World::Generate(const WorldParams& params) {
         robot.id = state.ids.Allocate();
         robot.apartment =
             AssignRoom(rooms, RoomKind::Apartment, used, population);
-        robot.workspace =
-            AssignRoom(rooms, RoomKind::Workspace, used, population);
+        robot.workspace = AssignJob(rooms, robot.id, staff, population);
         robot.location = robot.apartment;
         robot.punctualityMinutes = population.UniformInt(
             kMinPunctualityMinutes, kMaxPunctualityMinutes);
@@ -264,6 +297,11 @@ std::expected<World, std::string> World::FromState(WorldState state) {
         return std::unexpected(std::move(valid.error()));
     }
     return World(std::move(state));
+}
+
+bool World::IsGuestTrip(const Robot& robot, EntityId destination) const {
+    const auto room = rooms_.Find(destination);
+    return room && IsVenue(room->room->kind) && destination != robot.workspace;
 }
 
 const Robot* World::FindRobot(EntityId id) const noexcept {
@@ -408,7 +446,7 @@ void World::Arrive(Robot& robot) {
         robot.activity = RobotActivity::Working;
         // A late robot still leaves at the regular end of its shift.
         robot.nextActionAt = std::max(
-            robot.shiftStartsAt + WorkplaceOf(robot).shift.lengthMinutes, now);
+            robot.shiftStartsAt + ShiftOf(robot).lengthMinutes, now);
         const auto late = static_cast<std::uint32_t>(
             now > robot.shiftStartsAt ? now - robot.shiftStartsAt : 0);
         if (late > 0) {
@@ -442,11 +480,17 @@ void World::Arrive(Robot& robot) {
     const std::uint32_t others = GuestsIn(robot.location);
     robot.activity = RobotActivity::Visiting;
     ++guests_[robot.location.value];
+    const std::int64_t luxury = LuxuryOf(robot, rules->price);
+    if (robot.credits < static_cast<std::int64_t>(rules->price)) {
+        Withdraw(robot, rules->price - robot.credits);  // Repairs from savings.
+    }
     Sell(robot, venue->room->owner, rules->price);
+    robot.spentToday += rules->price;
     state_.today.venueSales += rules->price;
-    if (const std::int64_t luxury = LuxuryOf(robot); luxury > 0) {
+    if (luxury > 0) {
         Withdraw(robot, luxury);
         Sell(robot, venue->room->owner, luxury);
+        robot.spentToday += luxury;
         state_.today.venueSales += luxury;
     }
     ++state_.today.visits;
@@ -493,17 +537,26 @@ void World::Decide(Robot& robot) {
     const std::int64_t reserve =
         RentOf(robot) + robot.rentOwed + static_cast<std::int64_t>(kMetroFare) +
         (loan != nullptr ? std::min(loan->owed, PocketOf(robot)) : 0);
+    const std::int64_t budget = BudgetOf(robot);
     const auto here = rooms_.Find(robot.location);
     const RoomKind hereKind = here ? here->room->kind : RoomKind::Apartment;
     for (const RoomKind kind : VenueKinds()) {
         const VenueRules& rules = *FindVenueRules(kind);
-        if (robot.credits - static_cast<std::int64_t>(rules.price) < reserve) {
+        // Within what it can pay, and what it means to spend today. A worn
+        // robot pays for repairs out of its savings, budget or not.
+        const bool needsRepair = (kind == RoomKind::Clinic || kind == RoomKind::RepairShop) &&
+                                 robot.needs.condition < kRepairUrgentCondition;
+        const auto price = static_cast<std::int64_t>(rules.price);
+        if (needsRepair ? robot.credits + robot.savings - price < reserve
+                        : (robot.credits - price < reserve ||
+                           robot.spentToday + price > budget)) {
             continue;
         }
         for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
             const Room& room = *venue.room;
-            // Leaving a venue means going somewhere else.
-            if (room.id == robot.location ||
+            // Leaving a venue means going somewhere else, and nobody goes
+            // out to the venue it works at.
+            if (room.id == robot.location || room.id == robot.workspace ||
                 reserved_[room.id.value] >= room.capacity) {
                 continue;
             }
@@ -575,8 +628,7 @@ void World::StartWalk(Robot& robot, EntityId destination) {
         robot.boardsAt = 0;
         robot.alightsAt = 0;
     }
-    const auto room = rooms_.Find(destination);
-    if (room && IsVenue(room->room->kind)) {
+    if (IsGuestTrip(robot, destination)) {
         ++reserved_[destination.value];
     }
     ++state_.today.walks;
@@ -653,7 +705,7 @@ bool World::IsDayOff(const Robot& robot, Tick tick) noexcept {
 }
 
 Tick World::NextShiftStart(const Robot& robot, Tick after) const {
-    Tick start = StartOfDay(after) + WorkplaceOf(robot).shift.startMinute;
+    Tick start = StartOfDay(after) + ShiftOf(robot).startMinute;
     // At most a week ahead: validation guarantees a working day.
     while (start <= after || IsDayOff(robot, start)) {
         start += kMinutesPerDay;
@@ -762,13 +814,6 @@ void World::CollectRent() {
     }
 }
 
-const Building& World::WorkplaceOf(const Robot& robot) const {
-    const auto workspace = rooms_.Find(robot.workspace);
-    if (!workspace) {
-        throw std::logic_error("Robot has no workspace");
-    }
-    return *workspace->building;
-}
 
 void World::Emit(const SimEvent& event) const {
     if (sink_) {
@@ -992,7 +1037,9 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                                     robot.name));
         }
         const Room* apartment = roomOfKind(robot.apartment, RoomKind::Apartment);
-        const Room* workspace = roomOfKind(robot.workspace, RoomKind::Workspace);
+        // A job at a workspace, or on a venue's staff.
+        const auto job = rooms.Find(robot.workspace);
+        const Room* workspace = job && JobsAt(*job->room) > 0 ? job->room : nullptr;
         if (apartment == nullptr ||
             (robot.workspace.IsValid() && workspace == nullptr) ||
             robot.jobLevel > kMaxJobLevel) {
@@ -1002,7 +1049,7 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
         }
         if (++occupants[apartment->id.value] > apartment->capacity ||
             (workspace != nullptr &&
-             ++occupants[workspace->id.value] > workspace->capacity)) {
+             ++occupants[workspace->id.value] > JobsAt(*workspace))) {
             return fail(std::format("Robot '{}' exceeds the capacity of its "
                                     "apartment or workspace",
                                     robot.name));

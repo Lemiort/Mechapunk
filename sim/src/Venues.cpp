@@ -1,5 +1,6 @@
 #include "mechapunk/sim/Venues.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <limits>
@@ -25,7 +26,8 @@ constexpr VenueRules kBar{.label = "bar",
                           .minVisitMinutes = 60,
                           .maxVisitMinutes = 150,
                           .minCapacity = 12,
-                          .maxCapacity = 30};
+                          .maxCapacity = 30,
+    .staff = {.shiftStarts = {Hour(17)}, .shifts = 1, .lengthMinutes = 540, .wage = 100, .guestsPerWorker = 12}};
 // Noodle diners never close, so night-shift workers have company too.
 constexpr VenueRules kDiner{.label = "noodle diner",
                             .opensAt = 0,
@@ -38,7 +40,8 @@ constexpr VenueRules kDiner{.label = "noodle diner",
                             .minVisitMinutes = 30,
                             .maxVisitMinutes = 70,
                             .minCapacity = 8,
-                            .maxCapacity = 20};
+                            .maxCapacity = 20,
+    .staff = {.shiftStarts = {Hour(6), Hour(14), Hour(22)}, .shifts = 3, .lengthMinutes = 480, .wage = 90, .guestsPerWorker = 10}};
 constexpr VenueRules kChargingBay{.label = "charging bay",
                                   .opensAt = 0,
                                   .closesAt = 0,
@@ -50,7 +53,8 @@ constexpr VenueRules kChargingBay{.label = "charging bay",
                                   .minVisitMinutes = 30,
                                   .maxVisitMinutes = 80,
                                   .minCapacity = 6,
-                                  .maxCapacity = 16};
+                                  .maxCapacity = 16,
+    .staff = {.shiftStarts = {Hour(6), Hour(14), Hour(22)}, .shifts = 3, .lengthMinutes = 480, .wage = 85, .guestsPerWorker = 16}};
 constexpr VenueRules kRepairShop{.label = "repair shop",
                                  .opensAt = Hour(7),
                                  .closesAt = Hour(21),
@@ -62,7 +66,8 @@ constexpr VenueRules kRepairShop{.label = "repair shop",
                                  .minVisitMinutes = 30,
                                  .maxVisitMinutes = 60,
                                  .minCapacity = 6,
-                                 .maxCapacity = 12};
+                                 .maxCapacity = 12,
+    .staff = {.shiftStarts = {Hour(7), Hour(13)}, .shifts = 2, .lengthMinutes = 480, .wage = 120, .guestsPerWorker = 6}};
 constexpr VenueRules kArcade{.label = "arcade",
                              .opensAt = Hour(10),
                              .closesAt = Hour(4),
@@ -74,7 +79,8 @@ constexpr VenueRules kArcade{.label = "arcade",
                              .minVisitMinutes = 45,
                              .maxVisitMinutes = 120,
                              .minCapacity = 12,
-                             .maxCapacity = 26};
+                             .maxCapacity = 26,
+    .staff = {.shiftStarts = {Hour(10), Hour(18)}, .shifts = 2, .lengthMinutes = 480, .wage = 90, .guestsPerWorker = 14}};
 constexpr VenueRules kShop{.label = "parts shop",
                            .opensAt = Hour(9),
                            .closesAt = Hour(21),
@@ -86,7 +92,8 @@ constexpr VenueRules kShop{.label = "parts shop",
                            .minVisitMinutes = 20,
                            .maxVisitMinutes = 50,
                            .minCapacity = 6,
-                           .maxCapacity = 14};
+                           .maxCapacity = 14,
+    .staff = {.shiftStarts = {Hour(9), Hour(13)}, .shifts = 2, .lengthMinutes = 480, .wage = 95, .guestsPerWorker = 10}};
 
 constexpr VenueRules kClinic{.label = "repair clinic",
                              .opensAt = Hour(8),
@@ -99,7 +106,8 @@ constexpr VenueRules kClinic{.label = "repair clinic",
                              .minVisitMinutes = 60,
                              .maxVisitMinutes = 120,
                              .minCapacity = 6,
-                             .maxCapacity = 12};
+                             .maxCapacity = 12,
+    .staff = {.shiftStarts = {Hour(8)}, .shifts = 1, .lengthMinutes = 720, .wage = 150, .guestsPerWorker = 4}};
 constexpr VenueRules kBlackMarket{.label = "black market",
                                   .opensAt = Hour(22),
                                   .closesAt = Hour(5),
@@ -111,7 +119,8 @@ constexpr VenueRules kBlackMarket{.label = "black market",
                                   .minVisitMinutes = 20,
                                   .maxVisitMinutes = 60,
                                   .minCapacity = 6,
-                                  .maxCapacity = 14};
+                                  .maxCapacity = 14,
+    .staff = {.shiftStarts = {Hour(22)}, .shifts = 1, .lengthMinutes = 420, .wage = 110, .guestsPerWorker = 10}};
 
 constexpr std::array kVenueKinds{RoomKind::Bar,         RoomKind::Diner,
                                  RoomKind::ChargingBay, RoomKind::RepairShop,
@@ -211,6 +220,27 @@ std::span<const std::string_view> VenueNames(RoomKind kind) noexcept {
             return {};
     }
     return {};
+}
+
+
+std::uint32_t StaffPerShift(const Room& venue) noexcept {
+    const VenueRules* rules = FindVenueRules(venue.kind);
+    if (rules == nullptr) {
+        return 0;
+    }
+    return std::max<std::uint32_t>(1, venue.capacity / rules->staff.guestsPerWorker);
+}
+
+std::uint32_t JobsAt(const Room& room) noexcept {
+    if (room.kind == RoomKind::Workspace) {
+        return room.capacity;
+    }
+    const VenueRules* rules = FindVenueRules(room.kind);
+    return rules != nullptr ? StaffPerShift(room) * rules->staff.shifts : 0;
+}
+
+std::uint32_t ShiftSlot(EntityId robot, const VenueRules& rules) noexcept {
+    return static_cast<std::uint32_t>((robot.value * 2654435761ULL >> 8U) % rules.staff.shifts);
 }
 
 }  // namespace mechapunk::sim

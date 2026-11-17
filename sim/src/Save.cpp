@@ -133,6 +133,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 9,
               .summary = "a closed economy with owners, banks and statistics",
               .apply = &migrations::V9ToV10},
+    Migration{.fromVersion = 10,
+              .summary = "daily budgets",
+              .apply = &migrations::V10ToV11},
 };
 }  // namespace
 

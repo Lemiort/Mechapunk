@@ -20,7 +20,8 @@ namespace mechapunk::sim {
 namespace {
 constexpr std::uint64_t kEconomyStream = 7;
 // Of every credit a sector takes, this much buys supplies from industry.
-constexpr std::int64_t kVenueSupplyPercent = 95;
+constexpr std::int64_t kMinSupplyPercent = 20;
+constexpr std::int64_t kMaxSupplyPercent = 95;
 constexpr std::int64_t kUtilitySupplyPercent = 95;
 constexpr std::int64_t kTransitSupplyPercent = 95;
 constexpr std::int64_t kHousingSupplyPercent = 50;
@@ -42,10 +43,17 @@ constexpr std::int64_t kCorporationFloor = 200;
 // Of what a corporation has beyond twice its reserve, the share paid out
 // each night.
 constexpr std::int64_t kDividendPercent = 50;
-// Robots with more saved than this spend 1/kLuxuryDivisor of the rest on
-// every visit, on better drinks, parts and service.
-constexpr std::int64_t kComfortableSavings = 2000;
-constexpr std::int64_t kLuxuryDivisor = 100;
+// A robot's daily budget for outings: this share of its average day's pay,
+// plus 1/kSavingsSpendDays of what it has saved beyond kSavingsTargetNights
+// of its bills (savings put by for a rainy day), plus a little.
+constexpr std::int64_t kBudgetPercent = 80;
+constexpr std::int64_t kSavingsSpendDays = 10;
+constexpr std::int64_t kSavingsTargetNights = 30;
+constexpr std::int64_t kBaseBudget = 10;
+constexpr std::int64_t kWorkDaysPerWeek = 5;
+// Robots with more saved than this spend a quarter of what is left of
+// their budget on every visit, on better drinks, parts and service.
+constexpr std::int64_t kComfortableSavings = 1000;
 
 constexpr std::array<std::string_view, 12> kIndustryNames{
     "Kessler", "Omni", "Vortek", "Hexa", "Ironclad", "Synthex",
@@ -476,7 +484,7 @@ void World::PayOrBorrow(Organization& payer, EntityId to, std::int64_t amount) {
 void World::PaySupplies(Organization& buyer, std::int64_t revenue) {
     std::int64_t percent = 0;
     switch (buyer.sector) {
-        case Sector::Venues: percent = kVenueSupplyPercent; break;
+        case Sector::Venues: percent = state_.economy.supplyPercent; break;
         case Sector::Utilities: percent = kUtilitySupplyPercent; break;
         case Sector::Transit: percent = kTransitSupplyPercent; break;
         case Sector::Housing: percent = kHousingSupplyPercent; break;
@@ -492,11 +500,26 @@ void World::PaySupplies(Organization& buyer, std::int64_t revenue) {
     state_.today.supplies += supplies;
 }
 
-std::int64_t World::LuxuryOf(const Robot& robot) const {
-    // The rich spend more: a share of savings above a comfortable sum.
-    return robot.savings > kComfortableSavings
-               ? (robot.savings - kComfortableSavings) / kLuxuryDivisor
-               : 0;
+std::int64_t World::LuxuryOf(const Robot& robot, std::int64_t price) const {
+    if (robot.savings <= kComfortableSavings) {
+        return 0;
+    }
+    return std::max<std::int64_t>(0, BudgetOf(robot) - robot.spentToday - price) / 4;
+}
+
+std::int64_t World::PayOf(const Robot& robot) const {
+    const auto job = rooms_.Find(robot.workspace);
+    const Organization* employer = job ? FindOrganization(job->room->owner) : nullptr;
+    const std::int64_t percent = employer != nullptr ? employer->payPercent : 100;
+    return static_cast<std::int64_t>(WageOf(robot)) * percent / 100;
+}
+
+std::int64_t World::BudgetOf(const Robot& robot) const {
+    const std::int64_t pay =
+        robot.workspace.IsValid() ? PayOf(robot) * kWorkDaysPerWeek / kDaysPerWeek : 0;
+    const std::int64_t target = kSavingsTargetNights * RentOf(robot);
+    const std::int64_t spare = std::max<std::int64_t>(0, robot.savings - target);
+    return (pay * kBudgetPercent / 100) + (spare / kSavingsSpendDays) + kBaseBudget;
 }
 
 void World::Sell(Robot& buyer, EntityId seller, std::int64_t price) {
@@ -517,7 +540,7 @@ void World::PayWage(Robot& robot) {
     if (employer == nullptr) {
         throw std::logic_error("A workspace without an owner");
     }
-    const std::int64_t wage = static_cast<std::int64_t>(WageOf(robot)) * employer->payPercent / 100;
+    const std::int64_t wage = PayOf(robot);
     employer->today.wages += wage;
     PayOrBorrow(*employer, robot.id, wage);
     state_.today.wages += wage;
@@ -627,7 +650,7 @@ std::int64_t World::ReserveOf(const Organization& organization) const {
         return books.wages + books.supplies + books.upkeep + books.rent;
     };
     return std::max(kCorporationFloor,
-                    2 * std::max(costs(organization.today), costs(organization.yesterday)));
+                    std::max(costs(organization.today), costs(organization.yesterday)));
 }
 
 void World::TradeProperty() {
@@ -768,14 +791,43 @@ void World::SettleEconomy() {
         IndexEconomy();
     }
 
-    // Industry pays what it can afford: less while losing money, more while
-    // earning it.
-    for (Organization* corporation : industry) {
+    // The price of supplies follows industry's books: it must cover the
+    // wages and pay down a fiftieth of industry's debts a day. It moves by up
+    // to five points a day, faster the further off it is.
+    {
+        std::int64_t revenue = 0;
+        std::int64_t needed = 0;
+        for (const Organization* corporation : industry) {
+            revenue += corporation->today.revenue;
+            needed += corporation->today.wages;
+            if (const Loan* loan = LoanOf(corporation->id)) {
+                needed += loan->owed / 50;
+            }
+        }
+        if (needed > 0) {
+            const std::int64_t gapPercent = (needed - revenue) * 100 / needed;
+            const std::int64_t step = std::clamp<std::int64_t>(std::abs(gapPercent) / 2, 1, 5);
+            std::int64_t& price = economy.supplyPercent;
+            if (gapPercent > 0) {
+                price = std::min(kMaxSupplyPercent, price + step);
+            } else if (gapPercent < -2) {
+                price = std::max(kMinSupplyPercent, price - step);
+            }
+        }
+    }
+
+    // Employers pay what they can afford: less while losing money, more
+    // while earning it.
+    for (Organization& employer : economy.organizations) {
+        if (employer.sector != Sector::Industry && employer.sector != Sector::Venues) {
+            continue;
+        }
+        Organization* corporation = &employer;
         const Books& books = corporation->today;
         const std::int64_t costs = books.wages + books.supplies;
         if (books.revenue < costs) {
             corporation->payPercent = std::max(kMinPayPercent, corporation->payPercent - 1);
-        } else if (books.revenue > costs) {
+        } else if (LoanOf(corporation->id) == nullptr && books.revenue > costs) {
             corporation->payPercent = std::min(kMaxPayPercent, corporation->payPercent + 1);
         }
     }
@@ -815,8 +867,10 @@ void World::SettleEconomy() {
         }
     }
 
-    // Robots bank what they do not need in their pocket, or take some out.
+    // Robots bank what they do not need in their pocket, or take some out,
+    // and start a new day's budget.
     for (Robot& robot : state_.robots) {
+        robot.spentToday = 0;
         const std::int64_t pocket = PocketOf(robot);
         if (robot.credits > 2 * pocket) {
             const std::int64_t deposit = robot.credits - pocket;
@@ -895,6 +949,7 @@ void World::RecordStatistics() {
         }
     }
     stats.averagePayPercent = industry > 0 ? payPercent / industry : 100;
+    stats.supplyPercent = state.economy.supplyPercent;
     for (const Robot& robot : state.robots) {
         stats.robotMoney += robot.credits;
         stats.robotSavings += robot.savings;

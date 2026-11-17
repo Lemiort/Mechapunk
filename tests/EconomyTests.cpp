@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <map>
 #include <unordered_set>
 #include <vector>
 
@@ -61,6 +62,22 @@ TEST(Economy, EverythingHasAnOwnerFromTheStart) {
                                                                            : sim::Sector::Venues);
         }
     }
+    // Every venue has its staff, on every shift.
+    std::map<std::uint64_t, std::uint32_t> staff;
+    for (const sim::Robot& robot : state.robots) {
+        if (const auto job = world.Rooms().Find(robot.workspace)) {
+            staff[sim::JobKey(*job->room, robot.id)] += 1;
+        }
+    }
+    for (const sim::RoomKind kind : sim::VenueKinds()) {
+        for (const sim::RoomRef& venue : world.Rooms().RoomsOfKind(kind)) {
+            const sim::VenueRules& rules = *sim::FindVenueRules(kind);
+            for (std::uint32_t slot = 0; slot < rules.staff.shifts; ++slot) {
+                EXPECT_EQ(staff[(venue.room->id.value * 4) + slot], sim::StaffPerShift(*venue.room))
+                    << venue.room->name << " shift " << slot;
+            }
+        }
+    }
     for (const sim::Organization& organization : state.economy.organizations) {
         if (organization.kind != sim::OrganizationKind::CentralBank) {
             EXPECT_FALSE(organization.owners.empty()) << organization.name;
@@ -110,15 +127,20 @@ TEST(Economy, WagesAndSalesMoveBetweenAccounts) {
     EXPECT_EQ(day.counted.wages, wages);
     EXPECT_GT(day.counted.venueSales, 0);
     EXPECT_GT(day.counted.supplies, 0);
+    // Industry and venues employ robots; between them they paid every wage.
     std::int64_t industryRevenue = 0;
-    std::int64_t industryWages = 0;
+    std::int64_t employersWages = 0;
+    std::int64_t venueWages = 0;
     for (const sim::Organization& organization : world.State().economy.organizations) {
+        employersWages += organization.yesterday.wages;
         if (organization.sector == sim::Sector::Industry) {
             industryRevenue += organization.yesterday.revenue;
-            industryWages += organization.yesterday.wages;
+        } else if (organization.sector == sim::Sector::Venues) {
+            venueWages += organization.yesterday.wages;
         }
     }
-    EXPECT_EQ(industryWages, wages);
+    EXPECT_EQ(employersWages, wages);
+    EXPECT_GT(venueWages, 0);
     EXPECT_GT(industryRevenue, 0);
 }
 

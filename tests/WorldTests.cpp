@@ -87,7 +87,7 @@ TEST(World, RobotsWorkEveryDayOnTime) {
             const sim::Robot* robot = world.FindRobot(event.robot);
             const auto workspace = world.Rooms().Find(robot->workspace);
             if (event.tick != robot->shiftStartsAt +
-                                  workspace->building->shift.lengthMinutes) {
+                                  sim::JobShift(*workspace, robot->id).lengthMinutes) {
                 ++wrongLengths;
             }
         }
@@ -224,7 +224,8 @@ TEST(World, RobotsKeepABudgetForRent) {
         const sim::Room& home = *world.Rooms().Find(robot->apartment)->room;
         const std::int64_t bill =
             home.owner == robot->id ? home.rent * sim::kUpkeepPercent / 100 : home.rent;
-        EXPECT_GE(robot->credits, bill + robot->rentOwed) << robot->name;
+        // Repairs a worn robot needs may come out of its savings.
+        EXPECT_GE(robot->credits + robot->savings, bill + robot->rentOwed) << robot->name;
     });
     world.RunFor(7 * sim::kMinutesPerDay);
 }

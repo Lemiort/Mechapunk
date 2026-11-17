@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -26,6 +27,17 @@ struct NeedEffects {
     std::int32_t fun{};
 };
 
+// The staff of a kind of venue: up to three shifts a day, starting at these
+// minutes, each kStaffShiftMinutes long (or until closing), and one worker
+// a shift for every guestsPerWorker places, at least one.
+struct StaffRules {
+    std::array<std::uint32_t, 3> shiftStarts{};
+    std::uint32_t shifts{1};
+    std::uint32_t lengthMinutes{480};
+    std::uint32_t wage{};  // Base wage a shift.
+    std::uint32_t guestsPerWorker{10};
+};
+
 // How a kind of venue works. These are game rules, not saved state: changing
 // them changes behavior but never the save format.
 struct VenueRules {
@@ -44,6 +56,7 @@ struct VenueRules {
     std::uint32_t maxVisitMinutes{};
     std::uint32_t minCapacity{};
     std::uint32_t maxCapacity{};
+    StaffRules staff;
 };
 
 // Rules for a venue room; nothing for apartments and workspaces.
@@ -54,6 +67,14 @@ struct VenueRules {
 // Minutes from `minuteOfDay` until closing; a large number when always open.
 [[nodiscard]] std::uint32_t MinutesUntilClose(const VenueRules& rules,
                                               std::uint32_t minuteOfDay) noexcept;
+
+// Workers a venue needs on each of its shifts.
+[[nodiscard]] std::uint32_t StaffPerShift(const Room& venue) noexcept;
+// Jobs in a room: a workspace's capacity, a venue's staff on all shifts.
+[[nodiscard]] std::uint32_t JobsAt(const Room& room) noexcept;
+// Which of its venue's shifts a robot works: fixed by the robot, so a
+// venue hires for the shift a newcomer can take.
+[[nodiscard]] std::uint32_t ShiftSlot(EntityId robot, const VenueRules& rules) noexcept;
 
 // Every venue kind, for generation.
 [[nodiscard]] std::span<const RoomKind> VenueKinds() noexcept;

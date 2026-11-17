@@ -67,6 +67,8 @@ struct Robot {
     // credits the bank holds and owes it.
     EntityId bank;
     std::int64_t savings{};
+    // Spent on outings since midnight, against its daily budget.
+    std::int64_t spentToday{};
     // Bit n set: likes Interest n.
     std::uint8_t interests{};
     // Robots it has talked to, sorted by their id.
@@ -292,6 +294,8 @@ private:
     void StartWalk(Robot& robot, EntityId destination);
     void ScheduleNextCommute(Robot& robot);
     [[nodiscard]] Tick LatestHomeTick(const Robot& robot);
+    // Going to a venue as a guest, not to work there.
+    [[nodiscard]] bool IsGuestTrip(const Robot& robot, EntityId destination) const;
     void CollectRent();
     // Metro, in Transit.cpp.
     void IndexStations();
@@ -329,7 +333,14 @@ private:
     // Longest time the robot may need between leaving home and its shift.
     [[nodiscard]] Tick MaxCommuteLead(const Robot& robot);
     [[nodiscard]] std::int64_t RentOf(const Robot& robot) const;
-    [[nodiscard]] const Building& WorkplaceOf(const Robot& robot) const;
+    // The shift a robot works, at a workspace or a venue.
+    [[nodiscard]] Shift ShiftOf(const Robot& robot) const;
+    // Robots holding each job, by JobKey.
+    [[nodiscard]] std::unordered_map<std::uint64_t, std::uint32_t> StaffCounts() const;
+    // Jobs a robot could take now: workspaces with room, and venues short of
+    // staff on the shift it would work.
+    [[nodiscard]] std::vector<EntityId> OpeningsFor(
+        EntityId robot, const std::unordered_map<std::uint64_t, std::uint32_t>& staff) const;
     void Emit(const SimEvent& event) const;
     // Money, in Economy.cpp.
     void FoundEconomy(std::uint64_t seed);
@@ -351,7 +362,11 @@ private:
     void Sell(Robot& buyer, EntityId seller, std::int64_t price);
     void PaySupplies(Organization& buyer, std::int64_t revenue);
     // What a robot spends beyond the price on a visit.
-    [[nodiscard]] std::int64_t LuxuryOf(const Robot& robot) const;
+    [[nodiscard]] std::int64_t LuxuryOf(const Robot& robot, std::int64_t price) const;
+    // A shift's pay: the job level's wage at the employer's share of it.
+    [[nodiscard]] std::int64_t PayOf(const Robot& robot) const;
+    // What a robot means to spend on outings in a day.
+    [[nodiscard]] std::int64_t BudgetOf(const Robot& robot) const;
     void Lend(EntityId lender, EntityId borrower, std::int64_t amount);
     [[nodiscard]] bool MayBorrow(const Robot& robot, std::int64_t amount) const;
     void ChangeMoney(EntityId account, std::int64_t amount, EmissionReason reason);
@@ -393,6 +408,12 @@ private:
     EntityId transit_;
     EventSink sink_;
 };
+
+// The shift of a job: a workspace's building shift, or for venue staff
+// the venue's shift the robot works.
+[[nodiscard]] Shift JobShift(const RoomRef& job, EntityId robot) noexcept;
+// A job and shift, as a key: a robot at a venue counts toward its shift.
+[[nodiscard]] std::uint64_t JobKey(const Room& job, EntityId robot) noexcept;
 
 // Checks references and invariants of a state; describes the first problem.
 [[nodiscard]] std::expected<void, std::string> ValidateWorldState(

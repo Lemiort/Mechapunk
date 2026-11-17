@@ -177,14 +177,25 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v10-city.json";
+        kFixtureDirectory / "saves" / "v11-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
-    // Saved with tenants, savers, robots and a corporation in debt, scrapped
+    // Saved with venue staff,
+    EXPECT_TRUE(std::ranges::any_of(state->robots, [&](const sim::Robot& robot) {
+        for (const sim::Building& building : state->city.buildings) {
+            for (const sim::Room& room : building.rooms) {
+                if (room.id == robot.workspace && sim::IsVenue(room.kind)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }));
+    // tenants, savers, robots and a corporation in debt, scrapped
     // robots still remembered, and days of statistics.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [&](const sim::Robot& robot) {
         for (const sim::Building& building : state->city.buildings) {
@@ -489,5 +500,25 @@ TEST(Save, Version9FixtureMigratesAndRuns) {
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_EQ(world->State().history.size(), 2U);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 10 save gets daily budgets and a price of supplies, and goes on
+// running: out-of-work robots find jobs on venues' staff.
+TEST(Save, Version10FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v10-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_EQ(state->economy.supplyPercent, 60);
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_EQ(robot.spentToday, 0) << robot.name;
+    }
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

@@ -172,6 +172,7 @@ struct DailyStats {
     std::int64_t broke{};           // Robots with less than tonight's bill.
     std::int64_t behindOnBills{};
     std::int64_t averagePayPercent{};
+    std::int64_t supplyPercent{};
     // Property.
     std::int64_t homeowners{};
     std::int64_t tenants{};
@@ -193,6 +194,10 @@ struct Economy {
     // Paid today for supplies; shared among industry at midnight in
     // proportion to the wages each corporation paid.
     std::int64_t supplyMarket{};
+    // The price of supplies: the share of their takings, in percent, venues
+    // pay industry. It rises while industry loses money and falls while it
+    // makes a profit.
+    std::int64_t supplyPercent{60};
 };
 
 // The price of an apartment: so many nights of its rent.

@@ -58,6 +58,9 @@ struct RoomPlan {
     // Places for occupants, in the order they are used. In an apartment the
     // first is the bed and the second the sofa.
     std::vector<Spot> spots;
+    // The last staffSpots spots are for the venue's staff on shift: behind
+    // the bar, at the till, by the lifts.
+    std::size_t staffSpots{0};
     bool home{false};
     // The way in, from the floor's corridor or, with `streetDoor`, from the
     // pavement outside the room's own door.

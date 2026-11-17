@@ -59,7 +59,63 @@ std::int32_t PromotionTarget(std::uint8_t level) noexcept {
 }
 
 std::uint32_t World::WageOf(const Robot& robot) const {
-    return WageAtLevel(WorkplaceOf(robot).shift.wage, robot.jobLevel);
+    return WageAtLevel(ShiftOf(robot).wage, robot.jobLevel);
+}
+
+Shift JobShift(const RoomRef& job, EntityId robot) noexcept {
+    const VenueRules* rules = FindVenueRules(job.room->kind);
+    if (rules == nullptr) {
+        return job.building->shift;
+    }
+    const std::uint32_t slot = ShiftSlot(robot, *rules);
+    return {.startMinute = rules->staff.shiftStarts.at(slot),
+            .lengthMinutes = rules->staff.lengthMinutes,
+            .wage = rules->staff.wage};
+}
+
+std::uint64_t JobKey(const Room& job, EntityId robot) noexcept {
+    const VenueRules* rules = FindVenueRules(job.kind);
+    return (job.id.value * 4) + (rules != nullptr ? ShiftSlot(robot, *rules) : 0);
+}
+
+Shift World::ShiftOf(const Robot& robot) const {
+    const auto job = rooms_.Find(robot.workspace);
+    if (!job) {
+        throw std::logic_error("Robot has no job");
+    }
+    return JobShift(*job, robot.id);
+}
+
+std::unordered_map<std::uint64_t, std::uint32_t> World::StaffCounts() const {
+    std::unordered_map<std::uint64_t, std::uint32_t> staff;
+    for (const Robot& robot : state_.robots) {
+        if (const auto job = rooms_.Find(robot.workspace)) {
+            ++staff[JobKey(*job->room, robot.id)];
+        }
+    }
+    return staff;
+}
+
+std::vector<EntityId> World::OpeningsFor(
+    EntityId robot, const std::unordered_map<std::uint64_t, std::uint32_t>& staff) const {
+    std::vector<EntityId> openings;
+    const auto taken = [&](const Room& room) {
+        const auto found = staff.find(JobKey(room, robot));
+        return found != staff.end() ? found->second : 0U;
+    };
+    for (const RoomRef& workspace : rooms_.RoomsOfKind(RoomKind::Workspace)) {
+        if (taken(*workspace.room) < workspace.room->capacity) {
+            openings.push_back(workspace.room->id);
+        }
+    }
+    for (const RoomKind kind : VenueKinds()) {
+        for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
+            if (taken(*venue.room) < StaffPerShift(*venue.room)) {
+                openings.push_back(venue.room->id);
+            }
+        }
+    }
+    return openings;
 }
 
 void World::ScoreArrivalAtWork(Robot& robot) {
@@ -98,30 +154,19 @@ void World::EndShift(Robot& robot) {
 }
 
 void World::ReviewJobs() {
-    std::unordered_map<std::uint64_t, std::uint32_t> staff;
-    for (const Robot& robot : state_.robots) {
-        if (robot.workspace.IsValid()) {
-            ++staff[robot.workspace.value];
-        }
-    }
-    std::vector<EntityId> openings;
+    std::unordered_map<std::uint64_t, std::uint32_t> staff = StaffCounts();
     for (Robot& robot : state_.robots) {
         if (robot.workspace.IsValid() ||
             state_.random.UniformInt(1, 100) > kHirePercent) {
             continue;
         }
-        openings.clear();
-        for (const RoomRef& workspace : rooms_.RoomsOfKind(RoomKind::Workspace)) {
-            if (staff[workspace.room->id.value] < workspace.room->capacity) {
-                openings.push_back(workspace.room->id);
-            }
-        }
+        const std::vector<EntityId> openings = OpeningsFor(robot.id, staff);
         if (openings.empty()) {
-            return;  // The city is fully staffed.
+            continue;  // Nothing on the shifts it could work.
         }
         const EntityId job = openings.at(state_.random.UniformInt(
             0, static_cast<std::uint32_t>(openings.size() - 1)));
-        ++staff[job.value];
+        ++staff[JobKey(*rooms_.Find(job)->room, robot.id)];
         robot.workspace = job;
         robot.jobLevel = 0;
         robot.performance = 0;

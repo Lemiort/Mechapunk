@@ -12,6 +12,7 @@
 #include <set>
 #include <span>
 #include <tuple>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -903,7 +904,7 @@ const CityView::RoomWays* CityView::WaysOf(sim::EntityId room) {
         }
         return walk;
     };
-    RoomWays ways{.home = roomPlan->home};
+    RoomWays ways{.home = roomPlan->home, .staffSpots = roomPlan->staffSpots};
     for (std::size_t spot = 0; spot < roomPlan->spots.size(); ++spot) {
         ways.fromSpot.push_back(toWorld(WayOut(*roomPlan, spot, floor)));
     }
@@ -912,10 +913,13 @@ const CityView::RoomWays* CityView::WaysOf(sim::EntityId room) {
 }
 
 std::size_t CityView::SpotFor(sim::EntityId robot, sim::EntityId room, bool home,
-                              std::size_t count, double tick) const {
+                              std::size_t count, double tick, std::size_t staffSpots,
+                              bool staff) const {
     if (count == 0) {
         return 0;
     }
+    // Guests use the first spots, staff the last staffSpots.
+    const auto [first, last] = SpotRange(count, staffSpots, staff);
     if (home) {
         const double minute = std::fmod(tick, static_cast<double>(sim::kMinutesPerDay));
         const bool night = minute >= kBedtime || minute < kWakeUp;
@@ -923,10 +927,19 @@ std::size_t CityView::SpotFor(sim::EntityId robot, sim::EntityId room, bool home
     }
     if (const auto found = assignedSpots_.find(robot.value);
         found != assignedSpots_.end() && found->second.room == room &&
-        found->second.spot < count) {
+        found->second.spot >= first && found->second.spot < last) {
         return found->second.spot;
     }
-    return static_cast<std::size_t>((robot.value * 2654435761ULL) >> 11U) % count;
+    return first + (static_cast<std::size_t>((robot.value * 2654435761ULL) >> 11U) % (last - first));
+}
+
+std::pair<std::size_t, std::size_t> CityView::SpotRange(std::size_t count,
+                                                        std::size_t staffSpots, bool staff) {
+    if (staffSpots == 0 || staffSpots >= count) {
+        return {0, count};
+    }
+    return staff ? std::pair{count - staffSpots, count}
+                 : std::pair{std::size_t{0}, count - staffSpots};
 }
 
 void CityView::AssignSpots(const WorldFrame& frame, const FloorPlan& plan) {
@@ -934,10 +947,20 @@ void CityView::AssignSpots(const WorldFrame& frame, const FloorPlan& plan) {
     std::unordered_map<std::uint64_t, std::vector<std::pair<sim::Tick, std::uint64_t>>>
         visitors;
     std::unordered_map<std::uint64_t, std::size_t> spotCounts;
+    std::unordered_map<std::uint64_t, std::size_t> staffCounts;
     for (const RoomPlan& room : plan.rooms) {
         if (!room.home && !room.spots.empty()) {
             visitors[room.room.value];
             spotCounts[room.room.value] = room.spots.size();
+            staffCounts[room.room.value] = room.staffSpots;
+        }
+    }
+    // Robots at, or on their way to, the venue they work at.
+    std::unordered_set<std::uint64_t> staff;
+    for (const RobotFrame& robot : frame.robots) {
+        if (robot.workspace.IsValid() &&
+            (robot.workspace == robot.location || robot.workspace == robot.destination)) {
+            staff.insert(robot.id.value);
         }
     }
     std::unordered_map<std::uint64_t, AssignedSpot> next;
@@ -961,11 +984,14 @@ void CityView::AssignSpots(const WorldFrame& frame, const FloorPlan& plan) {
         const sim::EntityId room{roomValue};
         std::vector<bool> taken(count, false);
         std::vector<std::uint64_t> newcomers;
+        const std::size_t staffSpots = staffCounts.at(roomValue);
         // Robots keep the spots they already had.
         for (const auto& [arrives, id] : robots) {
             const auto had = assignedSpots_.find(id);
+            const auto [first, last] = SpotRange(count, staffSpots, staff.contains(id));
             if (had != assignedSpots_.end() && had->second.room == room &&
-                had->second.spot < count && !taken[had->second.spot]) {
+                had->second.spot >= first && had->second.spot < last &&
+                !taken[had->second.spot]) {
                 taken[had->second.spot] = true;
                 next[id] = had->second;
             } else {
@@ -974,11 +1000,13 @@ void CityView::AssignSpots(const WorldFrame& frame, const FloorPlan& plan) {
         }
         // Newcomers take their favourite free spot, or the next free one.
         for (const std::uint64_t id : newcomers) {
+            const auto [first, last] = SpotRange(count, staffSpots, staff.contains(id));
+            const std::size_t range = last - first;
             const std::size_t favourite =
-                static_cast<std::size_t>((id * 2654435761ULL) >> 11U) % count;
-            std::size_t spot = favourite;
-            for (std::size_t step = 0; step < count; ++step) {
-                const std::size_t candidate = (favourite + step) % count;
+                static_cast<std::size_t>((id * 2654435761ULL) >> 11U) % range;
+            std::size_t spot = first + favourite;
+            for (std::size_t step = 0; step < range; ++step) {
+                const std::size_t candidate = first + ((favourite + step) % range);
                 if (!taken[candidate]) {
                     spot = candidate;
                     break;
@@ -1455,8 +1483,11 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
                                          .radius = 0.6F * kS});
                 continue;
             }
-            const Spot& spot = room.spots.at(
-                SpotFor(robot, room.room, room.home, room.spots.size(), renderTick));
+            const RobotFrame* robotFrame = SimulationHost::FindRobot(frame, robot);
+            const bool working = robotFrame != nullptr && robotFrame->workspace == room.room;
+            const Spot& spot = room.spots.at(SpotFor(robot, room.room, room.home,
+                                                     room.spots.size(), renderTick,
+                                                     room.staffSpots, working));
             const bool selected = robot == selection.robot;
             const bool lying = spot.pose == Pose::Lying;
             const vec3 origin = ToWorld(shape, current, spot.position);
@@ -1613,7 +1644,8 @@ std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& rob
         if (const RoomWays* ways = WaysOf(robot.location)) {
             const std::size_t spot =
                 SpotFor(robot.id, robot.location, ways->home, ways->fromSpot.size(),
-                        static_cast<double>(robot.departedAt));
+                        static_cast<double>(robot.departedAt), ways->staffSpots,
+                        robot.workspace == robot.location);
             const Walk& way = ways->fromSpot.empty() ? ways->fromDoor : ways->fromSpot[spot];
             walk_.insert(walk_.end(), way.begin(), way.end());
         } else if (const auto shape = shapes_.find(robot.from.value);
@@ -1625,7 +1657,8 @@ std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& rob
         if (const RoomWays* ways = WaysOf(robot.destination)) {
             const std::size_t spot =
                 SpotFor(robot.id, robot.destination, ways->home, ways->fromSpot.size(),
-                        static_cast<double>(robot.arrivesAt));
+                        static_cast<double>(robot.arrivesAt), ways->staffSpots,
+                        robot.workspace == robot.destination);
             const Walk& way = ways->fromSpot.empty() ? ways->fromDoor : ways->fromSpot[spot];
             walk_.insert(walk_.end(), way.rbegin(), way.rend());
         } else if (const auto shape = shapes_.find(robot.to.value);

@@ -97,7 +97,7 @@ TEST(Careers, WagesFollowTheJobLevel) {
         ASSERT_NE(employer, nullptr);
         EXPECT_EQ(event.credits,
                   static_cast<std::int64_t>(
-                      sim::WageAtLevel(room->building->shift.wage, robot->jobLevel)) *
+                      sim::WageAtLevel(sim::JobShift(*room, robot->id).wage, robot->jobLevel)) *
                       employer->payPercent / 100);
         ++shifts;
     });
@@ -147,7 +147,7 @@ TEST(Careers, WornDownWorkersAreFiredAndHiredAgain) {
     const auto workspace = city.Rooms().Find(robot.workspace);
     ASSERT_TRUE(workspace.has_value());
     const sim::Tick shiftEnd =
-        robot.shiftStartsAt + workspace->building->shift.lengthMinutes;
+        robot.shiftStartsAt + sim::JobShift(*workspace, robot.id).lengthMinutes;
     const sim::EntityId id = robot.id;
 
     sim::World world = Load(std::move(state));

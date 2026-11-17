@@ -604,6 +604,39 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
     }
     FillStanding(area, f, 1.0F, width - 1.0F, kDepth - 6.0F, kDepth - 1.0F,
                  room.capacity);
+    // Staff on shift, where the work is done.
+    const std::uint32_t staff = std::min<std::uint32_t>(sim::StaffPerShift(room), 3);
+    const auto worker = [&](float x, float u, vec2 facing, std::vector<vec3> approach = {}) {
+        area.spots.push_back(Via(MakeSpot(f, x, u, facing, Pose::Standing), std::move(approach)));
+        ++area.staffSpots;
+    };
+    for (std::uint32_t index = 0; index < staff; ++index) {
+        const auto i = static_cast<float>(index);
+        switch (room.kind) {
+            case sim::RoomKind::Bar:
+            case sim::RoomKind::Diner:
+                // Behind the counter, round its end by the left wall.
+                worker(middle - 1.0F + i, 2.6F, {0, 1},
+                       {f.At(0.7F, kDepth - 2.0F), f.At(0.7F, 2.6F)});
+                break;
+            case sim::RoomKind::Shop:
+                worker(width - 0.5F, kDepth - 3.0F - i, {-1, 0});
+                break;
+            case sim::RoomKind::Clinic:
+                worker(middle - 0.8F + (0.8F * i), kDepth - 3.7F, {0, 1});
+                break;
+            case sim::RoomKind::RepairShop:
+                worker(1.2F + (2.4F * i), 2.4F, {0, -1});
+                break;
+            case sim::RoomKind::BlackMarket:
+                worker(0.3F, 1.5F + (3.2F * i), {1, 0});
+                break;
+            default:
+                // An attendant by the door.
+                worker(width - 0.8F, kDepth - 4.0F - i, {-1, 0});
+                break;
+        }
+    }
     LampGrid(plan, f, width, kDepth, room.id, 6.0F);
     plan.rooms.push_back(std::move(area));
 }

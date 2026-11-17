@@ -160,6 +160,7 @@ private:
     // The ways out of a room to the pavement in front of its building.
     struct RoomWays {
         bool home{false};
+        std::size_t staffSpots{0};  // The last ones, for staff.
         std::vector<Walk> fromSpot;
         Walk fromDoor;  // For a room without spots.
     };
@@ -244,9 +245,15 @@ private:
     // The spot a robot takes in `room`, which has `count` spots, at
     // `tick`: at home the bed by night and the sofa by day, elsewhere the
     // one it was given in that room on the open floor, else its favourite.
+    // Staff working in the room take its last staffSpots spots; guests the
+    // others.
     [[nodiscard]] std::size_t SpotFor(sim::EntityId robot, sim::EntityId room,
-                                      bool home, std::size_t count,
-                                      double tick) const;
+                                      bool home, std::size_t count, double tick,
+                                      std::size_t staffSpots, bool staff) const;
+    // The spots, first to last (exclusive), for staff or for guests.
+    [[nodiscard]] static std::pair<std::size_t, std::size_t> SpotRange(std::size_t count,
+                                                                       std::size_t staffSpots,
+                                                                       bool staff);
     // Gives the robots in or walking to the rooms of `plan` a spot each, in
     // order of arrival, so nobody shares one while another is free. A robot
     // keeps its spot from frame to frame, and a robot walking out keeps the

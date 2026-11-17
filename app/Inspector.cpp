@@ -448,12 +448,21 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
         }
         if (const auto work = city.Rooms().Find(robot.workspace)) {
             follow(RoomLink(city, robot.workspace, "Work: "));
-            const sim::Shift& shift = work->building->shift;
+            const sim::Shift shift = sim::JobShift(*work, robot.id);
+            // The level's wage at the share of it the employer pays now.
+            std::int64_t pay = sim::WageAtLevel(shift.wage, robot.jobLevel);
+            if (frame.economy != nullptr) {
+                if (const sim::Organization* employer =
+                        frame.economy->FindOrganization(frame.economy->OwnerOf(robot.workspace))) {
+                    pay = pay * employer->payPercent / 100;
+                }
+            }
             const std::string job = std::format(
-                "{}, {}-{}, {} cr a shift", sim::JobTitle(robot.jobLevel),
+                "{}{}, {}-{}, {} cr a shift", sim::JobTitle(robot.jobLevel),
+                sim::IsVenue(work->room->kind) ? " on the staff" : "",
                 sim::FormatClock(shift.startMinute),
-                sim::FormatClock(shift.startMinute + shift.lengthMinutes),
-                sim::WageAtLevel(shift.wage, robot.jobLevel));
+                sim::FormatClock((shift.startMinute + shift.lengthMinutes) % sim::kMinutesPerDay),
+                pay);
             ImGui::TextDisabled("%s", job.c_str());
             DrawPerformance(robot);
         } else {

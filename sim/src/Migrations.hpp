@@ -47,4 +47,9 @@ namespace mechapunk::sim::migrations {
 // rest. The founding money is logged as created; no statistics yet.
 [[nodiscard]] std::expected<void, std::string> V9ToV10(SaveDocument& world);
 
+// Version 10 to 11: robots have spent nothing of today's budget yet, and
+// supplies cost venues 60% of their takings. Venues hire staff as robots
+// look for work; no format change is needed for that.
+[[nodiscard]] std::expected<void, std::string> V10ToV11(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

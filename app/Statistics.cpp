@@ -186,7 +186,9 @@ void DrawEconomy(const std::vector<sim::DailyStats>& history) {
     }
     PlotCredits("Wages", history, [](const auto& d) { return d.counted.wages; });
     PlotCredits("Venue sales", history, [](const auto& d) { return d.counted.venueSales; });
-    PlotCount("Pay, % of base", history, [](const auto& d) { return d.averagePayPercent; });
+    PlotCount("Industry pay, % of base", history, [](const auto& d) { return d.averagePayPercent; });
+    PlotCount("Price of supplies, % of venue takings", history,
+              [](const auto& d) { return d.supplyPercent; });
     ImGui::SeparatorText("Wealth");
     if (BeginFacts("wealth")) {
         Row("Credits: median / mean", std::format("{} / {}", Credits(day.medianCredits), Credits(day.meanCredits)));
