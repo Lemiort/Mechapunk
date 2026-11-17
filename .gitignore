@@ -6,3 +6,4 @@ CMakeUserPresets.json
 # drive-game.ps1 working files
 tools/pid.txt
 tools/out.txt
+tools/err.txt

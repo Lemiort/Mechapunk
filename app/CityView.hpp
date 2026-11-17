@@ -171,7 +171,12 @@ private:
     [[nodiscard]] glm::vec3 StationStairsBottom(std::uint32_t station) const;
     [[nodiscard]] glm::vec3 StationStairsTop(std::uint32_t station) const;
     void AddElevatedLines();
-    void AddStaticBox(glm::vec3 minimum, glm::vec3 maximum, glm::vec3 color);
+    // A box that never moves; `glows` makes it shine with its own color.
+    void AddStaticBox(glm::vec3 minimum, glm::vec3 maximum, glm::vec3 color,
+                      bool glows = false);
+    // The material of a prop part, glowing for neon, bulbs and screens.
+    [[nodiscard]] std::shared_ptr<const Material> PartMaterial(const PropPart& part,
+                                                               glm::vec3 tint) const;
     // Trains carrying the riders on board in `frame`.
     void SubmitTrains(RenderQueue& queue, const WorldFrame& frame,
                       double renderTick);

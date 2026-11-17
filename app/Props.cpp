@@ -41,9 +41,15 @@ constexpr std::array<vec3, 6> kGoods{
     vec3{0.85F, 0.2F, 0.2F}, vec3{0.2F, 0.5F, 0.9F}, vec3{0.95F, 0.8F, 0.2F},
     vec3{0.3F, 0.8F, 0.4F},  vec3{0.8F, 0.4F, 0.9F}, vec3{0.9F, 0.55F, 0.2F}};
 
+// Neon, bulbs, screens and status lights shine with their own color.
+bool Glows(vec3 color) {
+    return color == kNeonPink || color == kNeonCyan || color == kGlow ||
+           color == kBulb || color == kScreen || color == kGreen;
+}
+
 // A box with its base-center at (x, y, z) and the given width, height, depth.
 PropPart Box(float x, float y, float z, float w, float h, float d, vec3 color) {
-    return {.pivot = {x, y, z}, .size = {w, h, d}, .color = color};
+    return {.pivot = {x, y, z}, .size = {w, h, d}, .color = color, .glows = Glows(color)};
 }
 PropPart Tinted(float x, float y, float z, float w, float h, float d) {
     PropPart part = Box(x, y, z, w, h, d, kWhite);

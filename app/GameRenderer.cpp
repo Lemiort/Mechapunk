@@ -77,22 +77,53 @@ MaterialPalette::MaterialPalette(std::shared_ptr<Shader> shader,
       flatNormal_(std::move(flatNormal)),
       specular_(std::move(specular)) {}
 
-std::shared_ptr<const Material> MaterialPalette::Get(glm::vec3 color) {
-    // Colors are shared at 8 bits per channel.
+namespace {
+// Colors are shared at 8 bits per channel.
+std::uint32_t ColorKey(glm::vec3 color) {
     const auto channel = [](float value) {
         return static_cast<std::uint32_t>(std::clamp(value, 0.0F, 1.0F) * 255.0F);
     };
-    const std::uint32_t key = (channel(color.r) << 16U) |
-                              (channel(color.g) << 8U) | channel(color.b);
+    return (channel(color.r) << 16U) | (channel(color.g) << 8U) | channel(color.b);
+}
+}  // namespace
+
+std::shared_ptr<Material> MaterialPalette::Make(glm::vec3 color) const {
+    auto material = std::make_shared<Material>(gsl_lite::not_null{shader_});
+    material->SetColorTexture(SolidTexture(color));
+    material->SetNormalTexture(flatNormal_);
+    material->SetSpecularTexture(specular_);
+    return material;
+}
+
+std::shared_ptr<const Material> MaterialPalette::Get(glm::vec3 color) {
+    const std::uint32_t key = ColorKey(color);
     auto found = cache_.find(key);
     if (found == cache_.end()) {
-        auto material = std::make_shared<Material>(gsl_lite::not_null{shader_});
-        material->SetColorTexture(SolidTexture(color));
-        material->SetNormalTexture(flatNormal_);
-        material->SetSpecularTexture(specular_);
-        found = cache_.emplace(key, std::move(material)).first;
+        found = cache_.emplace(key, Make(color)).first;
     }
     return found->second;
+}
+
+std::shared_ptr<const Material> MaterialPalette::GetGlowing(glm::vec3 color,
+                                                            glm::vec3 emissive) {
+    const auto key = std::make_pair(ColorKey(color), ColorKey(emissive));
+    auto found = glowing_.find(key);
+    if (found == glowing_.end()) {
+        Glowing glowing{.material = Make(color), .emissive = emissive};
+        glowing.material->SetEmissiveColor(emissive * glow_);
+        found = glowing_.emplace(key, std::move(glowing)).first;
+    }
+    return found->second.material;
+}
+
+void MaterialPalette::SetGlow(float glow) {
+    if (glow == glow_) {
+        return;
+    }
+    glow_ = glow;
+    for (auto& [key, glowing] : glowing_) {
+        glowing.material->SetEmissiveColor(glowing.emissive * glow_);
+    }
 }
 
 GameRenderer::GameRenderer(int width, int height) {

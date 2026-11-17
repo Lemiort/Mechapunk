@@ -69,7 +69,11 @@ endif()
 
 # Runtime assets: engine assets first, then game assets (when present) so the
 # game can override engine files with the same name.
+# Editing an asset, such as an engine shader, re-runs CMake to copy it again.
 foreach(dir shaders fonts models textures)
+    file(GLOB_RECURSE asset_files CONFIGURE_DEPENDS
+        ${NEE_ASSET_DIR}/${dir}/* ${CMAKE_CURRENT_SOURCE_DIR}/assets/${dir}/*)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${asset_files})
     file(COPY ${NEE_ASSET_DIR}/${dir} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets/${dir})
         file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/assets/${dir}

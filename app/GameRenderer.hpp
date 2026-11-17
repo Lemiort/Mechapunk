@@ -30,12 +30,27 @@ public:
                     std::shared_ptr<Texture2D> flatNormal,
                     std::shared_ptr<Texture2D> specular);
     [[nodiscard]] std::shared_ptr<const Material> Get(glm::vec3 color);
+    // A surface of `color` that also gives off light of `emissive`, such as
+    // a neon tube, a screen or a lit window. Every glowing surface is scaled
+    // by the glow set with SetGlow.
+    [[nodiscard]] std::shared_ptr<const Material> GetGlowing(glm::vec3 color,
+                                                             glm::vec3 emissive);
+    // How strongly glowing surfaces shine, 1 at night.
+    void SetGlow(float glow);
 
 private:
+    struct Glowing {
+        std::shared_ptr<Material> material;
+        glm::vec3 emissive;
+    };
+    [[nodiscard]] std::shared_ptr<Material> Make(glm::vec3 color) const;
+
     std::shared_ptr<Shader> shader_;
     std::shared_ptr<Texture2D> flatNormal_;
     std::shared_ptr<Texture2D> specular_;
     std::map<std::uint32_t, std::shared_ptr<Material>> cache_;
+    std::map<std::pair<std::uint32_t, std::uint32_t>, Glowing> glowing_;
+    float glow_{1.0F};
 };
 
 // Meshes and surface materials shared by everything the game draws.

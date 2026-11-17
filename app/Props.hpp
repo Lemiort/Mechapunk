@@ -20,6 +20,8 @@ struct PropPart {
     bool tinted{false};
     // Drawn see-through, like a window pane.
     bool glass{false};
+    // Gives off light of its own color, like a neon tube, a bulb or a screen.
+    bool glows{false};
 };
 
 // A piece of furniture or equipment made of boxes, standing on y = 0 with

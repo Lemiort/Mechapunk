@@ -43,7 +43,9 @@ constexpr vec2 kQuadrantOffset{(kStreetWidth * 0.5F) + (1.6F * kS) +
                                    (kBuildingDepth * 0.5F)};
 constexpr float kWalkerPickRadius = 0.7F * kS;
 constexpr float kRobotSpread = 3.0F * kS;
-constexpr float kNeonPower = 2.5F;
+// Signs glow by themselves; their lights only spill onto nearby walls and
+// pavement.
+constexpr float kNeonPower = 0.03F;
 constexpr float kGlassOpacity = 0.3F;
 constexpr float kHighlightOpacity = 0.3F;
 // Separate random stream so decoration never affects the simulation.
@@ -67,6 +69,9 @@ constexpr vec3 kCanopy{0.3F, 0.34F, 0.4F};
 constexpr vec3 kStationSign{0.1F, 0.85F, 1.0F};
 constexpr vec3 kPavement{0.36F, 0.36F, 0.38F};
 constexpr vec3 kFacadeGlass{0.13F, 0.17F, 0.24F};
+// Light from a lit window at night, and the share of windows that are lit.
+constexpr vec3 kWindowLight{0.55F, 0.42F, 0.25F};
+constexpr std::uint32_t kLitWindowsInTen = 4;
 constexpr vec3 kConcrete{0.3F, 0.31F, 0.35F};
 constexpr vec3 kGlassColor{0.6F, 0.8F, 0.92F};
 constexpr vec3 kSelected{1.0F, 1.0F, 1.0F};
@@ -215,10 +220,25 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
         // A sign high on the street side, and one per store at street level
         // above its door.
         const float front = shape.turned ? -1.0F : 1.0F;
+        // The glowing panel of a sign, flat against the front wall and
+        // spanning x; its light hangs a little further out.
+        const auto signPanel = [&](vec3 base, float width, float tall, vec3 color) {
+            statics_.push_back(
+                {.mesh = assets_.cube.get(),
+                 .transform = {.position = base,
+                               .rotationDegrees = vec3(0.0F),
+                               .scale = {width, tall, 0.15F * kS}},
+                 .material = assets_.palette->GetGlowing(color, color)});
+        };
+        signPanel(centerOnGround +
+                      vec3{0.0F, (height * 0.6F) - (0.7F * kS),
+                           front * ((kBuildingDepth * 0.5F) + (0.075F * kS))},
+                  kBuildingWidth * 0.45F, 1.4F * kS,
+                  habitat ? kHabitatNeon : kWorkplaceNeon);
         neonSigns_.push_back(
             {.position = centerOnGround +
                          vec3{0.0F, height * 0.6F,
-                              front * ((kBuildingDepth * 0.5F) + (0.6F * kS))},
+                              front * ((kBuildingDepth * 0.5F) + (2.5F * kS))},
              .color = habitat ? kHabitatNeon : kWorkplaceNeon,
              .building = building.id});
         std::vector<const sim::Room*> stores;
@@ -231,9 +251,13 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
             21.0F / static_cast<float>(std::max<std::size_t>(stores.size(), 1));
         for (std::size_t index = 0; index < stores.size(); ++index) {
             const float x = -8.0F + (storeWidth * (static_cast<float>(index) + 0.5F));
+            signPanel(ToWorld(shape, 0,
+                              {x, 2.6F, (kFootprintDepthMeters * 0.5F) + 0.075F}),
+                      std::min(storeWidth - 1.0F, 3.0F) * kS, 0.45F * kS,
+                      StoreNeon(stores[index]->kind));
             neonSigns_.push_back(
                 {.position = ToWorld(shape, 0,
-                                     {x, 2.9F, (kFootprintDepthMeters * 0.5F) + 0.8F}),
+                                     {x, 2.9F, (kFootprintDepthMeters * 0.5F) + 2.0F}),
                  .color = StoreNeon(stores[index]->kind),
                  .building = building.id});
         }
@@ -299,6 +323,20 @@ void CityView::AddFacade(vec3 center, float width, float depth,
     // of the wall so they read from a distance.
     const std::shared_ptr<const Material> glass =
         assets_.palette->Get(kFacadeGlass);
+    const std::shared_ptr<const Material> litGlass =
+        assets_.palette->GetGlowing(kFacadeGlass, kWindowLight);
+    // Which windows are lit is fixed per window, mixed from its place.
+    const auto lit = [&](std::uint32_t face, std::uint32_t floor, int window) {
+        std::uint32_t hash =
+            (static_cast<std::uint32_t>(std::lround(center.x)) * 73856093U) ^
+            (static_cast<std::uint32_t>(std::lround(center.z)) * 19349663U) ^
+            (face * 40503U) ^ (floor * 83492791U) ^
+            (static_cast<std::uint32_t>(window) * 2654435761U);
+        hash ^= hash >> 15U;
+        hash *= 2246822519U;
+        hash ^= hash >> 13U;
+        return hash % 10U < kLitWindowsInTen;
+    };
     constexpr float kSpacing = 3.5F * kS;
     constexpr float kWidth = 1.6F * kS;
     constexpr float kHeight = 1.4F * kS;
@@ -306,6 +344,7 @@ void CityView::AddFacade(vec3 center, float width, float depth,
     constexpr float kProud = 0.06F * kS;
     const auto side = [&](float length, bool alongX, float offset) {
         const int count = std::max(1, static_cast<int>(length / kSpacing));
+        const std::uint32_t face = (alongX ? 0U : 2U) + (offset > 0.0F ? 1U : 0U);
         for (std::uint32_t floor = 0; floor < floors; ++floor) {
             const float y = (static_cast<float>(floor) * kFloorHeight) + kSill;
             for (int window = 0; window < count; ++window) {
@@ -321,9 +360,12 @@ void CityView::AddFacade(vec3 center, float width, float depth,
                     transform.position += vec3{offset, y, along};
                     transform.scale = {kProud * 2.0F, kHeight, kWidth};
                 }
-                statics_.push_back({.mesh = assets_.cube.get(),
-                                    .transform = transform,
-                                    .material = glass});
+                statics_.push_back(
+                    {.mesh = assets_.cube.get(),
+                     .transform = transform,
+                     .material = lit(face, floor, window)
+                                     ? litGlass
+                                     : glass});
             }
         }
     };
@@ -380,14 +422,15 @@ vec3 CityView::StationStairsTop(std::uint32_t station) const {
            vec3{kPlatformHalf, kTrackHeight, kStairsAcross};
 }
 
-void CityView::AddStaticBox(vec3 minimum, vec3 maximum, vec3 color) {
+void CityView::AddStaticBox(vec3 minimum, vec3 maximum, vec3 color, bool glows) {
     statics_.push_back(
         {.mesh = assets_.cube.get(),
          .transform = {.position = {(minimum.x + maximum.x) * 0.5F, minimum.y,
                                     (minimum.z + maximum.z) * 0.5F},
                        .rotationDegrees = vec3(0.0F),
                        .scale = maximum - minimum},
-         .material = assets_.palette->Get(color)});
+         .material = glows ? assets_.palette->GetGlowing(color, color)
+                           : assets_.palette->Get(color)});
 }
 
 void CityView::AddStations() {
@@ -423,7 +466,8 @@ void CityView::AddStations() {
         AddStaticBox(bottom + vec3{1.0F * kS, 0.0F, -1.2F * kS},
                      bottom + vec3{1.15F * kS, 3.0F * kS, -1.05F * kS}, kTrackSteel);
         AddStaticBox(bottom + vec3{0.8F * kS, 3.0F * kS, -1.3F * kS},
-                     bottom + vec3{1.35F * kS, 3.6F * kS, -0.95F * kS}, kStationSign);
+                     bottom + vec3{1.35F * kS, 3.6F * kS, -0.95F * kS}, kStationSign,
+                     true);
     }
 }
 
@@ -660,6 +704,13 @@ void CityView::AssignSpots(const WorldFrame& frame, const FloorPlan& plan) {
     }
 }
 
+std::shared_ptr<const Material> CityView::PartMaterial(const PropPart& part,
+                                                       vec3 tint) const {
+    const vec3 color = part.tinted ? tint : part.color;
+    return part.glows ? assets_.palette->GetGlowing(color, color)
+                      : assets_.palette->Get(color);
+}
+
 void CityView::AddStaticModel(const PropModel& model, vec3 origin,
                               float yawDegrees) {
     ForEachPart(model, origin, yawDegrees, 0.0F, kS,
@@ -667,7 +718,7 @@ void CityView::AddStaticModel(const PropModel& model, vec3 origin,
                     statics_.push_back(
                         {.mesh = assets_.cube.get(),
                          .transform = transform,
-                         .material = assets_.palette->Get(part.color)});
+                         .material = PartMaterial(part, part.color)});
                 });
 }
 
@@ -729,6 +780,7 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
     // Neon dims in daylight but never goes out. Lights shine through walls,
     // so the open building's own signs are off while it is inspected.
     const float neon = 1.0F - (0.75F * daylight);
+    assets_.palette->SetGlow(neon);
     const auto points = scene.GetPointLights();
     for (const Neon& sign : neons_) {
         if (sign.lightIndex < points.size()) {
@@ -809,8 +861,7 @@ void CityView::SubmitModel(RenderQueue& queue, const PropModel& model,
                            vec3 tint, float scale) {
     ForEachPart(model, origin, yawDegrees, tiltDegrees, scale,
                 [&](const PropPart& part, const Transform& transform) {
-                    const auto material =
-                        assets_.palette->Get(part.tinted ? tint : part.color);
+                    const auto material = PartMaterial(part, tint);
                     if (part.glass) {
                         queue.SubmitTransparentMesh(*assets_.cube, transform,
                                                     material, kGlassOpacity);

@@ -52,7 +52,7 @@ The game build rebuilds `external/NEE/build/Release` first. Quit a running
 | M2 See it | Done: buildings and robots drawn, smooth movement, picking, inspector, time controls |
 | M3 Needs and the economy | Done: charge, condition, social, fun; wages, rent, debt, venues, evenings out, days off |
 | M4 Social life | Done: interests, talks, bonds (friend, close friend, rival), memories. The "chronicle" is only the inspector's recent events, which are not saved |
-| M5 Atmosphere | **Partly done**: day and night, neon signs, street lamps, room lamps, walking animation. **Missing: emissive, HDR, bloom, tonemapping, rain** |
+| M5 Atmosphere | **Partly done**: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces. **Missing: HDR, bloom, tonemapping, rain** |
 | M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers). **Missing: simulation level of detail, corporations and factions, construction** |
 
 Also done since the plan was written:
@@ -78,7 +78,7 @@ Also done since the plan was written:
 | 7 | Versioned serialization | Done in the game (`sim/src/Save.cpp`: migrations, temp-file-then-rename write). Rotating autosaves are missing |
 | 8 | Dear ImGui overlay | Done (NEE #62) |
 | 9 | Keep the node hierarchy on model import, for rigid-part animation | Not done. Robots and furniture are box props in `app/Props.cpp` |
-| 10 | Look: emissive G-buffer channel, HDR, bloom, tonemapping, instanced light volumes or clustered lighting, particle fix (#29) for rain | Not done |
+| 10 | Look: emissive G-buffer channel, HDR, bloom, tonemapping, instanced light volumes or clustered lighting, particle fix (#29) for rain | Emissive done (NEE #65); the rest not done |
 
 Also done in NEE beyond the plan: screenshots (#60), distance-field text
 (#61), the Conan package (#64), and skipping dark lights (#63).
@@ -88,14 +88,23 @@ The open NEE architecture-review issues are #20, #24, #27 and #29–#43.
 
 ## Recommended next: finish M5 (atmosphere)
 
-The neon city has no glow yet, and this is the biggest visible gain left.
+Surfaces now glow, but light still clips at full brightness and nothing
+blooms; this is the biggest visible gain left.
 Do it as separate NEE PRs, each generic and with tests, then use each one
 in the game:
 
-1. **Emissive channel.** Materials get an emissive color, written to a
-   G-buffer channel and added in the lighting pass. In the game, neon signs,
-   lit windows, train strips, station signs and lamp bulbs become emissive.
-   Today their glow is faked with point lights and bright colors.
+1. **Emissive channel.** Done (NEE #65): an emissive texture times an
+   emissive color per material (`SetEmissiveTexture`, on the last texture
+   unit, white by default; `SetEmissiveColor`, black by default), a sixth
+   G-buffer attachment, and the light accumulation target starting from the
+   emissive light before lights add on top. The NEE demo has an "Emissive
+   buffer" render mode. In the game, neon sign panels, lit windows (four in
+   ten), station signs, train strips, lamp bulbs, screens and status lights
+   glow, dimmed by day through `MaterialPalette::SetGlow`. Sign point
+   lights dropped from 2.5 to 0.03, so they only light a pool around the
+   sign. The game uses the color only, since each glowing part is its own
+   box; an emissive map of the facade textures could later replace the
+   window boxes.
 2. **HDR and tonemapping.** Light into a floating-point target, then
    tonemap (ACES or Reinhard) with exposure. This may need to dim the
    game's current light powers.
