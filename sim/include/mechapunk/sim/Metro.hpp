@@ -73,7 +73,8 @@ struct TrainState {
     std::uint32_t train{};
     Phase phase{Phase::InDepot};
     // Running: meters along the line (negative and beyond its length in the
-    // tail tracks), the track's side from -1 (up track) to +1 (down track),
+    // tail tracks), the track's side from -1 (up track) to +1 (down track);
+    // trains keep right, so -1 is the right of a train running up,
     // and whether it is driven toward the line's end.
     double meters{};
     double side{-1.0};

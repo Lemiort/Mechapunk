@@ -493,10 +493,13 @@ float DeckHeight(sim::LineAxis axis) {
 vec3 AlongOf(sim::LineAxis axis) {
     return axis == sim::LineAxis::Row ? vec3{1.0F, 0.0F, 0.0F} : vec3{0.0F, 0.0F, 1.0F};
 }
+// Across a line, toward its left when facing up it: the -1 side is on the
+// right, so trains keep right. (Right of a way is cross(way, up).)
 vec3 AcrossOf(sim::LineAxis axis) {
-    return axis == sim::LineAxis::Row ? vec3{0.0F, 0.0F, 1.0F} : vec3{1.0F, 0.0F, 0.0F};
+    return axis == sim::LineAxis::Row ? vec3{0.0F, 0.0F, -1.0F} : vec3{1.0F, 0.0F, 0.0F};
 }
-// The up track is on the -1 side of a line, the down track on the +1 side.
+// The up track is on the -1 side of a line, the down track on the +1 side:
+// each on the right of the trains running on it.
 float SideOf(sim::Direction direction) {
     return direction == sim::Direction::Up ? -1.0F : 1.0F;
 }
