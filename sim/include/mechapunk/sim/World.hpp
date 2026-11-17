@@ -379,6 +379,14 @@ private:
     // Pocket money kept out of the bank.
     [[nodiscard]] std::int64_t PocketOf(const Robot& robot) const;
     [[nodiscard]] std::int64_t PriceOf(const Room& apartment) const;
+    // Rent asked for an apartment now: its base rent at the market rent of
+    // its class; dorm rents are set by the housing office.
+    [[nodiscard]] std::int64_t RentFor(const Room& apartment) const;
+    // The price a venue asks for a visit now.
+    [[nodiscard]] std::int64_t PriceAt(const Room& venue) const;
+    // At midnight: venues' prices follow how busy they were, and market
+    // rents how many homes stand empty.
+    void SetPrices();
     [[nodiscard]] std::int64_t UpkeepOf(const Room& apartment) const;
     // Changes an apartment's owner for `price`, paid by the buyer.
     void Transfer(EntityId apartment, EntityId buyer, std::int64_t price);

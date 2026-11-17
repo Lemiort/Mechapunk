@@ -56,4 +56,8 @@ namespace mechapunk::sim::migrations {
 // studio. The city gets a housing office, with no dorms yet.
 [[nodiscard]] std::expected<void, std::string> V11ToV12(SaveDocument& world);
 
+// Version 12 to 13: venues ask their base price and have had no guests
+// today; market rents are at their base.
+[[nodiscard]] std::expected<void, std::string> V12ToV13(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

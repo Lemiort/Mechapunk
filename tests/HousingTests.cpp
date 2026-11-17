@@ -87,9 +87,11 @@ TEST(Housing, FriendsMoveInTogether) {
     };
     befriend(first, second);
     befriend(second, first);
-    // Out of work, so no bank gives them a mortgage to buy alone.
+    // Out of work, so no bank gives them a mortgage, and with enough for a
+    // share of a flat's rent for a while but not to buy one.
     for (sim::Robot* robot : {&first, &second}) {
-        sim::SetCredits(state, *robot, 30000);
+        sim::SetCredits(state, *robot, 1500);
+        robot->savings = 0;
         robot->workspace = {};
         robot->commuteAt = sim::kNoCommute;
     }
@@ -98,7 +100,7 @@ TEST(Housing, FriendsMoveInTogether) {
     auto loaded = sim::World::FromState(std::move(state));
     ASSERT_TRUE(loaded.has_value()) << loaded.error();
     sim::World world = std::move(*loaded);
-    for (int day = 0; day < 120 && world.FindRobot(a)->apartment != world.FindRobot(b)->apartment;
+    for (int day = 0; day < 30 && world.FindRobot(a)->apartment != world.FindRobot(b)->apartment;
          ++day) {
         world.RunFor(sim::kMinutesPerDay);
     }
@@ -113,4 +115,52 @@ TEST(Housing, FriendsMoveInTogether) {
     }
     EXPECT_TRUE(remembers);
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
+// A new city's market homes mostly stand empty, so their rents fall night
+// by night while dorm rents stay where the housing office set them.
+TEST(Housing, RentsFallWhileHomesStandEmpty) {
+    sim::World world = sim::World::Generate({.seed = 6, .robots = 400});
+    world.RunFor(5 * sim::kMinutesPerDay);
+    const auto& history = world.State().history;
+    ASSERT_EQ(history.size(), 5U);
+    // Studios and one-bedroom flats, which every town has.
+    EXPECT_LT(world.State().economy.rentPercent[0], 100);
+    EXPECT_LT(world.State().economy.rentPercent[1], 100);
+    EXPECT_LT(history.back().averageRent[1], history.front().averageRent[1]);
+    EXPECT_EQ(history.back().averageRent[0], history.front().averageRent[0]);
+}
+
+// A venue that filled up three times over asks more the next day; one that
+// had fewer guests than places asks less.
+TEST(Housing, VenuePricesFollowDemand) {
+    sim::World start = sim::World::Generate({.seed = 6, .robots = 400});
+    start.RunFor(sim::kMinutesPerDay - 1);
+    sim::WorldState state = start.State();
+    sim::Room* busy = nullptr;
+    sim::Room* quiet = nullptr;
+    for (sim::Building& building : state.city.buildings) {
+        for (sim::Room& room : building.rooms) {
+            if (sim::IsVenue(room.kind)) {
+                (busy == nullptr ? busy : quiet) = &room;
+                if (quiet != nullptr) {
+                    break;
+                }
+            }
+        }
+        if (quiet != nullptr) {
+            break;
+        }
+    }
+    ASSERT_NE(quiet, nullptr);
+    busy->visits = busy->capacity * 4;
+    quiet->visits = 0;
+    const sim::EntityId busyId = busy->id;
+    const sim::EntityId quietId = quiet->id;
+    auto world = sim::World::FromState(std::move(state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(1);
+    EXPECT_GT(world->Rooms().Find(busyId)->room->pricePercent, 100U);
+    EXPECT_LT(world->Rooms().Find(quietId)->room->pricePercent, 100U);
+    EXPECT_EQ(world->Rooms().Find(busyId)->room->visits, 0U);
 }

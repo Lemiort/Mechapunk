@@ -17,6 +17,7 @@ every fixture, so old saves keep working as the format evolves.
 | `v10-city.json` | 10     | `mechapunk-sim --seed 33 --robots 60 --minutes 28370 --save v10-city.json` (game 0.10.0) |
 | `v11-city.json` | 11     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v11-city.json` (game 0.11.0) |
 | `v12-city.json` | 12     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v12-city.json` (game 0.12.0) |
+| `v13-city.json` | 13     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v13-city.json` (game 0.13.0) |
 
 `v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
 working. `v2-city.json` stops at Day 2 19:00, with robots resting, walking,
@@ -47,6 +48,8 @@ no longer make a town with tenants and scrapped robots by then.
 `v12-city.json` stops at the same moment in a city with apartment classes:
 most robots still in the dorms they started in, others in studios, flats
 and two-bedroom flats, some of them shared.
+`v13-city.json` stops at the same moment with venues asking more or less
+than usual and market rents moved by empty homes.
 `Version1FixtureMigratesAndRuns` loads the v1
 fixture through the migration, checks every robot kept its home and
 workplace, and runs two days of evenings; `Version2FixtureMigratesAndRuns`
@@ -65,7 +68,8 @@ city is founded an economy whose money adds up, and records statistics.
 `Version10FixtureMigratesAndRuns` checks that v10 robots start with an
 unspent budget, supplies cost 60% of venue takings, and the city runs on.
 `Version11FixtureMigratesAndRuns` checks that v11 apartments become studios
-and the city gets a housing office.
+and the city gets a housing office. `Version12FixtureMigratesAndRuns` checks
+that v12 venues ask their base prices and market rents start at their base.
 
 ## Changing the save format
 

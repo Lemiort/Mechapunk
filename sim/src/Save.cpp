@@ -148,6 +148,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 11,
               .summary = "apartment classes and the city's housing office",
               .apply = &migrations::V11ToV12},
+    Migration{.fromVersion = 12,
+              .summary = "venue prices and market rents",
+              .apply = &migrations::V12ToV13},
 };
 }  // namespace
 

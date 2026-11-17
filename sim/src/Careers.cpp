@@ -180,7 +180,7 @@ void World::ReviewJobs() {
 namespace {
 // Each night, the chance in percent that a robot living alone in a rented
 // home asks its closest friend to move in together.
-constexpr std::uint32_t kShareHomePercent = 3;
+constexpr std::uint32_t kShareHomePercent = 10;
 }  // namespace
 
 void World::ReviewHomes() {
@@ -226,7 +226,7 @@ void World::ReviewHomes() {
         if (!owns && rent > 0 && robot.rentOwed >= kEvictionNights * rent) {
             // Out to the cheapest place there is; the debt is written off.
             const auto cheapest = pick(
-                [](const Room& a, const Room& b) { return a.rent < b.rent; },
+                [&](const Room& a, const Room& b) { return RentFor(a) < RentFor(b); },
                 [](const Room&) { return true; });
             if (cheapest) {
                 const EntityId old = robot.apartment;
@@ -237,6 +237,10 @@ void World::ReviewHomes() {
             }
             continue;
         }
+        // Flatmates stay together; moving up is for robots living alone.
+        if (ResidentsOf(robot.apartment) > 1) {
+            continue;
+        }
         const std::int64_t means = robot.credits + robot.savings;
         if (means < kMoveUpSavings ||
             state_.random.UniformInt(1, 100) > kMoveUpPercent) {
@@ -244,16 +248,16 @@ void World::ReviewHomes() {
         }
         // The priciest apartment it can afford for a while. An owner sells
         // its home to the trust and buys the new one.
-        const std::int64_t homeRent = home ? home->room->rent : 0;
+        const std::int64_t homeRent = home ? RentFor(*home->room) : 0;
         const std::int64_t sale = owns ? PriceOf(*home->room) * kSellPercent / 100 : 0;
         const auto nicer = pick(
-            [](const Room& a, const Room& b) { return a.rent > b.rent; },
+            [&](const Room& a, const Room& b) { return RentFor(a) > RentFor(b); },
             [&](const Room& room) {
-                if (room.rent <= homeRent) {
+                if (RentFor(room) <= homeRent) {
                     return false;
                 }
-                return owns ? PriceOf(room) + (kAffordNights * room.rent) <= means + sale
-                            : static_cast<std::int64_t>(room.rent) * kAffordNights <= means;
+                return owns ? PriceOf(room) + (kAffordNights * RentFor(room)) <= means + sale
+                            : RentFor(room) * kAffordNights <= means;
             });
         if (nicer) {
             if (owns) {
@@ -306,12 +310,12 @@ void World::ReviewHomes() {
         }
         const std::int64_t means = std::min(robot.credits + robot.savings, mate->credits + mate->savings);
         const auto shared = pick(
-            [](const Room& a, const Room& b) { return a.rent > b.rent; },
+            [&](const Room& a, const Room& b) { return RentFor(a) > RentFor(b); },
             [&](const Room& room) {
                 if (room.capacity < 2) {
                     return false;
                 }
-                const std::int64_t share = (room.rent + room.capacity - 1) / room.capacity;
+                const std::int64_t share = (RentFor(room) + room.capacity - 1) / room.capacity;
                 return share * kAffordNights <= means;
             });
         if (!shared) {

@@ -581,4 +581,25 @@ std::expected<void, std::string> V11ToV12(SaveDocument& world) try {
         std::format("the version 11 world is malformed ({})", error.what()));
 }
 
+
+std::expected<void, std::string> V12ToV13(SaveDocument& world) try {
+    for (SaveDocument& building : world["city"]["buildings"].get_array()) {
+        for (SaveDocument& room : building["rooms"].get_array()) {
+            room["pricePercent"] = std::uint64_t{100};
+            room["visits"] = std::uint64_t{0};
+        }
+    }
+    world["economy"]["rentPercent"] =
+        Array{std::int64_t{100}, std::int64_t{100}, std::int64_t{100}, std::int64_t{100}};
+    for (SaveDocument& day : world["history"].get_array()) {
+        day["averageRent"] = Array{std::int64_t{0}, std::int64_t{0}, std::int64_t{0},
+                                   std::int64_t{0}, std::int64_t{0}};
+        day["venuePricePercent"] = std::int64_t{100};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 12 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

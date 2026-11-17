@@ -519,15 +519,17 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
     ImGui::Text("%s in %s, %s", KindLabel(room.kind).c_str(),
                 found->building->name.c_str(), FloorName(room.floor).c_str());
     if (const sim::VenueRules* rules = sim::FindVenueRules(room.kind)) {
+        const auto price = static_cast<unsigned>(
+            std::max<std::uint64_t>(1, std::uint64_t{rules->price} * room.pricePercent / 100));
         if (rules->opensAt == rules->closesAt) {
-            ImGui::TextDisabled("Open around the clock, %u cr a visit",
-                                rules->price);
+            ImGui::TextDisabled("Open around the clock, %u cr a visit", price);
         } else {
             ImGui::TextDisabled("Open %s-%s, %u cr a visit",
                                 sim::FormatClock(rules->opensAt).c_str(),
-                                sim::FormatClock(rules->closesAt).c_str(),
-                                rules->price);
+                                sim::FormatClock(rules->closesAt).c_str(), price);
         }
+        ImGui::TextDisabled("Prices at %u%% of usual, %u guests today", room.pricePercent,
+                            room.visits);
     } else if (room.kind == sim::RoomKind::Apartment) {
         const std::string kind{sim::ApartmentClassName(room.apartmentClass)};
         ImGui::TextDisabled("A %s of %u m2, sleeps %u; %u cr a night, worth %lld cr",

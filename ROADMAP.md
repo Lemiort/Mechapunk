@@ -74,6 +74,10 @@ Also done since the plan was written:
   take a whole floor. A new city starts everyone in the city housing
   office's dorms; robots rent their way out, friends share a flat with a
   bedroom each, and robots with a job buy their first home with a mortgage.
+- Prices that follow demand: each venue's price rises a point a night while
+  it is packed and falls while it is quiet, market rents of each class
+  follow how many homes stand empty (and home prices with them), and banks
+  ration mortgages to what they can spare.
 - Transit: an elevated metro on a timetable. Every station row and column
   is a line with two tracks, on two levels so lines cross. Two-ended trains
   turn back over a crossover in the tail track past each end station, run
@@ -155,7 +159,7 @@ game:
 ## Recommended next: M6 (scale and depth)
 
 - **Demand.** Venues open and close, or workplaces turn into venues and
-  back, as demand changes; prices of venues and rents follow demand.
+  back, as demand changes.
 - **Gangs.** Rival or friendly to each other, always rivals of the police;
   members rob robots outside their gang. Unions later.
 - **Construction.** The city grows: new buildings on park corners as the
@@ -188,9 +192,9 @@ game:
 - Not yet seen in the running game: bags, bar bottles, robots on the
   stairs.
 - Trains have no drivers yet, and no limit on riders.
-- The economy settles with industry paying about three quarters of base
-  wages, but the housing trust keeps borrowing to buy homes from owners
-  who sell, and a third of robots carry small debts. Prices of venues and
-  rents are fixed. The Statistics window (T) shows it all.
+- The economy settles with industry paying near full wages, but banks lend
+  more than they hold, so the central bank creates money slowly, and wealth
+  inequality creeps up as owners pull ahead of robots still in dorms. The
+  Statistics window (T) shows it all.
 - From above, the upper deck of a station hides the lower level's trains.
 - Robots inside closed buildings aren't drawn (nobody can see them).

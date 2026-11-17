@@ -485,13 +485,15 @@ void World::Arrive(Robot& robot) {
     const std::uint32_t others = GuestsIn(robot.location);
     robot.activity = RobotActivity::Visiting;
     ++guests_[robot.location.value];
-    const std::int64_t luxury = LuxuryOf(robot, rules->price);
-    if (robot.credits < static_cast<std::int64_t>(rules->price)) {
-        Withdraw(robot, rules->price - robot.credits);  // Repairs from savings.
+    const std::int64_t price = PriceAt(*venue->room);
+    ++MutableRoom(venue->room->id).visits;
+    const std::int64_t luxury = LuxuryOf(robot, price);
+    if (robot.credits < price) {
+        Withdraw(robot, price - robot.credits);  // Repairs from savings.
     }
-    Sell(robot, venue->room->owner, rules->price);
-    robot.spentToday += rules->price;
-    state_.today.venueSales += rules->price;
+    Sell(robot, venue->room->owner, price);
+    robot.spentToday += price;
+    state_.today.venueSales += price;
     if (luxury > 0) {
         Withdraw(robot, luxury);
         Sell(robot, venue->room->owner, luxury);
@@ -519,7 +521,7 @@ void World::Arrive(Robot& robot) {
           .robot = robot.id,
           .room = robot.location,
           .minutes = static_cast<std::uint32_t>(stay),
-          .credits = rules->price,
+          .credits = price,
           .others = others});
 }
 
@@ -551,14 +553,14 @@ void World::Decide(Robot& robot) {
         // robot pays for repairs out of its savings, budget or not.
         const bool needsRepair = (kind == RoomKind::Clinic || kind == RoomKind::RepairShop) &&
                                  robot.needs.condition < kRepairUrgentCondition;
-        const auto price = static_cast<std::int64_t>(rules.price);
-        if (needsRepair ? robot.credits + robot.savings - price < reserve
-                        : (robot.credits - price < reserve ||
-                           robot.spentToday + price > budget)) {
-            continue;
-        }
         for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
             const Room& room = *venue.room;
+            const std::int64_t price = PriceAt(room);
+            if (needsRepair ? robot.credits + robot.savings - price < reserve
+                            : (robot.credits - price < reserve ||
+                               robot.spentToday + price > budget)) {
+                continue;
+            }
             // Leaving a venue means going somewhere else, and nobody goes
             // out to the venue it works at.
             if (room.id == robot.location || room.id == robot.workspace ||
@@ -586,7 +588,7 @@ void World::Decide(Robot& robot) {
             const std::int64_t score =
                 Relief(robot.needs, effects, periods) -
                 (kWalkCostPerMinute * walk) -
-                (kPriceCostPerCredit * rules.price) -
+                (kPriceCostPerCredit * price) -
                 (kind == hereKind ? kSameKindPenalty : 0) +
                 (kind == RoomKind::Clinic ? robot.wear / kWearPerClinicPoint : 0) +
                 CompanyAt(robot, room.id) +
@@ -751,7 +753,7 @@ std::int64_t World::RentOf(const Robot& robot) const {
         return UpkeepOf(*apartment->room);
     }
     const std::int64_t sharers = std::max<std::uint32_t>(1, ResidentsOf(robot.apartment));
-    return (static_cast<std::int64_t>(apartment->room->rent) + sharers - 1) / sharers;
+    return (RentFor(*apartment->room) + sharers - 1) / sharers;
 }
 
 std::uint32_t World::ResidentsOf(EntityId apartment) const {

@@ -187,6 +187,10 @@ struct DailyStats {
     // dorm rooms; and robots sharing a home with someone.
     std::array<std::int64_t, 5> residentsByClass{};
     std::int64_t sharing{};
+    // Average rent asked for each class, dorms first; and venues' average
+    // price, in percent of their base prices.
+    std::array<std::int64_t, 5> averageRent{};
+    std::int64_t venuePricePercent{};
 };
 
 struct Economy {
@@ -205,6 +209,10 @@ struct Economy {
     // pay industry. It rises while industry loses money and falls while it
     // makes a profit.
     std::int64_t supplyPercent{60};
+    // Market rents of each class of home but dorm rooms, ApartmentClass
+    // order from studios, in percent of an apartment's base rent. They rise
+    // while few homes of a class stand empty and fall while many do.
+    std::array<std::int64_t, 4> rentPercent{100, 100, 100, 100};
 };
 
 // The price of an apartment: so many nights of its rent.

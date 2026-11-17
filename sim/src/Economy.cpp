@@ -35,6 +35,18 @@ constexpr std::int64_t kBuyReserveNights = 20;
 // shifts' pay.
 constexpr std::int64_t kDepositPercent = 20;
 constexpr std::int64_t kMortgageShifts = 60;
+// Venue prices move a step a night between these, in percent of base;
+// a venue counts as busy when it had kBusyTurns times its places in guests.
+constexpr std::uint32_t kPriceStep = 1;
+constexpr std::uint32_t kMinPricePercent = 50;
+constexpr std::uint32_t kMaxPricePercent = 300;
+constexpr std::uint32_t kBusyTurns = 3;
+// Market rents move a point a night while fewer homes than the tight share
+// stand empty, or more than the loose share; within these bounds.
+constexpr std::int64_t kTightVacancyPercent = 5;
+constexpr std::int64_t kLooseVacancyPercent = 15;
+constexpr std::int64_t kMinRentPercent = 50;
+constexpr std::int64_t kMaxRentPercent = 300;
 // Each night, the chance a robot sells an apartment nobody lives in.
 constexpr std::uint32_t kSellVacantPercent = 20;
 constexpr std::uint32_t kMinPayPercent = 50;
@@ -558,11 +570,68 @@ void World::PayWage(Robot& robot) {
 }
 
 std::int64_t World::PriceOf(const Room& apartment) const {
-    return static_cast<std::int64_t>(apartment.rent) * kPriceNights;
+    return RentFor(apartment) * kPriceNights;
+}
+
+std::int64_t World::RentFor(const Room& apartment) const {
+    const auto kind = static_cast<std::size_t>(apartment.apartmentClass);
+    if (apartment.apartmentClass == ApartmentClass::Dorm || kind < 2) {
+        return apartment.rent;
+    }
+    return std::max<std::int64_t>(
+        1, static_cast<std::int64_t>(apartment.rent) * state_.economy.rentPercent.at(kind - 2) / 100);
+}
+
+std::int64_t World::PriceAt(const Room& venue) const {
+    const VenueRules* rules = FindVenueRules(venue.kind);
+    return rules != nullptr
+               ? std::max<std::int64_t>(1, static_cast<std::int64_t>(rules->price) * venue.pricePercent / 100)
+               : 0;
+}
+
+void World::SetPrices() {
+    // A venue that had three times its places in guests asks more; one
+    // that had fewer guests than places, less.
+    for (Building& building : state_.city.buildings) {
+        for (Room& room : building.rooms) {
+            if (!IsVenue(room.kind)) {
+                continue;
+            }
+            if (room.visits >= kBusyTurns * room.capacity) {
+                room.pricePercent = std::min(kMaxPricePercent, room.pricePercent + kPriceStep);
+            } else if (room.visits < room.capacity) {
+                room.pricePercent = std::max(kMinPricePercent, room.pricePercent - kPriceStep);
+            }
+            room.visits = 0;
+        }
+    }
+    // Market rents follow how many homes of each class stand empty.
+    std::array<std::int64_t, 4> homes{};
+    std::array<std::int64_t, 4> empty{};
+    for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+        const auto kind = static_cast<std::size_t>(apartment.room->apartmentClass);
+        if (kind < 2) {
+            continue;
+        }
+        ++homes.at(kind - 2);
+        empty.at(kind - 2) += ResidentsOf(apartment.room->id) == 0 ? 1 : 0;
+    }
+    for (std::size_t kind = 0; kind < homes.size(); ++kind) {
+        if (homes[kind] == 0) {
+            continue;
+        }
+        std::int64_t& rent = state_.economy.rentPercent[kind];
+        const std::int64_t vacancy = empty[kind] * 100 / homes[kind];
+        if (vacancy < kTightVacancyPercent) {
+            rent = std::min(kMaxRentPercent, rent + 1);
+        } else if (vacancy > kLooseVacancyPercent) {
+            rent = std::max(kMinRentPercent, rent - 1);
+        }
+    }
 }
 
 std::int64_t World::UpkeepOf(const Room& apartment) const {
-    return static_cast<std::int64_t>(apartment.rent) * kUpkeepPercent / 100;
+    return RentFor(apartment) * kUpkeepPercent / 100;
 }
 
 void World::Transfer(EntityId apartment, EntityId buyer, std::int64_t price) {
@@ -716,13 +785,13 @@ void World::TradeProperty() {
         for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
             const Room& room = *apartment.room;
             if (room.owner != housing_ || taken.contains(room.id.value) ||
-                Sleeps(room.apartmentClass) != 1 || room.rent <= home->room->rent) {
+                Sleeps(room.apartmentClass) != 1 || RentFor(room) <= RentFor(*home->room)) {
                 continue;
             }
             const std::int64_t price = PriceOf(room);
             const std::int64_t deposit = price * kDepositPercent / 100;
             if (means < deposit + (kBuyReserveNights * UpkeepOf(room)) || price - deposit > mortgage ||
-                (best != nullptr && room.rent <= best->rent)) {
+                (best != nullptr && RentFor(room) <= RentFor(*best))) {
                 continue;
             }
             best = &room;
@@ -732,6 +801,11 @@ void World::TradeProperty() {
         }
         const std::int64_t price = PriceOf(*best);
         const std::int64_t own = std::min(means - (kBuyReserveNights * UpkeepOf(*best)), price);
+        // A bank lends only what it can spare beyond its reserve.
+        const Organization* bank = FindOrganization(robot.bank);
+        if (bank == nullptr || bank->credits - (price - own) < ReserveOf(*bank)) {
+            continue;
+        }
         Withdraw(robot, own - robot.credits);
         Lend(robot.bank, robot.id, price - std::min(own, robot.credits));
         Transfer(best->id, robot.id, price);
@@ -758,7 +832,7 @@ void World::TradeProperty() {
             continue;
         }
         const auto home = rooms_.Find(robot.apartment);
-        const std::int64_t keep = kBuyReserveNights * (home ? home->room->rent : 0);
+        const std::int64_t keep = kBuyReserveNights * (home ? RentFor(*home->room) : 0);
         const std::int64_t means = robot.credits + robot.savings;
         EntityId target;
         if (home && home->room->owner == housing_ && means >= PriceOf(*home->room) + keep) {
@@ -821,7 +895,7 @@ void World::SettleEconomy() {
         std::int64_t spare = 0;
         if (const Robot* robot = FindRobot(loan.borrower)) {
             const auto home = rooms_.Find(robot->apartment);
-            spare = robot->credits - (2 * (home ? static_cast<std::int64_t>(home->room->rent) : 0));
+            spare = robot->credits - (2 * (home ? RentFor(*home->room) : 0));
         } else if (const Organization* organization = FindOrganization(loan.borrower)) {
             spare = organization->credits - ReserveOf(*organization);
         }
@@ -933,6 +1007,7 @@ void World::SettleEconomy() {
         }
     }
 
+    SetPrices();
     RecordStatistics();
     for (Organization& organization : economy.organizations) {
         organization.yesterday = organization.today;
@@ -1005,6 +1080,29 @@ void World::RecordStatistics() {
     }
     stats.averagePayPercent = industry > 0 ? payPercent / industry : 100;
     stats.supplyPercent = state.economy.supplyPercent;
+    {
+        std::array<std::int64_t, 5> rents{};
+        std::array<std::int64_t, 5> counts{};
+        for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+            const auto kind = static_cast<std::size_t>(apartment.room->apartmentClass);
+            if (kind >= 1 && kind <= 5) {
+                rents.at(kind - 1) += RentFor(*apartment.room);
+                ++counts.at(kind - 1);
+            }
+        }
+        for (std::size_t kind = 0; kind < rents.size(); ++kind) {
+            stats.averageRent.at(kind) = counts[kind] > 0 ? rents[kind] / counts[kind] : 0;
+        }
+        std::int64_t percent = 0;
+        std::int64_t venues = 0;
+        for (const RoomKind kind : VenueKinds()) {
+            for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
+                percent += venue.room->pricePercent;
+                ++venues;
+            }
+        }
+        stats.venuePricePercent = venues > 0 ? percent / venues : 100;
+    }
     for (const Robot& robot : state.robots) {
         stats.robotMoney += robot.credits;
         stats.robotSavings += robot.savings;

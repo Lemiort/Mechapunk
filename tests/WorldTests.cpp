@@ -147,7 +147,10 @@ TEST(World, EveningsAreSpentInOpenVenuesWithinCapacity) {
         ASSERT_NE(rules, nullptr);
         EXPECT_TRUE(sim::IsOpen(*rules, sim::MinuteOfDay(event.tick)))
             << world.Describe(event);
-        EXPECT_EQ(event.credits, rules->price);
+        // The price the venue asks today, around the kind's base price.
+        EXPECT_EQ(event.credits,
+                  std::max<std::int64_t>(1, std::int64_t{rules->price} *
+                                                venue->room->pricePercent / 100));
         ++visits[venue->room->kind];
     });
     for (sim::Tick minute = 0; minute < 3 * sim::kMinutesPerDay; ++minute) {

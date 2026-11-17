@@ -189,6 +189,8 @@ void DrawEconomy(const std::vector<sim::DailyStats>& history) {
     PlotCount("Industry pay, % of base", history, [](const auto& d) { return d.averagePayPercent; });
     PlotCount("Price of supplies, % of venue takings", history,
               [](const auto& d) { return d.supplyPercent; });
+    PlotCount("Venue prices, % of usual", history,
+              [](const auto& d) { return d.venuePricePercent; });
     ImGui::SeparatorText("Wealth");
     if (BeginFacts("wealth")) {
         Row("Credits: median / mean", std::format("{} / {}", Credits(day.medianCredits), Credits(day.meanCredits)));
@@ -286,6 +288,12 @@ void DrawProperty(const std::vector<sim::DailyStats>& history) {
     PlotCount("In two-bedroom flats", history, [](const auto& d) { return d.residentsByClass[3]; });
     PlotCount("In penthouses", history, [](const auto& d) { return d.residentsByClass[4]; });
     PlotCount("Sharing a home", history, [](const auto& d) { return d.sharing; });
+    ImGui::SeparatorText("Rents asked");
+    PlotCredits("Dorm room", history, [](const auto& d) { return d.averageRent[0]; });
+    PlotCredits("Studio", history, [](const auto& d) { return d.averageRent[1]; });
+    PlotCredits("One-bedroom flat", history, [](const auto& d) { return d.averageRent[2]; });
+    PlotCredits("Two-bedroom flat", history, [](const auto& d) { return d.averageRent[3]; });
+    PlotCredits("Penthouse", history, [](const auto& d) { return d.averageRent[4]; });
     PlotCount("Tenants", history, [](const auto& d) { return d.tenants; });
     PlotCount("Landlords", history, [](const auto& d) { return d.landlords; });
     PlotCount("Let by corporations", history, [](const auto& d) { return d.corporateApartments; });

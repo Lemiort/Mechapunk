@@ -87,6 +87,10 @@ struct Room {
     EntityId owner;
     // Apartments only.
     ApartmentClass apartmentClass{ApartmentClass::None};
+    // Venues only: the price asked, in percent of the kind's base price,
+    // and guests since midnight, by which the price is set each night.
+    std::uint32_t pricePercent{100};
+    std::uint32_t visits{};
 };
 
 // Daily working hours of a workplace.

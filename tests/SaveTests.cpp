@@ -177,14 +177,22 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v12-city.json";
+        kFixtureDirectory / "saves" / "v13-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
-    // Saved with robots still in dorms and others moved on,
+    // Saved with venues asking more and less than usual, rents moved,
+    EXPECT_TRUE(std::ranges::any_of(state->city.buildings, [](const sim::Building& building) {
+        return std::ranges::any_of(building.rooms, [](const sim::Room& room) {
+            return sim::IsVenue(room.kind) && room.pricePercent != 100;
+        });
+    }));
+    EXPECT_TRUE(std::ranges::any_of(state->economy.rentPercent,
+                                    [](std::int64_t percent) { return percent != 100; }));
+    // robots still in dorms and others moved on,
     std::set<sim::ApartmentClass> lived;
     for (const sim::Robot& robot : state->robots) {
         for (const sim::Building& building : state->city.buildings) {
@@ -556,6 +564,25 @@ TEST(Save, Version11FixtureMigratesAndRuns) {
     EXPECT_TRUE(std::ranges::any_of(state->economy.organizations, [](const sim::Organization& each) {
         return each.kind == sim::OrganizationKind::Government;
     }));
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 12 save's venues ask their base prices and market rents start
+// at their base; then it keeps running.
+TEST(Save, Version12FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v12-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    for (const std::int64_t percent : state->economy.rentPercent) {
+        EXPECT_EQ(percent, 100);
+    }
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(2 * sim::kMinutesPerDay);
