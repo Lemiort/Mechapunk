@@ -12,6 +12,7 @@ every fixture, so old saves keep working as the format evolves.
 | `v5-city.json` | 5       | `mechapunk-sim --seed 10 --robots 60 --minutes 28500 --save v5-city.json` (game 0.5.0) |
 | `v6-city.json` | 6       | `mechapunk-sim --seed 10 --robots 60 --minutes 28500 --save v6-city.json` (game 0.6.0) |
 | `v7-city.json` | 7       | `mechapunk-sim --seed 10 --robots 60 --minutes 26432 --save v7-city.json` (game 0.7.0) |
+| `v8-city.json` | 8       | `mechapunk-sim --seed 33 --robots 60 --minutes 28370 --save v8-city.json` (game 0.8.0) |
 
 `v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
 working. `v2-city.json` stops at Day 2 19:00, with robots resting, walking,
@@ -25,6 +26,11 @@ out of work, and memories of losing and finding jobs and moving up.
 have been scrapped and are remembered by friends, and newcomers have moved
 in. `v7-city.json` stops during a weekday morning commute (Day 19,
 08:32), with robots walking to, riding and coming up from the metro.
+`v8-city.json` stops on a rainy Saturday afternoon (Day 20, 16:50) with a
+robot riding the metro to a diner, one out of work and a scrapped robot
+still remembered. It uses another seed than the older fixtures: the city
+generator changed, and seed 10 no longer makes a town anyone rides the
+metro in.
 `Version1FixtureMigratesAndRuns` loads the v1
 fixture through the migration, checks every robot kept its home and
 workplace, and runs two days of evenings; `Version2FixtureMigratesAndRuns`
@@ -35,6 +41,8 @@ gets two interests and no bonds yet, and that friendships form;
 a clean record and keep working. `Version5FixtureMigratesAndRuns` checks that v5
 robots get an age and matching wear and go on aging. `Version6FixtureMigratesAndRuns` checks
 that a v6 city gets its stations and that robots start riding.
+`Version7FixtureMigratesAndRuns` checks that a v7 world starts dry for six
+hours and then its weather changes.
 
 ## Changing the save format
 

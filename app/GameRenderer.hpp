@@ -13,6 +13,7 @@
 #include "GBuffer.hpp"
 #include "Material.hpp"
 #include "Mesh.hpp"
+#include "Rain.hpp"
 #include "RenderQueue.hpp"
 #include "Scene.hpp"
 #include "Shader.hpp"
@@ -97,6 +98,8 @@ public:
     [[nodiscard]] const BloomSettings& GetBloom() const {
         return deferredPipeline_->GetBloom();
     }
+    // Rain for a world of `unitsPerMeter`, with the particle shaders.
+    [[nodiscard]] std::unique_ptr<RainEffect> MakeRain(float unitsPerMeter) const;
     // Draws the queued meshes lit by the scene's lights into the window's
     // framebuffer, which stays bound for UI drawn on top.
     void Render(const Scene& scene, const RenderQueue& queue,
@@ -112,6 +115,8 @@ private:
     std::shared_ptr<Shader> toneMapShader_;
     std::shared_ptr<Shader> bloomDownsampleShader_;
     std::shared_ptr<Shader> bloomUpsampleShader_;
+    std::shared_ptr<Shader> particleUpdateShader_;
+    std::shared_ptr<Shader> particleShader_;
     std::shared_ptr<GBuffer> gBuffer_;
     std::unique_ptr<ForwardPipeline> forwardPipeline_;
     std::unique_ptr<DeferredPipeline> deferredPipeline_;

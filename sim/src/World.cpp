@@ -243,6 +243,7 @@ World World::Generate(const WorldParams& params) {
         robot.jobLevel =
             static_cast<std::uint8_t>(careers.UniformInt(0, kHighestStartingLevel));
     }
+    state.weather = StartingWeather(params.seed, state.tick);
 
     state.random = Pcg32::FromSeed(params.seed, kRuntimeStream);
     World world(std::move(state));
@@ -283,6 +284,14 @@ std::optional<Walk> World::WalkOf(const Robot& robot) {
 
 void World::Step() {
     ++state_.tick;
+    if (state_.tick >= state_.weather.changesAt) {
+        state_.weather = NextWeather(state_.weather, state_.seed, state_.tick);
+        Emit({.tick = state_.tick,
+              .kind = EventKind::WeatherChanged,
+              .minutes = static_cast<std::uint32_t>(state_.weather.changesAt -
+                                                    state_.tick),
+              .change = static_cast<std::int32_t>(state_.weather.rain)});
+    }
     if (MinuteOfDay(state_.tick) == 0) {
         CollectRent();
         AgeRobots();
@@ -775,6 +784,12 @@ std::string World::Describe(const SimEvent& event) const {
         case EventKind::Arrived:
             return std::format("{}  {} moved to the city, into {}", when, who,
                                room);
+        case EventKind::WeatherChanged:
+            return event.change == 0
+                       ? std::format("{}  The rain stopped", when)
+                       : std::format("{}  {} for {} min", when,
+                                     RainName(static_cast<std::uint32_t>(event.change)),
+                                     event.minutes);
     }
     return std::format("{}  {}: unknown event", when, who);
 }
@@ -949,6 +964,9 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                                     "range",
                                     robot.name));
         }
+    }
+    if (state.weather.rain > kMaxRain) {
+        return fail("The rain is out of range");
     }
     return ValidateSocial(state);
 }

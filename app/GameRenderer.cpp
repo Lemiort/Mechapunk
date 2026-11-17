@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <vector>
 #include <cstdint>
 #include <filesystem>
 #include <initializer_list>
@@ -159,6 +160,13 @@ GameRenderer::GameRenderer(int width, int height) {
         LoadShader({{"shaders/fullscreen.vsh", ShaderType::Vertex},
                     {"shaders/bloom_upsample.fsh", ShaderType::Fragment}});
 
+    particleUpdateShader_ =
+        LoadShader({{"shaders/particle_update.vsh", ShaderType::Vertex}});
+    particleShader_ =
+        LoadShader({{"shaders/particle.vsh", ShaderType::Vertex},
+                    {"shaders/particle.gsh", ShaderType::Geometry},
+                    {"shaders/particle.fsh", ShaderType::Fragment}});
+
     gBuffer_ = std::make_shared<GBuffer>(width, height);
     forwardPipeline_ =
         std::make_unique<ForwardPipeline>(gsl_lite::not_null{meshShader_});
@@ -212,6 +220,11 @@ GameRenderer::GameRenderer(int width, int height) {
 }
 
 GameRenderer::~GameRenderer() = default;
+
+std::unique_ptr<RainEffect> GameRenderer::MakeRain(float unitsPerMeter) const {
+    return std::make_unique<RainEffect>(particleUpdateShader_, particleShader_,
+                                        unitsPerMeter);
+}
 
 void GameRenderer::Resize(int width, int height) {
     if (width > 0 && height > 0) {

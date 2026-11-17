@@ -49,6 +49,7 @@ public:
         pitch_ = std::clamp(degrees, kMinPitch, kMaxPitch);
     }
     [[nodiscard]] float Distance() const noexcept { return distance_; }
+    [[nodiscard]] glm::vec3 Target() const noexcept { return target_; }
 
     // Moves the target in the camera's ground plane; units scale with zoom.
     void Pan(float right, float forward) {

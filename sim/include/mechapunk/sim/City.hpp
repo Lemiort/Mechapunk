@@ -130,7 +130,8 @@ struct EntityIdAllocator {
 
 // Builds a connected street grid with a few missing segments, and a metro
 // station at every second intersection each way. Every intersection has
-// room for four buildings, one on each corner. Habitats,
+// room for four buildings, one on each corner. Buildings rise toward the
+// middle of a big city, up to about thirty floors; towns stay low. Habitats,
 // concentrated in the west, have stores on the ground floor and apartments
 // above; workplaces in the east are split into workspaces over their floors.
 [[nodiscard]] City GenerateCity(const CityParams& params, Pcg32& random,

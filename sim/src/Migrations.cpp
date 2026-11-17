@@ -301,4 +301,18 @@ std::expected<void, std::string> V6ToV7(SaveDocument& world) try {
         std::format("the version 6 world is malformed ({})", error.what()));
 }
 
+
+std::expected<void, std::string> V7ToV8(SaveDocument& world) try {
+    constexpr std::uint64_t kFirstDryMinutes = 6 * 60;
+    SaveDocument weather = Object{};
+    weather["rain"] = std::uint64_t{0};
+    weather["changesAt"] = world["tick"].as<std::uint64_t>() + kFirstDryMinutes;
+    weather["spells"] = std::uint64_t{0};
+    world["weather"] = std::move(weather);
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 7 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

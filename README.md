@@ -48,7 +48,7 @@ Run the tests with `ctest --test-dir build/build/Release --output-on-failure`.
 
 `mechapunk` continues `mechapunk-save.json` from the working directory when
 it exists, and otherwise starts a new city. It saves there when you quit.
-Start over with `--new`, or pick a city with `--seed N --robots N` (2000
+Start over with `--new`, or pick a city with `--seed N --robots N` (6000
 robots by default; the street grid grows with the population); use
 `--save FILE` for another save file. A save that cannot be read is moved
 aside to `FILE.broken` instead of being overwritten.
@@ -136,8 +136,19 @@ parcel under the arm.
 
 Habitats are cyan towers with colored store signs at street level,
 workplaces are magenta, and street corners without a building are small
-parks with trees and benches. Building height follows the number of floors. Sunlight follows the time of day; at night neon signs
-glow and street lamps along every street cast pools of light on the road.
+parks with trees and benches. Building height follows the number of floors,
+and a big city rises toward its middle: habitats reach about thirty floors
+and the largest workplaces become office towers with one workspace per
+floor. Every window is its own pane on the facade, about four in ten lit
+at night. Sunlight follows
+the time of day; at night neon signs glow and the street lamps nearest the
+camera cast pools of light on the road. Only the 96 neon lights and 64
+street lamps nearest where the camera looks light the scene; farther away
+the glowing signs and bulbs carry the look.
+
+When it rains, streaks of rain fall around where the camera looks, heavier
+the harder it rains, and the sun and sky dim. The **City** window shows the
+weather next to the time.
 
 The robot panel has **Look at** and **Follow**. Following keeps the camera
 on the robot: it opens the building and floor the robot is in and closes it
@@ -160,6 +171,15 @@ down to single rooms:
   apartments above.
 - Workplaces are split into workspaces over their floors and pay a wage per
   shift.
+- Buildings grow toward the middle of a big city: from 500 robots up the
+  middle rises, and from 6000 it reaches full height. Tall habitats get a
+  fourth store and bigger stores, so there is as much room in venues for
+  each resident as in a small habitat.
+- Weather comes in spells: dry for 8 to 48 hours, then rain for 1 to 8
+  hours, from drizzle to downpour, light rain more often than heavy. Each
+  spell is picked from the world's seed and its number, so it never changes
+  what robots do, and the same seed always brings the same weather. Robots
+  don't react to rain yet.
 - Every robot has its own apartment and, unless it is out of work, a
   workspace, and is always in a known room or walking between two.
 - Habitats get their stores in a fixed order: repair shops, charging bays,
@@ -248,7 +268,7 @@ minutes, riding (30 km/h along the lines, first the row and then the
 column) and walking on from the station nearest the destination beats
 walking all the way. A ride costs 4 cr; robots budget for the fare home,
 and a robot that cannot spare the fare without missing tonight's rent walks
-instead. In a city of 2000, about one trip in eight is by metro.
+instead. In a city of 6000, about one trip in eight is by metro.
 
 Riders climb the stairs, wait in the open corners of the platform, and
 ride a two-car train with everyone who boarded with them; the train runs

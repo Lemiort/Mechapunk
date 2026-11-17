@@ -72,8 +72,14 @@ public:
     void AddLights(Scene& scene);
     // Day-night cycle, street lamps at night, and the lamps switched on in
     // the open floor as of the last Submit.
+    // `focus` is where the camera looks: only the neon and street lamps
+    // nearest it light the scene, the rest show by their glow alone.
+    // `overcast`, 0 to 1, dims the sun and sky while it rains.
     void UpdateLights(Scene& scene, double minuteOfDay,
-                      const Selection& selection) const;
+                      const Selection& selection, glm::vec3 focus,
+                      float overcast) const;
+    // 0 at night, 1 in full daylight, easing through dawn and dusk.
+    [[nodiscard]] static float DaylightAt(double minuteOfDay);
 
     // Queues the city and robots for one frame and remembers where things
     // were drawn, for PickAt. Robots outdoors are drawn `streetFigureScale`

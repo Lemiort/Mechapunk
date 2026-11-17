@@ -5,6 +5,7 @@
 #include <bit>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iterator>
 #include <set>
@@ -176,14 +177,14 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v7-city.json";
+        kFixtureDirectory / "saves" / "v8-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
-    // Saved during the morning commute, with robots on the metro.
+    // Saved with a robot riding the metro to a diner.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
         return robot.alightsAt != 0;
     }));
@@ -197,6 +198,10 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
         return !robot.bonds.empty() && !robot.memories.empty();
     }));
+    // Saved in the rain, after many spells of weather.
+    EXPECT_GT(state->weather.rain, 0U);
+    EXPECT_GT(state->weather.spells, 10U);
+    EXPECT_GT(state->weather.changesAt, state->tick);
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -240,7 +245,8 @@ TEST(Save, Version1FixtureMigratesAndRuns) {
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(visits, 0U);
     // Saving the migrated world writes the current version.
-    EXPECT_NE(Serialize(world->State()).find("\"version\": 7"),
+    EXPECT_NE(Serialize(world->State())
+                  .find(std::format("\"version\": {}", sim::kCurrentSaveVersion)),
               std::string::npos);
 }
 
@@ -400,5 +406,31 @@ TEST(Save, Version6FixtureMigratesAndRuns) {
     });
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(rides, 0U);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 7 save (metro, no weather) loads through one migration: the
+// world starts dry for six hours, then its weather changes like any other.
+TEST(Save, Version7FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v7-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_EQ(state->weather.rain, 0U);
+    EXPECT_EQ(state->weather.spells, 0U);
+    EXPECT_EQ(state->weather.changesAt, state->tick + (6 * sim::kMinutesPerHour));
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    std::uint32_t changes = 0;
+    world->SetEventSink([&](const sim::SimEvent& event) {
+        changes += event.kind == sim::EventKind::WeatherChanged ? 1 : 0;
+    });
+    world->RunFor(4 * sim::kMinutesPerDay);
+    EXPECT_GT(changes, 0U);
+    EXPECT_EQ(world->State().weather.spells, changes);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

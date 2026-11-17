@@ -140,6 +140,8 @@ struct DayStats {
     std::uint64_t scrapped{};
     std::uint64_t arrived{};
     std::uint64_t arguments{};
+    std::uint64_t rainMinutes{};
+    std::uint32_t heaviestRain{};
     std::map<sim::MemoryKind, std::uint64_t> memories;
     std::map<std::string, std::uint64_t> visitsByKind;
 
@@ -189,6 +191,13 @@ struct DayStats {
                 break;
             case sim::EventKind::Arrived:
                 ++arrived;
+                break;
+            case sim::EventKind::WeatherChanged:
+                if (event.change > 0) {
+                    rainMinutes += event.minutes;
+                    heaviestRain = std::max(
+                        heaviestRain, static_cast<std::uint32_t>(event.change));
+                }
                 break;
         }
     }
@@ -287,6 +296,10 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
         stats.metroRides, stats.fares, stats.scrapped, stats.arrived, memories(sim::MemoryKind::LostFriend),
         memories(sim::MemoryKind::GotBadPart), world.State().robots.size(),
         age / count, wear / count);
+    // Rain spells are counted on the day they start, for their whole length.
+    std::println("   weather: {} min of rain started, heaviest {}; now {}",
+                 stats.rainMinutes, sim::RainName(stats.heaviestRain),
+                 sim::RainName(world.State().weather.rain));
 }
 
 
@@ -339,8 +352,8 @@ int Run(std::span<char*> arguments) {
         stats.Add(*world, event);
         const bool show =
             !options->quiet &&
-            (options->all || std::ranges::find(followed, event.robot) !=
-                                 followed.end());
+            (options->all || event.kind == sim::EventKind::WeatherChanged ||
+             std::ranges::find(followed, event.robot) != followed.end());
         if (show) {
             std::println("{}", world->Describe(event));
         }

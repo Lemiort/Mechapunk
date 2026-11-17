@@ -11,6 +11,7 @@ add_library(mechapunk_sim STATIC
     src/Social.cpp
     src/Transit.cpp
     src/Venues.cpp
+    src/Weather.cpp
     src/World.cpp
 )
 add_library(mechapunk::sim ALIAS mechapunk_sim)

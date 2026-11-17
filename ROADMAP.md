@@ -20,8 +20,8 @@ building, room, store and robot can be seen and inspected.
   RAII wrappers around them. NEE's `ImGuiOverlay` is fine.
 - Saves are glaze JSON with frozen migrations. Any change to saved state
   bumps the save version, adds a migration and a fixture (see
-  `tests/fixtures/saves/README.md`). The current save version is 7, game
-  version 0.7.0.
+  `tests/fixtures/saves/README.md`). The current save version is 8, game
+  version 0.8.0.
 
 ### Building and testing
 
@@ -52,14 +52,19 @@ The game build rebuilds `external/NEE/build/Release` first. Quit a running
 | M2 See it | Done: buildings and robots drawn, smooth movement, picking, inspector, time controls |
 | M3 Needs and the economy | Done: charge, condition, social, fun; wages, rent, debt, venues, evenings out, days off |
 | M4 Social life | Done: interests, talks, bonds (friend, close friend, rival), memories. The "chronicle" is only the inspector's recent events, which are not saved |
-| M5 Atmosphere | **Partly done**: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces, HDR, tone mapping and bloom. **Missing: rain** |
+| M5 Atmosphere | Done: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces, HDR, tone mapping, bloom, weather and rain |
 | M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers). **Missing: simulation level of detail, corporations and factions, construction** |
 
 Also done since the plan was written:
 
 - Careers and moving house: promotions, firing, rehiring, evictions.
 - Transit: an elevated metro with platforms, stairs and trains.
-- A dense city of 2000 robots by default.
+- A city of 6000 robots by default, rising toward the middle: habitats up
+  to about thirty floors, office towers up to about twenty. Only the neon
+  and street lamps nearest the camera are real lights. A night frame runs
+  at about 40 fps at 6000 robots and 26 fps at 10000; most of the cost is
+  the facade windows, one box each, which the engine re-sorts and
+  re-uploads every frame (see the engine table, #3 and #4).
 - Parks on free corners.
 - Carried items and table props.
 - Robots walking through doors, corridors and stairs.
@@ -78,7 +83,7 @@ Also done since the plan was written:
 | 7 | Versioned serialization | Done in the game (`sim/src/Save.cpp`: migrations, temp-file-then-rename write). Rotating autosaves are missing |
 | 8 | Dear ImGui overlay | Done (NEE #62) |
 | 9 | Keep the node hierarchy on model import, for rigid-part animation | Not done. Robots and furniture are box props in `app/Props.cpp` |
-| 10 | Look: emissive G-buffer channel, HDR, bloom, tonemapping, instanced light volumes or clustered lighting, particle fix (#29) for rain | Emissive (NEE #65), HDR and tone mapping (NEE #66), bloom (NEE #67) and particles (NEE #68) done; more lights not done |
+| 10 | Look: emissive G-buffer channel, HDR, bloom, tonemapping, instanced light volumes or clustered lighting, particle fix (#29) for rain | Emissive (NEE #65), HDR and tone mapping (NEE #66), bloom (NEE #67), particles (NEE #68) and NaN-safe lighting (NEE #69) done; more lights not done |
 
 Also done in NEE beyond the plan: screenshots (#60), distance-field text
 (#61), the Conan package (#64), and skipping dark lights (#63).
@@ -86,12 +91,10 @@ Also done in NEE beyond the plan: screenshots (#60), distance-field text
 The open NEE architecture-review issues are #20, #24, #27 and #29–#43.
 #43 is the tracker.
 
-## Recommended next: finish M5 (atmosphere)
+## M5 (atmosphere), done
 
-Surfaces glow, light is kept above 1, tone-mapped and blooms. Rain is what
-is left.
-Do it as separate NEE PRs, each generic and with tests, then use each one
-in the game:
+Done as separate NEE PRs, each generic and with tests, then used in the
+game:
 
 1. **Emissive channel.** Done (NEE #65): an emissive texture times an
    emissive color per material (`SetEmissiveTexture`, on the last texture
@@ -103,8 +106,7 @@ in the game:
    glow, dimmed by day through `MaterialPalette::SetGlow`. Sign point
    lights dropped from 2.5 to 0.03, so they only light a pool around the
    sign. The game uses the color only, since each glowing part is its own
-   box; an emissive map of the facade textures could later replace the
-   window boxes.
+   box.
 2. **HDR and tonemapping.** Done (NEE #66): the light
    target is RGBA16F and a fullscreen pass tone-maps it with exposure and
    None, Reinhard or ACES (`DeferredPipeline::SetToneMapping`). The game
@@ -117,17 +119,19 @@ in the game:
    glow at three times their color, so they pass the threshold of 1 while
    lit windows don't, and bloom strength is 0.4. The Display panel has
    bloom strength, threshold and radius sliders.
-4. **Rain.** The particle system is rebuilt (NEE #68):
-   GPU particles born in an emitter box, with velocity, jitter,
-   acceleration and lifetime, drawn as camera-facing quads or streaks
-   through `RenderQueue::SubmitParticles`. Next, add rain in the game
-   with a weather state in the sim (saved, so it needs a migration). Wet
-   streets could come later with a reflection or specular tweak.
+4. **Rain.** Done. The particle system is rebuilt (NEE #68): GPU
+   particles born in an emitter box, with velocity, jitter, acceleration
+   and lifetime, drawn as camera-facing quads or streaks through
+   `RenderQueue::SubmitParticles`. The sim has weather (save version 8):
+   spells of dry weather and rain picked from the seed. The game draws rain
+   as `RainEffect` around the camera's focus, sized by zoom, and dims the
+   sun and sky while it rains. Wet streets could come later with a
+   reflection or specular tweak, and robots could react to rain.
 5. Optionally, more point and spot lights: the game's lamp pool is 32 for
    the open floor. That would need instanced light volumes or clustered
    lighting.
 
-## After that: M6 (scale and depth)
+## Recommended next: M6 (scale and depth)
 
 - **Corporations and factions.** Workplaces belong to corporations;
   robots join factions or gangs. Rivalries and loyalties feed the existing
@@ -135,11 +139,23 @@ in the game:
 - **Construction.** The city grows: new buildings on park corners as the
   population grows, and building projects that employ robots.
 - **Simulation level of detail.** Cheaper updates for robots nobody is
-  looking at, so the city can grow well past 2000.
+  looking at. 10000 robots simulate a day in about 1.5 s, so drawing is
+  the limit for now, and saves next (about 40 MB and 2 to 3 seconds at
+  10000 robots).
 - **Chronicle.** A saved city history of notable events (deaths,
   friendships, firings), viewable in the UI.
 
 ## Known gaps and rough edges
+
+- Tall habitats have bigger stores rather than more of them, so busy
+  stores hold more guests than their seats and spots; a retail podium
+  (stores on the first floor too) would fix it.
+- Facade windows are opaque boxes; the plan is see-through glass showing
+  the rooms behind, or a cube map inside each window. The lit windows do
+  not follow which apartments are really occupied.
+- Workplaces sit in the east half, where only the western edge is central,
+  so office towers are lower than the tallest habitats.
+- Robots don't react to rain, and streets don't look wet.
 
 - Indoor walks avoid walls (checked by `layout_tests`) but can clip through
   furniture in some rooms, such as charging bays with no aisle.

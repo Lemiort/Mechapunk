@@ -73,6 +73,8 @@ struct RobotSocial {
 // Immutable copy of the world's visible state, published after every step.
 struct WorldFrame {
     sim::Tick tick{};
+    // The weather's rain, 0 (dry) to sim::kMaxRain.
+    std::uint32_t rain{};
     std::vector<RobotFrame> robots;
     std::uint32_t resting{};
     std::uint32_t working{};

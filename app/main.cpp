@@ -40,6 +40,7 @@
 #include "Screenshot.hpp"
 #include "SimulationHost.hpp"
 #include "mechapunk/sim/GameTime.hpp"
+#include "mechapunk/sim/Weather.hpp"
 #include "mechapunk/sim/Save.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -72,7 +73,7 @@ constexpr float kUiFontSize = 17.0F;
 struct Options {
     bool startNew{false};
     std::uint64_t seed{1};
-    std::uint32_t robots{2000};
+    std::uint32_t robots{6000};
     std::filesystem::path savePath{"mechapunk-save.json"};
 };
 
@@ -141,7 +142,9 @@ public:
           renderer_(kWindowWidth, kWindowHeight),
           host_(std::move(world)),
           city_(host_.City(), host_.Seed(), renderer_.Assets()),
-          camera_(city_.Center(), city_.Extent() * 1.1F) {
+          camera_(city_.Center(), city_.Extent() * 1.1F),
+          rain_(renderer_.MakeRain(CityView::kUnitsPerMeter)),
+          lastFrameAt_(glfwGetTime()) {
         city_.AddLights(scene_);
         glfwSetWindowUserPointer(&window_, this);
         glfwSetKeyCallback(&window_, &Game::OnKey);
@@ -482,6 +485,9 @@ private:
             KeepFollowedRobotInView(*frame);
         }
 
+        const double now = glfwGetTime();
+        const auto frameSeconds = static_cast<float>(now - lastFrameAt_);
+        lastFrameAt_ = now;
         queue_.Clear();
         if (frame != nullptr) {
             const float figureScale =
@@ -501,10 +507,17 @@ private:
                 camera_.FocusTarget(*position);
             }
         }
+        rain_->Update(frameSeconds, frame != nullptr ? frame->rain : 0,
+                      camera_.Target(),
+                      camera_.MakeCamera(width_, height_).GetPos(),
+                      camera_.Distance(),
+                      CityView::DaylightAt(std::fmod(
+                          renderTick, static_cast<double>(sim::kMinutesPerDay))));
+        rain_->Submit(queue_);
         city_.UpdateLights(
             scene_,
             std::fmod(renderTick, static_cast<double>(sim::kMinutesPerDay)),
-            selection_);
+            selection_, camera_.Target(), rain_->Level());
         renderer_.Render(scene_, queue_, camera_.MakeCamera(width_, height_));
         overlay_->Render();
     }
@@ -541,6 +554,11 @@ private:
                          ImGuiWindowFlags_AlwaysAutoResize)) {
             const auto tick = static_cast<sim::Tick>(std::floor(renderTick));
             ImGui::TextUnformatted(sim::FormatTime(tick).c_str());
+            if (frame != nullptr && frame->rain > 0) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4{0.55F, 0.75F, 1.0F, 1.0F}, "%s",
+                                   std::string{sim::RainName(frame->rain)}.c_str());
+            }
 
             bool paused = host_.IsPaused();
             if (ImGui::Checkbox("Paused", &paused)) {
@@ -661,6 +679,8 @@ private:
     SimulationHost host_;
     CityView city_;
     OrbitCamera camera_;
+    std::unique_ptr<RainEffect> rain_;
+    double lastFrameAt_{0.0};
     std::unique_ptr<ImGuiOverlay> overlay_;
     bool wasDragging_{false};
     bool pressOnUi_{false};

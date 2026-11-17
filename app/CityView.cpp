@@ -10,6 +10,7 @@
 #include <numbers>
 #include <optional>
 #include <set>
+#include <span>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -760,10 +761,51 @@ void CityView::AddLights(Scene& scene) {
     }
 }
 
+namespace {
+// Lights kept lit nearest the camera's focus; every one costs two passes of
+// the deferred renderer. Glowing signs and lamp bulbs still show far away.
+constexpr std::size_t kNeonLightBudget = 96;
+constexpr std::size_t kStreetLampBudget = 64;
+// The farthest quarter of a budget fades out, so lights don't pop as the
+// camera moves.
+constexpr float kBudgetFade = 0.25F;
+
+// How bright each of `positions` should be: 1 for the `budget` nearest
+// `focus` (ground distance), fading over the farthest of them, 0 beyond.
+std::vector<float> NearestWeights(std::span<const vec3> positions, vec3 focus,
+                                  std::size_t budget) {
+    std::vector<float> weights(positions.size(), 0.0F);
+    std::vector<std::pair<float, std::size_t>> byDistance;
+    byDistance.reserve(positions.size());
+    for (std::size_t index = 0; index < positions.size(); ++index) {
+        const vec2 offset{positions[index].x - focus.x, positions[index].z - focus.z};
+        byDistance.emplace_back(glm::dot(offset, offset), index);
+    }
+    const std::size_t kept = std::min(budget, byDistance.size());
+    std::ranges::partial_sort(byDistance, byDistance.begin() + static_cast<std::ptrdiff_t>(kept));
+    const auto fadeFrom = static_cast<std::size_t>(static_cast<float>(budget) * (1.0F - kBudgetFade));
+    for (std::size_t rank = 0; rank < kept; ++rank) {
+        weights[byDistance[rank].second] =
+            rank < fadeFrom ? 1.0F
+                            : 1.0F - (static_cast<float>(rank - fadeFrom + 1) /
+                                      static_cast<float>(budget - fadeFrom + 1));
+    }
+    return weights;
+}
+}  // namespace
+
+float CityView::DaylightAt(double minuteOfDay) {
+    return Smoothstep(-0.1F, 0.25F, SunHeight(minuteOfDay));
+}
+
 void CityView::UpdateLights(Scene& scene, double minuteOfDay,
-                            const Selection& selection) const {
+                            const Selection& selection, vec3 focus,
+                            float overcast) const {
     const float sunHeight = SunHeight(minuteOfDay);
-    const float daylight = Smoothstep(-0.1F, 0.25F, sunHeight);
+    const float daylight = DaylightAt(minuteOfDay);
+    // Clouds hide most of the sun and gray the sky.
+    const float sun = 1.0F - (0.75F * overcast);
+    const float sky = 1.0F - (0.35F * overcast);
     const auto directional = scene.GetDirectionalLights();
     if (directional.size() >= 3) {
         // The sun travels from east (+x) to west (-x) across the south.
@@ -773,8 +815,8 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
             static_cast<float>(std::cos(phase) * (morning ? 1.0 : -1.0));
         directional[0].SetDirection(
             -glm::normalize(vec3{horizontal, std::max(sunHeight, 0.05F), 0.35F}));
-        directional[0].SetColor(kSunColor * std::max(sunHeight, 0.0F) * 1.1F);
-        directional[1].SetColor(glm::mix(kNightSky, kDaySky, daylight));
+        directional[0].SetColor(kSunColor * std::max(sunHeight, 0.0F) * 1.1F * sun);
+        directional[1].SetColor(glm::mix(kNightSky, kDaySky, daylight) * sky);
         // Brighter at night, when the sky no longer lights the rooms.
         directional[2].SetColor(selection.building.IsValid()
                                     ? kInspectionLight * (2.0F - daylight)
@@ -785,12 +827,22 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
     const float neon = 1.0F - (0.75F * daylight);
     assets_.palette->SetGlow(neon);
     const auto points = scene.GetPointLights();
+    std::vector<vec3> neonPositions;
+    neonPositions.reserve(neons_.size());
     for (const Neon& sign : neons_) {
+        neonPositions.push_back(sign.lightIndex < points.size()
+                                    ? points[sign.lightIndex].GetPosition()
+                                    : vec3(0.0F));
+    }
+    const std::vector<float> neonWeights =
+        NearestWeights(neonPositions, focus, kNeonLightBudget);
+    for (std::size_t index = 0; index < neons_.size(); ++index) {
+        const Neon& sign = neons_[index];
         if (sign.lightIndex < points.size()) {
             const bool inspected = selection.building.IsValid() &&
                                    sign.building == selection.building;
-            points[sign.lightIndex].SetColor(inspected ? vec3(0.0F)
-                                                       : sign.color * neon);
+            points[sign.lightIndex].SetColor(
+                inspected ? vec3(0.0F) : sign.color * neon * neonWeights[index]);
         }
     }
     for (std::size_t lamp = 0; lamp < kLampPool; ++lamp) {
@@ -810,9 +862,18 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
     // renderer skips.
     const vec3 street = kStreetLampColor * (1.0F - daylight);
     const bool lit = daylight < 1.0F;
-    for (SpotLight& lamp : scene.GetSpotLights()) {
-        const vec3 bulb = lamp.GetPos();
-        lamp.SetColor(street);
+    const auto spots = scene.GetSpotLights();
+    std::vector<vec3> bulbs;
+    bulbs.reserve(spots.size());
+    for (const SpotLight& lamp : spots) {
+        bulbs.push_back(lamp.GetPos());
+    }
+    const std::vector<float> lampWeights =
+        NearestWeights(bulbs, focus, kStreetLampBudget);
+    for (std::size_t index = 0; index < spots.size(); ++index) {
+        SpotLight& lamp = spots[index];
+        const vec3 bulb = bulbs[index];
+        lamp.SetColor(street * lampWeights[index]);
         lamp.SetTarget(lit ? vec3{bulb.x, 0.0F, bulb.z} : bulb);
     }
 }

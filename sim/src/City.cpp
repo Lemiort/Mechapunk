@@ -8,6 +8,7 @@
 #include <format>
 #include <functional>
 #include <limits>
+#include <numbers>
 #include <optional>
 #include <queue>
 #include <span>
@@ -24,8 +25,17 @@ namespace {
 constexpr std::uint32_t kUnreachable = std::numeric_limits<std::uint32_t>::max();
 // One candidate street segment in this many is considered for removal.
 constexpr std::uint32_t kStreetRemovalOdds = 10;
+// Habitats at the city's edge have 30 to 60 apartments, five to ten floors;
+// toward the middle they rise to 90 to 180, up to thirty floors.
 constexpr std::uint32_t kMinApartments = 30;
 constexpr std::uint32_t kMaxApartments = 60;
+constexpr std::uint32_t kMinCentralApartments = 90;
+constexpr std::uint32_t kMaxCentralApartments = 180;
+// Tall habitats get one more store, and bigger stores, so there is as much
+// room in venues for each resident as in a habitat of kTypicalApartments
+// with an average number of stores.
+constexpr std::uint32_t kApartmentsForExtraStore = 100;
+constexpr double kTypicalApartments = 45.0;
 constexpr std::uint32_t kApartmentsPerFloor = 6;
 // Daily rent of a habitat's lowest apartments; each floor up costs a credit
 // more.
@@ -33,11 +43,16 @@ constexpr std::uint32_t kMinBaseRent = 25;
 constexpr std::uint32_t kMaxBaseRent = 40;
 constexpr std::uint32_t kMinStores = 2;
 constexpr std::uint32_t kMaxStores = 3;
+// Workplaces grow toward the middle the same way.
 constexpr std::uint32_t kMinWorkplaceJobs = 15;
 constexpr std::uint32_t kMaxWorkplaceJobs = 40;
+constexpr std::uint32_t kMinCentralJobs = 60;
+constexpr std::uint32_t kMaxCentralJobs = 160;
 constexpr std::uint32_t kMinWorkspaceSize = 5;
 constexpr std::uint32_t kMaxWorkspaceSize = 10;
 constexpr std::uint32_t kWorkspacesPerFloor = 2;
+// Workplaces of this many jobs are office towers, one workspace per floor.
+constexpr std::uint32_t kTowerJobs = 60;
 
 struct WorkplaceType {
     std::string_view name;
@@ -120,15 +135,53 @@ NodeId RandomNodeInColumns(const CityParams& params, Pcg32& random,
     return node;
 }
 
+// How close an intersection is to the middle of the grid: 1 at the middle,
+// 0 at the corners.
+double Centrality(NodeId node, std::uint32_t gridSize) {
+    const double half = (static_cast<double>(gridSize) - 1.0) / 2.0;
+    if (half <= 0.0) {
+        return 1.0;
+    }
+    const double dx = static_cast<double>(node.value % gridSize) - half;
+    const double dz = static_cast<double>(node.value / gridSize) - half;
+    return std::clamp(1.0 - (std::sqrt((dx * dx) + (dz * dz)) / (half * std::numbers::sqrt2)),
+                      0.0, 1.0);
+}
+
+// How much a city of `residents` rises in the middle: towns of up to
+// kTownResidents keep every building low; from kCityResidents up the middle
+// reaches full height.
+constexpr double kTownResidents = 500.0;
+constexpr double kCityResidents = 6000.0;
+double Urbanity(std::uint32_t residents) {
+    return std::clamp((static_cast<double>(residents) - kTownResidents) /
+                          (kCityResidents - kTownResidents),
+                      0.0, 1.0);
+}
+
+// A whole number between `edge` and `central` by centrality.
+std::uint32_t Lerp(std::uint32_t edge, std::uint32_t central, double centrality) {
+    return edge + static_cast<std::uint32_t>(
+                      std::lround(static_cast<double>(central - edge) * centrality));
+}
+
 // The smallest grid of at least kMinGridSize on which the buildings for
 // `residents` take about kBuildingsPerNode of every intersection's corners.
 std::uint32_t GridSizeFor(std::uint32_t residents) {
     constexpr std::uint32_t kMinGridSize = 4;
-    constexpr double kAverageApartments = (kMinApartments + kMaxApartments) / 2.0;
-    constexpr double kAverageJobs = (kMinWorkplaceJobs + kMaxWorkplaceJobs) / 2.0;
+    // Sizes at the average centrality of a grid's intersections, about 0.45.
+    const double averageCentrality = 0.45 * Urbanity(residents);
+    const double averageApartments =
+        ((kMinApartments + kMaxApartments) / 2.0) +
+        ((((kMinCentralApartments + kMaxCentralApartments) -
+           (kMinApartments + kMaxApartments)) / 2.0) * averageCentrality);
+    const double averageJobs =
+        ((kMinWorkplaceJobs + kMaxWorkplaceJobs) / 2.0) +
+        ((((kMinCentralJobs + kMaxCentralJobs) -
+           (kMinWorkplaceJobs + kMaxWorkplaceJobs)) / 2.0) * averageCentrality);
     constexpr double kBuildingsPerNode = 3.0;
-    const double buildings = std::ceil(residents / kAverageApartments) +
-                             std::ceil(residents / kAverageJobs);
+    const double buildings = std::ceil(residents / averageApartments) +
+                             std::ceil(residents / averageJobs);
     const auto size =
         static_cast<std::uint32_t>(std::ceil(std::sqrt(buildings / kBuildingsPerNode)));
     return std::max(kMinGridSize, size);
@@ -168,20 +221,30 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
                       .floors = 1,
                       .shift = {},
                       .rooms = {}};
-    const std::uint32_t stores = random.UniformInt(kMinStores, kMaxStores);
+    const double centrality =
+        Centrality(building.entrance, params.gridSize) * Urbanity(params.residents);
+    const std::uint32_t apartments = random.UniformInt(
+        Lerp(kMinApartments, kMinCentralApartments, centrality),
+        Lerp(kMaxApartments, kMaxCentralApartments, centrality));
+    const std::uint32_t stores = random.UniformInt(kMinStores, kMaxStores) +
+                                 (apartments >= kApartmentsForExtraStore ? 1 : 0);
+    constexpr double kAverageStores = (kMinStores + kMaxStores) / 2.0;
+    const double capacityScale =
+        std::max(1.0, (static_cast<double>(apartments) * kAverageStores) /
+                          (kTypicalApartments * static_cast<double>(stores)));
     for (std::uint32_t store = 0; store < stores; ++store) {
         const RoomKind kind = kStoreOrder.at(storeRotation++ % kStoreOrder.size());
         const VenueRules& rules = *FindVenueRules(kind);
+        const std::uint32_t capacity =
+            random.UniformInt(rules.minCapacity, rules.maxCapacity);
         building.rooms.push_back(
             {.id = ids.Allocate(),
              .name = std::string{Pick(VenueNames(kind), random)},
              .kind = kind,
              .floor = 0,
-             .capacity = random.UniformInt(rules.minCapacity,
-                                           rules.maxCapacity)});
+             .capacity = static_cast<std::uint32_t>(
+                 std::lround(static_cast<double>(capacity) * capacityScale))});
     }
-    const std::uint32_t apartments =
-        random.UniformInt(kMinApartments, kMaxApartments);
     const std::uint32_t baseRent = random.UniformInt(kMinBaseRent, kMaxBaseRent);
     for (std::uint32_t index = 0; index < apartments; ++index) {
         const std::uint32_t floor = 1 + (index / kApartmentsPerFloor);
@@ -214,14 +277,18 @@ Building MakeWorkplace(const CityParams& params, Pcg32& random,
         .floors = 1,
         .shift = type.shift,
         .rooms = {}};
+    const double centrality =
+        Centrality(building.entrance, params.gridSize) * Urbanity(params.residents);
     const std::uint32_t jobs =
-        random.UniformInt(kMinWorkplaceJobs, kMaxWorkplaceJobs);
+        random.UniformInt(Lerp(kMinWorkplaceJobs, kMinCentralJobs, centrality),
+                          Lerp(kMaxWorkplaceJobs, kMaxCentralJobs, centrality));
     std::uint32_t staffed = 0;
     for (std::uint32_t index = 0; staffed < jobs; ++index) {
         const std::uint32_t size = std::min(
             jobs - staffed,
             random.UniformInt(kMinWorkspaceSize, kMaxWorkspaceSize));
-        const std::uint32_t floor = index / kWorkspacesPerFloor;
+        const std::uint32_t floor =
+            index / (jobs >= kTowerJobs ? 1 : kWorkspacesPerFloor);
         building.rooms.push_back(
             {.id = ids.Allocate(),
              .name = std::format("{} {}", type.workspace, index + 1),

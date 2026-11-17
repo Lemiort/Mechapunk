@@ -16,6 +16,7 @@
 #include "mechapunk/sim/Random.hpp"
 #include "mechapunk/sim/Social.hpp"
 #include "mechapunk/sim/Venues.hpp"
+#include "mechapunk/sim/Weather.hpp"
 
 namespace mechapunk::sim {
 
@@ -116,6 +117,7 @@ struct WorldState {
     std::vector<Robot> robots;
     // Scrapped robots someone remembers, sorted by id.
     std::vector<DepartedRobot> departed;
+    Weather weather;
 };
 
 struct WorldParams {
@@ -150,6 +152,9 @@ enum class EventKind : std::uint8_t {
     Scrapped,
     // A newcomer moved to the city; room: its apartment.
     Arrived,
+    // Rain started, changed or stopped; no robot. change: the rain now
+    // (0 when dry); minutes: how long this spell lasts.
+    WeatherChanged,
 };
 
 // Something that happened during a step, for logs and observers. Events are

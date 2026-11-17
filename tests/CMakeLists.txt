@@ -9,6 +9,7 @@ add_executable(sim_tests
     SaveTests.cpp
     SocialTests.cpp
     TransitTests.cpp
+    WeatherTests.cpp
     WorldTests.cpp
 )
 target_link_libraries(sim_tests PRIVATE mechapunk::sim GTest::gtest_main)
