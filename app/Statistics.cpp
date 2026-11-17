@@ -1,0 +1,466 @@
+#include "Statistics.hpp"
+
+#include <imgui.h>
+
+#include <algorithm>
+#include <cfloat>
+#include <cstddef>
+#include <cstdint>
+#include <format>
+#include <functional>
+#include <map>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "mechapunk/sim/Economy.hpp"
+#include "mechapunk/sim/GameTime.hpp"
+
+namespace mechapunk {
+
+namespace {
+using Stat = std::function<double(const sim::DailyStats&)>;
+
+constexpr float kPlotHeight = 46.0F;
+constexpr ImVec4 kGood{0.45F, 0.9F, 0.55F, 1.0F};
+constexpr ImVec4 kBad{1.0F, 0.4F, 0.35F, 1.0F};
+
+std::string Credits(std::int64_t credits) {
+    // 1234567 -> "1 234 567 cr"
+    std::string digits = std::to_string(credits < 0 ? -credits : credits);
+    std::string grouped;
+    for (std::size_t index = 0; index < digits.size(); ++index) {
+        if (index > 0 && (digits.size() - index) % 3 == 0) {
+            grouped += ' ';
+        }
+        grouped += digits[index];
+    }
+    return std::format("{}{} cr", credits < 0 ? "-" : "", grouped);
+}
+
+std::string PerMille(std::int64_t value) {
+    return std::format("{:.1f}%", static_cast<double>(value) / 10.0);
+}
+
+std::string Share(std::int64_t part, std::int64_t whole) {
+    return whole > 0 ? std::format("{:.1f}%", 100.0 * static_cast<double>(part) /
+                                                  static_cast<double>(whole))
+                     : std::string{"-"};
+}
+
+// A labelled line chart of one statistic over the days kept, with the
+// latest value written over it.
+void Plot(const char* label, const std::vector<sim::DailyStats>& history, const Stat& stat,
+          const std::function<std::string(double)>& format) {
+    std::vector<float> values;
+    values.reserve(history.size());
+    for (const sim::DailyStats& day : history) {
+        values.push_back(static_cast<float>(stat(day)));
+    }
+    const std::string overlay =
+        values.empty() ? std::string{"no days yet"}
+                       : std::format("{}: {}", label, format(stat(history.back())));
+    ImGui::PlotLines(std::format("##{}", label).c_str(), values.data(),
+                     static_cast<int>(values.size()), 0, overlay.c_str(), FLT_MAX, FLT_MAX,
+                     ImVec2{-1.0F, kPlotHeight});
+}
+
+void PlotCredits(const char* label, const std::vector<sim::DailyStats>& history,
+                 const Stat& stat) {
+    Plot(label, history, stat,
+         [](double value) { return Credits(static_cast<std::int64_t>(value)); });
+}
+
+void PlotCount(const char* label, const std::vector<sim::DailyStats>& history,
+               const Stat& stat) {
+    Plot(label, history, stat, [](double value) { return std::format("{:.0f}", value); });
+}
+
+void PlotPerMille(const char* label, const std::vector<sim::DailyStats>& history,
+                  const Stat& stat) {
+    Plot(label, history, stat,
+         [](double value) { return PerMille(static_cast<std::int64_t>(value)); });
+}
+
+// Two columns of label and value.
+void Row(const char* label, const std::string& value) {
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::TextUnformatted(label);
+    ImGui::TableSetColumnIndex(1);
+    ImGui::TextUnformatted(value.c_str());
+}
+
+bool BeginFacts(const char* id) {
+    return ImGui::BeginTable(id, 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg);
+}
+
+std::int64_t MoneyInAccounts(const WorldFrame& frame) {
+    std::int64_t money = frame.economy->supplyMarket;
+    for (const RobotFrame& robot : frame.robots) {
+        money += robot.credits;
+    }
+    for (const sim::Organization& organization : frame.economy->organizations) {
+        money += organization.credits;
+    }
+    return money;
+}
+
+void DrawOverview(const WorldFrame& frame, const std::vector<sim::DailyStats>& history) {
+    const EconomyFrame& economy = *frame.economy;
+    std::int64_t savings = 0;
+    std::int64_t credits = 0;
+    std::uint32_t employed = 0;
+    for (const RobotFrame& robot : frame.robots) {
+        savings += robot.savings;
+        credits += robot.credits;
+        employed += robot.workspace.IsValid() ? 1 : 0;
+    }
+    const auto population = static_cast<std::int64_t>(frame.robots.size());
+    ImGui::SeparatorText("Now");
+    if (BeginFacts("now")) {
+        Row("Robots", std::format("{} ({} with a job, {})", population, employed,
+                                  Share(employed, population)));
+        Row("Money in the city", Credits(economy.created - economy.destroyed));
+        Row("Robots' credits and savings", std::format("{} + {}", Credits(credits), Credits(savings)));
+        Row("Created by the central bank today", Credits(economy.today.created));
+        Row("Wages paid today", Credits(economy.today.wages));
+        Row("Spent at venues today", Credits(economy.today.venueSales));
+        ImGui::EndTable();
+    }
+    if (history.empty()) {
+        ImGui::TextDisabled("Statistics start at the end of the first day.");
+        return;
+    }
+    const sim::DailyStats& day = history.back();
+    ImGui::SeparatorText(std::format("End of day {}", day.day).c_str());
+    if (BeginFacts("yesterday")) {
+        Row("Median wealth", Credits(day.medianWealth));
+        Row("Wealth inequality (Gini)", PerMille(day.giniWealth));
+        Row("Richest tenth holds", PerMille(day.topTenthShare));
+        Row("Homeowners", Share(day.homeowners, day.population));
+        Row("Out of work", std::format("{} ({})", day.unemployed, Share(day.unemployed, day.population)));
+        Row("In debt", std::format("{} robots, {}", day.indebtedRobots, Credits(day.robotDebt)));
+        Row("Without a friend", Share(day.lonely, day.population));
+        Row("Average charge / condition / social / fun",
+            std::format("{} / {} / {} / {}", day.averageCharge, day.averageCondition,
+                        day.averageSocial, day.averageFun));
+        ImGui::EndTable();
+    }
+    PlotCredits("Median wealth", history, [](const auto& d) { return d.medianWealth; });
+    PlotPerMille("Gini", history, [](const auto& d) { return d.giniWealth; });
+    PlotCount("Out of work", history, [](const auto& d) { return d.unemployed; });
+}
+
+void DrawEconomy(const std::vector<sim::DailyStats>& history) {
+    if (history.empty()) {
+        ImGui::TextDisabled("Statistics start at the end of the first day.");
+        return;
+    }
+    const sim::DailyStats& day = history.back();
+    const sim::DayCounters& counted = day.counted;
+    ImGui::SeparatorText("Money");
+    PlotCredits("Money in the city", history, [](const auto& d) { return d.moneySupply; });
+    PlotCredits("Created that day", history, [](const auto& d) { return d.counted.created; });
+    PlotCredits("Robots' credits", history, [](const auto& d) { return d.robotMoney; });
+    PlotCredits("Robots' savings", history, [](const auto& d) { return d.robotSavings; });
+    PlotCredits("Corporations' credits", history, [](const auto& d) { return d.corporationMoney; });
+    PlotCredits("Banks' credits", history, [](const auto& d) { return d.bankMoney; });
+    ImGui::SeparatorText("Debts");
+    PlotCredits("Robots owe", history, [](const auto& d) { return d.robotDebt; });
+    PlotCredits("Corporations owe", history, [](const auto& d) { return d.corporationDebt; });
+    PlotCredits("Banks owe the central bank", history, [](const auto& d) { return d.bankDebt; });
+    ImGui::SeparatorText(std::format("Flows on day {}", day.day).c_str());
+    if (BeginFacts("flows")) {
+        Row("Wages", std::format("{} at {}% of base pay", Credits(counted.wages), day.averagePayPercent));
+        Row("Venue sales", Credits(counted.venueSales));
+        Row("Rent", Credits(counted.rent));
+        Row("Upkeep", Credits(counted.upkeep));
+        Row("Fares", Credits(counted.fares));
+        Row("Supplies bought from industry", Credits(counted.supplies));
+        Row("Dividends", Credits(counted.dividends));
+        Row("Interest added to loans", Credits(counted.interest));
+        Row("Lent", std::format("{} in {} loans", Credits(counted.lent), counted.loansTaken));
+        Row("Written off", Credits(counted.writtenOff));
+        ImGui::EndTable();
+    }
+    PlotCredits("Wages", history, [](const auto& d) { return d.counted.wages; });
+    PlotCredits("Venue sales", history, [](const auto& d) { return d.counted.venueSales; });
+    PlotCount("Pay, % of base", history, [](const auto& d) { return d.averagePayPercent; });
+    ImGui::SeparatorText("Wealth");
+    if (BeginFacts("wealth")) {
+        Row("Credits: median / mean", std::format("{} / {}", Credits(day.medianCredits), Credits(day.meanCredits)));
+        Row("Wealth: median / mean", std::format("{} / {}", Credits(day.medianWealth), Credits(day.meanWealth)));
+        Row("Gini", PerMille(day.giniWealth));
+        Row("Richest tenth / poorer half hold",
+            std::format("{} / {}", PerMille(day.topTenthShare), PerMille(day.bottomHalfShare)));
+        Row("Broke (less than a night's rent)", std::format("{}", day.broke));
+        Row("Behind on bills", std::format("{}", day.behindOnBills));
+        ImGui::EndTable();
+    }
+    PlotPerMille("Gini", history, [](const auto& d) { return d.giniWealth; });
+    PlotPerMille("Richest tenth's share", history, [](const auto& d) { return d.topTenthShare; });
+    PlotCount("Broke", history, [](const auto& d) { return d.broke; });
+}
+
+void DrawSociety(const std::vector<sim::DailyStats>& history) {
+    if (history.empty()) {
+        ImGui::TextDisabled("Statistics start at the end of the first day.");
+        return;
+    }
+    const sim::DailyStats& day = history.back();
+    const sim::DayCounters& counted = day.counted;
+    ImGui::SeparatorText("People");
+    if (BeginFacts("people")) {
+        Row("Robots", std::format("{} ({} arrived, {} scrapped that day)", day.population,
+                                  counted.arrivals, counted.scrapped));
+        Row("Average age / wear", std::format("{} days / {}", day.averageAge, day.averageWear));
+        Row("Junior / regular / senior / lead",
+            std::format("{} / {} / {} / {}", day.jobLevels[0], day.jobLevels[1], day.jobLevels[2],
+                        day.jobLevels[3]));
+        Row("Out of work", std::format("{}", day.unemployed));
+        Row("Promoted / lost a job / found one",
+            std::format("{} / {} / {}", counted.promotions, counted.jobsLost, counted.jobsFound));
+        Row("Moved up / evicted", std::format("{} / {}", counted.movedUp, counted.evictions));
+        ImGui::EndTable();
+    }
+    PlotCount("Robots", history, [](const auto& d) { return d.population; });
+    PlotCount("Out of work", history, [](const auto& d) { return d.unemployed; });
+    ImGui::SeparatorText("Wellbeing");
+    PlotCount("Average charge", history, [](const auto& d) { return d.averageCharge; });
+    PlotCount("Average condition", history, [](const auto& d) { return d.averageCondition; });
+    PlotCount("Average social", history, [](const auto& d) { return d.averageSocial; });
+    PlotCount("Average fun", history, [](const auto& d) { return d.averageFun; });
+    ImGui::SeparatorText("Relationships");
+    if (BeginFacts("relationships")) {
+        Row("With a friend / a close friend / a rival",
+            std::format("{} / {} / {}", day.withFriend, day.withCloseFriend, day.withRival));
+        Row("Without a friend", std::format("{}", day.lonely));
+        Row("Talks / arguments", std::format("{} / {}", counted.talks, counted.arguments));
+        Row("New friendships / rivalries",
+            std::format("{} / {}", counted.newFriendships, counted.newRivalries));
+        ImGui::EndTable();
+    }
+    PlotCount("With a friend", history, [](const auto& d) { return d.withFriend; });
+    PlotCount("With a rival", history, [](const auto& d) { return d.withRival; });
+    ImGui::SeparatorText("Getting about");
+    if (BeginFacts("travel")) {
+        Row("Walks / by metro", std::format("{} / {}", counted.walks, counted.metroRides));
+        Row("Venue visits", std::format("{}", counted.visits));
+        Row("Late for work", std::format("{}", counted.lateArrivals));
+        Row("Dodgy parts", std::format("{}", counted.badParts));
+        ImGui::EndTable();
+    }
+    PlotCount("Metro rides", history, [](const auto& d) { return d.counted.metroRides; });
+    PlotCount("Venue visits", history, [](const auto& d) { return d.counted.visits; });
+}
+
+void DrawProperty(const std::vector<sim::DailyStats>& history) {
+    if (history.empty()) {
+        ImGui::TextDisabled("Statistics start at the end of the first day.");
+        return;
+    }
+    const sim::DailyStats& day = history.back();
+    if (BeginFacts("property")) {
+        Row("Homeowners", std::format("{} ({})", day.homeowners, Share(day.homeowners, day.population)));
+        Row("Tenants", std::format("{}", day.tenants));
+        Row("Landlords", std::format("{}", day.landlords));
+        Row("Let by corporations", std::format("{}", day.corporateApartments));
+        Row("Vacant", std::format("{}", day.vacantApartments));
+        Row("Shareholders", std::format("{}", day.shareholders));
+        Row("Sales that day", std::format("{} for {}", day.counted.propertySales,
+                                          Credits(day.counted.propertySalesValue)));
+        ImGui::EndTable();
+    }
+    PlotCount("Homeowners", history, [](const auto& d) { return d.homeowners; });
+    PlotCount("Tenants", history, [](const auto& d) { return d.tenants; });
+    PlotCount("Landlords", history, [](const auto& d) { return d.landlords; });
+    PlotCount("Let by corporations", history, [](const auto& d) { return d.corporateApartments; });
+    PlotCount("Sales", history, [](const auto& d) { return d.counted.propertySales; });
+}
+
+std::optional<InspectorRequest> DrawOrganizations(StatisticsView& view, const WorldFrame& frame) {
+    const EconomyFrame& economy = *frame.economy;
+    std::optional<InspectorRequest> request;
+    // Rooms and workers of each organization.
+    std::map<std::uint64_t, std::uint32_t> rooms;
+    if (economy.owners != nullptr) {
+        for (const auto& [room, owner] : *economy.owners) {
+            ++rooms[owner.value];
+        }
+    }
+    std::map<std::uint64_t, std::uint32_t> workers;
+    for (const RobotFrame& robot : frame.robots) {
+        if (robot.workspace.IsValid()) {
+            ++workers[economy.OwnerOf(robot.workspace).value];
+        }
+    }
+    constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
+                                       ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
+    if (ImGui::BeginTable("organizations", 8, kFlags, ImVec2{0.0F, 260.0F})) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 3.0F);
+        for (const char* column : {"Sector", "Credits", "Owes", "Revenue", "Wages", "Dividends",
+                                   "Pay"}) {
+            ImGui::TableSetupColumn(column, ImGuiTableColumnFlags_WidthStretch, 1.4F);
+        }
+        ImGui::TableHeadersRow();
+        for (const sim::Organization& organization : economy.organizations) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            if (ImGui::Selectable(organization.name.c_str(), view.organization == organization.id,
+                                  ImGuiSelectableFlags_SpanAllColumns)) {
+                view.organization = organization.id;
+            }
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(organization.kind == sim::OrganizationKind::CentralBank
+                                       ? "central bank"
+                                       : std::string{sim::SectorName(organization.sector)}.c_str());
+            ImGui::TableSetColumnIndex(2);
+            ImGui::TextUnformatted(Credits(organization.credits).c_str());
+            ImGui::TableSetColumnIndex(3);
+            const sim::Loan* loan = economy.LoanOf(organization.id);
+            ImGui::TextUnformatted(loan != nullptr ? Credits(loan->owed).c_str() : "");
+            ImGui::TableSetColumnIndex(4);
+            ImGui::TextUnformatted(Credits(organization.yesterday.revenue).c_str());
+            ImGui::TableSetColumnIndex(5);
+            ImGui::TextUnformatted(Credits(organization.yesterday.wages).c_str());
+            ImGui::TableSetColumnIndex(6);
+            ImGui::TextUnformatted(Credits(organization.yesterday.dividends).c_str());
+            ImGui::TableSetColumnIndex(7);
+            if (organization.sector == sim::Sector::Industry) {
+                ImGui::Text("%u%%", organization.payPercent);
+            }
+        }
+        ImGui::EndTable();
+    }
+    const sim::Organization* selected = economy.FindOrganization(view.organization);
+    if (selected == nullptr) {
+        ImGui::TextDisabled("Select an organization for its owners and books.");
+        return request;
+    }
+    ImGui::SeparatorText(selected->name.c_str());
+    if (BeginFacts("organization")) {
+        Row("Credits", Credits(selected->credits));
+        Row("Borrows from", SimulationHost::AccountName(frame, selected->bank));
+        Row("Rooms owned", std::format("{}", rooms[selected->id.value]));
+        Row("Workers", std::format("{}", workers[selected->id.value]));
+        const sim::Books& books = selected->yesterday;
+        Row("Yesterday: revenue / wages / supplies",
+            std::format("{} / {} / {}", Credits(books.revenue), Credits(books.wages), Credits(books.supplies)));
+        Row("Yesterday: upkeep / dividends / repaid",
+            std::format("{} / {} / {}", Credits(books.upkeep), Credits(books.dividends), Credits(books.repaid)));
+        ImGui::EndTable();
+    }
+    std::uint64_t shares = 0;
+    for (const sim::Share& share : selected->owners) {
+        shares += share.shares;
+    }
+    ImGui::TextUnformatted("Owners:");
+    for (const sim::Share& share : selected->owners) {
+        const std::string name = SimulationHost::AccountName(frame, share.owner);
+        const std::string label = std::format("{} ({})##{}", name,
+                                              Share(share.shares, static_cast<std::int64_t>(shares)),
+                                              share.owner.value);
+        if (SimulationHost::FindRobot(frame, share.owner) != nullptr) {
+            if (ImGui::Selectable(label.c_str())) {
+                request = InspectorRequest{.selection = {.robot = share.owner}, .jumpToRobot = true};
+            }
+        } else if (ImGui::Selectable(label.c_str())) {
+            view.organization = share.owner;
+        }
+    }
+    return request;
+}
+
+void DrawCentralBank(const WorldFrame& frame, const std::vector<sim::DailyStats>& history) {
+    const EconomyFrame& economy = *frame.economy;
+    const std::int64_t expected = economy.created - economy.destroyed;
+    const std::int64_t held = MoneyInAccounts(frame);
+    if (BeginFacts("central")) {
+        Row("Created since the city began", Credits(economy.created));
+        Row("Destroyed (paid back)", Credits(economy.destroyed));
+        Row("Should be in circulation", Credits(expected));
+        Row("Held in all accounts", Credits(held));
+        Row("Created today", Credits(economy.today.created));
+        ImGui::EndTable();
+    }
+    if (held == expected) {
+        ImGui::TextColored(kGood, "The money adds up.");
+    } else {
+        ImGui::TextColored(kBad, "The money is off by %s!", Credits(held - expected).c_str());
+    }
+    PlotCredits("Created per day", history, [](const auto& d) { return d.counted.created; });
+    PlotCredits("Destroyed per day", history, [](const auto& d) { return d.counted.destroyed; });
+    ImGui::SeparatorText("Log, newest first");
+    constexpr ImGuiTableFlags kFlags =
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV;
+    if (ImGui::BeginTable("emissions", 4, kFlags, ImVec2{0.0F, 260.0F})) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        for (const char* column : {"When", "Account", "Amount", "Why"}) {
+            ImGui::TableSetupColumn(column);
+        }
+        ImGui::TableHeadersRow();
+        for (auto emission = economy.emissions.rbegin(); emission != economy.emissions.rend();
+             ++emission) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(sim::FormatTime(emission->tick).c_str());
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(SimulationHost::AccountName(frame, emission->account).c_str());
+            ImGui::TableSetColumnIndex(2);
+            ImGui::TextColored(emission->amount >= 0 ? kBad : kGood, "%s%s",
+                               emission->amount >= 0 ? "+" : "", Credits(emission->amount).c_str());
+            ImGui::TableSetColumnIndex(3);
+            ImGui::TextUnformatted(std::string{sim::EmissionReasonName(emission->reason)}.c_str());
+        }
+        ImGui::EndTable();
+    }
+}
+}  // namespace
+
+std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const WorldFrame& frame) {
+    if (!view.open || frame.economy == nullptr) {
+        return std::nullopt;
+    }
+    std::optional<InspectorRequest> request;
+    // Beside the City panel, leaving the right side to the inspector.
+    ImGui::SetNextWindowPos(ImVec2{360.0F, 10.0F}, ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2{760.0F, 720.0F}, ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Statistics", &view.open)) {
+        static const std::vector<sim::DailyStats> kNone;
+        const std::vector<sim::DailyStats>& history =
+            frame.economy->history != nullptr ? *frame.economy->history : kNone;
+        if (ImGui::BeginTabBar("statistics")) {
+            if (ImGui::BeginTabItem("Overview")) {
+                DrawOverview(frame, history);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Economy")) {
+                DrawEconomy(history);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Society")) {
+                DrawSociety(history);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Property")) {
+                DrawProperty(history);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Organizations")) {
+                request = DrawOrganizations(view, frame);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Central bank")) {
+                DrawCentralBank(frame, history);
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
+    }
+    ImGui::End();
+    return request;
+}
+
+}  // namespace mechapunk

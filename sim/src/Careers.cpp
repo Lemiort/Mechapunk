@@ -39,7 +39,6 @@ constexpr std::int32_t kContentNeed = 200;
 constexpr std::uint32_t kHirePercent = 50;
 
 // Owing this many nights of rent gets a robot evicted.
-constexpr std::int64_t kEvictionNights = 5;
 // Robots with this much saved sometimes move to a nicer, pricier apartment
 // they can pay for this many nights from savings.
 constexpr std::int64_t kMoveUpSavings = 500;
@@ -170,32 +169,51 @@ void World::ReviewHomes() {
             continue;
         }
         const std::int64_t rent = RentOf(robot);
-        if (rent > 0 && robot.rentOwed >= kEvictionNights * rent) {
+        const auto home = rooms_.Find(robot.apartment);
+        // Owners behind on upkeep sell instead; see TradeProperty.
+        const bool owns = home && home->room->owner == robot.id;
+        if (!owns && rent > 0 && robot.rentOwed >= kEvictionNights * rent) {
             // Out to the cheapest place there is; the debt is written off.
             const auto cheapest = pick(
                 [](const Room& a, const Room& b) { return a.rent < b.rent; },
                 [](const Room&) { return true; });
             if (cheapest) {
                 const EntityId old = robot.apartment;
+                state_.today.writtenOff += robot.rentOwed;
                 robot.rentOwed = 0;
                 move(robot, *cheapest);
                 Remember(robot, MemoryKind::Evicted, {}, old);
             }
             continue;
         }
-        if (robot.credits < kMoveUpSavings ||
+        const std::int64_t means = robot.credits + robot.savings;
+        if (means < kMoveUpSavings ||
             state_.random.UniformInt(1, 100) > kMoveUpPercent) {
             continue;
         }
-        // The priciest apartment it can afford for a while.
+        // The priciest apartment it can afford for a while. An owner sells
+        // its home to the trust and buys the new one.
+        const std::int64_t homeRent = home ? home->room->rent : 0;
+        const std::int64_t sale = owns ? PriceOf(*home->room) * kSellPercent / 100 : 0;
         const auto nicer = pick(
             [](const Room& a, const Room& b) { return a.rent > b.rent; },
             [&](const Room& room) {
-                return room.rent > rent &&
-                       static_cast<std::int64_t>(room.rent) * kAffordNights <=
-                           robot.credits;
+                if (room.rent <= homeRent) {
+                    return false;
+                }
+                return owns ? PriceOf(room) + (kAffordNights * room.rent) <= means + sale
+                            : static_cast<std::int64_t>(room.rent) * kAffordNights <= means;
             });
         if (nicer) {
+            if (owns) {
+                const EntityId old = robot.apartment;
+                Transfer(old, housing_, sale);
+                const auto room = rooms_.Find(*nicer);
+                if (room->room->owner != robot.id) {
+                    Withdraw(robot, PriceOf(*room->room) - robot.credits);
+                    Transfer(*nicer, robot.id, PriceOf(*room->room));
+                }
+            }
             move(robot, *nicer);
             Remember(robot, MemoryKind::MovedUp, {}, *nicer);
         }

@@ -1,0 +1,1056 @@
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <format>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+#include "mechapunk/sim/Economy.hpp"
+#include "mechapunk/sim/World.hpp"
+
+namespace mechapunk::sim {
+
+namespace {
+constexpr std::uint64_t kEconomyStream = 7;
+// Of every credit a sector takes, this much buys supplies from industry.
+constexpr std::int64_t kVenueSupplyPercent = 95;
+constexpr std::int64_t kUtilitySupplyPercent = 95;
+constexpr std::int64_t kTransitSupplyPercent = 95;
+constexpr std::int64_t kHousingSupplyPercent = 50;
+// A robot with a job may owe up to this many shifts' wages.
+constexpr std::int64_t kRobotDebtShifts = 5;
+// Each night, the chance in percent that a robot able to buy an apartment
+// does, and the nights of rent it keeps after paying.
+constexpr std::uint32_t kBuyPercent = 3;
+constexpr std::int64_t kBuyReserveNights = 20;
+// Each night, the chance a robot sells an apartment nobody lives in.
+constexpr std::uint32_t kSellVacantPercent = 20;
+constexpr std::uint32_t kMinPayPercent = 50;
+constexpr std::uint32_t kMaxPayPercent = 150;
+// What a bank keeps before lending or paying out, plus a share of what it
+// has lent, in percent.
+constexpr std::int64_t kBankFloor = 1000;
+constexpr std::int64_t kBankReservePercent = 10;
+constexpr std::int64_t kCorporationFloor = 200;
+// Of what a corporation has beyond twice its reserve, the share paid out
+// each night.
+constexpr std::int64_t kDividendPercent = 50;
+// Robots with more saved than this spend 1/kLuxuryDivisor of the rest on
+// every visit, on better drinks, parts and service.
+constexpr std::int64_t kComfortableSavings = 2000;
+constexpr std::int64_t kLuxuryDivisor = 100;
+
+constexpr std::array<std::string_view, 12> kIndustryNames{
+    "Kessler", "Omni", "Vortek", "Hexa", "Ironclad", "Synthex",
+    "Chrome", "Atlas", "Raijin", "Brassworks", "Quantum", "Meridian"};
+constexpr std::array<std::string_view, 8> kIndustryKinds{
+    "Dynamics", "Forge", "Works", "Systems", "Industries", "Fabrication",
+    "Logistics", "Robotics"};
+constexpr std::array<std::string_view, 6> kChainNames{
+    "Neon", "Volt", "Rust", "Static", "Glow", "Byte"};
+constexpr std::array<std::string_view, 3> kBankNames{
+    "First Chrome Bank", "Ironside Savings", "Neon Credit Union"};
+
+std::string_view ChainKind(RoomKind kind) {
+    switch (kind) {
+        case RoomKind::Bar: return "Taps";
+        case RoomKind::Diner: return "Noodle Co.";
+        case RoomKind::ChargingBay: return "Charge";
+        case RoomKind::RepairShop: return "Repairs";
+        case RoomKind::Arcade: return "Arcades";
+        case RoomKind::Shop: return "Goods";
+        case RoomKind::Clinic: return "Clinics";
+        case RoomKind::BlackMarket: return "Syndicate";
+        default: return "Holdings";
+    }
+}
+}  // namespace
+
+std::string_view SectorName(Sector sector) noexcept {
+    switch (sector) {
+        case Sector::Industry: return "industry";
+        case Sector::Venues: return "venues";
+        case Sector::Housing: return "housing";
+        case Sector::Utilities: return "utilities";
+        case Sector::Transit: return "transit";
+        case Sector::Banking: return "banking";
+    }
+    return "";
+}
+
+std::string_view EmissionReasonName(EmissionReason reason) noexcept {
+    switch (reason) {
+        case EmissionReason::Founding: return "founding";
+        case EmissionReason::NewcomerSavings: return "newcomer's savings";
+        case EmissionReason::BankRescue: return "bank rescue";
+        case EmissionReason::Repaid: return "repaid";
+        case EmissionReason::Interest: return "interest";
+    }
+    return "";
+}
+
+std::int64_t GiniPerMille(std::vector<std::int64_t> wealth) {
+    // Debts count as having nothing, so the measure stays within 0..1000.
+    for (std::int64_t& each : wealth) {
+        each = std::max<std::int64_t>(each, 0);
+    }
+    std::ranges::sort(wealth);
+    std::int64_t total = 0;
+    std::int64_t weighted = 0;
+    const auto count = static_cast<std::int64_t>(wealth.size());
+    for (std::int64_t index = 0; index < count; ++index) {
+        total += wealth[static_cast<std::size_t>(index)];
+        weighted += (index + 1) * wealth[static_cast<std::size_t>(index)];
+    }
+    if (total == 0 || count == 0) {
+        return 0;
+    }
+    // G = 2 sum(i x_i) / (n sum x) - (n + 1) / n
+    const long double gini = (2.0L * static_cast<long double>(weighted)) /
+                                 (static_cast<long double>(count) * static_cast<long double>(total)) -
+                             (static_cast<long double>(count + 1) / static_cast<long double>(count));
+    return std::clamp<std::int64_t>(static_cast<std::int64_t>(gini * 1000.0L), 0, 1000);
+}
+
+void World::FoundEconomy(std::uint64_t seed) {
+    Pcg32 random = Pcg32::FromSeed(seed, kEconomyStream);
+    Economy& economy = state_.economy;
+    const auto found = [&](std::string name, OrganizationKind kind, Sector sector) -> Organization& {
+        economy.organizations.push_back(
+            {.id = state_.ids.Allocate(), .name = std::move(name), .kind = kind, .sector = sector});
+        return economy.organizations.back();
+    };
+    found("Central Reserve", OrganizationKind::CentralBank, Sector::Banking);
+    std::vector<std::size_t> banks;
+    for (const std::string_view name : kBankNames) {
+        banks.push_back(economy.organizations.size());
+        found(std::string{name}, OrganizationKind::Bank, Sector::Banking);
+    }
+    found("Habitat Trust", OrganizationKind::Corporation, Sector::Housing);
+    found("Gridline Power & Water", OrganizationKind::Corporation, Sector::Utilities);
+    found("Metro Authority", OrganizationKind::Corporation, Sector::Transit);
+
+    // Industry: corporations of about four workplaces each.
+    std::vector<Building*> workplaces;
+    for (Building& building : state_.city.buildings) {
+        if (building.kind == BuildingKind::Workplace) {
+            workplaces.push_back(&building);
+        }
+    }
+    const std::size_t corporations =
+        std::clamp<std::size_t>(workplaces.size() / 4, 1, kIndustryNames.size() * 2);
+    const std::size_t firstIndustry = economy.organizations.size();
+    for (std::size_t index = 0; index < corporations; ++index) {
+        found(std::format("{} {}", kIndustryNames.at(index % kIndustryNames.size()),
+                          kIndustryKinds.at((index + (index / kIndustryNames.size())) %
+                                            kIndustryKinds.size())),
+              OrganizationKind::Corporation, Sector::Industry);
+    }
+    for (std::size_t index = 0; index < workplaces.size(); ++index) {
+        // A random corporation for each, but every corporation gets one.
+        const std::size_t owner =
+            index < corporations
+                ? index
+                : random.UniformInt(0, static_cast<std::uint32_t>(corporations - 1));
+        Organization& corporation = economy.organizations[firstIndustry + owner];
+        for (Room& room : workplaces[index]->rooms) {
+            room.owner = corporation.id;
+            // Three days of base wages to start with.
+            corporation.credits += 3 * static_cast<std::int64_t>(room.capacity) *
+                                   workplaces[index]->shift.wage;
+        }
+    }
+
+    // Venues: up to three chains of each kind.
+    std::unordered_map<std::uint8_t, std::vector<Room*>> venues;
+    for (Building& building : state_.city.buildings) {
+        for (Room& room : building.rooms) {
+            if (IsVenue(room.kind)) {
+                venues[static_cast<std::uint8_t>(room.kind)].push_back(&room);
+            }
+        }
+    }
+    std::size_t chain = 0;
+    for (const RoomKind kind : VenueKinds()) {
+        const auto rooms = venues.find(static_cast<std::uint8_t>(kind));
+        if (rooms == venues.end()) {
+            continue;
+        }
+        const std::size_t chains = std::clamp<std::size_t>(rooms->second.size() / 12, 1, 3);
+        const std::size_t first = economy.organizations.size();
+        for (std::size_t index = 0; index < chains; ++index) {
+            found(std::format("{} {}", kChainNames.at(chain++ % kChainNames.size()), ChainKind(kind)),
+                  OrganizationKind::Corporation, Sector::Venues);
+        }
+        for (std::size_t index = 0; index < rooms->second.size(); ++index) {
+            Organization& owner = economy.organizations[first + (index % chains)];
+            rooms->second[index]->owner = owner.id;
+            owner.credits += 100;
+        }
+    }
+
+    // Robots own the apartments they live in; the trust owns the rest.
+    Organization& trust = economy.organizations.at(banks.back() + 1);
+    std::unordered_map<std::uint64_t, EntityId> resident;
+    for (const Robot& robot : state_.robots) {
+        resident.try_emplace(robot.apartment.value, robot.id);
+    }
+    for (Building& building : state_.city.buildings) {
+        for (Room& room : building.rooms) {
+            if (room.kind == RoomKind::Apartment) {
+                const auto found = resident.find(room.id.value);
+                room.owner = found != resident.end() ? found->second : trust.id;
+            }
+        }
+    }
+
+    // Starting money: robots' savings, and capital for every organization.
+    const auto population = static_cast<std::int64_t>(state_.robots.size());
+    for (Organization& organization : economy.organizations) {
+        switch (organization.sector) {
+            case Sector::Housing:
+            case Sector::Utilities:
+            case Sector::Transit:
+                organization.credits += 1000 + (population / 2);
+                break;
+            case Sector::Banking:
+                organization.credits = organization.kind == OrganizationKind::Bank
+                                           ? kBankFloor + (population * 4)
+                                           : 0;
+                break;
+            default:
+                break;
+        }
+    }
+    std::int64_t savings = 0;
+    for (Robot& robot : state_.robots) {
+        savings += robot.credits;
+        robot.bank = economy.organizations.at(banks.at(
+            random.UniformInt(0, static_cast<std::uint32_t>(banks.size() - 1)))).id;
+    }
+    const EntityId central = economy.organizations.front().id;
+    for (Organization& organization : economy.organizations) {
+        organization.bank = organization.kind == OrganizationKind::Corporation
+                                ? economy.organizations.at(banks.at(random.UniformInt(
+                                      0, static_cast<std::uint32_t>(banks.size() - 1)))).id
+                                : (organization.kind == OrganizationKind::Bank ? central : EntityId{});
+        economy.created += organization.credits;
+        if (organization.credits > 0) {
+            economy.emissions.push_back({.tick = state_.tick,
+                                         .account = organization.id,
+                                         .amount = organization.credits,
+                                         .reason = EmissionReason::Founding});
+        }
+    }
+    economy.created += savings;
+    economy.emissions.push_back(
+        {.tick = state_.tick, .account = {}, .amount = savings, .reason = EmissionReason::Founding});
+
+    // Owners: one to three robots or banks for every corporation and bank.
+    for (Organization& organization : economy.organizations) {
+        if (organization.kind == OrganizationKind::CentralBank) {
+            continue;
+        }
+        const std::uint32_t owners = random.UniformInt(1, 3);
+        for (std::uint32_t index = 0; index < owners; ++index) {
+            EntityId owner;
+            if (organization.kind == OrganizationKind::Corporation &&
+                random.UniformInt(1, 100) <= 25) {
+                owner = economy.organizations.at(banks.at(
+                    random.UniformInt(0, static_cast<std::uint32_t>(banks.size() - 1)))).id;
+            } else if (!state_.robots.empty()) {
+                owner = state_.robots.at(random.UniformInt(
+                    0, static_cast<std::uint32_t>(state_.robots.size() - 1))).id;
+            }
+            if (!owner.IsValid() || std::ranges::contains(organization.owners, owner, &Share::owner)) {
+                continue;
+            }
+            organization.owners.push_back({.owner = owner, .shares = random.UniformInt(10, 100)});
+        }
+        std::ranges::sort(organization.owners, {}, [](const Share& share) { return share.owner.value; });
+    }
+}
+
+void World::IndexEconomy() {
+    loanOf_.clear();
+    for (std::size_t index = 0; index < state_.economy.loans.size(); ++index) {
+        loanOf_[state_.economy.loans[index].borrower.value] = index;
+    }
+    for (const Organization& organization : state_.economy.organizations) {
+        if (organization.kind == OrganizationKind::CentralBank) {
+            centralBank_ = organization.id;
+        }
+        switch (organization.sector) {
+            case Sector::Housing: housing_ = organization.id; break;
+            case Sector::Utilities: utilities_ = organization.id; break;
+            case Sector::Transit: transit_ = organization.id; break;
+            default: break;
+        }
+    }
+}
+
+const Organization* World::FindOrganization(EntityId id) const noexcept {
+    const auto& organizations = state_.economy.organizations;
+    const auto found = std::ranges::lower_bound(organizations, id.value, {},
+                                                [](const Organization& each) { return each.id.value; });
+    return found != organizations.end() && found->id == id ? &*found : nullptr;
+}
+
+Organization* World::MutableOrganization(EntityId id) noexcept {
+    return const_cast<Organization*>(std::as_const(*this).FindOrganization(id));
+}
+
+Robot* World::MutableRobot(EntityId id) noexcept {
+    return const_cast<Robot*>(FindRobot(id));
+}
+
+Room& World::MutableRoom(EntityId id) {
+    const auto room = rooms_.Find(id);
+    if (!room) {
+        throw std::logic_error("No such room");
+    }
+    // The index points into state_.city, which this world owns and may
+    // change; only the room's owner changes, never what the index keys on.
+    return const_cast<Room&>(*room->room);
+}
+
+const Loan* World::LoanOf(EntityId borrower) const noexcept {
+    const auto found = loanOf_.find(borrower.value);
+    return found != loanOf_.end() ? &state_.economy.loans[found->second] : nullptr;
+}
+
+std::string_view World::AccountName(EntityId account) const {
+    if (const Organization* organization = FindOrganization(account)) {
+        return organization->name;
+    }
+    return NameOf(account);
+}
+
+std::int64_t& World::Balance(EntityId account) {
+    if (Organization* organization = MutableOrganization(account)) {
+        return organization->credits;
+    }
+    if (Robot* robot = MutableRobot(account)) {
+        return robot->credits;
+    }
+    throw std::logic_error(std::format("No account {}", account.value));
+}
+
+Books* World::BooksOf(EntityId account) {
+    Organization* organization = MutableOrganization(account);
+    return organization != nullptr ? &organization->today : nullptr;
+}
+
+void World::Pay(EntityId from, EntityId to, std::int64_t amount) {
+    if (amount <= 0 || from == to) {
+        return;
+    }
+    std::int64_t& payer = Balance(from);
+    if (payer < amount) {
+        throw std::logic_error(std::format("Account {} cannot pay {}", from.value, amount));
+    }
+    payer -= amount;
+    Balance(to) += amount;
+}
+
+void World::ChangeMoney(EntityId account, std::int64_t amount, EmissionReason reason) {
+    Economy& economy = state_.economy;
+    Balance(account) += amount;
+    if (amount >= 0) {
+        economy.created += amount;
+        state_.today.created += amount;
+    } else {
+        economy.destroyed -= amount;
+        state_.today.destroyed -= amount;
+    }
+    economy.emissions.push_back(
+        {.tick = state_.tick, .account = account, .amount = amount, .reason = reason});
+    if (economy.emissions.size() > kEmissionLogSize) {
+        economy.emissions.erase(economy.emissions.begin());
+    }
+    Emit({.tick = state_.tick,
+          .kind = EventKind::MoneySupplyChanged,
+          .credits = amount,
+          .account = account,
+          .emission = reason});
+}
+
+void World::Lend(EntityId lender, EntityId borrower, std::int64_t amount) {
+    if (amount <= 0) {
+        return;
+    }
+    Organization* bank = MutableOrganization(lender);
+    if (bank == nullptr) {
+        throw std::logic_error("Lending without a lender");
+    }
+    if (bank->kind == OrganizationKind::CentralBank) {
+        // Money the city did not have.
+        ChangeMoney(lender, amount, EmissionReason::BankRescue);
+    } else if (bank->credits - amount < kBankFloor) {
+        Lend(bank->bank, bank->id, amount + kBankFloor - bank->credits + (amount / 2));
+        bank = MutableOrganization(lender);
+    }
+    Pay(lender, borrower, amount);
+    auto& loans = state_.economy.loans;
+    if (const auto found = loanOf_.find(borrower.value); found != loanOf_.end()) {
+        loans[found->second].owed += amount;
+    } else {
+        loanOf_[borrower.value] = loans.size();
+        loans.push_back({.id = state_.ids.Allocate(),
+                         .lender = lender,
+                         .borrower = borrower,
+                         .owed = amount,
+                         .takenAt = state_.tick});
+    }
+    state_.today.loansTaken += 1;
+    state_.today.lent += amount;
+}
+
+bool World::MayBorrow(const Robot& robot, std::int64_t amount) const {
+    if (!robot.workspace.IsValid() || !robot.bank.IsValid()) {
+        return false;
+    }
+    const Loan* loan = LoanOf(robot.id);
+    const std::int64_t owed = loan != nullptr ? loan->owed : 0;
+    return owed + amount <= kRobotDebtShifts * WageOf(robot);
+}
+
+std::int64_t World::PocketOf(const Robot& robot) const {
+    return std::max<std::int64_t>(60, 6 * RentOf(robot));
+}
+
+void World::Withdraw(Robot& robot, std::int64_t amount) {
+    amount = std::min(amount, robot.savings);
+    if (amount <= 0) {
+        return;
+    }
+    Organization* bank = MutableOrganization(robot.bank);
+    if (bank->credits - amount < 0) {
+        // A run on the bank: the central bank lends it what it lacks.
+        Lend(bank->bank, bank->id, amount - bank->credits + kBankFloor);
+    }
+    robot.savings -= amount;
+    Pay(robot.bank, robot.id, amount);
+}
+
+std::int64_t World::PayBill(Robot& robot, EntityId to, std::int64_t amount) {
+    if (amount <= 0) {
+        return 0;
+    }
+    if (robot.credits < amount) {
+        Withdraw(robot, amount - robot.credits);
+    }
+    if (robot.credits < amount && MayBorrow(robot, amount - robot.credits)) {
+        const bool first = LoanOf(robot.id) == nullptr;
+        const std::int64_t borrowed = amount - robot.credits;
+        Lend(robot.bank, robot.id, borrowed);
+        Emit({.tick = state_.tick, .kind = EventKind::Borrowed, .robot = robot.id, .credits = borrowed});
+        if (first) {
+            Remember(robot, MemoryKind::TookLoan, {}, {});
+        }
+    }
+    const std::int64_t paid = std::min(robot.credits, amount);
+    Pay(robot.id, to, paid);
+    robot.rentOwed += amount - paid;
+    return paid;
+}
+
+void World::PayOrBorrow(Organization& payer, EntityId to, std::int64_t amount) {
+    if (amount <= 0) {
+        return;
+    }
+    const EntityId id = payer.id;
+    if (payer.credits < amount) {
+        Lend(payer.bank, id, amount - payer.credits);
+    }
+    Pay(id, to, amount);
+}
+
+void World::PaySupplies(Organization& buyer, std::int64_t revenue) {
+    std::int64_t percent = 0;
+    switch (buyer.sector) {
+        case Sector::Venues: percent = kVenueSupplyPercent; break;
+        case Sector::Utilities: percent = kUtilitySupplyPercent; break;
+        case Sector::Transit: percent = kTransitSupplyPercent; break;
+        case Sector::Housing: percent = kHousingSupplyPercent; break;
+        default: return;
+    }
+    const std::int64_t supplies = std::min(buyer.credits, revenue * percent / 100);
+    if (supplies <= 0) {
+        return;
+    }
+    buyer.credits -= supplies;
+    buyer.today.supplies += supplies;
+    state_.economy.supplyMarket += supplies;
+    state_.today.supplies += supplies;
+}
+
+std::int64_t World::LuxuryOf(const Robot& robot) const {
+    // The rich spend more: a share of savings above a comfortable sum.
+    return robot.savings > kComfortableSavings
+               ? (robot.savings - kComfortableSavings) / kLuxuryDivisor
+               : 0;
+}
+
+void World::Sell(Robot& buyer, EntityId seller, std::int64_t price) {
+    const std::int64_t paid = std::min(buyer.credits, price);
+    if (paid <= 0) {
+        return;
+    }
+    Pay(buyer.id, seller, paid);
+    if (Organization* organization = MutableOrganization(seller)) {
+        organization->today.revenue += paid;
+        PaySupplies(*organization, paid);
+    }
+}
+
+void World::PayWage(Robot& robot) {
+    const auto workspace = rooms_.Find(robot.workspace);
+    Organization* employer = workspace ? MutableOrganization(workspace->room->owner) : nullptr;
+    if (employer == nullptr) {
+        throw std::logic_error("A workspace without an owner");
+    }
+    const std::int64_t wage = static_cast<std::int64_t>(WageOf(robot)) * employer->payPercent / 100;
+    employer->today.wages += wage;
+    PayOrBorrow(*employer, robot.id, wage);
+    state_.today.wages += wage;
+    Emit({.tick = state_.tick,
+          .kind = EventKind::ShiftEnded,
+          .robot = robot.id,
+          .room = robot.workspace,
+          .credits = wage});
+}
+
+std::int64_t World::PriceOf(const Room& apartment) const {
+    return static_cast<std::int64_t>(apartment.rent) * kPriceNights;
+}
+
+std::int64_t World::UpkeepOf(const Room& apartment) const {
+    return static_cast<std::int64_t>(apartment.rent) * kUpkeepPercent / 100;
+}
+
+void World::Transfer(EntityId apartment, EntityId buyer, std::int64_t price) {
+    Room& room = MutableRoom(apartment);
+    const EntityId seller = room.owner;
+    if (Organization* organization = MutableOrganization(buyer)) {
+        PayOrBorrow(*organization, seller, price);
+    } else {
+        Pay(buyer, seller, price);
+    }
+    MutableRoom(apartment).owner = buyer;
+    state_.today.propertySales += 1;
+    state_.today.propertySalesValue += price;
+    if (Robot* robot = MutableRobot(buyer)) {
+        Emit({.tick = state_.tick, .kind = EventKind::BoughtProperty, .robot = buyer,
+              .room = apartment, .credits = price});
+        Remember(*robot, MemoryKind::BoughtProperty, {}, apartment);
+    }
+    if (FindRobot(seller) != nullptr) {
+        Emit({.tick = state_.tick, .kind = EventKind::SoldProperty, .robot = seller,
+              .room = apartment, .credits = price});
+    }
+}
+
+void World::Bequeath(Robot& robot) {
+    // Its best friend gets everything, or failing that its bank.
+    EntityId heir = robot.bank;
+    std::int32_t closest = 0;
+    for (const Bond& bond : robot.bonds) {
+        if ((bond.level == BondLevel::Friend || bond.level == BondLevel::CloseFriend) &&
+            bond.affinity > closest && FindRobot(bond.robot) != nullptr) {
+            closest = bond.affinity;
+            heir = bond.robot;
+        }
+    }
+    // Its savings come out of the bank; debts are paid first, and what
+    // cannot be is lost to the lender.
+    Withdraw(robot, robot.savings);
+    if (const auto found = loanOf_.find(robot.id.value); found != loanOf_.end()) {
+        Loan& loan = state_.economy.loans[found->second];
+        const std::int64_t paid = std::min(loan.owed, robot.credits);
+        Pay(robot.id, loan.lender, paid);
+        state_.today.writtenOff += loan.owed - paid;
+        loan.owed = 0;
+    }
+    Pay(robot.id, heir, robot.credits);
+    for (Building& building : state_.city.buildings) {
+        for (Room& room : building.rooms) {
+            if (room.owner == robot.id) {
+                room.owner = heir;
+            }
+        }
+    }
+    for (Organization& organization : state_.economy.organizations) {
+        auto& owners = organization.owners;
+        const auto share = std::ranges::find(owners, robot.id, &Share::owner);
+        if (share == owners.end()) {
+            continue;
+        }
+        const std::uint32_t shares = share->shares;
+        owners.erase(share);
+        if (heir == organization.id) {
+            continue;  // A bank does not own itself.
+        }
+        if (const auto existing = std::ranges::find(owners, heir, &Share::owner);
+            existing != owners.end()) {
+            existing->shares += shares;
+        } else {
+            owners.push_back({.owner = heir, .shares = shares});
+            std::ranges::sort(owners, {}, [](const Share& each) { return each.owner.value; });
+        }
+    }
+    if (Robot* friendRobot = MutableRobot(heir)) {
+        Emit({.tick = state_.tick, .kind = EventKind::Inherited, .robot = heir, .otherRobot = robot.id});
+        Remember(*friendRobot, MemoryKind::Inherited, robot.id, {});
+    }
+}
+
+std::int64_t World::ReserveOf(const Organization& organization) const {
+    if (organization.kind == OrganizationKind::Bank) {
+        std::int64_t held = 0;
+        for (const Loan& loan : state_.economy.loans) {
+            held += loan.lender == organization.id ? loan.owed : 0;
+        }
+        for (const Robot& robot : state_.robots) {
+            held += robot.bank == organization.id ? robot.savings : 0;
+        }
+        return kBankFloor + (held * kBankReservePercent / 100);
+    }
+    const auto costs = [](const Books& books) {
+        return books.wages + books.supplies + books.upkeep + books.rent;
+    };
+    return std::max(kCorporationFloor,
+                    2 * std::max(costs(organization.today), costs(organization.yesterday)));
+}
+
+void World::TradeProperty() {
+    std::unordered_set<std::uint64_t> lived;
+    for (const Robot& robot : state_.robots) {
+        lived.insert(robot.apartment.value);
+    }
+    // Robots with apartments nobody lives in sell them to the trust.
+    Organization* trust = MutableOrganization(housing_);
+    for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+        const Room& room = *apartment.room;
+        if (lived.contains(room.id.value) || FindRobot(room.owner) == nullptr ||
+            state_.random.UniformInt(1, 100) > kSellVacantPercent || trust == nullptr) {
+            continue;
+        }
+        Transfer(room.id, housing_, PriceOf(room) * kSellPercent / 100);
+    }
+    // Owners who cannot keep up with their bills sell their home and rent
+    // it back.
+    for (Robot& robot : state_.robots) {
+        const auto home = rooms_.Find(robot.apartment);
+        if (!home || home->room->owner != robot.id) {
+            continue;
+        }
+        const std::int64_t upkeep = UpkeepOf(*home->room);
+        if (upkeep <= 0 || robot.rentOwed < kEvictionNights * upkeep) {
+            continue;
+        }
+        Transfer(robot.apartment, housing_, PriceOf(*home->room) * kSellPercent / 100);
+        Remember(robot, MemoryKind::SoldHome, {}, robot.apartment);
+        // The sale pays its debts.
+        const std::int64_t bills = std::min(robot.rentOwed, robot.credits);
+        Pay(robot.id, utilities_, bills);
+        robot.rentOwed -= bills;
+        if (const auto found = loanOf_.find(robot.id.value); found != loanOf_.end()) {
+            Loan& loan = state_.economy.loans[found->second];
+            const std::int64_t repaid = std::min(loan.owed, robot.credits);
+            Pay(robot.id, loan.lender, repaid);
+            loan.owed -= repaid;
+        }
+    }
+    // Robots with savings buy: first the home they rent from the trust,
+    // then a let apartment of the trust's to collect its rent.
+    std::vector<EntityId> letByTrust;
+    for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+        if (apartment.room->owner == housing_ && lived.contains(apartment.room->id.value)) {
+            letByTrust.push_back(apartment.room->id);
+        }
+    }
+    for (Robot& robot : state_.robots) {
+        if (LoanOf(robot.id) != nullptr || robot.rentOwed > 0 ||
+            state_.random.UniformInt(1, 100) > kBuyPercent) {
+            continue;
+        }
+        const auto home = rooms_.Find(robot.apartment);
+        const std::int64_t keep = kBuyReserveNights * (home ? home->room->rent : 0);
+        const std::int64_t means = robot.credits + robot.savings;
+        EntityId target;
+        if (home && home->room->owner == housing_ && means >= PriceOf(*home->room) + keep) {
+            target = robot.apartment;
+        } else if (!letByTrust.empty()) {
+            const EntityId candidate = letByTrust.at(state_.random.UniformInt(
+                0, static_cast<std::uint32_t>(letByTrust.size() - 1)));
+            const auto room = rooms_.Find(candidate);
+            if (room && room->room->owner == housing_ && means >= PriceOf(*room->room) + keep) {
+                target = candidate;
+            }
+        }
+        if (target.IsValid()) {
+            const auto room = rooms_.Find(target);
+            Withdraw(robot, PriceOf(*room->room) - robot.credits);
+            Transfer(target, robot.id, PriceOf(*room->room));
+            std::erase(letByTrust, target);
+        }
+    }
+}
+
+void World::SettleEconomy() {
+    Economy& economy = state_.economy;
+    // The supply market pays industry for the day's supplies, in proportion
+    // to the wages each corporation paid.
+    std::int64_t wageBill = 0;
+    std::vector<Organization*> industry;
+    for (Organization& organization : economy.organizations) {
+        if (organization.sector == Sector::Industry) {
+            industry.push_back(&organization);
+            wageBill += organization.today.wages;
+        }
+    }
+    if (!industry.empty() && economy.supplyMarket > 0) {
+        std::int64_t left = economy.supplyMarket;
+        for (std::size_t index = 0; index < industry.size(); ++index) {
+            Organization& corporation = *industry[index];
+            const std::int64_t share =
+                index + 1 == industry.size()
+                    ? left
+                    : (wageBill > 0 ? economy.supplyMarket * corporation.today.wages / wageBill
+                                    : economy.supplyMarket / static_cast<std::int64_t>(industry.size()));
+            corporation.credits += share;
+            corporation.today.revenue += share;
+            left -= share;
+        }
+        economy.supplyMarket = 0;
+    }
+
+    // Interest, then repayments from whatever borrowers can spare.
+    for (Loan& loan : economy.loans) {
+        const std::int64_t interest = (loan.owed * kInterestPerNight + 9999) / 10000;
+        loan.owed += interest;
+        state_.today.interest += interest;
+        if (Organization* lender = MutableOrganization(loan.lender)) {
+            lender->today.revenue += interest;
+        }
+    }
+    for (Loan& loan : economy.loans) {
+        std::int64_t spare = 0;
+        if (const Robot* robot = FindRobot(loan.borrower)) {
+            const auto home = rooms_.Find(robot->apartment);
+            spare = robot->credits - (2 * (home ? static_cast<std::int64_t>(home->room->rent) : 0));
+        } else if (const Organization* organization = FindOrganization(loan.borrower)) {
+            spare = organization->credits - ReserveOf(*organization);
+        }
+        const std::int64_t repaid = std::clamp<std::int64_t>(spare, 0, loan.owed);
+        if (repaid <= 0) {
+            continue;
+        }
+        if (loan.lender == centralBank_) {
+            ChangeMoney(loan.borrower, -repaid, EmissionReason::Repaid);
+        } else {
+            Pay(loan.borrower, loan.lender, repaid);
+        }
+        loan.owed -= repaid;
+        if (Books* books = BooksOf(loan.borrower)) {
+            books->repaid += repaid;
+        }
+    }
+    if (std::erase_if(economy.loans, [](const Loan& loan) { return loan.owed <= 0; }) > 0) {
+        IndexEconomy();
+    }
+
+    // Industry pays what it can afford: less while losing money, more while
+    // earning it.
+    for (Organization* corporation : industry) {
+        const Books& books = corporation->today;
+        const std::int64_t costs = books.wages + books.supplies;
+        if (books.revenue < costs) {
+            corporation->payPercent = std::max(kMinPayPercent, corporation->payPercent - 1);
+        } else if (books.revenue > costs) {
+            corporation->payPercent = std::min(kMaxPayPercent, corporation->payPercent + 1);
+        }
+    }
+
+    // Dividends from what organizations without debts have to spare.
+    for (Organization& organization : economy.organizations) {
+        if (organization.kind == OrganizationKind::CentralBank || organization.owners.empty() ||
+            LoanOf(organization.id) != nullptr) {
+            continue;
+        }
+        const std::int64_t spare = organization.credits - (2 * ReserveOf(organization));
+        if (spare <= 0) {
+            continue;
+        }
+        // A bank's credits are mostly its savers' money: it pays out only
+        // from the interest it earned.
+        std::int64_t payout = spare * kDividendPercent / 100;
+        if (organization.kind == OrganizationKind::Bank) {
+            payout = std::min(payout, organization.today.revenue * kDividendPercent / 100);
+        }
+        if (payout <= 0) {
+            continue;
+        }
+        std::int64_t shares = 0;
+        for (const Share& share : organization.owners) {
+            shares += share.shares;
+        }
+        const EntityId payer = organization.id;
+        for (const Share& share : organization.owners) {
+            const std::int64_t dividend = payout * share.shares / shares;
+            Pay(payer, share.owner, dividend);
+            MutableOrganization(payer)->today.dividends += dividend;
+            state_.today.dividends += dividend;
+            if (Books* books = BooksOf(share.owner)) {
+                books->revenue += dividend;
+            }
+        }
+    }
+
+    // Robots bank what they do not need in their pocket, or take some out.
+    for (Robot& robot : state_.robots) {
+        const std::int64_t pocket = PocketOf(robot);
+        if (robot.credits > 2 * pocket) {
+            const std::int64_t deposit = robot.credits - pocket;
+            Pay(robot.id, robot.bank, deposit);
+            robot.savings += deposit;
+        } else if (robot.credits < pocket) {
+            Withdraw(robot, pocket - robot.credits);
+        }
+    }
+
+    RecordStatistics();
+    for (Organization& organization : economy.organizations) {
+        organization.yesterday = organization.today;
+        organization.today = {};
+    }
+    state_.today = {};
+}
+
+void World::RecordStatistics() {
+    const WorldState& state = state_;
+    DailyStats stats{.day = DayNumber(state.tick - 1), .counted = state.today};
+    const auto count = static_cast<std::int64_t>(state.robots.size());
+    stats.population = count;
+    std::unordered_map<std::uint64_t, std::int64_t> property;
+    std::unordered_set<std::uint64_t> lived;
+    for (const Robot& robot : state.robots) {
+        lived.insert(robot.apartment.value);
+    }
+    for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+        const Room& room = *apartment.room;
+        property[room.owner.value] += PriceOf(room);
+        if (!lived.contains(room.id.value)) {
+            ++stats.vacantApartments;
+        } else if (FindOrganization(room.owner) != nullptr) {
+            ++stats.corporateApartments;
+        }
+    }
+    std::unordered_set<std::uint64_t> shareholders;
+    for (const Organization& organization : state.economy.organizations) {
+        for (const Share& share : organization.owners) {
+            if (FindRobot(share.owner) != nullptr) {
+                shareholders.insert(share.owner.value);
+            }
+        }
+        switch (organization.kind) {
+            case OrganizationKind::Corporation:
+                stats.corporationMoney += organization.credits;
+                break;
+            default:
+                stats.bankMoney += organization.credits;
+                break;
+        }
+    }
+    stats.shareholders = static_cast<std::int64_t>(shareholders.size());
+    for (const Loan& loan : state.economy.loans) {
+        if (FindRobot(loan.borrower) != nullptr) {
+            stats.robotDebt += loan.owed;
+            ++stats.indebtedRobots;
+        } else if (loan.lender == centralBank_) {
+            stats.bankDebt += loan.owed;
+        } else {
+            stats.corporationDebt += loan.owed;
+        }
+    }
+
+    std::vector<std::int64_t> credits;
+    std::vector<std::int64_t> wealth;
+    credits.reserve(state.robots.size());
+    wealth.reserve(state.robots.size());
+    std::int64_t payPercent = 0;
+    std::int64_t industry = 0;
+    for (const Organization& organization : state.economy.organizations) {
+        if (organization.sector == Sector::Industry) {
+            payPercent += organization.payPercent;
+            ++industry;
+        }
+    }
+    stats.averagePayPercent = industry > 0 ? payPercent / industry : 100;
+    for (const Robot& robot : state.robots) {
+        stats.robotMoney += robot.credits;
+        stats.robotSavings += robot.savings;
+        if (robot.workspace.IsValid()) {
+            ++stats.employed;
+            ++stats.jobLevels.at(std::min<std::size_t>(robot.jobLevel, stats.jobLevels.size() - 1));
+        }
+        stats.averageCharge += robot.needs.charge;
+        stats.averageCondition += robot.needs.condition;
+        stats.averageSocial += robot.needs.social;
+        stats.averageFun += robot.needs.fun;
+        stats.averageAge += robot.age;
+        stats.averageWear += robot.wear;
+        bool friendly = false;
+        bool close = false;
+        bool rival = false;
+        for (const Bond& bond : robot.bonds) {
+            friendly = friendly || bond.level == BondLevel::Friend || bond.level == BondLevel::CloseFriend;
+            close = close || bond.level == BondLevel::CloseFriend;
+            rival = rival || bond.level == BondLevel::Rival;
+        }
+        stats.withFriend += friendly ? 1 : 0;
+        stats.withCloseFriend += close ? 1 : 0;
+        stats.withRival += rival ? 1 : 0;
+        stats.lonely += friendly ? 0 : 1;
+        const auto home = rooms_.Find(robot.apartment);
+        stats.broke += robot.credits + robot.savings < RentOf(robot) ? 1 : 0;
+        stats.behindOnBills += robot.rentOwed > 0 ? 1 : 0;
+        if (home && home->room->owner == robot.id) {
+            ++stats.homeowners;
+        } else {
+            ++stats.tenants;
+        }
+        const auto owned = property.find(robot.id.value);
+        const std::int64_t propertyValue = owned != property.end() ? owned->second : 0;
+        if (owned != property.end() &&
+            propertyValue > (home && home->room->owner == robot.id ? PriceOf(*home->room) : 0)) {
+            ++stats.landlords;
+        }
+        const Loan* loan = LoanOf(robot.id);
+        credits.push_back(robot.credits + robot.savings);
+        wealth.push_back(robot.credits + robot.savings + propertyValue - robot.rentOwed - (loan != nullptr ? loan->owed : 0));
+    }
+    stats.unemployed = count - stats.employed;
+    if (count > 0) {
+        stats.averageCharge /= count;
+        stats.averageCondition /= count;
+        stats.averageSocial /= count;
+        stats.averageFun /= count;
+        stats.averageAge /= count;
+        stats.averageWear /= count;
+        stats.meanCredits = (stats.robotMoney + stats.robotSavings) / count;
+        std::int64_t total = 0;
+        for (const std::int64_t each : wealth) {
+            total += each;
+        }
+        stats.meanWealth = total / count;
+        std::ranges::sort(credits);
+        std::vector<std::int64_t> sorted = wealth;
+        std::ranges::sort(sorted);
+        stats.medianCredits = credits[credits.size() / 2];
+        stats.medianWealth = sorted[sorted.size() / 2];
+        std::int64_t positive = 0;
+        std::int64_t top = 0;
+        std::int64_t bottom = 0;
+        for (std::size_t index = 0; index < sorted.size(); ++index) {
+            const std::int64_t each = std::max<std::int64_t>(sorted[index], 0);
+            positive += each;
+            top += index >= sorted.size() - std::max<std::size_t>(sorted.size() / 10, 1) ? each : 0;
+            bottom += index < sorted.size() / 2 ? each : 0;
+        }
+        stats.topTenthShare = positive > 0 ? top * 1000 / positive : 0;
+        stats.bottomHalfShare = positive > 0 ? bottom * 1000 / positive : 0;
+    }
+    stats.giniWealth = GiniPerMille(std::move(wealth));
+    stats.moneySupply = stats.robotMoney + stats.corporationMoney + stats.bankMoney +
+                        state.economy.supplyMarket;
+    stats.createdTotal = state.economy.created;
+    stats.destroyedTotal = state.economy.destroyed;
+    state_.history.push_back(stats);
+    if (state_.history.size() > kHistoryDays) {
+        state_.history.erase(state_.history.begin());
+    }
+}
+
+
+void SetCredits(WorldState& state, Robot& robot, std::int64_t credits) {
+    const std::int64_t change = credits - robot.credits;
+    if (change >= 0) {
+        state.economy.created += change;
+    } else {
+        state.economy.destroyed -= change;
+    }
+    robot.credits = credits;
+}
+
+std::expected<void, std::string> ValidateEconomy(const WorldState& state) {
+    const Economy& economy = state.economy;
+    const auto fail = [](std::string message) { return std::unexpected(std::move(message)); };
+    if (!std::ranges::is_sorted(economy.organizations, {},
+                                [](const Organization& each) { return each.id.value; })) {
+        return fail("Organizations are not sorted by id");
+    }
+    const auto organization = [&](EntityId id) -> const Organization* {
+        const auto found = std::ranges::lower_bound(economy.organizations, id.value, {},
+                                                    [](const Organization& each) { return each.id.value; });
+        return found != economy.organizations.end() && found->id == id ? &*found : nullptr;
+    };
+    const auto robot = [&](EntityId id) {
+        const auto found = std::ranges::lower_bound(state.robots, id.value, {},
+                                                    [](const Robot& each) { return each.id.value; });
+        return found != state.robots.end() && found->id == id;
+    };
+    std::int64_t money = economy.supplyMarket;
+    for (const Organization& each : economy.organizations) {
+        money += each.credits;
+        if (each.credits < 0) {
+            return fail(std::format("{} has {} credits", each.name, each.credits));
+        }
+        for (const Share& share : each.owners) {
+            if (!robot(share.owner) && organization(share.owner) == nullptr) {
+                return fail(std::format("{} has a missing owner", each.name));
+            }
+        }
+        if (each.kind != OrganizationKind::CentralBank && organization(each.bank) == nullptr) {
+            return fail(std::format("{} has no bank", each.name));
+        }
+    }
+    for (const Robot& each : state.robots) {
+        money += each.credits;
+        const Organization* bank = organization(each.bank);
+        if (bank == nullptr || bank->kind != OrganizationKind::Bank || each.savings < 0) {
+            return fail(std::format("Robot '{}' has no bank, or negative savings", each.name));
+        }
+    }
+    if (money != economy.created - economy.destroyed) {
+        return fail(std::format("The city holds {} credits, but {} were created and {} destroyed",
+                                money, economy.created, economy.destroyed));
+    }
+    for (const Building& building : state.city.buildings) {
+        for (const Room& room : building.rooms) {
+            if (!robot(room.owner) && organization(room.owner) == nullptr) {
+                return fail(std::format("{} in {} has no owner", room.name, building.name));
+            }
+        }
+    }
+    std::unordered_set<std::uint64_t> borrowers;
+    for (const Loan& loan : economy.loans) {
+        const Organization* lender = organization(loan.lender);
+        if (lender == nullptr || lender->kind == OrganizationKind::Corporation || loan.owed <= 0 ||
+            !borrowers.insert(loan.borrower.value).second ||
+            (!robot(loan.borrower) && organization(loan.borrower) == nullptr)) {
+            return fail(std::format("Loan {} is not valid", loan.id.value));
+        }
+    }
+    return {};
+}
+
+}  // namespace mechapunk::sim

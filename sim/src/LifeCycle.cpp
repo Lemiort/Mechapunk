@@ -99,6 +99,8 @@ void World::Scrap(EntityId id) {
           .kind = EventKind::Scrapped,
           .robot = robot.id,
           .room = robot.apartment});
+    ++state_.today.scrapped;
+    Bequeath(robot);
     const auto departed = std::ranges::lower_bound(
         state_.departed, id, std::less{}, &DepartedRobot::id);
     state_.departed.insert(
@@ -163,7 +165,17 @@ void World::AddNewcomer() {
     robot.location = robot.apartment;
     robot.punctualityMinutes = random.UniformInt(kMinPunctuality, kMaxPunctuality);
     robot.needs = {.charge = need(), .condition = need(), .social = need(), .fun = need()};
-    robot.credits = random.UniformInt(kMinNewcomerCredits, kMaxNewcomerCredits);
+    const std::int64_t savings = random.UniformInt(kMinNewcomerCredits, kMaxNewcomerCredits);
+    // A bank of its own, the way the first robots were given theirs.
+    std::vector<EntityId> banks;
+    for (const Organization& organization : state_.economy.organizations) {
+        if (organization.kind == OrganizationKind::Bank) {
+            banks.push_back(organization.id);
+        }
+    }
+    if (!banks.empty()) {
+        robot.bank = pick(banks);
+    }
     const std::uint32_t firstDayOff = random.UniformInt(0, kDaysPerWeek - 1);
     robot.daysOff = static_cast<std::uint8_t>((1U << firstDayOff) |
                                               (1U << ((firstDayOff + 1) % kDaysPerWeek)));
@@ -177,6 +189,9 @@ void World::AddNewcomer() {
     state_.robots.push_back(std::move(robot));
     ++populationVersion_;
     Robot& arrived = state_.robots.back();
+    ++state_.today.arrivals;
+    // It brings its savings from outside: new money in the city.
+    ChangeMoney(arrived.id, savings, EmissionReason::NewcomerSavings);
     Emit({.tick = state_.tick,
           .kind = EventKind::Arrived,
           .robot = arrived.id,

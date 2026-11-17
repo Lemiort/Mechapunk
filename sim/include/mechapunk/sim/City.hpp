@@ -61,6 +61,8 @@ struct Room {
     std::uint32_t capacity{};
     // Credits charged every midnight; apartments only.
     std::uint32_t rent{};
+    // The robot or organization it belongs to.
+    EntityId owner;
 };
 
 // Daily working hours of a workplace.

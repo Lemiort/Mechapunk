@@ -15,6 +15,25 @@
 namespace sim = mechapunk::sim;
 
 namespace {
+sim::EntityId HousingTrust(const sim::WorldState& state) {
+    for (const sim::Organization& organization : state.economy.organizations) {
+        if (organization.sector == sim::Sector::Housing) {
+            return organization.id;
+        }
+    }
+    return {};
+}
+
+void SetOwner(sim::WorldState& state, sim::EntityId room, sim::EntityId owner) {
+    for (sim::Building& building : state.city.buildings) {
+        for (sim::Room& each : building.rooms) {
+            if (each.id == room) {
+                each.owner = owner;
+            }
+        }
+    }
+}
+
 sim::World Load(sim::WorldState state) {
     auto world = sim::World::FromState(std::move(state));
     EXPECT_TRUE(world.has_value()) << world.error();
@@ -73,8 +92,13 @@ TEST(Careers, WagesFollowTheJobLevel) {
         const sim::Robot* robot = world.FindRobot(event.robot);
         const auto room = world.Rooms().Find(event.room);
         ASSERT_TRUE(robot != nullptr && room.has_value());
+        // The level's wage, at the share of it the employer pays now.
+        const sim::Organization* employer = world.FindOrganization(room->room->owner);
+        ASSERT_NE(employer, nullptr);
         EXPECT_EQ(event.credits,
-                  sim::WageAtLevel(room->building->shift.wage, robot->jobLevel));
+                  static_cast<std::int64_t>(
+                      sim::WageAtLevel(room->building->shift.wage, robot->jobLevel)) *
+                      employer->payPercent / 100);
         ++shifts;
     });
     world.RunFor(3 * sim::kMinutesPerDay);
@@ -174,7 +198,12 @@ TEST(Careers, DebtorsAreEvicted) {
     sim::Robot& robot = state.robots[*index];
     const sim::EntityId id = robot.id;
     const sim::EntityId home = robot.apartment;
-    robot.credits = 0;
+    // A tenant of the housing trust, out of work so no bank lends to it.
+    SetOwner(state, home, HousingTrust(state));
+    robot.workspace = {};
+    robot.commuteAt = sim::kNoCommute;
+    robot.savings = 0;
+    sim::SetCredits(state, robot, 0);
     robot.rentOwed = 10 * static_cast<std::int64_t>(RentOf(start, home));
 
     sim::World world = Load(std::move(state));
@@ -184,6 +213,37 @@ TEST(Careers, DebtorsAreEvicted) {
     EXPECT_LE(RentOf(world, after.apartment), RentOf(world, home));
     EXPECT_EQ(after.rentOwed, 0);
     EXPECT_TRUE(Remembers(after, sim::MemoryKind::Evicted));
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
+// An owner who cannot pay its home's upkeep sells it to the housing trust,
+// pays its debts from the sale and stays on as a tenant.
+TEST(Careers, OwnersBehindOnUpkeepSellAndStay) {
+    sim::World start = sim::World::Generate({.seed = 7, .robots = 200});
+    start.RunFor(sim::kMinutesPerDay + (23 * 60));
+    sim::WorldState state = start.State();
+    const auto index = FindIndex(state, [](const sim::Robot& robot) {
+        return robot.activity == sim::RobotActivity::Resting;
+    });
+    ASSERT_TRUE(index);
+    sim::Robot& robot = state.robots[*index];
+    const sim::EntityId id = robot.id;
+    const sim::EntityId home = robot.apartment;
+    robot.workspace = {};
+    robot.commuteAt = sim::kNoCommute;
+    robot.savings = 0;
+    sim::SetCredits(state, robot, 0);
+    robot.rentOwed = 10 * static_cast<std::int64_t>(RentOf(start, home));
+    const sim::EntityId trust = HousingTrust(state);
+
+    sim::World world = Load(std::move(state));
+    world.RunFor(90);
+    const sim::Robot& after = *world.FindRobot(id);
+    EXPECT_EQ(after.apartment, home);
+    EXPECT_EQ(world.Rooms().Find(home)->room->owner, trust);
+    EXPECT_EQ(after.rentOwed, 0);
+    EXPECT_GT(after.credits + after.savings, 0);
+    EXPECT_TRUE(Remembers(after, sim::MemoryKind::SoldHome));
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }
 
@@ -205,10 +265,11 @@ TEST(Careers, SaversMoveUp) {
     ASSERT_TRUE(index);
     // The only robot with savings, so nobody takes the nicer flats first.
     for (sim::Robot& other : state.robots) {
-        other.credits = std::min<std::int64_t>(other.credits, 50);
+        sim::SetCredits(state, other, std::min<std::int64_t>(other.credits, 50));
+        other.savings = 0;
     }
     sim::Robot& robot = state.robots[*index];
-    robot.credits = 5000;
+    sim::SetCredits(state, robot, 5000);
     const sim::EntityId id = robot.id;
     const sim::EntityId home = robot.apartment;
 

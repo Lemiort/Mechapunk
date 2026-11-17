@@ -38,6 +38,8 @@ struct RobotFrame {
     sim::Needs needs;
     std::int64_t credits{};
     std::int64_t rentOwed{};
+    std::int64_t savings{};
+    sim::EntityId bank;
     // Robots move house and change jobs, so these come with every frame.
     sim::EntityId apartment;
     sim::EntityId workspace;  // None while out of work.
@@ -70,6 +72,26 @@ struct RobotSocial {
     std::vector<sim::Memory> memories;
 };
 
+// Money and ownership. Organizations, loans and the central bank's log are
+// copied every ten minutes; statistics and owners only change at midnight,
+// so frames of a day share one copy.
+struct EconomyFrame {
+    std::vector<sim::Organization> organizations;  // Sorted by id.
+    std::vector<sim::Loan> loans;
+    std::vector<sim::Emission> emissions;  // Oldest first.
+    std::int64_t created{};
+    std::int64_t destroyed{};
+    std::int64_t supplyMarket{};
+    sim::DayCounters today;
+    std::shared_ptr<const std::vector<sim::DailyStats>> history;
+    // Owner of every room, by room id.
+    std::shared_ptr<const std::unordered_map<std::uint64_t, sim::EntityId>> owners;
+
+    [[nodiscard]] const sim::Organization* FindOrganization(sim::EntityId id) const;
+    [[nodiscard]] const sim::Loan* LoanOf(sim::EntityId borrower) const;
+    [[nodiscard]] sim::EntityId OwnerOf(sim::EntityId room) const;
+};
+
 // Immutable copy of the world's visible state, published after every step.
 struct WorldFrame {
     sim::Tick tick{};
@@ -86,6 +108,7 @@ struct WorldFrame {
     // Every living robot and every remembered scrapped one; shared by frames
     // until the population changes.
     std::shared_ptr<const RobotDirectory> directory;
+    std::shared_ptr<const EconomyFrame> economy;
 };
 
 // Runs a World on a SimulationThread. The world belongs to the worker while
@@ -114,6 +137,8 @@ public:
                                                      sim::EntityId robot);
     [[nodiscard]] static const RobotSocial* FindSocial(const WorldFrame& frame,
                                                        sim::EntityId robot);
+    // A robot's or an organization's name.
+    [[nodiscard]] static std::string AccountName(const WorldFrame& frame, sim::EntityId account);
     // The robot's latest events, newest last, as "Day 2 19:41  text".
     [[nodiscard]] std::vector<std::string> RecentEvents(sim::EntityId robot,
                                                         std::size_t count) const;
@@ -156,6 +181,10 @@ private:
     std::shared_ptr<const std::vector<RobotSocial>> social_;
     std::shared_ptr<const RobotDirectory> directory_;
     std::uint64_t directoryVersion_{};
+    std::shared_ptr<const EconomyFrame> economy_;
+    std::shared_ptr<const std::vector<sim::DailyStats>> history_;
+    std::shared_ptr<const std::unordered_map<std::uint64_t, sim::EntityId>> owners_;
+    sim::Tick economyDay_{};
     // Written by the worker in its event sink, read by the render thread.
     mutable std::mutex logMutex_;
     std::unordered_map<std::uint64_t, std::deque<std::string>> log_;

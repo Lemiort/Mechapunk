@@ -72,7 +72,29 @@ struct glz::meta<mechapunk::sim::MemoryKind> {
         FellBehindOnRent, "paidOffDebt", PaidOffDebt, "promoted", Promoted,
         "lostJob", LostJob, "foundJob", FoundJob, "movedUp", MovedUp,
         "evicted", Evicted, "lostFriend", LostFriend, "arrivedInCity",
-        ArrivedInCity, "gotBadPart", GotBadPart);
+        ArrivedInCity, "gotBadPart", GotBadPart, "boughtProperty",
+        BoughtProperty, "soldHome", SoldHome, "tookLoan", TookLoan,
+        "inherited", Inherited);
+};
+template <>
+struct glz::meta<mechapunk::sim::OrganizationKind> {
+    using enum mechapunk::sim::OrganizationKind;
+    static constexpr auto value = enumerate("corporation", Corporation, "bank", Bank,
+                                            "centralBank", CentralBank);
+};
+template <>
+struct glz::meta<mechapunk::sim::Sector> {
+    using enum mechapunk::sim::Sector;
+    static constexpr auto value =
+        enumerate("industry", Industry, "venues", Venues, "housing", Housing, "utilities",
+                  Utilities, "transit", Transit, "banking", Banking);
+};
+template <>
+struct glz::meta<mechapunk::sim::EmissionReason> {
+    using enum mechapunk::sim::EmissionReason;
+    static constexpr auto value =
+        enumerate("founding", Founding, "newcomerSavings", NewcomerSavings, "bankRescue",
+                  BankRescue, "repaid", Repaid, "interest", Interest);
 };
 
 namespace mechapunk::sim {
@@ -108,6 +130,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 8,
               .summary = "metro timetable and changing lines",
               .apply = &migrations::V8ToV9},
+    Migration{.fromVersion = 9,
+              .summary = "a closed economy with owners, banks and statistics",
+              .apply = &migrations::V9ToV10},
 };
 }  // namespace
 

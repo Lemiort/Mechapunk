@@ -202,6 +202,16 @@ std::string MemoryText(MemoryKind kind, std::string_view other,
             return at("moved to the city", "into");
         case MemoryKind::GotBadPart:
             return at("got a dodgy part", "at");
+        case MemoryKind::BoughtProperty:
+            return place.empty() ? std::string{"bought an apartment"}
+                                 : std::format("bought {}", place);
+        case MemoryKind::SoldHome:
+            return place.empty() ? std::string{"sold its home"}
+                                 : std::format("sold {} and rents it now", place);
+        case MemoryKind::TookLoan:
+            return "took a loan";
+        case MemoryKind::Inherited:
+            return std::format("inherited everything {} had", other);
     }
     return "remembered something";
 }
@@ -274,6 +284,8 @@ void World::Talk(Robot& first, Robot& second) {
         shared != 0 ? spread + kSharedTalkBase +
                           (kPerSharedInterest * std::popcount(shared))
                     : spread + kStrangerTalkBase;
+    ++state_.today.talks;
+    state_.today.arguments += change < 0 ? 1 : 0;
     // About something they share, or failing that one of them likes.
     std::uint8_t topics = shared != 0
                               ? shared
@@ -356,6 +368,18 @@ void World::UpdateBondLevel(Robot& robot, Bond& bond, EntityId room) {
 
 void World::Remember(Robot& robot, MemoryKind kind, EntityId other,
                      EntityId room) {
+    DayCounters& today = state_.today;
+    switch (kind) {
+        case MemoryKind::Promoted: ++today.promotions; break;
+        case MemoryKind::LostJob: ++today.jobsLost; break;
+        case MemoryKind::FoundJob: ++today.jobsFound; break;
+        case MemoryKind::MovedUp: ++today.movedUp; break;
+        case MemoryKind::Evicted: ++today.evictions; break;
+        case MemoryKind::BecameFriends: ++today.newFriendships; break;
+        case MemoryKind::BecameRivals: ++today.newRivalries; break;
+        case MemoryKind::GotBadPart: ++today.badParts; break;
+        default: break;
+    }
     robot.memories.push_back(
         {.tick = state_.tick, .kind = kind, .robot = other, .room = room});
     if (robot.memories.size() > kMaxMemories) {

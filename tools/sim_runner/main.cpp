@@ -300,6 +300,25 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
     std::println("   weather: {} min of rain started, heaviest {}; now {}",
                  stats.rainMinutes, sim::RainName(stats.heaviestRain),
                  sim::RainName(world.State().weather.rain));
+    if (!world.State().history.empty()) {
+        const sim::DailyStats& day = world.State().history.back();
+        const sim::DayCounters& counted = day.counted;
+        std::println(
+            "   economy: money {} (robots {}, corporations {}, banks {}); created {} "
+            "today, {} in all, destroyed {}; wages {} at {}%, sales {}, rent {}, upkeep {}, "
+            "supplies {}, dividends {}; debts: robots {} ({} robots), corporations {}, "
+            "banks {}\n   wealth: median {} credits, {} wealth, gini {}, top tenth {}, "
+            "bottom half {}; {} homeowners, {} tenants, {} landlords, {} let by "
+            "corporations, {} vacant; {} sales; {} broke, {} behind",
+            day.moneySupply, day.robotMoney, day.corporationMoney, day.bankMoney,
+            counted.created, day.createdTotal, day.destroyedTotal, counted.wages,
+            day.averagePayPercent, counted.venueSales, counted.rent, counted.upkeep,
+            counted.supplies, counted.dividends, day.robotDebt, day.indebtedRobots,
+            day.corporationDebt, day.bankDebt, day.medianCredits, day.medianWealth,
+            day.giniWealth, day.topTenthShare, day.bottomHalfShare, day.homeowners,
+            day.tenants, day.landlords, day.corporateApartments, day.vacantApartments,
+            counted.propertySales, day.broke, day.behindOnBills);
+    }
 }
 
 

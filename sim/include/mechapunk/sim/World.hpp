@@ -11,6 +11,7 @@
 
 #include "mechapunk/sim/Careers.hpp"
 #include "mechapunk/sim/City.hpp"
+#include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Ids.hpp"
 #include "mechapunk/sim/Metro.hpp"
@@ -59,8 +60,13 @@ struct Robot {
     Tick commuteAt{};
     Needs needs;
     std::int64_t credits{};
-    // Rent not yet paid; collected from later credits first.
+    // Rent, or for an apartment it owns the upkeep, not yet paid; collected
+    // from later credits first.
     std::int64_t rentOwed{};
+    // The bank it saves at and borrows from, and what it has saved there:
+    // credits the bank holds and owes it.
+    EntityId bank;
+    std::int64_t savings{};
     // Bit n set: likes Interest n.
     std::uint8_t interests{};
     // Robots it has talked to, sorted by their id.
@@ -123,6 +129,11 @@ struct WorldState {
     // Scrapped robots someone remembers, sorted by id.
     std::vector<DepartedRobot> departed;
     Weather weather;
+    Economy economy;
+    // Counted since midnight.
+    DayCounters today;
+    // One entry per day, oldest first, at most kHistoryDays.
+    std::vector<DailyStats> history;
 };
 
 struct WorldParams {
@@ -160,6 +171,17 @@ enum class EventKind : std::uint8_t {
     // Rain started, changed or stopped; no robot. change: the rain now
     // (0 when dry); minutes: how long this spell lasts.
     WeatherChanged,
+    // A robot borrowed; credits: how much.
+    Borrowed,
+    // A robot bought an apartment (room); credits: the price.
+    BoughtProperty,
+    // A robot sold an apartment (room); credits: what it got.
+    SoldProperty,
+    // A robot got a scrapped robot's things; otherRobot: whose.
+    Inherited,
+    // The central bank created money (credits > 0) or destroyed it; no
+    // robot; account: whose account.
+    MoneySupplyChanged,
 };
 
 // Something that happened during a step, for logs and observers. Events are
@@ -182,6 +204,8 @@ struct SimEvent {
     std::uint32_t fromStation{};
     std::uint32_t viaStation{};
     std::uint32_t toStation{};
+    EntityId account;
+    EmissionReason emission{};
 };
 
 // Deterministic simulation of the city. The same WorldState always produces
@@ -227,6 +251,11 @@ public:
     }
     [[nodiscard]] const RoomIndex& Rooms() const noexcept { return rooms_; }
     [[nodiscard]] const Metro& GetMetro() const noexcept { return metro_; }
+    [[nodiscard]] const Organization* FindOrganization(EntityId id) const noexcept;
+    // What a robot or organization owes, or nothing.
+    [[nodiscard]] const Loan* LoanOf(EntityId borrower) const noexcept;
+    // Name of a robot, a remembered robot or an organization.
+    [[nodiscard]] std::string_view AccountName(EntityId account) const;
     // Robots in a venue right now, not counting those still on their way.
     [[nodiscard]] std::uint32_t GuestsIn(EntityId room) const;
 
@@ -302,6 +331,47 @@ private:
     [[nodiscard]] std::int64_t RentOf(const Robot& robot) const;
     [[nodiscard]] const Building& WorkplaceOf(const Robot& robot) const;
     void Emit(const SimEvent& event) const;
+    // Money, in Economy.cpp.
+    void FoundEconomy(std::uint64_t seed);
+    void IndexEconomy();
+    [[nodiscard]] Organization* MutableOrganization(EntityId id) noexcept;
+    [[nodiscard]] Robot* MutableRobot(EntityId id) noexcept;
+    [[nodiscard]] Room& MutableRoom(EntityId id);
+    [[nodiscard]] std::int64_t& Balance(EntityId account);
+    [[nodiscard]] Books* BooksOf(EntityId account);
+    // Moves credits; the payer must have them.
+    void Pay(EntityId from, EntityId to, std::int64_t amount);
+    // A robot pays what it can of a bill, borrowing if it may; the rest
+    // is added to what it owes. Returns what was paid.
+    std::int64_t PayBill(Robot& robot, EntityId to, std::int64_t amount);
+    // An organization pays, borrowing whatever it lacks.
+    void PayOrBorrow(Organization& payer, EntityId to, std::int64_t amount);
+    // A sale to a robot at a venue, the metro or similar: revenue for the
+    // seller, part of which buys supplies from industry.
+    void Sell(Robot& buyer, EntityId seller, std::int64_t price);
+    void PaySupplies(Organization& buyer, std::int64_t revenue);
+    // What a robot spends beyond the price on a visit.
+    [[nodiscard]] std::int64_t LuxuryOf(const Robot& robot) const;
+    void Lend(EntityId lender, EntityId borrower, std::int64_t amount);
+    [[nodiscard]] bool MayBorrow(const Robot& robot, std::int64_t amount) const;
+    void ChangeMoney(EntityId account, std::int64_t amount, EmissionReason reason);
+    void PayWage(Robot& robot);
+    // Takes up to `amount` of a robot's savings out of its bank.
+    void Withdraw(Robot& robot, std::int64_t amount);
+    // Pocket money kept out of the bank.
+    [[nodiscard]] std::int64_t PocketOf(const Robot& robot) const;
+    [[nodiscard]] std::int64_t PriceOf(const Room& apartment) const;
+    [[nodiscard]] std::int64_t UpkeepOf(const Room& apartment) const;
+    // Changes an apartment's owner for `price`, paid by the buyer.
+    void Transfer(EntityId apartment, EntityId buyer, std::int64_t price);
+    // Hands a scrapped robot's credits, apartments and shares on.
+    void Bequeath(Robot& robot);
+    // At midnight: the supply market, interest, repayments, wages and
+    // dividends; then the day's statistics.
+    void SettleEconomy();
+    void TradeProperty();
+    void RecordStatistics();
+    [[nodiscard]] std::int64_t ReserveOf(const Organization& organization) const;
 
     WorldState state_;
     RoutePlanner routes_;
@@ -315,11 +385,22 @@ private:
     // For every street node, its nearest station and the walk there.
     std::vector<std::uint32_t> nearestStation_;
     std::vector<std::uint32_t> metersToStation_;
+    // The loan of each borrower, as an index into economy.loans.
+    std::unordered_map<std::uint64_t, std::size_t> loanOf_;
+    EntityId centralBank_;
+    EntityId housing_;
+    EntityId utilities_;
+    EntityId transit_;
     EventSink sink_;
 };
 
 // Checks references and invariants of a state; describes the first problem.
 [[nodiscard]] std::expected<void, std::string> ValidateWorldState(
     const WorldState& state);
+// For tests and tools: sets a robot's credits, as if the central bank had
+// created or destroyed the difference, so the money still adds up.
+void SetCredits(WorldState& state, Robot& robot, std::int64_t credits);
+// The money adds up, and every owner, bank and loan exists.
+[[nodiscard]] std::expected<void, std::string> ValidateEconomy(const WorldState& state);
 
 }  // namespace mechapunk::sim

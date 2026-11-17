@@ -33,6 +33,7 @@
 #include "ImGuiOverlay.hpp"
 #include "Inspector.hpp"
 #include "OrbitCamera.hpp"
+#include "Statistics.hpp"
 #include "RenderQueue.hpp"
 #include "Scene.hpp"
 #include "Screenshot.hpp"
@@ -268,6 +269,8 @@ private:
                 kSpeeds.at(static_cast<std::size_t>(key - GLFW_KEY_1)));
         } else if (key == GLFW_KEY_F) {
             following_ = !following_ && selection_.robot.IsValid();
+        } else if (key == GLFW_KEY_T) {
+            statistics_.open = !statistics_.open;
         } else if (key == GLFW_KEY_F12) {
             screenshotRequested_ = true;
         } else if (key == GLFW_KEY_F5) {
@@ -477,6 +480,10 @@ private:
             following_ = false;
         }
         if (frame != nullptr) {
+            if (const auto picked = DrawStatistics(statistics_, *frame)) {
+                ApplySelection(picked->selection);
+                jumpTo_ = picked->selection.robot;
+            }
             if (const auto next = DrawInspector(selection_, *frame, city_,
                                                 host_, following_)) {
                 ApplySelection(next->selection);
@@ -605,6 +612,10 @@ private:
             if (ImGui::Button("Screenshot")) {
                 screenshotRequested_ = true;
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Statistics")) {
+                statistics_.open = !statistics_.open;
+            }
             if (glfwGetTime() < messageUntil_) {
                 ImGui::TextDisabled("%s", message_.c_str());
             }
@@ -616,6 +627,7 @@ private:
                 ImGui::BulletText(
                     "Double-click a robot or its name: look at it");
                 ImGui::BulletText("F: follow the selected robot");
+                ImGui::BulletText("T: statistics");
                 ImGui::BulletText("F5: save   F12: screenshot");
                 ImGui::BulletText("Esc: close the selection, then quit");
             }
@@ -719,6 +731,7 @@ private:
     sim::EntityId jumpTo_;
     bool screenshotRequested_{false};
     Selection selection_;
+    StatisticsView statistics_;
 };
 
 int RunGame(GLFWwindow& window, const Options& options) {

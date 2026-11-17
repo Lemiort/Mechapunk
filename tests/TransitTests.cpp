@@ -93,7 +93,8 @@ TEST(Transit, RidersPayAndBrokeRobotsWalk) {
         }
         commuters.insert(robot.id.value);
         if (commuters.size() % 2 == 0) {
-            robot.credits = 0;
+            sim::SetCredits(state, robot, 0);
+            robot.savings = 0;
             broke.insert(robot.id.value);
         }
     }

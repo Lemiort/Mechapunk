@@ -404,6 +404,41 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
         ImGui::TextColored(kWarning, "Behind on rent: owes %lld cr",
                            static_cast<long long>(robot.rentOwed));
     }
+    if (frame.economy != nullptr) {
+        const EconomyFrame& economy = *frame.economy;
+        const std::string bank = SimulationHost::AccountName(frame, robot.bank);
+        ImGui::Text("Savings: %lld cr at %s", static_cast<long long>(robot.savings), bank.c_str());
+        if (const sim::Loan* loan = economy.LoanOf(robot.id)) {
+            ImGui::TextColored(kWarning, "Owes %lld cr to %s", static_cast<long long>(loan->owed),
+                               SimulationHost::AccountName(frame, loan->lender).c_str());
+        }
+        // Its home, apartments it lets, and organizations it owns part of.
+        const sim::EntityId landlord = economy.OwnerOf(robot.apartment);
+        if (landlord == robot.id) {
+            ImGui::TextUnformatted("Owns its home");
+        } else if (landlord.IsValid()) {
+            ImGui::Text("Rents its home from %s",
+                        SimulationHost::AccountName(frame, landlord).c_str());
+        }
+        std::uint32_t let = 0;
+        if (economy.owners != nullptr) {
+            for (const auto& [room, owner] : *economy.owners) {
+                let += owner == robot.id && room != robot.apartment.value ? 1 : 0;
+            }
+        }
+        if (let > 0) {
+            ImGui::Text("Owns %u other apartment%s", let, let == 1 ? "" : "s");
+        }
+        std::string shares;
+        for (const sim::Organization& organization : economy.organizations) {
+            if (std::ranges::contains(organization.owners, robot.id, &sim::Share::owner)) {
+                shares += std::format("{}{}", shares.empty() ? "" : ", ", organization.name);
+            }
+        }
+        if (!shares.empty()) {
+            ImGui::TextWrapped("Owns part of %s", shares.c_str());
+        }
+    }
 
     if (const RobotInfo* info = SimulationHost::FindRobotInfo(frame, robot.id)) {
         ImGui::SeparatorText("Home and work");
@@ -485,7 +520,22 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
                                 rules->price);
         }
     } else if (room.kind == sim::RoomKind::Apartment) {
-        ImGui::TextDisabled("%u cr a night", room.rent);
+        ImGui::TextDisabled("%u cr a night, worth %lld cr", room.rent,
+                            static_cast<long long>(room.rent * sim::kPriceNights));
+    }
+    if (frame.economy != nullptr) {
+        const sim::EntityId owner = frame.economy->OwnerOf(room.id);
+        const std::string name = SimulationHost::AccountName(frame, owner);
+        if (SimulationHost::FindRobot(frame, owner) != nullptr) {
+            Selection next = selection;
+            next.robot = owner;
+            next.room = {};
+            if (auto link = RobotLink(std::format("Owner: {}", name), next, 0)) {
+                result = link;
+            }
+        } else {
+            ImGui::Text("Owner: %s", name.c_str());
+        }
     }
 
     const auto occupants = Occupants(frame);

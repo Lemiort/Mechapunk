@@ -41,4 +41,10 @@ namespace mechapunk::sim::migrations {
 // station, that is, they don't.
 [[nodiscard]] std::expected<void, std::string> V8ToV9(SaveDocument& world);
 
+// Version 9 to 10: a closed economy. Banks, a central bank and
+// corporations are founded with capital; corporations own every workspace
+// and venue, robots the apartments they live in, and a housing trust the
+// rest. The founding money is logged as created; no statistics yet.
+[[nodiscard]] std::expected<void, std::string> V9ToV10(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

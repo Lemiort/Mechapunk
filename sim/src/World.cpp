@@ -173,6 +173,7 @@ World::World(WorldState state)
       routes_(state_.city),
       rooms_(state_.city),
       metro_(state_.city) {
+    IndexEconomy();
     for (const Robot& robot : state_.robots) {
         if (robot.activity == RobotActivity::Visiting) {
             ++reserved_[robot.location.value];
@@ -250,6 +251,8 @@ World World::Generate(const WorldParams& params) {
 
     state.random = Pcg32::FromSeed(params.seed, kRuntimeStream);
     World world(std::move(state));
+    world.FoundEconomy(params.seed);
+    world.IndexEconomy();
     for (Robot& robot : world.state_.robots) {
         world.ScheduleNextCommute(robot);
     }
@@ -309,6 +312,8 @@ void World::Step() {
     // Last, once tonight's new memories have pushed out old ones.
     if (MinuteOfDay(state_.tick) == 0) {
         ForgetDeparted();
+        TradeProperty();
+        SettleEconomy();
     }
     // Robots act in id order, so random draws happen in a fixed order.
     for (Robot& robot : state_.robots) {
@@ -377,13 +382,7 @@ void World::Act(Robot& robot) {
             Arrive(robot);
             break;
         case RobotActivity::Working: {
-            const std::uint32_t wage = WageOf(robot);
-            robot.credits += wage;
-            Emit({.tick = state_.tick,
-                  .kind = EventKind::ShiftEnded,
-                  .robot = robot.id,
-                  .room = robot.workspace,
-                  .credits = wage});
+            PayWage(robot);
             EndShift(robot);
             Decide(robot);
             break;
@@ -416,6 +415,7 @@ void World::Arrive(Robot& robot) {
             robot.performance -= kLatePerformance;
         }
         ScoreArrivalAtWork(robot);
+        state_.today.lateArrivals += late > 0 ? 1 : 0;
         Emit({.tick = now,
               .kind = EventKind::ClockedIn,
               .robot = robot.id,
@@ -442,7 +442,14 @@ void World::Arrive(Robot& robot) {
     const std::uint32_t others = GuestsIn(robot.location);
     robot.activity = RobotActivity::Visiting;
     ++guests_[robot.location.value];
-    robot.credits -= std::min<std::int64_t>(rules->price, robot.credits);
+    Sell(robot, venue->room->owner, rules->price);
+    state_.today.venueSales += rules->price;
+    if (const std::int64_t luxury = LuxuryOf(robot); luxury > 0) {
+        Withdraw(robot, luxury);
+        Sell(robot, venue->room->owner, luxury);
+        state_.today.venueSales += luxury;
+    }
+    ++state_.today.visits;
     if (venue->room->kind == RoomKind::BlackMarket &&
         state_.random.UniformInt(1, 100) <= kBadPartPercent) {
         robot.wear = std::min(robot.wear + kBadPartWear, kMaxWear);
@@ -480,10 +487,12 @@ void World::Decide(Robot& robot) {
     }
     EntityId best = robot.apartment;
 
-    // Keep enough for tonight's rent, anything already owed, and a fare
-    // home.
+    // Keep enough for tonight's rent, anything already owed, a fare home,
+    // and something toward paying back a loan.
+    const Loan* loan = LoanOf(robot.id);
     const std::int64_t reserve =
-        RentOf(robot) + robot.rentOwed + static_cast<std::int64_t>(kMetroFare);
+        RentOf(robot) + robot.rentOwed + static_cast<std::int64_t>(kMetroFare) +
+        (loan != nullptr ? std::min(loan->owed, PocketOf(robot)) : 0);
     const auto here = rooms_.Find(robot.location);
     const RoomKind hereKind = here ? here->room->kind : RoomKind::Apartment;
     for (const RoomKind kind : VenueKinds()) {
@@ -556,7 +565,9 @@ void World::StartWalk(Robot& robot, EntityId destination) {
         robot.boardsAt = state_.tick + trip.minutesToStation;
         robot.alightsAt = robot.boardsAt + trip.minutesUnderground;
         fare = std::min<std::int64_t>(kMetroFare, robot.credits);
-        robot.credits -= fare;
+        Sell(robot, transit_, fare);
+        state_.today.fares += fare;
+        ++state_.today.metroRides;
     } else {
         robot.rideFrom = 0;
         robot.rideVia = 0;
@@ -568,6 +579,7 @@ void World::StartWalk(Robot& robot, EntityId destination) {
     if (room && IsVenue(room->room->kind)) {
         ++reserved_[destination.value];
     }
+    ++state_.today.walks;
     Emit({.tick = state_.tick,
           .kind = EventKind::Departed,
           .robot = robot.id,
@@ -673,17 +685,43 @@ Tick World::LatestHomeTick(const Robot& robot) {
 }
 
 std::int64_t World::RentOf(const Robot& robot) const {
+    // Tenants pay rent; owners pay the upkeep of their home.
     const auto apartment = rooms_.Find(robot.apartment);
-    return apartment ? apartment->room->rent : 0;
+    if (!apartment) {
+        return 0;
+    }
+    return apartment->room->owner == robot.id ? UpkeepOf(*apartment->room)
+                                               : apartment->room->rent;
 }
 
 void World::CollectRent() {
+    // Takes in a payment: revenue for an organization, which buys supplies
+    // with part of it.
+    const auto received = [&](EntityId payee, std::int64_t amount) {
+        if (Organization* organization = MutableOrganization(payee)) {
+            organization->today.revenue += amount;
+            PaySupplies(*organization, amount);
+        }
+    };
+    std::unordered_set<std::uint64_t> settled;
     for (Robot& robot : state_.robots) {
+        const auto home = rooms_.Find(robot.apartment);
+        if (!home) {
+            continue;
+        }
+        const Room& room = *home->room;
+        const bool owns = room.owner == robot.id;
+        const EntityId payee = owns ? utilities_ : room.owner;
         const std::int64_t owedBefore = robot.rentOwed;
+        // Anything owed first, then tonight's rent or upkeep.
         const std::int64_t due = RentOf(robot) + robot.rentOwed;
-        const std::int64_t paid = std::min(robot.credits, due);
-        robot.credits -= paid;
-        robot.rentOwed = due - paid;
+        robot.rentOwed = 0;
+        const std::int64_t paid = PayBill(robot, payee, due);
+        received(payee, paid);
+        (owns ? state_.today.upkeep : state_.today.rent) += paid;
+        if (owns) {
+            settled.insert(room.id.value);
+        }
         if (owedBefore == 0 && robot.rentOwed > 0) {
             Remember(robot, MemoryKind::FellBehindOnRent, {}, robot.apartment);
         } else if (owedBefore > 0 && robot.rentOwed == 0) {
@@ -703,6 +741,24 @@ void World::CollectRent() {
                   .room = robot.apartment,
                   .credits = robot.rentOwed});
         }
+    }
+    // Landlords pay the upkeep of the apartments they let.
+    for (const Robot& tenant : state_.robots) {
+        const auto home = rooms_.Find(tenant.apartment);
+        if (!home || !settled.insert(home->room->id.value).second) {
+            continue;
+        }
+        const std::int64_t upkeep = UpkeepOf(*home->room);
+        const EntityId owner = home->room->owner;
+        std::int64_t paid = upkeep;
+        if (Organization* organization = MutableOrganization(owner)) {
+            organization->today.upkeep += upkeep;
+            PayOrBorrow(*organization, utilities_, upkeep);
+        } else if (Robot* landlord = MutableRobot(owner)) {
+            paid = PayBill(*landlord, utilities_, upkeep);
+        }
+        received(utilities_, paid);
+        state_.today.upkeep += paid;
     }
 }
 
@@ -800,6 +856,23 @@ std::string World::Describe(const SimEvent& event) const {
         case EventKind::Arrived:
             return std::format("{}  {} moved to the city, into {}", when, who,
                                room);
+        case EventKind::Borrowed:
+            return std::format("{}  {} borrowed {} cr", when, who, event.credits);
+        case EventKind::BoughtProperty:
+            return std::format("{}  {} bought {} for {} cr", when, who, room, event.credits);
+        case EventKind::SoldProperty:
+            return std::format("{}  {} sold {} for {} cr", when, who, room, event.credits);
+        case EventKind::Inherited:
+            return std::format("{}  {} inherited everything {} had", when, who,
+                               NameOf(event.otherRobot));
+        case EventKind::MoneySupplyChanged:
+            return event.credits >= 0
+                       ? std::format("{}  The central bank created {} cr for {} ({})", when,
+                                     event.credits, AccountName(event.account),
+                                     EmissionReasonName(event.emission))
+                       : std::format("{}  The central bank destroyed {} cr from {} ({})", when,
+                                     -event.credits, AccountName(event.account),
+                                     EmissionReasonName(event.emission));
         case EventKind::WeatherChanged:
             return event.change == 0
                        ? std::format("{}  The rain stopped", when)
@@ -984,6 +1057,9 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
     }
     if (state.weather.rain > kMaxRain) {
         return fail("The rain is out of range");
+    }
+    if (auto economy = ValidateEconomy(state); !economy) {
+        return economy;
     }
     return ValidateSocial(state);
 }

@@ -210,6 +210,33 @@ void SimulationHost::Publish() {
         directoryVersion_ = world_.PopulationVersion();
     }
     frame.directory = directory_;
+    if (economy_ == nullptr || frame.tick % kSocialPeriod == 0) {
+        const sim::WorldState& state = world_.State();
+        const sim::Tick day = sim::StartOfDay(frame.tick);
+        if (history_ == nullptr || economyDay_ != day) {
+            history_ = std::make_shared<const std::vector<sim::DailyStats>>(state.history);
+            auto owners = std::make_shared<std::unordered_map<std::uint64_t, sim::EntityId>>();
+            for (const sim::Building& building : state.city.buildings) {
+                for (const sim::Room& room : building.rooms) {
+                    owners->emplace(room.id.value, room.owner);
+                }
+            }
+            owners_ = std::move(owners);
+            economyDay_ = day;
+        }
+        auto economy = std::make_shared<EconomyFrame>();
+        economy->organizations = state.economy.organizations;
+        economy->loans = state.economy.loans;
+        economy->emissions = state.economy.emissions;
+        economy->created = state.economy.created;
+        economy->destroyed = state.economy.destroyed;
+        economy->supplyMarket = state.economy.supplyMarket;
+        economy->today = state.today;
+        economy->history = history_;
+        economy->owners = owners_;
+        economy_ = std::move(economy);
+    }
+    frame.economy = economy_;
     frame.robots.reserve(world_.State().robots.size());
     for (const sim::Robot& robot : world_.State().robots) {
         RobotFrame robotFrame{.id = robot.id,
@@ -222,6 +249,8 @@ void SimulationHost::Publish() {
                               .needs = robot.needs,
                               .credits = robot.credits,
                               .rentOwed = robot.rentOwed,
+                              .savings = robot.savings,
+                              .bank = robot.bank,
                               .apartment = robot.apartment,
                               .workspace = robot.workspace,
                               .jobLevel = robot.jobLevel,
@@ -259,6 +288,38 @@ void SimulationHost::Publish() {
         frame.robots.push_back(robotFrame);
     }
     frames_.Publish(static_cast<double>(frame.tick), std::move(frame));
+}
+
+
+const sim::Organization* EconomyFrame::FindOrganization(sim::EntityId id) const {
+    const auto found = std::ranges::lower_bound(organizations, id.value, {},
+                                                [](const sim::Organization& each) { return each.id.value; });
+    return found != organizations.end() && found->id == id ? &*found : nullptr;
+}
+
+const sim::Loan* EconomyFrame::LoanOf(sim::EntityId borrower) const {
+    const auto found = std::ranges::find(loans, borrower, &sim::Loan::borrower);
+    return found != loans.end() ? &*found : nullptr;
+}
+
+sim::EntityId EconomyFrame::OwnerOf(sim::EntityId room) const {
+    if (owners == nullptr) {
+        return {};
+    }
+    const auto found = owners->find(room.value);
+    return found != owners->end() ? found->second : sim::EntityId{};
+}
+
+std::string SimulationHost::AccountName(const WorldFrame& frame, sim::EntityId account) {
+    if (frame.economy != nullptr) {
+        if (const sim::Organization* organization = frame.economy->FindOrganization(account)) {
+            return organization->name;
+        }
+    }
+    if (const RobotInfo* info = FindRobotInfo(frame, account)) {
+        return info->name;
+    }
+    return account.IsValid() ? "someone gone" : "every robot";
 }
 
 }  // namespace mechapunk

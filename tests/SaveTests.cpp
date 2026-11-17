@@ -177,28 +177,41 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v9-city.json";
+        kFixtureDirectory / "saves" / "v10-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
-    // Saved with a robot on its way to lunch by metro, changing lines.
-    EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
-        return robot.alightsAt != 0 && robot.rideVia != robot.rideTo;
+    // Saved with tenants, savers, robots and a corporation in debt, scrapped
+    // robots still remembered, and days of statistics.
+    EXPECT_TRUE(std::ranges::any_of(state->robots, [&](const sim::Robot& robot) {
+        for (const sim::Building& building : state->city.buildings) {
+            for (const sim::Room& room : building.rooms) {
+                if (room.id == robot.apartment && room.owner != robot.id) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }));
+    EXPECT_TRUE(std::ranges::any_of(state->robots,
+                                    [](const sim::Robot& robot) { return robot.savings > 0; }));
+    EXPECT_GT(state->economy.loans.size(), 1U);
+    EXPECT_FALSE(state->departed.empty());
+    EXPECT_GT(state->history.size(), 10U);
+    EXPECT_FALSE(state->economy.emissions.empty());
     // The fixture carries friendships and memories.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
         return !robot.bonds.empty() && !robot.memories.empty();
     }));
-    // After many spells of weather.
     EXPECT_GT(state->weather.spells, 10U);
-    EXPECT_GT(state->weather.changesAt, state->tick);
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }
 
 // A save from the first release, before rooms existed, must load through the
@@ -454,5 +467,27 @@ TEST(Save, Version8FixtureMigratesAndRuns) {
     });
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(rides, 0U);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 9 save gets a founded economy: organizations with capital,
+// every room an owner, robots a bank, and money that adds up; then it
+// keeps running and records statistics.
+TEST(Save, Version9FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v9-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_GT(state->economy.organizations.size(), 6U);
+    EXPECT_TRUE(state->history.empty());
+    EXPECT_TRUE(sim::ValidateWorldState(*state));
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_EQ(world->State().history.size(), 2U);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

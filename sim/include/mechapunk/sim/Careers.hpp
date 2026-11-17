@@ -8,6 +8,10 @@
 
 namespace mechapunk::sim {
 
+// Nights of rent owed that get a tenant evicted, or an owner of upkeep
+// owed that make it sell its home.
+inline constexpr std::int64_t kEvictionNights = 5;
+
 // Job levels from 0 (junior) to kMaxJobLevel (lead). Each level pays a
 // quarter more than the one below.
 inline constexpr std::uint8_t kMaxJobLevel = 3;

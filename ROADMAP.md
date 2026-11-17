@@ -53,11 +53,18 @@ The game build rebuilds `external/NEE/build/Release` first. Quit a running
 | M3 Needs and the economy | Done: charge, condition, social, fun; wages, rent, debt, venues, evenings out, days off |
 | M4 Social life | Done: interests, talks, bonds (friend, close friend, rival), memories. The "chronicle" is only the inspector's recent events, which are not saved |
 | M5 Atmosphere | Done: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces, HDR, tone mapping, bloom, weather and rain |
-| M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers). **Missing: simulation level of detail, corporations and factions, construction** |
+| M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers), a closed economy with banks, a central bank, corporations and property, and daily statistics. **Missing: venue staff, venues opening and closing with demand, gangs, simulation level of detail, construction** |
 
 Also done since the plan was written:
 
 - Careers and moving house: promotions, firing, rehiring, evictions.
+- A closed economy. Credits only move between accounts: corporations own
+  every workspace and venue and pay wages; venues, utilities and the metro
+  buy supplies from industry; robots own their homes or rent, buy and sell
+  apartments, save at banks and borrow. A central bank creates money only
+  when a bank runs short, or for a newcomer's savings, and logs every
+  credit. Statistics of money, wealth, work, wellbeing, relationships and
+  property are kept daily and charted in the Statistics window (T).
 - Transit: an elevated metro on a timetable. Every station row and column
   is a line with two tracks, on two levels so lines cross. Two-ended trains
   turn back over a crossover in the tail track past each end station, run
@@ -138,9 +145,11 @@ game:
 
 ## Recommended next: M6 (scale and depth)
 
-- **Corporations and factions.** Workplaces belong to corporations;
-  robots join factions or gangs. Rivalries and loyalties feed the existing
-  bonds, memories and venue choice. Black markets tie in.
+- **Venue staff.** Every venue has workers (a barman, a cook) paid by its
+  corporation, and venues open and close, or workplaces turn into venues
+  and back, as demand changes.
+- **Gangs.** Rival or friendly to each other, always rivals of the police;
+  members rob robots outside their gang. Unions later.
 - **Construction.** The city grows: new buildings on park corners as the
   population grows, and building projects that employ robots.
 - **Simulation level of detail.** Cheaper updates for robots nobody is
@@ -171,5 +180,8 @@ game:
 - Not yet seen in the running game: bags, bar bottles, robots on the
   stairs.
 - Trains have no drivers yet, and no limit on riders.
+- The economy is not in balance yet: venue habits don't follow income, so
+  industry keeps cutting pay a little most days and some robots stay in
+  small debts. The Statistics window (T) shows the drift.
 - From above, the upper deck of a station hides the lower level's trains.
 - Robots inside closed buildings aren't drawn (nobody can see them).
