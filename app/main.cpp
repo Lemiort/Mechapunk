@@ -73,7 +73,7 @@ constexpr float kUiFontSize = 17.0F;
 struct Options {
     bool startNew{false};
     std::uint64_t seed{1};
-    std::uint32_t robots{6000};
+    std::uint32_t robots{10000};
     std::filesystem::path savePath{"mechapunk-save.json"};
 };
 
@@ -637,6 +637,15 @@ private:
                 if (bloomChanged) {
                     renderer_.SetBloom(bloom);
                 }
+                // The opaque geometry of the last frame.
+                const RenderStatistics& statistics = renderer_.GetStatistics();
+                ImGui::Text("Meshes: %zu drawn, %zu culled",
+                            statistics.meshesDrawn, statistics.meshesCulled);
+                ImGui::Text("Batches: %zu drawn (%zu instances), %zu culled",
+                            statistics.batchesDrawn,
+                            statistics.batchInstancesDrawn,
+                            statistics.batchesCulled);
+                ImGui::Text("Draw calls: %zu", statistics.drawCalls);
             }
         }
         ImGui::End();

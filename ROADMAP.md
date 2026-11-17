@@ -59,12 +59,13 @@ Also done since the plan was written:
 
 - Careers and moving house: promotions, firing, rehiring, evictions.
 - Transit: an elevated metro with platforms, stairs and trains.
-- A city of 6000 robots by default, rising toward the middle: habitats up
+- A city of 10000 robots by default, rising toward the middle: habitats up
   to about thirty floors, office towers up to about twenty. Only the neon
-  and street lamps nearest the camera are real lights. A night frame runs
-  at about 40 fps at 6000 robots and 26 fps at 10000; most of the cost is
-  the facade windows, one box each, which the engine re-sorts and
-  re-uploads every frame (see the engine table, #3 and #4).
+  and street lamps nearest the camera are real lights. Everything that
+  never moves (streets, lamps, parks, stations, and each building's block,
+  windows and signs) is drawn as static mesh batches, culled by the view
+  (NEE #71): the whole city at night runs at about 55 fps at 10000 robots
+  and 87 fps at 6000, against 26 and 40 before.
 - Parks on free corners.
 - Carried items and table props.
 - Robots walking through doors, corridors and stairs.
@@ -76,8 +77,8 @@ Also done since the plan was written:
 | --- | --- | --- |
 | 1 | `nee` library target | Done (NEE #58) |
 | 2 | Fixed-step clock, pause, time scale | Done (NEE #59, #63) |
-| 3 | Instance handles with generation counters (closes #31, #34) | Not done. The game resubmits everything each frame through `RenderQueue` |
-| 4 | Bounds and frustum culling (#39), renderer statistics (#42) | Not done |
+| 3 | Instance handles with generation counters (closes #31, #34) | Partly: static geometry is uploaded once as `MeshBatch`es (NEE #71); per-frame meshes are still resubmitted |
+| 4 | Bounds and frustum culling (#39), renderer statistics (#42) | Done for opaque meshes and batches (NEE #71) |
 | 5 | Input action mapping, orbit and free-fly camera controllers | Not done in the engine; the game handles its own camera |
 | 6 | Picking ray against bounding boxes | Done in the game (`CityView::PickAt`), not in the engine |
 | 7 | Versioned serialization | Done in the game (`sim/src/Save.cpp`: migrations, temp-file-then-rename write). Rotating autosaves are missing |

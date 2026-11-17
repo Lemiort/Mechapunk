@@ -288,6 +288,63 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
             }
         }
     }
+    BuildStaticBatches();
+}
+
+void CityView::BuildStaticBatches() {
+    // Statics away from buildings are grouped in square cells this wide, so
+    // the renderer can skip the cells out of view.
+    constexpr float kCell = 100.0F * kS;
+    using Key = std::tuple<std::uint64_t, std::int64_t, std::int64_t, const Mesh*,
+                           const Material*>;
+    struct Group {
+        const Mesh* mesh;
+        std::shared_ptr<const Material> material;
+        std::vector<Transform> transforms;
+    };
+    std::map<Key, Group> groups;
+    const auto add = [&](std::uint64_t building, const StaticItem& item) {
+        std::int64_t cellX = 0;
+        std::int64_t cellZ = 0;
+        if (building == 0) {
+            cellX = static_cast<std::int64_t>(std::floor(item.transform.position.x / kCell));
+            cellZ = static_cast<std::int64_t>(std::floor(item.transform.position.z / kCell));
+        }
+        Group& group = groups[{building, cellX, cellZ, item.mesh, item.material.get()}];
+        group.mesh = item.mesh;
+        group.material = item.material;
+        group.transforms.push_back(item.transform);
+    };
+    // Cubes on a building's footprint (windows, signs) belong to it, and
+    // hide with its block while it is open; streets never do.
+    const auto owner = [&](const StaticItem& item) -> std::uint64_t {
+        if (item.mesh != assets_.cube.get() || item.material == assets_.street) {
+            return 0;
+        }
+        for (const auto& [id, shape] : shapes_) {
+            const vec3 offset = glm::abs(item.transform.position - shape.center);
+            if (offset.x <= (kBuildingWidth * 0.5F) + (0.1F * kS) &&
+                offset.z <= (kBuildingDepth * 0.5F) + (0.1F * kS)) {
+                return id;
+            }
+        }
+        return 0;
+    };
+    for (const StaticItem& item : statics_) {
+        add(owner(item), item);
+    }
+    for (const auto& [id, block] : buildingBlocks_) {
+        add(id, block);
+    }
+    staticBatches_.reserve(groups.size());
+    for (auto& [key, group] : groups) {
+        staticBatches_.push_back(
+            {.building = std::get<0>(key),
+             .batch = MeshBatch(*group.mesh, gsl_lite::not_null{group.material},
+                                group.transforms)});
+    }
+    statics_.clear();
+    statics_.shrink_to_fit();
 }
 
 void CityView::AddPark(vec3 center, sim::Pcg32& random) {
@@ -968,22 +1025,9 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
     } else {
         assignedSpots_.clear();
     }
-    for (const StaticItem& item : statics_) {
-        // The open building's facade windows sit on its hidden block.
-        if (open != shapes_.end()) {
-            const vec3 offset = glm::abs(item.transform.position - open->second.center);
-            if (offset.x <= (kBuildingWidth * 0.5F) + (0.1F * kS) &&
-                offset.z <= (kBuildingDepth * 0.5F) + (0.1F * kS) &&
-                item.mesh == assets_.cube.get() &&
-                item.material != assets_.street) {
-                continue;
-            }
-        }
-        queue.SubmitOpaqueMesh(*item.mesh, item.transform, item.material);
-    }
-    for (const auto& [id, block] : buildingBlocks_) {
-        if (id != selection.building.value) {
-            queue.SubmitOpaqueMesh(*block.mesh, block.transform, block.material);
+    for (const StaticBatch& part : staticBatches_) {
+        if (part.building == 0 || part.building != selection.building.value) {
+            queue.SubmitOpaqueBatch(part.batch);
         }
     }
 

@@ -17,6 +17,7 @@
 #include "Interior.hpp"
 #include "Light.hpp"
 #include "Material.hpp"
+#include "MeshBatch.hpp"
 #include "Mesh.hpp"
 #include "Props.hpp"
 #include "RenderQueue.hpp"
@@ -233,12 +234,23 @@ private:
                         double renderTick, const Selection& selection);
     void AddFacade(glm::vec3 center, float width, float depth,
                    std::uint32_t floors);
+    // Groups statics_ and the building blocks into batches by building,
+    // or for the rest by area, mesh and material.
+    void BuildStaticBatches();
 
     sim::City city_;
     sim::RoomIndex rooms_;
     sim::RoutePlanner routes_;
     RenderAssets& assets_;
     std::vector<StaticItem> statics_;
+    // Statics drawn as batches, made once by BuildStaticBatches. A batch
+    // of a building's outside (its block, windows and signs) is skipped
+    // while the building is open; `building` is 0 for the rest.
+    struct StaticBatch {
+        std::uint64_t building;
+        MeshBatch batch;
+    };
+    std::vector<StaticBatch> staticBatches_;
     std::map<std::uint64_t, StaticItem> buildingBlocks_;
     std::map<std::uint64_t, BuildingShape> shapes_;
     std::map<std::pair<std::uint64_t, std::uint32_t>, FloorPlan> plans_;

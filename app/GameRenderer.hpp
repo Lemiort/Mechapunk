@@ -98,6 +98,10 @@ public:
     [[nodiscard]] const BloomSettings& GetBloom() const {
         return deferredPipeline_->GetBloom();
     }
+    // What the last frame drew and culled of the opaque geometry.
+    [[nodiscard]] const RenderStatistics& GetStatistics() const {
+        return deferredPipeline_->GetStatistics();
+    }
     // Rain for a world of `unitsPerMeter`, with the particle shaders.
     [[nodiscard]] std::unique_ptr<RainEffect> MakeRain(float unitsPerMeter) const;
     // Draws the queued meshes lit by the scene's lights into the window's

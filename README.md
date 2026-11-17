@@ -48,7 +48,7 @@ Run the tests with `ctest --test-dir build/build/Release --output-on-failure`.
 
 `mechapunk` continues `mechapunk-save.json` from the working directory when
 it exists, and otherwise starts a new city. It saves there when you quit.
-Start over with `--new`, or pick a city with `--seed N --robots N` (6000
+Start over with `--new`, or pick a city with `--seed N --robots N` (10000
 robots by default; the street grid grows with the population); use
 `--save FILE` for another save file. A save that cannot be read is moved
 aside to `FILE.broken` instead of being overwritten.
@@ -268,7 +268,7 @@ minutes, riding (30 km/h along the lines, first the row and then the
 column) and walking on from the station nearest the destination beats
 walking all the way. A ride costs 4 cr; robots budget for the fare home,
 and a robot that cannot spare the fare without missing tonight's rent walks
-instead. In a city of 6000, about one trip in eight is by metro.
+instead. In a city of 10000, about one trip in five is by metro.
 
 Riders climb the stairs, wait in the open corners of the platform, and
 ride a two-car train with everyone who boarded with them; the train runs
