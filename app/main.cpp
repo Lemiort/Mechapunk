@@ -16,6 +16,10 @@
 #include <expected>
 #include <filesystem>
 #include <format>
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/vector_float4.hpp>
+#include <glm/geometric.hpp>
+#include <glm/matrix.hpp>
 #include <memory>
 #include <optional>
 #include <span>
@@ -24,24 +28,19 @@
 #include <system_error>
 #include <utility>
 
-#include <glm/ext/matrix_float4x4.hpp>
-#include <glm/ext/vector_float4.hpp>
-#include <glm/geometric.hpp>
-#include <glm/matrix.hpp>
-
 #include "CityView.hpp"
 #include "GameRenderer.hpp"
 #include "ImGuiOverlay.hpp"
 #include "Inspector.hpp"
-#include "imgui.h"
 #include "OrbitCamera.hpp"
 #include "RenderQueue.hpp"
 #include "Scene.hpp"
 #include "Screenshot.hpp"
 #include "SimulationHost.hpp"
+#include "imgui.h"
 #include "mechapunk/sim/GameTime.hpp"
-#include "mechapunk/sim/Weather.hpp"
 #include "mechapunk/sim/Save.hpp"
+#include "mechapunk/sim/Weather.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace {
@@ -52,7 +51,8 @@ constexpr int kWindowWidth = 1600;
 constexpr int kWindowHeight = 900;
 // Speeds for keys 1 to 6; at x1 a game minute takes two real seconds.
 // Times real time: at x1 a game minute takes a real minute.
-constexpr std::array<double, 5> kSpeeds{1.0, 2.0, 10.0, 100.0, 1000.0};
+constexpr std::array<double, 7> kSpeeds{1.0,    2.0,     10.0,    100.0,
+                                        1000.0, 10000.0, 100000.0};
 constexpr double kOrbitDegreesPerPixel = 0.25;
 constexpr float kPanPerSecond = 40.0F;
 constexpr double kMessageSeconds = 3.0;
@@ -87,8 +87,8 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
         const bool hasValue = index + 1 < arguments.size();
         const auto parse = [&](auto& value) {
             const std::string_view text = arguments[++index];
-            const auto [end, error] = std::from_chars(
-                text.data(), text.data() + text.size(), value);
+            const auto [end, error] =
+                std::from_chars(text.data(), text.data() + text.size(), value);
             return error == std::errc{} && end == text.data() + text.size();
         };
         if (name == "--new") {
@@ -214,8 +214,8 @@ private:
         return static_cast<Game*>(glfwGetWindowUserPointer(window));
     }
 
-    static void OnKey(GLFWwindow* window, int key, int /*scancode*/,
-                      int action, int /*mods*/) {
+    static void OnKey(GLFWwindow* window, int key, int /*scancode*/, int action,
+                      int /*mods*/) {
         if (Game* game = From(window); game != nullptr) {
             game->Key(key, action);
         }
@@ -272,9 +272,8 @@ private:
             screenshotRequested_ = true;
         } else if (key == GLFW_KEY_F5) {
             auto saved = host_.Save(savePath_);
-            ShowMessage(saved
-                            ? std::format("Saved {}", savePath_.string())
-                            : std::format("Save failed: {}", saved.error()));
+            ShowMessage(saved ? std::format("Saved {}", savePath_.string())
+                              : std::format("Save failed: {}", saved.error()));
         }
     }
 
@@ -309,8 +308,7 @@ private:
         const bool buttonDown =
             glfwGetMouseButton(&window_, GLFW_MOUSE_BUTTON_LEFT) ==
                 GLFW_PRESS ||
-            glfwGetMouseButton(&window_, GLFW_MOUSE_BUTTON_RIGHT) ==
-                GLFW_PRESS;
+            glfwGetMouseButton(&window_, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
         // A press that starts over a window belongs to the UI until release.
         if (buttonDown && !wasDragging_) {
             pressOnUi_ = overlay_->WantsMouse();
@@ -403,8 +401,8 @@ private:
             return;
         }
         const auto floors = static_cast<int>(city_.Floors(selection_.building));
-        const int floor = std::clamp(
-            static_cast<int>(selection_.floor) + delta, 0, floors - 1);
+        const int floor = std::clamp(static_cast<int>(selection_.floor) + delta,
+                                     0, floors - 1);
         selection_.floor = static_cast<std::uint32_t>(floor);
         // The selected room may be on another floor now.
         selection_.room = {};
@@ -433,7 +431,8 @@ private:
     // Opens the building and floor the followed robot is in, or closes the
     // open building while it walks the streets.
     void KeepFollowedRobotInView(const WorldFrame& frame) {
-        const RobotFrame* robot = SimulationHost::FindRobot(frame, selection_.robot);
+        const RobotFrame* robot =
+            SimulationHost::FindRobot(frame, selection_.robot);
         if (robot == nullptr) {
             following_ = false;
             return;
@@ -512,16 +511,16 @@ private:
             jumpTo_ = {};
         }
         if (following_) {
-            if (const auto position = city_.DrawnRobotPosition(selection_.robot)) {
+            if (const auto position =
+                    city_.DrawnRobotPosition(selection_.robot)) {
                 camera_.FocusTarget(*position);
             }
         }
-        rain_->Update(frameSeconds, frame != nullptr ? frame->rain : 0,
-                      camera_.Target(),
-                      camera_.MakeCamera(width_, height_).GetPos(),
-                      camera_.Distance(),
-                      CityView::DaylightAt(std::fmod(
-                          renderTick, static_cast<double>(sim::kMinutesPerDay))));
+        rain_->Update(
+            frameSeconds, frame != nullptr ? frame->rain : 0, camera_.Target(),
+            camera_.MakeCamera(width_, height_).GetPos(), camera_.Distance(),
+            CityView::DaylightAt(std::fmod(
+                renderTick, static_cast<double>(sim::kMinutesPerDay))));
         rain_->Submit(queue_);
         city_.UpdateLights(
             scene_,
@@ -534,8 +533,8 @@ private:
     void SetUpUiStyle() {
         ImGuiIO& io = ImGui::GetIO();
         if (std::filesystem::exists(kUiFont)) {
-            if (ImFont* font = io.Fonts->AddFontFromFileTTF(kUiFont,
-                                                            kUiFontSize)) {
+            if (ImFont* font =
+                    io.Fonts->AddFontFromFileTTF(kUiFont, kUiFontSize)) {
                 io.FontDefault = font;
             }
         } else {
@@ -551,22 +550,21 @@ private:
         style.Colors[ImGuiCol_TitleBgActive] = ImVec4{0.45F, 0.1F, 0.4F, 1.0F};
         style.Colors[ImGuiCol_PlotHistogram] = ImVec4{0.1F, 0.75F, 0.85F, 1.0F};
         style.Colors[ImGuiCol_Header] = ImVec4{0.1F, 0.45F, 0.55F, 0.6F};
-        style.Colors[ImGuiCol_HeaderHovered] =
-            ImVec4{0.1F, 0.55F, 0.65F, 0.8F};
+        style.Colors[ImGuiCol_HeaderHovered] = ImVec4{0.1F, 0.55F, 0.65F, 0.8F};
     }
 
     void DrawStatusWindow(const WorldFrame* frame, double renderTick) {
         constexpr float kMargin = 10.0F;
         ImGui::SetNextWindowPos(ImVec2{kMargin, kMargin},
                                 ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("City", nullptr,
-                         ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ImGui::Begin("City", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             const auto tick = static_cast<sim::Tick>(std::floor(renderTick));
             ImGui::TextUnformatted(sim::FormatTime(tick).c_str());
             if (frame != nullptr && frame->rain > 0) {
                 ImGui::SameLine();
-                ImGui::TextColored(ImVec4{0.55F, 0.75F, 1.0F, 1.0F}, "%s",
-                                   std::string{sim::RainName(frame->rain)}.c_str());
+                ImGui::TextColored(
+                    ImVec4{0.55F, 0.75F, 1.0F, 1.0F}, "%s",
+                    std::string{sim::RainName(frame->rain)}.c_str());
             }
 
             bool paused = host_.IsPaused();
@@ -599,9 +597,9 @@ private:
             ImGui::TextDisabled("%.0f fps", ImGui::GetIO().Framerate);
             if (ImGui::Button("Save")) {
                 auto saved = host_.Save(savePath_);
-                ShowMessage(saved ? std::format("Saved {}", savePath_.string())
-                                  : std::format("Save failed: {}",
-                                                saved.error()));
+                ShowMessage(
+                    saved ? std::format("Saved {}", savePath_.string())
+                          : std::format("Save failed: {}", saved.error()));
             }
             ImGui::SameLine();
             if (ImGui::Button("Screenshot")) {
@@ -615,7 +613,8 @@ private:
                 ImGui::BulletText("Q / E: floor down / up");
                 ImGui::BulletText("Drag: orbit   Wheel: zoom   WASD: move");
                 ImGui::BulletText("Space: pause   N: step   1-5: speed");
-                ImGui::BulletText("Double-click a robot or its name: look at it");
+                ImGui::BulletText(
+                    "Double-click a robot or its name: look at it");
                 ImGui::BulletText("F: follow the selected robot");
                 ImGui::BulletText("F5: save   F12: screenshot");
                 ImGui::BulletText("Esc: close the selection, then quit");
@@ -637,12 +636,12 @@ private:
                     renderer_.SetToneMapping(toneMapping);
                 }
                 BloomSettings bloom = renderer_.GetBloom();
-                bool bloomChanged = ImGui::SliderFloat(
-                    "Bloom", &bloom.strength, 0.0F, 0.5F, "%.3f");
+                bool bloomChanged = ImGui::SliderFloat("Bloom", &bloom.strength,
+                                                       0.0F, 0.5F, "%.3f");
                 bloomChanged |= ImGui::SliderFloat(
                     "Bloom threshold", &bloom.threshold, 0.0F, 4.0F, "%.2f");
-                bloomChanged |= ImGui::SliderFloat("Bloom radius", &bloom.radius,
-                                                   0.5F, 3.0F, "%.2f");
+                bloomChanged |= ImGui::SliderFloat(
+                    "Bloom radius", &bloom.radius, 0.5F, 3.0F, "%.2f");
                 if (bloomChanged) {
                     renderer_.SetBloom(bloom);
                 }
@@ -667,8 +666,9 @@ private:
             return;
         }
         auto saved = SaveScreenshot(*path, width_, height_);
-        ShowMessage(saved ? std::format("Screenshot saved: {}", path->string())
-                          : std::format("Screenshot failed: {}", saved.error()));
+        ShowMessage(saved
+                        ? std::format("Screenshot saved: {}", path->string())
+                        : std::format("Screenshot failed: {}", saved.error()));
     }
 
     void ShowMessage(std::string message) {
