@@ -78,7 +78,7 @@ Also done since the plan was written:
 | 7 | Versioned serialization | Done in the game (`sim/src/Save.cpp`: migrations, temp-file-then-rename write). Rotating autosaves are missing |
 | 8 | Dear ImGui overlay | Done (NEE #62) |
 | 9 | Keep the node hierarchy on model import, for rigid-part animation | Not done. Robots and furniture are box props in `app/Props.cpp` |
-| 10 | Look: emissive G-buffer channel, HDR, bloom, tonemapping, instanced light volumes or clustered lighting, particle fix (#29) for rain | Emissive (NEE #65), HDR and tone mapping (NEE #66) and bloom (NEE #67) done; more lights and the particle fix not done |
+| 10 | Look: emissive G-buffer channel, HDR, bloom, tonemapping, instanced light volumes or clustered lighting, particle fix (#29) for rain | Emissive (NEE #65), HDR and tone mapping (NEE #66), bloom (NEE #67) and particles (NEE #68) done; more lights not done |
 
 Also done in NEE beyond the plan: screenshots (#60), distance-field text
 (#61), the Conan package (#64), and skipping dark lights (#63).
@@ -117,7 +117,10 @@ in the game:
    glow at three times their color, so they pass the threshold of 1 while
    lit windows don't, and bloom strength is 0.4. The Display panel has
    bloom strength, threshold and radius sliders.
-4. **Rain.** Repair the particle system (#29), then add rain in the game
+4. **Rain.** The particle system is rebuilt (NEE #68):
+   GPU particles born in an emitter box, with velocity, jitter,
+   acceleration and lifetime, drawn as camera-facing quads or streaks
+   through `RenderQueue::SubmitParticles`. Next, add rain in the game
    with a weather state in the sim (saved, so it needs a migration). Wet
    streets could come later with a reflection or specular tweak.
 5. Optionally, more point and spot lights: the game's lamp pool is 32 for
