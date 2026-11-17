@@ -940,6 +940,12 @@ std::string World::Describe(const SimEvent& event) const {
                        : std::format("{}  The central bank destroyed {} cr from {} ({})", when,
                                      -event.credits, AccountName(event.account),
                                      EmissionReasonName(event.emission));
+        case EventKind::UnitOpened:
+            return std::format("{}  {} opened, run by {}", when, DescribeRoom(event.room),
+                               AccountName(event.account));
+        case EventKind::UnitClosed:
+            return std::format("{}  A unit closed: {} stands empty", when,
+                               DescribeRoom(event.room));
         case EventKind::WeatherChanged:
             return event.change == 0
                        ? std::format("{}  The rain stopped", when)

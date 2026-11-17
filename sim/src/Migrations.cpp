@@ -602,4 +602,25 @@ std::expected<void, std::string> V12ToV13(SaveDocument& world) try {
         std::format("the version 12 world is malformed ({})", error.what()));
 }
 
+
+std::expected<void, std::string> V13ToV14(SaveDocument& world) try {
+    for (SaveDocument& building : world["city"]["buildings"].get_array()) {
+        for (SaveDocument& room : building["rooms"].get_array()) {
+            room["quietNights"] = std::uint64_t{0};
+        }
+    }
+    world["today"]["venuesOpened"] = std::int64_t{0};
+    world["today"]["venuesClosed"] = std::int64_t{0};
+    for (SaveDocument& day : world["history"].get_array()) {
+        day["counted"]["venuesOpened"] = std::int64_t{0};
+        day["counted"]["venuesClosed"] = std::int64_t{0};
+        day["openVenues"] = std::int64_t{0};
+        day["emptyUnits"] = std::int64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 13 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

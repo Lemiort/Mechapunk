@@ -88,6 +88,7 @@ constexpr vec3 kRail{0.55F, 0.56F, 0.6F};
 constexpr vec3 kCanopy{0.3F, 0.34F, 0.4F};
 constexpr vec3 kStationSign{0.1F, 0.85F, 1.0F};
 constexpr vec3 kBumper{1.0F, 0.15F, 0.1F};
+constexpr vec3 kToLetBoard{0.55F, 0.55F, 0.5F};
 constexpr vec3 kPavement{0.36F, 0.36F, 0.38F};
 constexpr vec3 kFacadeGlass{0.13F, 0.17F, 0.24F};
 // Light from a lit window at night, and the share of windows that are lit.
@@ -265,25 +266,27 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                               front * ((kBuildingDepth * 0.5F) + (2.5F * kS))},
              .color = habitat ? kHabitatNeon : kWorkplaceNeon,
              .building = building.id});
-        std::vector<const sim::Room*> stores;
+        // A sign over the door of each ground-floor unit, lit while it is a
+        // venue; units open and close, so these are drawn every frame.
+        std::vector<const sim::Room*> units;
         for (const sim::Room& room : building.rooms) {
-            if (room.floor == 0 && sim::IsVenue(room.kind)) {
-                stores.push_back(&room);
+            if (room.floor == 0) {
+                units.push_back(&room);
             }
         }
-        const float storeWidth =
-            21.0F / static_cast<float>(std::max<std::size_t>(stores.size(), 1));
-        for (std::size_t index = 0; index < stores.size(); ++index) {
-            const float x = -8.0F + (storeWidth * (static_cast<float>(index) + 0.5F));
-            signPanel(ToWorld(shape, 0,
-                              {x, 2.6F, (kFootprintDepthMeters * 0.5F) + 0.075F}),
-                      std::min(storeWidth - 1.0F, 3.0F) * kS, 0.45F * kS,
-                      StoreNeon(stores[index]->kind));
-            neonSigns_.push_back(
-                {.position = ToWorld(shape, 0,
-                                     {x, 2.9F, (kFootprintDepthMeters * 0.5F) + 2.0F}),
-                 .color = StoreNeon(stores[index]->kind),
-                 .building = building.id});
+        const float unitWidth =
+            21.0F / static_cast<float>(std::max<std::size_t>(units.size(), 1));
+        for (std::size_t index = 0; index < units.size(); ++index) {
+            const float x = -8.0F + (unitWidth * (static_cast<float>(index) + 0.5F));
+            unitSigns_.push_back(
+                {.room = units[index]->id,
+                 .panel = ToWorld(shape, 0, {x, 2.6F, (kFootprintDepthMeters * 0.5F) + 0.075F}),
+                 .width = std::min(unitWidth - 1.0F, 3.0F) * kS,
+                 .light = ToWorld(shape, 0, {x, 2.9F, (kFootprintDepthMeters * 0.5F) + 2.0F})});
+            neonSigns_.push_back({.position = unitSigns_.back().light,
+                                  .color = vec3(0.0F),
+                                  .building = building.id,
+                                  .unit = unitSigns_.size() - 1});
         }
     }
     for (const sim::Building& building : city_.buildings) {
@@ -1061,7 +1064,9 @@ void CityView::AddLights(Scene& scene) {
     for (const NeonSign& sign : neonSigns_) {
         neons_.push_back({.lightIndex = scene.GetPointLights().size(),
                           .color = sign.color,
-                          .building = sign.building});
+                          .building = sign.building,
+                          .position = sign.position,
+                          .unit = sign.unit});
         scene.AddPointLight(PointLight(sign.position.x, sign.position.y,
                                        sign.position.z, sign.color.r,
                                        sign.color.g, sign.color.b, kNeonPower));
@@ -1146,9 +1151,9 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
     std::vector<vec3> neonPositions;
     neonPositions.reserve(neons_.size());
     for (const Neon& sign : neons_) {
-        neonPositions.push_back(sign.lightIndex < points.size()
-                                    ? points[sign.lightIndex].GetPosition()
-                                    : vec3(0.0F));
+        // Units that are no venue now keep their light far underground.
+        const bool dark = sign.unit != kNoUnit && !UnitIsVenue(sign.unit);
+        neonPositions.push_back(dark ? vec3{0.0F, kHiddenDepth, 0.0F} : sign.position);
     }
     const std::vector<float> neonWeights =
         NearestWeights(neonPositions, focus, kNeonLightBudget);
@@ -1157,8 +1162,10 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
         if (sign.lightIndex < points.size()) {
             const bool inspected = selection.building.IsValid() &&
                                    sign.building == selection.building;
+            const vec3 color = sign.unit == kNoUnit ? sign.color : UnitColor(sign.unit);
+            points[sign.lightIndex].SetPos(neonPositions[index]);
             points[sign.lightIndex].SetColor(
-                inspected ? vec3(0.0F) : sign.color * neon * neonWeights[index]);
+                inspected ? vec3(0.0F) : color * neon * neonWeights[index]);
         }
     }
     for (std::size_t lamp = 0; lamp < kLampPool; ++lamp) {
@@ -1268,6 +1275,48 @@ void CityView::SubmitBox(RenderQueue& queue, vec3 minimum, vec3 maximum,
     }
 }
 
+bool CityView::UnitIsVenue(std::size_t unit) const {
+    const auto room = rooms_.Find(unitSigns_.at(unit).room);
+    return room && sim::IsVenue(room->room->kind);
+}
+
+vec3 CityView::UnitColor(std::size_t unit) const {
+    const auto room = rooms_.Find(unitSigns_.at(unit).room);
+    return room && sim::IsVenue(room->room->kind) ? StoreNeon(room->room->kind) : vec3(0.0F);
+}
+
+void CityView::UpdateCity(const sim::City& city) {
+    // Only rooms change: their kinds, names, owners and sizes. The index
+    // and every plan of a floor follow.
+    city_.buildings = city.buildings;
+    rooms_ = sim::RoomIndex(city_);
+    plans_.clear();
+    roomWays_.clear();
+    assignedSpots_.clear();
+}
+
+void CityView::SubmitUnitSigns(RenderQueue& queue) const {
+    for (const UnitSign& sign : unitSigns_) {
+        const auto room = rooms_.Find(sign.room);
+        if (!room) {
+            continue;
+        }
+        const bool venue = sim::IsVenue(room->room->kind);
+        if (!venue && room->room->kind != sim::RoomKind::VacantStore) {
+            continue;
+        }
+        // Venues glow in their colour; an empty unit has a dull "to let"
+        // board.
+        const vec3 color = venue ? StoreNeon(room->room->kind) : kToLetBoard;
+        const Transform transform{.position = sign.panel,
+                                  .rotationDegrees = vec3(0.0F),
+                                  .scale = {sign.width, 0.45F * kS, 0.15F * kS}};
+        queue.SubmitOpaqueMesh(*assets_.cube, transform,
+                               venue ? assets_.palette->GetGlowing(color, color * kGlow)
+                                     : assets_.palette->Get(color));
+    }
+}
+
 void CityView::IndexResidents(const WorldFrame& frame) {
     if (residentsTick_ == frame.tick && !residentIndex_.empty()) {
         return;
@@ -1285,6 +1334,7 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
                       double renderTick, const Selection& selection,
                       float streetFigureScale) {
     IndexResidents(frame);
+    SubmitUnitSigns(queue);
     robotMarkers_.clear();
     roomTiles_.clear();
     litLamps_.clear();

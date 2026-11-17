@@ -236,7 +236,12 @@ TEST(World, RobotsKeepABudgetForRent) {
 TEST(World, NobodyWorksOnTheirDaysOff) {
     sim::World world = YoungCity({.seed = 15, .robots = 150});
     std::map<std::uint64_t, std::uint32_t> shifts;
+    // Robots laid off when their workplace closed work fewer shifts.
+    std::set<std::uint64_t> laidOff;
     world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::Remembered && event.memory == sim::MemoryKind::LostJob) {
+            laidOff.insert(event.robot.value);
+        }
         if (event.kind != sim::EventKind::ClockedIn) {
             return;
         }
@@ -250,6 +255,9 @@ TEST(World, NobodyWorksOnTheirDaysOff) {
     for (const sim::Robot& robot : world.State().robots) {
         EXPECT_EQ(std::popcount(static_cast<unsigned>(robot.daysOff)), 2)
             << robot.name;
+        if (laidOff.contains(robot.id.value)) {
+            continue;
+        }
         // Five working days a week, give or take the first and last shift.
         EXPECT_GE(shifts[robot.id.value], 9U) << robot.name;
         EXPECT_LE(shifts[robot.id.value], 11U) << robot.name;

@@ -854,6 +854,16 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
             }
             break;
         }
+        case sim::RoomKind::VacantStore:
+            // Bare floor, a few crates left behind, nobody inside.
+            for (int crate = 0; crate < 3; ++crate) {
+                Place(plan, PropKind::Crate,
+                      f.At(1.2F + (1.4F * static_cast<float>(crate)), 1.0F + static_cast<float>(crate % 2)),
+                      f.Dir(0, 1));
+            }
+            LampGrid(plan, f, width, kDepth, room.id, 6.0F);
+            plan.rooms.push_back(std::move(area));
+            return;
         default:
             break;
     }
@@ -1005,6 +1015,10 @@ void WorkplaceFloor(FloorPlan& plan, const std::vector<const sim::Room*>& rooms,
     const auto count = static_cast<float>(std::max<std::size_t>(rooms.size(), 1));
     const float width = span / count;
     std::vector<float> cuts{kCoreEdge};
+    std::vector<Opening> doors;
+    if (ground) {
+        doors.push_back(DoorAt(-10.5F, 2.0F));
+    }
     for (std::size_t index = 0; index < rooms.size(); ++index) {
         const float left = kCoreEdge + (width * static_cast<float>(index));
         const Frame frame{.x0 = left, .mx = 1.0F, .z0 = -kHalfDepth, .sz = 1.0F};
@@ -1015,10 +1029,16 @@ void WorkplaceFloor(FloorPlan& plan, const std::vector<const sim::Room*>& rooms,
                  {DoorAt(0.0F, 1.6F)}, kPlaster);
             cuts.push_back(left);
         }
-        Workspace(plan, *rooms[index], frame, width);
+        if (rooms[index]->kind == sim::RoomKind::Workspace) {
+            Workspace(plan, *rooms[index], frame, width);
+        } else {
+            // A venue opened in a workplace, or a unit standing empty: a
+            // store with its own door to the street.
+            Store(plan, *rooms[index], frame, width);
+            doors.push_back(DoorAt(left + (width * 0.5F), 1.8F));
+        }
     }
-    Exterior(plan, cuts, ground ? std::vector<Opening>{DoorAt(-10.5F, 2.0F)}
-                                : std::vector<Opening>{});
+    Exterior(plan, cuts, doors);
 }
 }  // namespace
 

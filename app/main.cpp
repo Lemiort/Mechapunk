@@ -479,6 +479,10 @@ private:
             selection_.robot = {};
             following_ = false;
         }
+        if (frame != nullptr && frame->cityVersion != cityVersion_ && frame->city != nullptr) {
+            city_.UpdateCity(*frame->city);  // Units opened or closed.
+            cityVersion_ = frame->cityVersion;
+        }
         if (frame != nullptr) {
             if (const auto picked = DrawStatistics(statistics_, *frame)) {
                 ApplySelection(picked->selection);
@@ -732,6 +736,7 @@ private:
     bool screenshotRequested_{false};
     Selection selection_;
     StatisticsView statistics_;
+    std::uint64_t cityVersion_{};
 };
 
 int RunGame(GLFWwindow& window, const Options& options) {

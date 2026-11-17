@@ -109,3 +109,40 @@ TEST(Layout, WaysOutPassThroughDoors) {
     }
     EXPECT_GT(ways, 1000U);
 }
+
+// A venue opened in a workplace's ground floor has its own street door: from
+// every spot the way out passes walls only through doors.
+TEST(Layout, VenuesInWorkplacesHaveStreetDoors) {
+    const sim::World world = sim::World::Generate({.seed = 5, .robots = 300});
+    std::size_t checked = 0;
+    for (sim::Building building : world.State().city.buildings) {
+        if (building.kind != sim::BuildingKind::Workplace) {
+            continue;
+        }
+        for (sim::Room& room : building.rooms) {
+            if (room.floor == 0) {
+                room.kind = sim::RoomKind::Bar;
+                room.capacity = 20;
+                break;
+            }
+        }
+        const FloorPlan plan = mechapunk::PlanFloor(building, 0);
+        for (const RoomPlan& room : plan.rooms) {
+            for (std::size_t spot = 0; spot <= room.spots.size(); ++spot) {
+                const std::vector<NavPoint> way = mechapunk::WayOut(room, spot, 0);
+                ASSERT_GE(way.size(), 2U);
+                EXPECT_TRUE(way.back().outside);
+                for (std::size_t index = 1; index < way.size(); ++index) {
+                    for (const WallBox& box : plan.boxes) {
+                        if (IsWallAtChest(box)) {
+                            EXPECT_FALSE(Crosses(way[index - 1].position, way[index].position, box))
+                                << building.name << " spot " << spot;
+                        }
+                    }
+                }
+                ++checked;
+            }
+        }
+    }
+    EXPECT_GT(checked, 20U);
+}

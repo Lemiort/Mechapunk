@@ -191,6 +191,8 @@ void DrawEconomy(const std::vector<sim::DailyStats>& history) {
               [](const auto& d) { return d.supplyPercent; });
     PlotCount("Venue prices, % of usual", history,
               [](const auto& d) { return d.venuePricePercent; });
+    PlotCount("Venues open", history, [](const auto& d) { return d.openVenues; });
+    PlotCount("Empty units", history, [](const auto& d) { return d.emptyUnits; });
     ImGui::SeparatorText("Wealth");
     if (BeginFacts("wealth")) {
         Row("Credits: median / mean", std::format("{} / {}", Credits(day.medianCredits), Credits(day.meanCredits)));

@@ -49,7 +49,11 @@ std::string KindLabel(sim::RoomKind kind) {
     if (const sim::VenueRules* rules = sim::FindVenueRules(kind)) {
         return std::string{rules->label};
     }
-    return kind == sim::RoomKind::Apartment ? "apartment" : "workspace";
+    switch (kind) {
+        case sim::RoomKind::Apartment: return "apartment";
+        case sim::RoomKind::VacantStore: return "empty unit, to let";
+        default: return "workspace";
+    }
 }
 
 std::string RoomLabel(const CityView& city, sim::EntityId room) {

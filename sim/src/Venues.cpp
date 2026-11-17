@@ -169,6 +169,7 @@ const VenueRules* FindVenueRules(RoomKind kind) noexcept {
             return &kBlackMarket;
         case RoomKind::Apartment:
         case RoomKind::Workspace:
+        case RoomKind::VacantStore:
             return nullptr;
     }
     return nullptr;
@@ -217,6 +218,7 @@ std::span<const std::string_view> VenueNames(RoomKind kind) noexcept {
             return kBlackMarketNames;
         case RoomKind::Apartment:
         case RoomKind::Workspace:
+        case RoomKind::VacantStore:
             return {};
     }
     return {};

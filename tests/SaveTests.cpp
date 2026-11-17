@@ -177,7 +177,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v13-city.json";
+        kFixtureDirectory / "saves" / "v14-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -582,6 +582,26 @@ TEST(Save, Version12FixtureMigratesAndRuns) {
     ASSERT_TRUE(state.has_value()) << state.error();
     for (const std::int64_t percent : state->economy.rentPercent) {
         EXPECT_EQ(percent, 100);
+    }
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 13 save's rooms have not been quiet yet; then it keeps running.
+TEST(Save, Version13FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v13-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    for (const sim::Building& building : state->city.buildings) {
+        for (const sim::Room& room : building.rooms) {
+            EXPECT_EQ(room.quietNights, 0U);
+        }
     }
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();

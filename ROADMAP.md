@@ -78,6 +78,12 @@ Also done since the plan was written:
   it is packed and falls while it is quiet, market rents of each class
   follow how many homes stand empty (and home prices with them), and banks
   ration mortgages to what they can spare.
+- Venues and workspaces open and close: a venue quiet for ten nights with
+  its prices cut closes and lays off its staff; a workspace under half
+  staffed closes while hardly anyone is out of work. Empty ground-floor
+  units open as the venues the city is short of, or as workspaces in
+  workplaces while many robots look for work. The city view follows: store
+  signs, lights and interiors change with the units.
 - Transit: an elevated metro on a timetable. Every station row and column
   is a line with two tracks, on two levels so lines cross. Two-ended trains
   turn back over a crossover in the tail track past each end station, run
@@ -158,8 +164,11 @@ game:
 
 ## Recommended next: M6 (scale and depth)
 
-- **Demand.** Venues open and close, or workplaces turn into venues and
-  back, as demand changes.
+- **City government.** Taxes on wages and property, support for robots out
+  of work, a metro run by the city with drivers on its payroll, and later
+  police. A stabiliser for the economy, as in real cities.
+- **Central bank rate.** Interest that rises while the central bank has to
+  create money and falls while money is short.
 - **Gangs.** Rival or friendly to each other, always rivals of the police;
   members rob robots outside their gang. Unions later.
 - **Construction.** The city grows: new buildings on park corners as the

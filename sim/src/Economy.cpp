@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <expected>
 #include <format>
+#include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -47,6 +49,23 @@ constexpr std::int64_t kTightVacancyPercent = 5;
 constexpr std::int64_t kLooseVacancyPercent = 15;
 constexpr std::int64_t kMinRentPercent = 50;
 constexpr std::int64_t kMaxRentPercent = 300;
+// A venue closes after this many nights in a row with fewer guests than
+// half its places, its prices already cut to kQuietPricePercent or less; a
+// workspace after as many under half staffed, while under the low share of
+// robots, in percent, is out of work.
+constexpr std::uint32_t kCloseAfterNights = 10;
+constexpr std::uint32_t kQuietPricePercent = 80;
+constexpr std::int64_t kLowUnemploymentPercent = 2;
+// Each night an empty unit may open, with this chance in percent: as a
+// workspace in a workplace while over the high share of robots is out of
+// work, otherwise as the venue the city is most short of.
+constexpr std::uint32_t kOpenUnitPercent = 10;
+constexpr std::int64_t kHighUnemploymentPercent = 5;
+// Venues of a kind count as in demand while their prices average this, in
+// percent of usual.
+constexpr std::int64_t kInDemandPercent = 105;
+constexpr std::uint32_t kMinWorkspaceStaff = 5;
+constexpr std::uint32_t kMaxWorkspaceStaff = 10;
 // Each night, the chance a robot sells an apartment nobody lives in.
 constexpr std::uint32_t kSellVacantPercent = 20;
 constexpr std::uint32_t kMinPayPercent = 50;
@@ -589,6 +608,160 @@ std::int64_t World::PriceAt(const Room& venue) const {
                : 0;
 }
 
+void World::CloseUnit(Room& room) {
+    const RoomKind was = room.kind;
+    // Its staff are laid off.
+    for (Robot& robot : state_.robots) {
+        if (robot.workspace != room.id) {
+            continue;
+        }
+        robot.workspace = {};
+        robot.jobLevel = 0;
+        robot.performance = 0;
+        robot.commuteAt = kNoCommute;
+        Remember(robot, MemoryKind::LostJob, {}, room.id);
+        if (robot.activity == RobotActivity::Resting) {
+            PlanAtHome(robot);
+        }
+    }
+    room.kind = RoomKind::VacantStore;
+    room.name = "Empty Unit";
+    room.pricePercent = 100;
+    room.visits = 0;
+    room.quietNights = 0;
+    ++cityVersion_;
+    ++state_.today.venuesClosed;
+    Emit({.tick = state_.tick, .kind = EventKind::UnitClosed, .room = room.id,
+          .account = room.owner, .change = static_cast<std::int32_t>(was)});
+}
+
+void World::OpenUnit(Room& room, RoomKind kind) {
+    // The chain with most venues of the kind takes it on, or for a
+    // workspace the corporation owning the rest of its workplace.
+    std::unordered_map<std::uint64_t, std::uint32_t> held;
+    const auto building = rooms_.Find(room.id);
+    if (kind == RoomKind::Workspace) {
+        for (const Room& other : building->building->rooms) {
+            if (other.kind == RoomKind::Workspace) {
+                ++held[other.owner.value];
+            }
+        }
+    } else {
+        for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
+            ++held[venue.room->owner.value];
+        }
+    }
+    EntityId owner;
+    std::uint32_t most = 0;
+    for (const Organization& organization : state_.economy.organizations) {
+        const auto found = held.find(organization.id.value);
+        const std::uint32_t count = found != held.end() ? found->second : 0;
+        const Sector wanted = kind == RoomKind::Workspace ? Sector::Industry : Sector::Venues;
+        if (organization.sector == wanted && (!owner.IsValid() || count > most)) {
+            owner = organization.id;
+            most = count;
+        }
+    }
+    if (owner.IsValid()) {
+        room.owner = owner;
+    }
+    room.kind = kind;
+    if (const VenueRules* rules = FindVenueRules(kind)) {
+        room.name = std::string{VenueNames(kind)[state_.random.UniformInt(
+            0, static_cast<std::uint32_t>(VenueNames(kind).size() - 1))]};
+        room.capacity = state_.random.UniformInt(rules->minCapacity, rules->maxCapacity);
+    } else {
+        room.name = "Workshop";
+        room.capacity = state_.random.UniformInt(kMinWorkspaceStaff, kMaxWorkspaceStaff);
+    }
+    room.pricePercent = 100;
+    room.visits = 0;
+    room.quietNights = 0;
+    ++cityVersion_;
+    ++state_.today.venuesOpened;
+    Emit({.tick = state_.tick, .kind = EventKind::UnitOpened, .room = room.id,
+          .account = room.owner});
+}
+
+void World::ReviewUnits() {
+    const std::uint64_t version = cityVersion_;
+    // Rooms someone is in or on the way to stay as they are tonight.
+    std::unordered_set<std::uint64_t> busy;
+    std::unordered_map<std::uint64_t, std::uint32_t> staff;
+    std::int64_t unemployed = 0;
+    for (const Robot& robot : state_.robots) {
+        busy.insert(robot.location.value);
+        busy.insert(robot.destination.value);
+        if (robot.workspace.IsValid()) {
+            ++staff[robot.workspace.value];
+        } else {
+            ++unemployed;
+        }
+    }
+    const std::int64_t population = std::max<std::int64_t>(1, static_cast<std::int64_t>(state_.robots.size()));
+    const std::int64_t unemployment = unemployed * 100 / population;
+    // How much each kind of venue is in demand: its average price, and
+    // whether the city has any.
+    std::map<RoomKind, std::pair<std::int64_t, std::int64_t>> demand;
+    for (const RoomKind kind : VenueKinds()) {
+        demand[kind] = {0, 0};
+        for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
+            demand[kind].first += venue.room->pricePercent;
+            ++demand[kind].second;
+        }
+    }
+    const auto mostWanted = [&]() -> std::optional<RoomKind> {
+        std::optional<RoomKind> best;
+        std::int64_t bestScore = 0;
+        for (const auto& [kind, sum] : demand) {
+            // A kind the city lacks altogether is wanted most.
+            const std::int64_t score = sum.second == 0 ? 1000 : sum.first / sum.second;
+            if (score >= kInDemandPercent && score > bestScore) {
+                best = kind;
+                bestScore = score;
+            }
+        }
+        return best;
+    };
+    for (Building& building : state_.city.buildings) {
+        for (Room& room : building.rooms) {
+            if (room.floor != 0) {
+                continue;
+            }
+            if (IsVenue(room.kind)) {
+                const bool quiet = room.visits * 2 < room.capacity && room.pricePercent <= kQuietPricePercent;
+                room.quietNights = quiet ? room.quietNights + 1 : 0;
+                if (room.quietNights >= kCloseAfterNights && !busy.contains(room.id.value)) {
+                    CloseUnit(room);
+                }
+            } else if (room.kind == RoomKind::Workspace) {
+                room.quietNights = staff[room.id.value] * 2 < room.capacity ? room.quietNights + 1 : 0;
+                if (room.quietNights >= kCloseAfterNights && unemployment < kLowUnemploymentPercent &&
+                    !busy.contains(room.id.value)) {
+                    CloseUnit(room);
+                }
+            } else if (room.kind == RoomKind::VacantStore) {
+                ++room.quietNights;
+                if (state_.random.UniformInt(1, 100) > kOpenUnitPercent || busy.contains(room.id.value)) {
+                    continue;
+                }
+                if (building.kind == BuildingKind::Workplace &&
+                    unemployment >= kHighUnemploymentPercent) {
+                    OpenUnit(room, RoomKind::Workspace);
+                } else if (const auto kind = mostWanted()) {
+                    OpenUnit(room, *kind);
+                    demand[*kind].first += 100;
+                    ++demand[*kind].second;
+                }
+            }
+        }
+    }
+    if (cityVersion_ != version) {
+        // Kinds changed: the index of rooms by kind must follow.
+        rooms_ = RoomIndex(state_.city);
+    }
+}
+
 void World::SetPrices() {
     // A venue that had three times its places in guests asks more; one
     // that had fewer guests than places, less.
@@ -1007,6 +1180,7 @@ void World::SettleEconomy() {
         }
     }
 
+    ReviewUnits();
     SetPrices();
     RecordStatistics();
     for (Organization& organization : economy.organizations) {
@@ -1102,6 +1276,8 @@ void World::RecordStatistics() {
             }
         }
         stats.venuePricePercent = venues > 0 ? percent / venues : 100;
+        stats.openVenues = venues;
+        stats.emptyUnits = static_cast<std::int64_t>(rooms_.RoomsOfKind(RoomKind::VacantStore).size());
     }
     for (const Robot& robot : state.robots) {
         stats.robotMoney += robot.credits;

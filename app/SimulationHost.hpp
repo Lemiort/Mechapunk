@@ -109,6 +109,10 @@ struct WorldFrame {
     // until the population changes.
     std::shared_ptr<const RobotDirectory> directory;
     std::shared_ptr<const EconomyFrame> economy;
+    // The city as it is now, shared by frames until a room opens, closes or
+    // changes; cityVersion counts those changes since the world was loaded.
+    std::uint64_t cityVersion{};
+    std::shared_ptr<const sim::City> city;
 };
 
 // Runs a World on a SimulationThread. The world belongs to the worker while
@@ -185,6 +189,8 @@ private:
     std::shared_ptr<const std::vector<sim::DailyStats>> history_;
     std::shared_ptr<const std::unordered_map<std::uint64_t, sim::EntityId>> owners_;
     sim::Tick economyDay_{};
+    std::shared_ptr<const sim::City> cityFrame_;
+    std::uint64_t cityVersion_{};
     // Written by the worker in its event sink, read by the render thread.
     mutable std::mutex logMutex_;
     std::unordered_map<std::uint64_t, std::deque<std::string>> log_;

@@ -184,6 +184,10 @@ enum class EventKind : std::uint8_t {
     // The central bank created money (credits > 0) or destroyed it; no
     // robot; account: whose account.
     MoneySupplyChanged,
+    // A ground-floor unit (room) opened as a venue or workspace, or closed;
+    // no robot; account: its owner.
+    UnitOpened,
+    UnitClosed,
 };
 
 // Something that happened during a step, for logs and observers. Events are
@@ -253,6 +257,8 @@ public:
     }
     [[nodiscard]] const RoomIndex& Rooms() const noexcept { return rooms_; }
     [[nodiscard]] const Metro& GetMetro() const noexcept { return metro_; }
+    // Changes whenever a room changes kind, so views of the city can update.
+    [[nodiscard]] std::uint64_t CityVersion() const noexcept { return cityVersion_; }
     [[nodiscard]] const Organization* FindOrganization(EntityId id) const noexcept;
     // What a robot or organization owes, or nothing.
     [[nodiscard]] const Loan* LoanOf(EntityId borrower) const noexcept;
@@ -387,6 +393,12 @@ private:
     // At midnight: venues' prices follow how busy they were, and market
     // rents how many homes stand empty.
     void SetPrices();
+    // At midnight: venues quiet for long close, and empty ground-floor
+    // units open as the venues the city is short of, or as workspaces
+    // while many robots are out of work.
+    void ReviewUnits();
+    void CloseUnit(Room& room);
+    void OpenUnit(Room& room, RoomKind kind);
     [[nodiscard]] std::int64_t UpkeepOf(const Room& apartment) const;
     // Changes an apartment's owner for `price`, paid by the buyer.
     void Transfer(EntityId apartment, EntityId buyer, std::int64_t price);
@@ -413,6 +425,7 @@ private:
     std::vector<std::uint32_t> metersToStation_;
     // Robots living in each apartment.
     std::unordered_map<std::uint64_t, std::uint32_t> residents_;
+    std::uint64_t cityVersion_{};
     // The loan of each borrower, as an index into economy.loans.
     std::unordered_map<std::uint64_t, std::size_t> loanOf_;
     EntityId centralBank_;

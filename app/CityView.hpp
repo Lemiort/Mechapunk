@@ -96,6 +96,8 @@ public:
         sim::EntityId robot) const;
 
     [[nodiscard]] const sim::City& City() const noexcept { return city_; }
+    // Takes on rooms that opened, closed or changed hands in the simulation.
+    void UpdateCity(const sim::City& city);
     [[nodiscard]] const sim::Metro& Transit() const noexcept { return metro_; }
     [[nodiscard]] const sim::RoomIndex& Rooms() const noexcept {
         return rooms_;
@@ -125,15 +127,28 @@ private:
         glm::vec3 minimum;
         glm::vec3 maximum;
     };
+    static constexpr std::size_t kNoUnit = static_cast<std::size_t>(-1);
     struct NeonSign {
         glm::vec3 position;
         glm::vec3 color;
         sim::EntityId building;
+        // The ground-floor unit whose sign it lights, or kNoUnit for a
+        // building's own sign.
+        std::size_t unit{kNoUnit};
     };
     struct Neon {
         std::size_t lightIndex;
         glm::vec3 color;
         sim::EntityId building;
+        glm::vec3 position;
+        std::size_t unit{kNoUnit};
+    };
+    // A ground-floor unit's sign over its door.
+    struct UnitSign {
+        sim::EntityId room;
+        glm::vec3 panel;
+        float width{};
+        glm::vec3 light;
     };
     struct Marker {
         sim::EntityId id;
@@ -245,6 +260,9 @@ private:
     // The spot a robot takes in `room`, which has `count` spots, at
     // `tick`: at home the bed by night and the sofa by day, elsewhere the
     // one it was given in that room on the open floor, else its favourite.
+    [[nodiscard]] bool UnitIsVenue(std::size_t unit) const;
+    [[nodiscard]] glm::vec3 UnitColor(std::size_t unit) const;
+    void SubmitUnitSigns(RenderQueue& queue) const;
     // Numbers flatmates 0, 1, 2 by id for the frame, for their beds and seats.
     void IndexResidents(const WorldFrame& frame);
     // Staff working in the room take its last staffSpots spots; guests the
@@ -332,6 +350,7 @@ private:
     std::unordered_map<std::uint64_t, AssignedSpot> assignedSpots_;
     Walk walk_;  // Scratch for RobotPosition.
     std::vector<NeonSign> neonSigns_;
+    std::vector<UnitSign> unitSigns_;
     std::vector<Neon> neons_;
     // Bulbs of the street lamps, which shine straight down.
     std::vector<glm::vec3> streetLamps_;

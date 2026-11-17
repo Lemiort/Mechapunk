@@ -45,7 +45,8 @@ struct glz::meta<mechapunk::sim::RoomKind> {
     static constexpr auto value = enumerate(
         "apartment", Apartment, "workspace", Workspace, "bar", Bar, "diner",
         Diner, "chargingBay", ChargingBay, "repairShop", RepairShop, "arcade",
-        Arcade, "shop", Shop, "clinic", Clinic, "blackMarket", BlackMarket);
+        Arcade, "shop", Shop, "clinic", Clinic, "blackMarket", BlackMarket, "vacantStore",
+        VacantStore);
 };
 template <>
 struct glz::meta<mechapunk::sim::ApartmentClass> {
@@ -151,6 +152,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 12,
               .summary = "venue prices and market rents",
               .apply = &migrations::V12ToV13},
+    Migration{.fromVersion = 13,
+              .summary = "venues and workspaces opening and closing",
+              .apply = &migrations::V13ToV14},
 };
 }  // namespace
 

@@ -124,6 +124,8 @@ struct DayCounters {
     std::int64_t movedUp{};
     std::int64_t evictions{};
     std::int64_t movedInTogether{};
+    std::int64_t venuesOpened{};
+    std::int64_t venuesClosed{};
     std::int64_t newFriendships{};
     std::int64_t newRivalries{};
     std::int64_t arrivals{};
@@ -191,6 +193,8 @@ struct DailyStats {
     // price, in percent of their base prices.
     std::array<std::int64_t, 5> averageRent{};
     std::int64_t venuePricePercent{};
+    std::int64_t openVenues{};
+    std::int64_t emptyUnits{};
 };
 
 struct Economy {

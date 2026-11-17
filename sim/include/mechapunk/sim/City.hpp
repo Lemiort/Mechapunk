@@ -48,6 +48,9 @@ enum class RoomKind : std::uint8_t {
     Shop,
     Clinic,       // Major repairs; also undoes wear.
     BlackMarket,  // Cheap repairs at night, sometimes with a dodgy part.
+    // A ground-floor unit standing empty: a venue that closed, or a
+    // workspace given up, until someone opens it again.
+    VacantStore,
 };
 
 // Classes of apartment, from a government dorm room to a whole floor. Each
@@ -91,6 +94,10 @@ struct Room {
     // and guests since midnight, by which the price is set each night.
     std::uint32_t pricePercent{100};
     std::uint32_t visits{};
+    // Nights in a row a venue has stood quiet with its prices cut, or a
+    // workspace under half staffed; it closes after enough of them. For an
+    // empty unit, nights it has stood empty.
+    std::uint32_t quietNights{};
 };
 
 // Daily working hours of a workplace.

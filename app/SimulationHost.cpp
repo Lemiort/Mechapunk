@@ -237,6 +237,12 @@ void SimulationHost::Publish() {
         economy_ = std::move(economy);
     }
     frame.economy = economy_;
+    if (cityFrame_ == nullptr || cityVersion_ != world_.CityVersion()) {
+        cityFrame_ = std::make_shared<const sim::City>(world_.State().city);
+        cityVersion_ = world_.CityVersion();
+    }
+    frame.city = cityFrame_;
+    frame.cityVersion = cityVersion_;
     frame.robots.reserve(world_.State().robots.size());
     for (const sim::Robot& robot : world_.State().robots) {
         RobotFrame robotFrame{.id = robot.id,

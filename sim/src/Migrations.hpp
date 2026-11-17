@@ -60,4 +60,7 @@ namespace mechapunk::sim::migrations {
 // today; market rents are at their base.
 [[nodiscard]] std::expected<void, std::string> V12ToV13(SaveDocument& world);
 
+// Version 13 to 14: no venue or workspace has been quiet yet.
+[[nodiscard]] std::expected<void, std::string> V13ToV14(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations
