@@ -13,6 +13,7 @@
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Ids.hpp"
+#include "mechapunk/sim/Metro.hpp"
 #include "mechapunk/sim/Random.hpp"
 #include "mechapunk/sim/Social.hpp"
 #include "mechapunk/sim/Venues.hpp"
@@ -74,10 +75,13 @@ struct Robot {
     std::uint32_t age{};
     // Lasting damage from 0 to kMaxWear; clinics take some of it away.
     std::int32_t wear{};
-    // A metro ride on the walk under way: underground from boardsAt to
-    // alightsAt, between stations (indices into City::stations). All zero
-    // when walking the whole way.
+    // A metro ride on the walk under way: on the platform at rideFrom from
+    // boardsAt, on the trains of the Metro timetable, changing lines at
+    // rideVia (rideTo when it rides one line), off at rideTo by alightsAt.
+    // Stations are indices into City::stations. All zero when walking the
+    // whole way.
     std::uint32_t rideFrom{};
+    std::uint32_t rideVia{};
     std::uint32_t rideTo{};
     Tick boardsAt{};
     Tick alightsAt{};
@@ -88,15 +92,16 @@ struct Trip {
     std::uint32_t minutes{};  // Door to door.
     bool metro{false};
     std::uint32_t fromStation{};  // Indices into City::stations.
+    std::uint32_t viaStation{};   // Where it changes lines; toStation if not.
     std::uint32_t toStation{};
     std::uint32_t minutesToStation{};    // Walk and stairs to the station.
-    std::uint32_t minutesUnderground{};  // Waiting for and riding the train.
+    // From reaching the platform to getting off the last train: waiting,
+    // riding and changing.
+    std::uint32_t minutesUnderground{};
 };
 
 // Fare of a metro ride; a robot that cannot pay it all pays what it has.
 inline constexpr std::uint32_t kMetroFare = 4;
-// Minutes a rider waits on the platform before its train leaves.
-inline constexpr std::uint32_t kMetroWaitMinutes = 3;
 
 // A robot that was scrapped, kept while others still remember it.
 struct DepartedRobot {
@@ -175,6 +180,7 @@ struct SimEvent {
     MemoryKind memory{};
     bool metro{false};
     std::uint32_t fromStation{};
+    std::uint32_t viaStation{};
     std::uint32_t toStation{};
 };
 
@@ -220,6 +226,7 @@ public:
         return populationVersion_;
     }
     [[nodiscard]] const RoomIndex& Rooms() const noexcept { return rooms_; }
+    [[nodiscard]] const Metro& GetMetro() const noexcept { return metro_; }
     // Robots in a venue right now, not counting those still on their way.
     [[nodiscard]] std::uint32_t GuestsIn(EntityId room) const;
 
@@ -259,8 +266,6 @@ private:
     void CollectRent();
     // Metro, in Transit.cpp.
     void IndexStations();
-    [[nodiscard]] std::uint32_t RideMinutes(std::uint32_t fromStation,
-                                            std::uint32_t toStation) const;
     // Work and money, in Careers.cpp.
     [[nodiscard]] std::uint32_t WageOf(const Robot& robot) const;
     // Costs performance for turning up worn down or miserable.
@@ -301,6 +306,7 @@ private:
     WorldState state_;
     RoutePlanner routes_;
     RoomIndex rooms_;
+    Metro metro_;
     // Robots in or heading to each venue room, for capacity checks.
     std::unordered_map<std::uint64_t, std::uint32_t> reserved_;
     // Robots inside each venue room.

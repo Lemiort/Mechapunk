@@ -3,6 +3,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -340,31 +341,53 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
             break;
         case sim::RobotActivity::Walking: {
             const auto& stations = city.City().stations;
-            const bool metro = robot.alightsAt > robot.boardsAt &&
+            const sim::Metro& metro = city.Transit();
+            const bool rides = robot.alightsAt > robot.boardsAt &&
                                robot.rideFrom < stations.size() &&
                                robot.rideTo < stations.size();
-            if (!metro) {
-                ImGui::Text("Walking, arrives %s", Clock(robot.nextActionAt).c_str());
-            } else if (frame.tick < robot.boardsAt) {
-                ImGui::Text("Walking to %s station, metro to %s, arrives %s",
-                            stations[robot.rideFrom].name.c_str(),
-                            stations[robot.rideTo].name.c_str(),
-                            Clock(robot.nextActionAt).c_str());
-            } else if (frame.tick < robot.boardsAt + sim::kMetroWaitMinutes) {
-                ImGui::Text("Waiting for the train at %s, to %s, arrives %s",
-                            stations[robot.rideFrom].name.c_str(),
-                            stations[robot.rideTo].name.c_str(),
-                            Clock(robot.nextActionAt).c_str());
-            } else if (frame.tick < robot.alightsAt) {
-                ImGui::Text("On the train from %s to %s, arrives %s",
-                            stations[robot.rideFrom].name.c_str(),
-                            stations[robot.rideTo].name.c_str(),
-                            Clock(robot.nextActionAt).c_str());
+            const std::vector<sim::Leg> legs =
+                rides ? metro.Route(robot.rideFrom, robot.rideTo,
+                                    static_cast<double>(robot.boardsAt))
+                      : std::vector<sim::Leg>{};
+            const auto name = [&](std::uint32_t station) -> const std::string& {
+                return stations[station].name;
+            };
+            // A train is named after the end of the line it runs to.
+            const auto toward = [&](const sim::Leg& leg) -> const std::string& {
+                const auto& line = metro.Lines()[leg.line].stations;
+                return name(leg.direction == sim::Direction::Up ? line.back() : line.front());
+            };
+            const auto now = static_cast<double>(frame.tick);
+            std::string doing;
+            if (legs.empty()) {
+                doing = "Walking";
+            } else if (now < static_cast<double>(robot.boardsAt)) {
+                doing = std::format("Walking to {} station, metro to {}", name(robot.rideFrom),
+                                    name(robot.rideTo));
+                if (legs.size() > 1) {
+                    doing += std::format(" changing at {}", name(legs.front().toStation));
+                }
             } else {
-                ImGui::Text("Walking from %s station, arrives %s",
-                            stations[robot.rideTo].name.c_str(),
-                            Clock(robot.nextActionAt).c_str());
+                doing = std::format("Walking from {} station", name(robot.rideTo));
+                for (std::size_t index = 0; index < legs.size(); ++index) {
+                    const sim::Leg& leg = legs[index];
+                    if (now < leg.departs - sim::kDwellMinutes) {
+                        doing = std::format("{} at {} for the {} train toward {}",
+                                            index == 0 ? "Waiting" : "Changing",
+                                            name(leg.fromStation),
+                                            sim::FormatClock(static_cast<std::uint32_t>(
+                                                std::fmod(leg.departs, sim::kMinutesPerDay))),
+                                            toward(leg));
+                        break;
+                    }
+                    if (now < leg.arrives) {
+                        doing = std::format("On the train toward {}, off at {}", toward(leg),
+                                            name(leg.toStation));
+                        break;
+                    }
+                }
             }
+            ImGui::Text("%s, arrives %s", doing.c_str(), Clock(robot.nextActionAt).c_str());
             follow(RoomLink(city, robot.destination, "to "));
             break;
         }

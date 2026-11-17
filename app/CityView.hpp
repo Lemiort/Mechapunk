@@ -25,6 +25,7 @@
 #include "SimulationHost.hpp"
 #include "Transform.hpp"
 #include "mechapunk/sim/City.hpp"
+#include "mechapunk/sim/Metro.hpp"
 #include "mechapunk/sim/Random.hpp"
 
 namespace mechapunk {
@@ -95,6 +96,7 @@ public:
         sim::EntityId robot) const;
 
     [[nodiscard]] const sim::City& City() const noexcept { return city_; }
+    [[nodiscard]] const sim::Metro& Transit() const noexcept { return metro_; }
     [[nodiscard]] const sim::RoomIndex& Rooms() const noexcept {
         return rooms_;
     }
@@ -181,11 +183,39 @@ private:
     [[nodiscard]] glm::vec3 NodePosition(sim::NodeId node) const;
     // Intersections walked through between two buildings' doors.
     const std::vector<glm::vec3>& Route(sim::EntityId from, sim::EntityId to);
-    // A station: its platform over the intersection, and the stairs up to
-    // it from the pavement.
-    [[nodiscard]] glm::vec3 StationPlatform(std::uint32_t station) const;
-    [[nodiscard]] glm::vec3 StationStairsBottom(std::uint32_t station) const;
-    [[nodiscard]] glm::vec3 StationStairsTop(std::uint32_t station) const;
+    // A line's frame: its first station's deck, the way it runs and the
+    // way across it, and how far (meters, negative) back to the city's edge.
+    struct LineFrame {
+        glm::vec3 origin;
+        glm::vec3 along;
+        glm::vec3 across;
+        float edge{};
+    };
+    struct Stairs {
+        glm::vec3 top;
+        glm::vec3 bottom;
+    };
+    [[nodiscard]] LineFrame FrameOf(std::uint32_t line) const;
+    // A point `meters` along a line and `across` meters to its side.
+    [[nodiscard]] glm::vec3 LinePoint(const LineFrame& frame, float meters,
+                                      float across) const;
+    // The stairs of a station's platform beside one track (side -1 up, +1
+    // down) of its row or column line.
+    [[nodiscard]] Stairs StairsOf(std::uint32_t station, sim::LineAxis axis,
+                                  float side) const;
+    // Where a robot waits for its train on that platform.
+    [[nodiscard]] glm::vec3 PlatformSpot(sim::EntityId robot, std::uint32_t station,
+                                         sim::LineAxis axis, float side) const;
+    // A depot siding's offset across its line.
+    [[nodiscard]] static float SidingOffset(const sim::MetroLine& line,
+                                            std::uint32_t train);
+    // Where a train of the timetable is drawn.
+    [[nodiscard]] TrainPose TrainPoseOf(const sim::TrainState& train) const;
+    // The trains a rider takes, planned again from its ride.
+    const std::vector<sim::Leg>& LegsOf(const RobotFrame& robot);
+    // A box turned to run from one point to another.
+    void AddStaticBeam(glm::vec3 from, glm::vec3 to, float width, float height,
+                       glm::vec3 color);
     void AddElevatedLines();
     // A box that never moves; `glows` makes it shine with its own color.
     void AddStaticBox(glm::vec3 minimum, glm::vec3 maximum, glm::vec3 color,
@@ -193,30 +223,18 @@ private:
     // The material of a prop part, glowing for neon, bulbs and screens.
     [[nodiscard]] std::shared_ptr<const Material> PartMaterial(const PropPart& part,
                                                                glm::vec3 tint) const;
-    // Trains carrying the riders on board in `frame`.
-    // The train of a ride at `tick`: sliding into the first platform,
-    // waiting there, riding, waiting at the last platform and sliding out.
-    // Nothing while it is not at either station or on its way.
-    [[nodiscard]] std::optional<TrainPose> TrainAt(std::uint32_t from,
-                                                   std::uint32_t to,
-                                                   sim::Tick boardsAt,
-                                                   sim::Tick alightsAt,
-                                                   double tick) const;
     // A rider's place in the train, and the door it uses, given the side
     // of the train it comes from (+1 right, -1 left).
     [[nodiscard]] glm::vec3 PlaceAboard(sim::EntityId robot,
                                         const TrainPose& train) const;
     [[nodiscard]] std::pair<glm::vec3, glm::vec3> DoorFor(
         sim::EntityId robot, const TrainPose& train, glm::vec3 from) const;
-    void SubmitTrains(RenderQueue& queue, const WorldFrame& frame,
-                      double renderTick);
+    // Every train of the timetable.
+    void SubmitTrains(RenderQueue& queue, double renderTick);
     // Intersections walked through from a building to a station.
     const std::vector<glm::vec3>& StationRoute(sim::EntityId building,
                                                std::uint32_t station);
     void AddStations();
-    // Where a robot waits for its train on the platform.
-    [[nodiscard]] glm::vec3 PlatformSpot(sim::EntityId robot,
-                                         std::uint32_t station) const;
     // Position along the walk and the direction of travel; nothing while
     // the robot rides the metro.
     [[nodiscard]] std::optional<Placement> RobotPosition(const RobotFrame& robot,
@@ -266,6 +284,15 @@ private:
     sim::City city_;
     sim::RoomIndex rooms_;
     sim::RoutePlanner routes_;
+    sim::Metro metro_;
+    struct RideLegs {
+        bool known{false};
+        sim::Tick boardsAt{};
+        std::uint32_t from{};
+        std::uint32_t to{};
+        std::vector<sim::Leg> legs;
+    };
+    std::unordered_map<std::uint64_t, RideLegs> rideLegs_;
     RenderAssets& assets_;
     std::vector<StaticItem> statics_;
     // Statics drawn as batches, made once by BuildStaticBatches. A batch

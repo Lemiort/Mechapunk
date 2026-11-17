@@ -58,7 +58,11 @@ The game build rebuilds `external/NEE/build/Release` first. Quit a running
 Also done since the plan was written:
 
 - Careers and moving house: promotions, firing, rehiring, evictions.
-- Transit: an elevated metro with platforms, stairs and trains.
+- Transit: an elevated metro on a timetable. Every station row and column
+  is a line with two tracks, on two levels so lines cross. Two-ended trains
+  turn back over a crossover in the tail track past each end station, run
+  from 05:00 to 01:00, and sleep in a depot past each line's first station.
+  Riders wait for the next train and change lines where two lines cross.
 - A city of 10000 robots by default, rising toward the middle: habitats up
   to about thirty floors, office towers up to about twenty. Only the neon
   and street lamps nearest the camera are real lights. Everything that
@@ -166,6 +170,6 @@ game:
 - Shopping bags show only while walking straight out of the shop.
 - Not yet seen in the running game: bags, bar bottles, robots on the
   stairs.
-- Trains still appear from nowhere: each slides into its first platform
-  and out of its last one, but doesn't come from or go to a depot.
+- Trains have no drivers yet, and no limit on riders.
+- From above, the upper deck of a station hides the lower level's trains.
 - Robots inside closed buildings aren't drawn (nobody can see them).

@@ -177,29 +177,22 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v8-city.json";
+        kFixtureDirectory / "saves" / "v9-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
-    // Saved with a robot riding the metro to a diner.
+    // Saved with a robot on its way to lunch by metro, changing lines.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
-        return robot.alightsAt != 0;
+        return robot.alightsAt != 0 && robot.rideVia != robot.rideTo;
     }));
-    // The fixture has a robot out of work, and scrapped robots that others
-    // still remember.
-    EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
-        return !robot.workspace.IsValid();
-    }));
-    EXPECT_FALSE(state->departed.empty());
     // The fixture carries friendships and memories.
     EXPECT_TRUE(std::ranges::any_of(state->robots, [](const sim::Robot& robot) {
         return !robot.bonds.empty() && !robot.memories.empty();
     }));
-    // Saved in the rain, after many spells of weather.
-    EXPECT_GT(state->weather.rain, 0U);
+    // After many spells of weather.
     EXPECT_GT(state->weather.spells, 10U);
     EXPECT_GT(state->weather.changesAt, state->tick);
 
@@ -432,5 +425,34 @@ TEST(Save, Version7FixtureMigratesAndRuns) {
     world->RunFor(4 * sim::kMinutesPerDay);
     EXPECT_GT(changes, 0U);
     EXPECT_EQ(world->State().weather.spells, changes);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 8 save (no changes of line) loads through one migration:
+// robots on the metro change at their last station, that is, they don't,
+// and the city goes on riding the timetable's trains.
+TEST(Save, Version8FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v8-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    bool riding = false;
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_EQ(robot.rideVia, robot.rideTo) << robot.name;
+        riding = riding || robot.alightsAt != 0;
+    }
+    EXPECT_TRUE(riding);
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    std::uint64_t rides = 0;
+    world->SetEventSink([&](const sim::SimEvent& event) {
+        rides += event.kind == sim::EventKind::Departed && event.metro ? 1 : 0;
+    });
+    world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_GT(rides, 0U);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

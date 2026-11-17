@@ -1,6 +1,7 @@
-// The metro: robots walk to the station nearest them, ride underground to
-// the station nearest where they are going, and walk on, whenever that is
-// faster than walking all the way.
+// The metro: robots walk to the station nearest them, ride the trains of the
+// timetable to the station nearest where they are going, changing lines once
+// if they must, and walk on, whenever that is faster than walking all the
+// way. Trains run from 05:00 to 01:00.
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -45,18 +46,6 @@ void World::IndexStations() {
     }
 }
 
-std::uint32_t World::RideMinutes(std::uint32_t fromStation,
-                                 std::uint32_t toStation) const {
-    const CityNode& from = state_.city.nodes.at(state_.city.stations.at(fromStation).node.value);
-    const CityNode& to = state_.city.nodes.at(state_.city.stations.at(toStation).node.value);
-    // Lines run over the station rows and columns: along the row, turning
-    // at the station where it meets the destination's column.
-    const double meters = std::abs(static_cast<double>(to.x - from.x)) +
-                          std::abs(static_cast<double>(to.z - from.z));
-    return kMetroWaitMinutes +
-           static_cast<std::uint32_t>(std::ceil(meters / kRideMetersPerMinute));
-}
-
 Trip World::PlanTrip(EntityId fromRoom, EntityId toRoom, bool metroAllowed) {
     const auto from = rooms_.Find(fromRoom);
     const auto to = rooms_.Find(toRoom);
@@ -93,7 +82,15 @@ Trip World::PlanTrip(EntityId fromRoom, EntityId toRoom, bool metroAllowed) {
     }
     const std::uint32_t toStation =
         WalkMinutes(metersToStation_.at(start.value)) + StairMinutes(from->room->floor);
-    const std::uint32_t underground = RideMinutes(board, alight);
+    const Tick onPlatform = state_.tick + toStation;
+    const std::vector<Leg> legs =
+        metro_.Route(board, alight, static_cast<double>(onPlatform));
+    if (legs.empty()) {
+        return trip;
+    }
+    // Off the last train at the end of the minute it arrives in.
+    const auto off = static_cast<Tick>(std::ceil(legs.back().arrives));
+    const auto underground = static_cast<std::uint32_t>(off - onPlatform);
     const std::uint32_t fromStation =
         WalkMinutes(metersToStation_.at(end.value)) + StairMinutes(to->room->floor);
     const std::uint32_t byMetro = toStation + underground + fromStation;
@@ -101,6 +98,7 @@ Trip World::PlanTrip(EntityId fromRoom, EntityId toRoom, bool metroAllowed) {
         trip = {.minutes = byMetro,
                 .metro = true,
                 .fromStation = board,
+                .viaStation = legs.front().toStation,
                 .toStation = alight,
                 .minutesToStation = toStation,
                 .minutesUnderground = underground};

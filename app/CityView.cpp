@@ -60,16 +60,33 @@ constexpr double kHomeWalkMinutes = 0.5;
 constexpr vec3 kHabitatNeon{0.1F, 0.9F, 1.0F};
 constexpr vec3 kWorkplaceNeon{1.0F, 0.2F, 0.8F};
 constexpr vec3 kGrass{0.16F, 0.32F, 0.17F};
-// The elevated metro: deck top 8 m over the street, a platform over each
-// station's intersection, and stairs up from the pavement.
-constexpr float kTrackHeight = 8.0F * kS;
-constexpr float kPlatformHalf = 6.5F * kS;
-constexpr float kStairsRun = 12.0F * kS;
-constexpr float kStairsAcross = (kStreetWidth * 0.5F) + (0.8F * kS);
+// The elevated metro. Row lines run with their deck top 8 m over the street
+// and column lines 14 m, so they cross without meeting. Each line has two
+// tracks 1.8 m either side of its middle; a station has a side platform
+// beside each track, with stairs down to the pavement past its end.
+// Lengths in meters.
+constexpr float kRowDeck = 8.0F;
+constexpr float kColumnDeck = 14.0F;
+constexpr float kDeckThickness = 0.7F;
+constexpr float kTrackOffset = 1.8F;
+constexpr float kDeckHalf = 3.6F;
+constexpr float kRailGauge = 0.7F;  // Each rail from its track's middle.
+constexpr float kPlatformInner = 3.4F;
+constexpr float kPlatformOuter = 6.4F;
+constexpr float kPlatformHalfLength = 14.0F;
+constexpr float kStairsAcross = (kStreetWidth * 0.5F) + (0.8F * kS);  // Units.
+// Depots: beyond the city's edge past each line's first station, a shed
+// with a siding for each train, fanning out from the up track.
+constexpr float kDepotGap = 4.0F;
+constexpr float kDepotLength = 32.0F;
+constexpr float kDepotThroat = 12.0F;
+constexpr float kSidingSpacing = 4.2F;
+
 constexpr vec3 kTrackSteel{0.22F, 0.23F, 0.27F};
 constexpr vec3 kRail{0.55F, 0.56F, 0.6F};
 constexpr vec3 kCanopy{0.3F, 0.34F, 0.4F};
 constexpr vec3 kStationSign{0.1F, 0.85F, 1.0F};
+constexpr vec3 kBumper{1.0F, 0.15F, 0.1F};
 constexpr vec3 kPavement{0.36F, 0.36F, 0.38F};
 constexpr vec3 kFacadeGlass{0.13F, 0.17F, 0.24F};
 // Light from a lit window at night, and the share of windows that are lit.
@@ -153,7 +170,7 @@ vec3 Accent(sim::EntityId robot) {
 
 CityView::CityView(const sim::City& city, std::uint64_t seed,
                    RenderAssets& assets)
-    : city_(city), rooms_(city_), routes_(city_), assets_(assets) {
+    : city_(city), rooms_(city_), routes_(city_), metro_(city_), assets_(assets) {
     vec3 minimum{0.0F};
     vec3 maximum{0.0F};
     for (const sim::CityNode& node : city_.nodes) {
@@ -469,20 +486,69 @@ void CityView::AddStreetLamps() {
     }
 }
 
-vec3 CityView::StationPlatform(std::uint32_t station) const {
-    return NodePosition(city_.stations.at(station).node) +
-           vec3{0.0F, kTrackHeight, 0.0F};
+namespace {
+float DeckHeight(sim::LineAxis axis) {
+    return (axis == sim::LineAxis::Row ? kRowDeck : kColumnDeck) * kS;
+}
+vec3 AlongOf(sim::LineAxis axis) {
+    return axis == sim::LineAxis::Row ? vec3{1.0F, 0.0F, 0.0F} : vec3{0.0F, 0.0F, 1.0F};
+}
+vec3 AcrossOf(sim::LineAxis axis) {
+    return axis == sim::LineAxis::Row ? vec3{0.0F, 0.0F, 1.0F} : vec3{1.0F, 0.0F, 0.0F};
+}
+// The up track is on the -1 side of a line, the down track on the +1 side.
+float SideOf(sim::Direction direction) {
+    return direction == sim::Direction::Up ? -1.0F : 1.0F;
+}
+}  // namespace
+
+CityView::LineFrame CityView::FrameOf(std::uint32_t line) const {
+    const sim::MetroLine& metro = metro_.Lines().at(line);
+    const sim::CityNode& first = city_.nodes.at(city_.stations.at(metro.stations.front()).node.value);
+    return {.origin = NodePosition(first.id) + vec3{0.0F, DeckHeight(metro.axis), 0.0F},
+            .along = AlongOf(metro.axis),
+            .across = AcrossOf(metro.axis),
+            .edge = -static_cast<float>(metro.axis == sim::LineAxis::Row ? first.x : first.z)};
 }
 
-vec3 CityView::StationStairsBottom(std::uint32_t station) const {
-    // On the pavement beside the street that runs along x.
-    return NodePosition(city_.stations.at(station).node) +
-           vec3{kStairsRun + kPlatformHalf, kStreetHeight, kStairsAcross};
+vec3 CityView::LinePoint(const LineFrame& frame, float meters, float across) const {
+    return frame.origin + (frame.along * (meters * kS)) + (frame.across * (across * kS));
 }
 
-vec3 CityView::StationStairsTop(std::uint32_t station) const {
+CityView::Stairs CityView::StairsOf(std::uint32_t station, sim::LineAxis axis,
+                                    float side) const {
+    // Along the pavement past the platform's far end, a step of 1.5 m for
+    // each meter they climb.
+    const float height = DeckHeight(axis);
+    const vec3 base = NodePosition(city_.stations.at(station).node) +
+                      (AcrossOf(axis) * (side * kStairsAcross));
+    const vec3 top = base + (AlongOf(axis) * (kPlatformHalfLength * kS)) + vec3{0.0F, height, 0.0F};
+    return {.top = top,
+            .bottom = base + (AlongOf(axis) * ((kPlatformHalfLength * kS) + (1.5F * height))) +
+                      vec3{0.0F, kStreetHeight, 0.0F}};
+}
+
+vec3 CityView::PlatformSpot(sim::EntityId robot, std::uint32_t station,
+                            sim::LineAxis axis, float side) const {
+    // Somewhere along the platform under its canopy, clear of the edge.
+    const std::uint64_t hash = robot.value * 2654435761ULL;
+    const float along = ((static_cast<float>(hash & 0xFFU) / 255.0F) * 2.0F - 1.0F) * 11.0F;
+    const float across = kPlatformInner + 0.6F +
+                         ((static_cast<float>((hash >> 8U) & 0xFFU) / 255.0F) *
+                          (kPlatformOuter - kPlatformInner - 1.0F));
     return NodePosition(city_.stations.at(station).node) +
-           vec3{kPlatformHalf, kTrackHeight, kStairsAcross};
+           vec3{0.0F, DeckHeight(axis), 0.0F} + (AlongOf(axis) * (along * kS)) +
+           (AcrossOf(axis) * (side * across * kS));
+}
+
+void CityView::AddStaticBeam(vec3 from, vec3 to, float width, float height, vec3 color) {
+    const vec3 span = to - from;
+    statics_.push_back(
+        {.mesh = assets_.cube.get(),
+         .transform = {.position = (from + to) * 0.5F,
+                       .rotationDegrees = {0.0F, glm::degrees(std::atan2(span.x, span.z)), 0.0F},
+                       .scale = {width, height, glm::length(vec3{span.x, 0.0F, span.z})}},
+         .material = assets_.palette->Get(color)});
 }
 
 void CityView::AddStaticBox(vec3 minimum, vec3 maximum, vec3 color, bool glows) {
@@ -497,101 +563,172 @@ void CityView::AddStaticBox(vec3 minimum, vec3 maximum, vec3 color, bool glows) 
 }
 
 void CityView::AddStations() {
-    const float deck = 0.7F * kS;
+    const float deck = kDeckThickness * kS;
     for (std::uint32_t station = 0; station < city_.stations.size(); ++station) {
-        const vec3 platform = StationPlatform(station);
-        // The platform deck, on four columns, under a canopy.
-        AddStaticBox(platform - vec3{kPlatformHalf, deck, kPlatformHalf},
-                     platform + vec3{kPlatformHalf, 0.0F, kPlatformHalf}, kTrackSteel);
-        for (const float x : {-1.0F, 1.0F}) {
-            for (const float z : {-1.0F, 1.0F}) {
-                const vec3 column = NodePosition(city_.stations[station].node) +
-                                    vec3{x * (kPlatformHalf - kS), 0.0F,
-                                         z * (kPlatformHalf - kS)};
-                AddStaticBox(column - vec3{0.45F * kS, 0.0F, 0.45F * kS},
-                             column + vec3{0.45F * kS, kTrackHeight - deck, 0.45F * kS},
-                             kTrackSteel);
+        const vec3 node = NodePosition(city_.stations[station].node);
+        for (const sim::LineAxis axis : {sim::LineAxis::Row, sim::LineAxis::Column}) {
+            if (!metro_.LineOf(station, axis)) {
+                continue;
+            }
+            const vec3 along = AlongOf(axis);
+            const vec3 across = AcrossOf(axis);
+            const vec3 up{0.0F, DeckHeight(axis), 0.0F};
+            const auto box = [&](float alongFrom, float alongTo, float acrossFrom,
+                                 float acrossTo, float bottom, float top, vec3 color,
+                                 bool glows = false) {
+                const vec3 a = node + (along * (alongFrom * kS)) + (across * (acrossFrom * kS));
+                const vec3 b = node + (along * (alongTo * kS)) + (across * (acrossTo * kS));
+                AddStaticBox(vec3{std::min(a.x, b.x), bottom, std::min(a.z, b.z)},
+                             vec3{std::max(a.x, b.x), top, std::max(a.z, b.z)}, color, glows);
+            };
+            for (const float side : {-1.0F, 1.0F}) {
+                const float middle = (kPlatformInner + kPlatformOuter) * 0.5F;
+                // The platform, its glowing edge, and a canopy on posts.
+                box(-kPlatformHalfLength, kPlatformHalfLength, side * kPlatformInner,
+                    side * kPlatformOuter, up.y - deck, up.y, kTrackSteel);
+                box(-kPlatformHalfLength, kPlatformHalfLength, side * kPlatformInner,
+                    side * (kPlatformInner + 0.25F), up.y, up.y + (0.03F * kS), kStationSign,
+                    true);
+                // The canopy is an open steel frame, so the riders waiting
+                // under it show from above.
+                for (const float edge : {kPlatformInner + 0.2F, kPlatformOuter}) {
+                    box(-12.0F, 12.0F, side * edge, side * (edge + 0.2F), up.y + (3.3F * kS),
+                        up.y + (3.5F * kS), kCanopy);
+                }
+                for (float rib = -12.0F; rib <= 12.01F; rib += 3.0F) {
+                    box(rib - 0.08F, rib + 0.08F, side * (kPlatformInner + 0.2F),
+                        side * (kPlatformOuter + 0.2F), up.y + (3.35F * kS), up.y + (3.45F * kS),
+                        kCanopy);
+                }
+                for (const float post : {-11.0F, 0.0F, 11.0F}) {
+                    box(post - 0.1F, post + 0.1F, side * (kPlatformOuter - 0.3F),
+                        side * (kPlatformOuter - 0.1F), up.y, up.y + (3.3F * kS), kTrackSteel);
+                }
+                for (const float column : {-11.0F, 11.0F}) {
+                    box(column - 0.45F, column + 0.45F, side * (middle - 0.45F),
+                        side * (middle + 0.45F), 0.0F, up.y - deck, kTrackSteel);
+                }
+                // Stairs down to the pavement, and the M sign at their foot.
+                const Stairs stairs = StairsOf(station, axis, side);
+                const vec3 run = vec3{stairs.top.x - stairs.bottom.x, 0.0F,
+                                      stairs.top.z - stairs.bottom.z};
+                const vec3 width = across * (0.8F * kS);
+                constexpr int kSteps = 16;
+                for (int step = 0; step < kSteps; ++step) {
+                    const float t = static_cast<float>(step + 1) / static_cast<float>(kSteps);
+                    const vec3 at = glm::mix(stairs.bottom, stairs.top, t);
+                    const vec3 a = at - width;
+                    const vec3 b = at + (run / static_cast<float>(kSteps)) + width;
+                    AddStaticBox(vec3{std::min(a.x, b.x), stairs.bottom.y, std::min(a.z, b.z)},
+                                 vec3{std::max(a.x, b.x), at.y, std::max(a.z, b.z)},
+                                 kTrackSteel);
+                }
+                const vec3 sign = stairs.bottom + (along * (1.1F * kS));
+                AddStaticBox(sign - vec3{0.08F * kS, 0.0F, 0.08F * kS},
+                             sign + vec3{0.08F * kS, 3.0F * kS, 0.08F * kS}, kTrackSteel);
+                AddStaticBox(sign + vec3{-0.28F * kS, 3.0F * kS, -0.28F * kS},
+                             sign + vec3{0.28F * kS, 3.6F * kS, 0.28F * kS}, kStationSign, true);
             }
         }
-        // A shelter over the crossing; the corners stay open to the sky.
-        AddStaticBox(platform + vec3{-2.4F * kS, 3.2F * kS, -2.4F * kS},
-                     platform + vec3{2.4F * kS, 3.4F * kS, 2.4F * kS}, kCanopy);
-        // Stairs up from the pavement, and the M sign at their foot.
-        const vec3 bottom = StationStairsBottom(station);
-        const vec3 top = StationStairsTop(station);
-        constexpr int kSteps = 16;
-        for (int step = 0; step < kSteps; ++step) {
-            const float t = static_cast<float>(step + 1) / static_cast<float>(kSteps);
-            const vec3 at = glm::mix(bottom, top, t);
-            AddStaticBox(vec3{at.x - (kStairsRun / kSteps), bottom.y, at.z - (0.8F * kS)},
-                         vec3{at.x, at.y, at.z + (0.8F * kS)}, kTrackSteel);
-        }
-        AddStaticBox(bottom + vec3{1.0F * kS, 0.0F, -1.2F * kS},
-                     bottom + vec3{1.15F * kS, 3.0F * kS, -1.05F * kS}, kTrackSteel);
-        AddStaticBox(bottom + vec3{0.8F * kS, 3.0F * kS, -1.3F * kS},
-                     bottom + vec3{1.35F * kS, 3.6F * kS, -0.95F * kS}, kStationSign,
-                     true);
     }
 }
 
 void CityView::AddElevatedLines() {
-    // Lines run over the streets of the station rows and columns, from the
-    // first station to the last, on columns between intersections.
-    std::map<std::int32_t, std::pair<std::int32_t, std::int32_t>> rows;
-    std::map<std::int32_t, std::pair<std::int32_t, std::int32_t>> columns;
-    for (const sim::Station& station : city_.stations) {
-        const sim::CityNode& node = city_.nodes.at(station.node.value);
-        auto [row, newRow] = rows.try_emplace(node.z, node.x, node.x);
-        row->second = {std::min(row->second.first, node.x), std::max(row->second.second, node.x)};
-        auto [column, newColumn] = columns.try_emplace(node.x, node.z, node.z);
-        column->second = {std::min(column->second.first, node.z),
-                          std::max(column->second.second, node.z)};
-    }
-    const float deck = 0.7F * kS;
-    const float halfWidth = 2.0F * kS;
-    const auto line = [&](vec3 from, vec3 to) {
-        const vec3 span = glm::abs(to - from);
-        const vec3 half = span.x > span.z ? vec3{0.0F, 0.0F, halfWidth}
-                                          : vec3{halfWidth, 0.0F, 0.0F};
-        const vec3 lift{0.0F, kTrackHeight, 0.0F};
-        AddStaticBox(glm::min(from, to) - half + lift - vec3{0.0F, deck, 0.0F},
-                     glm::max(from, to) + half + lift, kTrackSteel);
-        // Two rails on the deck.
-        const vec3 rail = half * 0.4F;
+    const float deck = kDeckThickness * kS;
+    const float tail = static_cast<float>(sim::kTailMeters);
+    for (std::uint32_t index = 0; index < metro_.Lines().size(); ++index) {
+        const sim::MetroLine& line = metro_.Lines()[index];
+        const LineFrame frame = FrameOf(index);
+        const float length = static_cast<float>(line.meters.back());
+        const float depotStart = frame.edge - kDepotGap;
+        const float depotEnd = depotStart - kDepotLength;
+        const float sidingHalf =
+            (static_cast<float>(line.trains - 1) * 0.5F * kSidingSpacing) + 2.5F;
+        const float height = frame.origin.y;
+        const auto slab = [&](float from, float to, float acrossFrom, float acrossTo,
+                              float bottom, float top, vec3 color, bool glows = false) {
+            const vec3 a = LinePoint(frame, from, acrossFrom);
+            const vec3 b = LinePoint(frame, to, acrossTo);
+            AddStaticBox(vec3{std::min(a.x, b.x), bottom, std::min(a.z, b.z)},
+                         vec3{std::max(a.x, b.x), top, std::max(a.z, b.z)}, color, glows);
+        };
+        const auto rails = [&](float from, float to, float across) {
+            for (const float rail : {-kRailGauge, kRailGauge}) {
+                slab(from, to, across + rail - 0.08F, across + rail + 0.08F, height,
+                     height + (0.2F * kS), kRail);
+            }
+        };
+        // Rails that turn from one track to another: a crossover or a
+        // siding's switch.
+        const auto switchRails = [&](float fromMeters, float fromAcross, float toMeters,
+                                     float toAcross) {
+            const vec3 a = LinePoint(frame, fromMeters, fromAcross);
+            const vec3 b = LinePoint(frame, toMeters, toAcross);
+            const vec3 aside = glm::normalize(glm::cross(b - a, vec3{0.0F, 1.0F, 0.0F}));
+            for (const float rail : {-kRailGauge, kRailGauge}) {
+                const vec3 offset = aside * (rail * kS);
+                AddStaticBeam(a + offset, b + offset, 0.16F * kS, 0.2F * kS, kRail);
+            }
+        };
+        const auto bumper = [&](float meters, float across, float facing) {
+            slab(meters, meters + (facing * 0.5F), across - 1.2F, across + 1.2F, height,
+                 height + (1.0F * kS), kBumper, true);
+        };
+
+        // The deck, from the depot to the far tail, and the tracks on it.
+        slab(depotStart, length + tail, -kDeckHalf, kDeckHalf, height - deck, height,
+             kTrackSteel);
+        slab(depotStart, depotStart + kDepotThroat, -sidingHalf, sidingHalf, height - deck,
+             height, kTrackSteel);
+        rails(depotStart + kDepotThroat, length + tail, -kTrackOffset);
+        rails(-tail, length + tail, kTrackOffset);
+        // Crossovers in the tails, where trains change ends and tracks.
+        switchRails(length + tail, -kTrackOffset, length + (tail * 0.5F), kTrackOffset);
+        switchRails(-tail, kTrackOffset, -tail * 0.5F, -kTrackOffset);
+        bumper(length + tail, -kTrackOffset, 1.0F);
+        bumper(length + tail, kTrackOffset, 1.0F);
+        bumper(-tail, kTrackOffset, -1.0F);
+        // Columns under the middle of every block, and the tails.
+        for (float meters = -40.0F; meters <= length + 40.0F + 1.0F; meters += 80.0F) {
+            slab(meters - 0.45F, meters + 0.45F, -0.45F, 0.45F, 0.0F, height - deck,
+                 kTrackSteel);
+        }
+
+        // The depot: a shed over a siding for each train.
+        slab(depotEnd, depotStart, -sidingHalf, sidingHalf, height - deck, height,
+             kTrackSteel);
+        for (std::uint32_t train = 0; train < line.trains; ++train) {
+            const float across = SidingOffset(line, train);
+            switchRails(depotStart + kDepotThroat, -kTrackOffset, depotStart, across);
+            rails(depotEnd + 0.5F, depotStart, across);
+            bumper(depotEnd + 0.5F, across, -1.0F);
+        }
+        const float roof = height + (5.5F * kS);
+        slab(depotEnd, depotStart, -sidingHalf, sidingHalf, roof, roof + (0.3F * kS),
+             kCanopy);
         for (const float side : {-1.0F, 1.0F}) {
-            const vec3 offset = rail * side;
-            const vec3 thin = span.x > span.z ? vec3{0.0F, 0.0F, 0.08F * kS}
-                                              : vec3{0.08F * kS, 0.0F, 0.0F};
-            AddStaticBox(glm::min(from, to) + offset - thin + lift,
-                         glm::max(from, to) + offset + thin + lift + vec3{0.0F, 0.2F * kS, 0.0F},
-                         kRail);
+            slab(depotEnd, depotStart, side * (sidingHalf - 0.3F), side * sidingHalf, height,
+                 roof, kConcrete);
         }
-        // Columns every half block, in the middle of the street.
-        const float length = glm::distance(from, to);
-        const int count = static_cast<int>(length / (40.0F * kS));
-        for (int index = 1; index < count; index += 2) {
-            const vec3 at = glm::mix(from, to, static_cast<float>(index) / static_cast<float>(count));
-            AddStaticBox(at - vec3{0.45F * kS, 0.0F, 0.45F * kS},
-                         at + vec3{0.45F * kS, kTrackHeight - deck, 0.45F * kS}, kTrackSteel);
+        slab(depotEnd, depotEnd + 0.3F, -sidingHalf, sidingHalf, height, roof, kConcrete);
+        slab(depotStart - 0.2F, depotStart, -sidingHalf, sidingHalf, roof - (0.4F * kS), roof,
+             kStationSign, true);
+        for (const float meters : {depotEnd + 1.0F, depotStart - 1.0F}) {
+            for (const float side : {-1.0F, 1.0F}) {
+                const float across = side * (sidingHalf - 1.0F);
+                slab(meters - 0.45F, meters + 0.45F, across - 0.45F, across + 0.45F, 0.0F,
+                     height - deck, kTrackSteel);
+            }
         }
-    };
-    for (const auto& [z, extent] : rows) {
-        line(vec3{static_cast<float>(extent.first) * kS, 0.0F, static_cast<float>(z) * kS},
-             vec3{static_cast<float>(extent.second) * kS, 0.0F, static_cast<float>(z) * kS});
-    }
-    for (const auto& [x, extent] : columns) {
-        line(vec3{static_cast<float>(x) * kS, 0.0F, static_cast<float>(extent.first) * kS},
-             vec3{static_cast<float>(x) * kS, 0.0F, static_cast<float>(extent.second) * kS});
     }
 }
 
+float CityView::SidingOffset(const sim::MetroLine& line, std::uint32_t train) {
+    return (static_cast<float>(train) - (static_cast<float>(line.trains - 1) * 0.5F)) *
+           kSidingSpacing;
+}
+
 namespace {
-// A train slides into its first platform this long before it waits there,
-// waits kTrainWaitMinutes with its doors open, rides, waits again at its
-// last platform and slides out.
-constexpr double kTrainSlideMinutes = 0.5;
-constexpr double kTrainWaitMinutes = 1.0;
-constexpr float kTrainSlideMeters = 60.0F;
 // The two cars' middles, ahead of and behind the train's middle.
 constexpr std::array<float, 2> kCarOffsets{-6.8F, 6.8F};
 constexpr float kCarFloorMeters = 0.45F;
@@ -605,67 +742,49 @@ constexpr float kDoorOutsideMeters = 2.0F;
 vec3 RightOf(vec3 forward) {
     return glm::normalize(glm::cross(forward, vec3{0.0F, 1.0F, 0.0F}));
 }
-
-float Ease(float t) { return t * t * (3.0F - (2.0F * t)); }
 }  // namespace
 
-std::optional<CityView::TrainPose> CityView::TrainAt(std::uint32_t from,
-                                                     std::uint32_t to,
-                                                     sim::Tick boardsAt,
-                                                     sim::Tick alightsAt,
-                                                     double tick) const {
-    if (from >= city_.stations.size() || to >= city_.stations.size() ||
-        alightsAt <= boardsAt) {
-        return std::nullopt;
+CityView::TrainPose CityView::TrainPoseOf(const sim::TrainState& train) const {
+    const sim::MetroLine& line = metro_.Lines().at(train.line);
+    const LineFrame frame = FrameOf(train.line);
+    const float depotStart = frame.edge - kDepotGap;
+    const float siding = SidingOffset(line, train.train);
+    const vec3 parked = LinePoint(frame, depotStart - (kDepotLength * 0.5F), siding);
+    switch (train.phase) {
+        case sim::TrainState::Phase::InDepot:
+            return {.position = parked, .forward = frame.along};
+        case sim::TrainState::Phase::Running:
+            return {.position = LinePoint(frame, static_cast<float>(train.meters),
+                                          static_cast<float>(train.side) * kTrackOffset),
+                    .forward = train.towardEnd ? frame.along : -frame.along};
+        case sim::TrainState::Phase::LeavingDepot:
+        case sim::TrainState::Phase::EnteringDepot:
+            break;
     }
-    const double departs = static_cast<double>(boardsAt + sim::kMetroWaitMinutes);
-    const double arrives = static_cast<double>(alightsAt);
-    const double comesIn = departs - kTrainWaitMinutes - kTrainSlideMinutes;
-    const double leaves = arrives + kTrainWaitMinutes + kTrainSlideMinutes;
-    if (tick < comesIn || tick >= leaves) {
-        return std::nullopt;
+    // Out of the siding, through its switch onto the up track, and on to
+    // the first platform; or back the same way.
+    const std::array<vec3, 4> way{parked, LinePoint(frame, depotStart, siding),
+                                  LinePoint(frame, depotStart + kDepotThroat, -kTrackOffset),
+                                  LinePoint(frame, 0.0F, -kTrackOffset)};
+    const bool leaving = train.phase == sim::TrainState::Phase::LeavingDepot;
+    const float t = std::clamp(static_cast<float>(leaving ? train.progress : 1.0 - train.progress),
+                               0.0F, 1.0F);
+    float total = 0.0F;
+    for (std::size_t index = 1; index < way.size(); ++index) {
+        total += glm::distance(way[index - 1], way[index]);
     }
-    // Along the row of the first station, then the column of the last.
-    const vec3 start = StationPlatform(from);
-    const vec3 end = StationPlatform(to);
-    const vec3 turn{end.x, start.y, start.z};
-    const float first = glm::distance(start, turn);
-    const float total = first + glm::distance(turn, end);
-    const auto direction = [](vec3 a, vec3 b, vec3 fallback) {
-        const vec3 offset = b - a;
-        return glm::length(offset) > 1e-6F ? glm::normalize(offset) : fallback;
-    };
-    const vec3 lastLeg = direction(turn, end, direction(start, turn, {0.0F, 0.0F, 1.0F}));
-    const vec3 firstLeg = direction(start, turn, lastLeg);
-    const float slide = kTrainSlideMeters * kS;
-    if (tick < departs - kTrainWaitMinutes) {
-        // Slowing into the platform.
-        const auto t = static_cast<float>((tick - comesIn) / kTrainSlideMinutes);
-        const float eased = 1.0F - ((1.0F - t) * (1.0F - t));
-        return TrainPose{.position = start - (firstLeg * (slide * (1.0F - eased))),
-                         .forward = firstLeg};
-    }
-    if (tick < departs) {
-        return TrainPose{.position = start, .forward = firstLeg};
-    }
-    if (tick < arrives) {
-        const float travelled =
-            Ease(static_cast<float>((tick - departs) / std::max(arrives - departs, 1e-6))) *
-            total;
-        if (travelled < first) {
-            return TrainPose{.position = glm::mix(start, turn, first > 0.0F ? travelled / first : 1.0F),
-                             .forward = firstLeg};
+    float remaining = t * total;
+    for (std::size_t index = 1; index < way.size(); ++index) {
+        const float length = glm::distance(way[index - 1], way[index]);
+        if (remaining <= length || index + 1 == way.size()) {
+            const vec3 forward = glm::normalize(way[index] - way[index - 1]);
+            return {.position = glm::mix(way[index - 1], way[index],
+                                         length > 0.0F ? std::min(remaining / length, 1.0F) : 1.0F),
+                    .forward = leaving ? forward : -forward};
         }
-        return TrainPose{.position = glm::mix(turn, end, (travelled - first) /
-                                                            std::max(total - first, 1e-6F)),
-                         .forward = lastLeg};
+        remaining -= length;
     }
-    if (tick < arrives + kTrainWaitMinutes) {
-        return TrainPose{.position = end, .forward = lastLeg};
-    }
-    // Pulling away.
-    const auto t = static_cast<float>((tick - arrives - kTrainWaitMinutes) / kTrainSlideMinutes);
-    return TrainPose{.position = end + (lastLeg * (slide * t * t)), .forward = lastLeg};
+    return {.position = parked, .forward = frame.along};
 }
 
 vec3 CityView::PlaceAboard(sim::EntityId robot, const TrainPose& train) const {
@@ -690,27 +809,33 @@ std::pair<vec3, vec3> CityView::DoorFor(sim::EntityId robot, const TrainPose& tr
             middle + (right * (side * kDoorInsideMeters * kS)) + floor};
 }
 
-void CityView::SubmitTrains(RenderQueue& queue, const WorldFrame& frame,
-                            double renderTick) {
-    // Riders who boarded together share a train.
-    std::set<std::tuple<std::uint32_t, std::uint32_t, sim::Tick>> trains;
-    for (const RobotFrame& robot : frame.robots) {
-        if (robot.alightsAt <= robot.boardsAt ||
-            !trains.insert({robot.rideFrom, robot.rideTo, robot.boardsAt}).second) {
-            continue;
-        }
-        const auto train = TrainAt(robot.rideFrom, robot.rideTo, robot.boardsAt,
-                                   robot.alightsAt, renderTick);
-        if (!train) {
-            continue;
-        }
-        const float yaw = glm::degrees(std::atan2(train->forward.x, train->forward.z));
+void CityView::SubmitTrains(RenderQueue& queue, double renderTick) {
+    for (const sim::TrainState& state : metro_.TrainsAt(renderTick)) {
+        const TrainPose train = TrainPoseOf(state);
+        const float yaw = glm::degrees(std::atan2(train.forward.x, train.forward.z));
         for (const float car : kCarOffsets) {
             SubmitModel(queue, Prop(PropKind::TrainCar),
-                        train->position + (train->forward * (car * kS)), yaw, 0.0F,
+                        train.position + (train.forward * (car * kS)), yaw, 0.0F,
                         vec3(1.0F), kS);
         }
     }
+}
+
+const std::vector<sim::Leg>& CityView::LegsOf(const RobotFrame& robot) {
+    RideLegs& ride = rideLegs_[robot.id.value];
+    if (!ride.known || ride.boardsAt != robot.boardsAt || ride.from != robot.rideFrom ||
+        ride.to != robot.rideTo) {
+        // The same trains the simulation planned the ride on.
+        ride = {.known = true,
+                .boardsAt = robot.boardsAt,
+                .from = robot.rideFrom,
+                .to = robot.rideTo,
+                .legs = robot.rideFrom < city_.stations.size() && robot.rideTo < city_.stations.size()
+                            ? metro_.Route(robot.rideFrom, robot.rideTo,
+                                           static_cast<double>(robot.boardsAt))
+                            : std::vector<sim::Leg>{}};
+    }
+    return ride.legs;
 }
 
 const std::vector<vec3>& CityView::StationRoute(sim::EntityId building,
@@ -728,17 +853,6 @@ const std::vector<vec3>& CityView::StationRoute(sim::EntityId building,
         }
     }
     return stationRoutes_.emplace(key, std::move(points)).first->second;
-}
-
-vec3 CityView::PlatformSpot(sim::EntityId robot, std::uint32_t station) const {
-    // One of the platform's open corners, clear of the tracks that cross it.
-    const std::uint64_t hash = robot.value * 2654435761ULL;
-    const auto corner = [&](unsigned shift) {
-        const float side = ((hash >> (shift + 8U)) & 1U) != 0U ? 1.0F : -1.0F;
-        const float along = static_cast<float>((hash >> shift) & 0xFFU) / 255.0F;
-        return side * ((2.8F * kS) + (along * (kPlatformHalf - (3.6F * kS))));
-    };
-    return StationPlatform(station) + vec3{corner(0U), 0.0F, corner(16U)};
 }
 
 const CityView::RoomWays* CityView::WaysOf(sim::EntityId room) {
@@ -1185,7 +1299,7 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
              .position = position + vec3{0.0F, 1.0F * scale, 0.0F},
              .radius = kWalkerPickRadius * (scale / kS)});
     }
-    SubmitTrains(queue, frame, renderTick);
+    SubmitTrains(queue, renderTick);
     if (open != shapes_.end()) {
         SubmitInterior(queue, frame, renderTick, selection);
     }
@@ -1523,64 +1637,98 @@ std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& rob
     double end = static_cast<double>(robot.arrivesAt);
     bool boarding = false;
     if (robot.alightsAt > robot.boardsAt) {
-        const double departs = static_cast<double>(robot.boardsAt + sim::kMetroWaitMinutes);
+        const std::vector<sim::Leg>& legs = LegsOf(robot);
+        if (legs.empty()) {
+            return std::nullopt;  // No train to ride: a ride from an old save.
+        }
+        const auto axisOf = [&](const sim::Leg& leg) { return metro_.Lines().at(leg.line).axis; };
+        const auto spotFor = [&](std::uint32_t station, const sim::Leg& leg) {
+            return PlatformSpot(robot.id, station, axisOf(leg), SideOf(leg.direction));
+        };
+        const auto stairsFor = [&](std::uint32_t station, const sim::Leg& leg) {
+            return StairsOf(station, axisOf(leg), SideOf(leg.direction));
+        };
+        const auto trainOf = [&](const sim::Leg& leg, double time) {
+            return TrainPoseOf(metro_.TrainAt(leg.line, leg.train, time));
+        };
+        // Up the stairs to the platform of a leg's first station.
+        const auto upTo = [&](const sim::Leg& leg) {
+            const Stairs stairs = stairsFor(leg.fromStation, leg);
+            exact(stairs.bottom);
+            exact(stairs.top);
+            exact(spotFor(leg.fromStation, leg));
+        };
+        // Out of the train standing at a leg's last station, and down.
+        const auto offAndDown = [&](const sim::Leg& leg) {
+            const TrainPose train = trainOf(leg, leg.arrives + 0.01);
+            const Stairs stairs = stairsFor(leg.toStation, leg);
+            const auto [outside, inside] = DoorFor(robot.id, train, stairs.top);
+            exact(PlaceAboard(robot.id, train));
+            exact(inside);
+            exact(outside);
+            exact(stairs.top);
+            exact(stairs.bottom);
+        };
         if (renderTick < static_cast<double>(robot.boardsAt)) {
             leave();
-            street(StationRoute(robot.from, robot.rideFrom), false);
-            exact(StationStairsBottom(robot.rideFrom));
-            exact(StationStairsTop(robot.rideFrom));
-            exact(PlatformSpot(robot.id, robot.rideFrom));
+            street(StationRoute(robot.from, legs.front().fromStation), false);
+            upTo(legs.front());
             end = static_cast<double>(robot.boardsAt);
-        } else if (renderTick < departs - kTrainWaitMinutes) {
-            return Placement{.position = PlatformSpot(robot.id, robot.rideFrom),
-                             .direction = {0.0F, 0.0F, 1.0F},
-                             .building = {}};
-        } else if (renderTick < departs) {
-            // Into the waiting train: to the nearer door and on to a place.
-            const auto train = TrainAt(robot.rideFrom, robot.rideTo, robot.boardsAt,
-                                       robot.alightsAt, renderTick);
-            if (!train) {
-                return std::nullopt;
-            }
-            const vec3 spot = PlatformSpot(robot.id, robot.rideFrom);
-            const auto [outside, inside] = DoorFor(robot.id, *train, spot);
-            exact(spot);
-            exact(outside);
-            exact(inside);
-            exact(PlaceAboard(robot.id, *train));
-            start = departs - kTrainWaitMinutes;
-            end = departs;
-            boarding = true;
-        } else if (renderTick < static_cast<double>(robot.alightsAt)) {
-            const auto train = TrainAt(robot.rideFrom, robot.rideTo, robot.boardsAt,
-                                       robot.alightsAt, renderTick);
-            if (!train) {
-                return std::nullopt;
-            }
-            return Placement{.position = PlaceAboard(robot.id, *train),
-                             .direction = RightOf(train->forward),
-                             .building = {},
-                             .aboard = true,
-                             .riding = true};
         } else {
-            // Out of the train through the door nearer the platform spot,
-            // which waits a minute with its doors open.
-            const auto train = TrainAt(robot.rideFrom, robot.rideTo, robot.boardsAt,
-                                       robot.alightsAt,
-                                       static_cast<double>(robot.alightsAt));
-            const vec3 spot = PlatformSpot(robot.id, robot.rideTo);
-            if (train) {
-                const auto [outside, inside] = DoorFor(robot.id, *train, spot);
-                exact(PlaceAboard(robot.id, *train));
-                exact(inside);
-                exact(outside);
+            for (std::size_t index = 0; index < legs.size(); ++index) {
+                const sim::Leg& leg = legs[index];
+                const double doors = leg.departs - sim::kDwellMinutes;
+                if (renderTick < doors) {
+                    // On the platform, facing the track.
+                    return Placement{.position = spotFor(leg.fromStation, leg),
+                                     .direction = AcrossOf(axisOf(leg)) * -SideOf(leg.direction),
+                                     .building = {}};
+                }
+                if (renderTick < leg.departs) {
+                    // Into the standing train: to the nearer door and a place.
+                    const TrainPose train = trainOf(leg, renderTick);
+                    const vec3 spot = spotFor(leg.fromStation, leg);
+                    const auto [outside, inside] = DoorFor(robot.id, train, spot);
+                    exact(spot);
+                    exact(outside);
+                    exact(inside);
+                    exact(PlaceAboard(robot.id, train));
+                    start = doors;
+                    end = leg.departs;
+                    boarding = true;
+                    break;
+                }
+                if (renderTick < leg.arrives) {
+                    const TrainPose train = trainOf(leg, renderTick);
+                    return Placement{.position = PlaceAboard(robot.id, train),
+                                     .direction = RightOf(train.forward),
+                                     .building = {},
+                                     .aboard = true,
+                                     .riding = true};
+                }
+                if (index + 1 < legs.size()) {
+                    // Changing lines: down to the street and up to the
+                    // other line's platform, then wait there.
+                    const sim::Leg& next = legs[index + 1];
+                    const double changed = std::min(leg.arrives + sim::kTransferMinutes,
+                                                    next.departs - sim::kDwellMinutes);
+                    if (renderTick < changed) {
+                        offAndDown(leg);
+                        exact(NodePosition(city_.stations.at(leg.toStation).node) +
+                              vec3{0.0F, kStreetHeight, 0.0F});
+                        upTo(next);
+                        start = leg.arrives;
+                        end = changed;
+                        break;
+                    }
+                    continue;
+                }
+                offAndDown(leg);
+                street(StationRoute(robot.to, leg.toStation), true);
+                arrive();
+                start = leg.arrives;
+                break;
             }
-            exact(spot);
-            exact(StationStairsTop(robot.rideTo));
-            exact(StationStairsBottom(robot.rideTo));
-            street(StationRoute(robot.to, robot.rideTo), true);
-            arrive();
-            start = static_cast<double>(robot.alightsAt);
         }
     } else {
         leave();

@@ -37,4 +37,8 @@ namespace mechapunk::sim::migrations {
 // Version 7 to 8: the world gets weather, dry for its first six hours.
 [[nodiscard]] std::expected<void, std::string> V7ToV8(SaveDocument& world);
 
+// Version 8 to 9: robots riding the metro change lines at their last
+// station, that is, they don't.
+[[nodiscard]] std::expected<void, std::string> V8ToV9(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

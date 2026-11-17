@@ -105,6 +105,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 7,
               .summary = "weather",
               .apply = &migrations::V7ToV8},
+    Migration{.fromVersion = 8,
+              .summary = "metro timetable and changing lines",
+              .apply = &migrations::V8ToV9},
 };
 }  // namespace
 

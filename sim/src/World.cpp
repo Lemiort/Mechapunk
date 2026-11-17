@@ -169,7 +169,10 @@ std::string RandomRobotName(Pcg32& random) {
 }
 
 World::World(WorldState state)
-    : state_(std::move(state)), routes_(state_.city), rooms_(state_.city) {
+    : state_(std::move(state)),
+      routes_(state_.city),
+      rooms_(state_.city),
+      metro_(state_.city) {
     for (const Robot& robot : state_.robots) {
         if (robot.activity == RobotActivity::Visiting) {
             ++reserved_[robot.location.value];
@@ -398,6 +401,7 @@ void World::Arrive(Robot& robot) {
     robot.location = robot.destination;
     robot.destination = EntityId{};
     robot.rideFrom = 0;
+    robot.rideVia = 0;
     robot.rideTo = 0;
     robot.boardsAt = 0;
     robot.alightsAt = 0;
@@ -547,6 +551,7 @@ void World::StartWalk(Robot& robot, EntityId destination) {
     std::int64_t fare = 0;
     if (trip.metro) {
         robot.rideFrom = trip.fromStation;
+        robot.rideVia = trip.viaStation;
         robot.rideTo = trip.toStation;
         robot.boardsAt = state_.tick + trip.minutesToStation;
         robot.alightsAt = robot.boardsAt + trip.minutesUnderground;
@@ -554,6 +559,7 @@ void World::StartWalk(Robot& robot, EntityId destination) {
         robot.credits -= fare;
     } else {
         robot.rideFrom = 0;
+        robot.rideVia = 0;
         robot.rideTo = 0;
         robot.boardsAt = 0;
         robot.alightsAt = 0;
@@ -571,6 +577,7 @@ void World::StartWalk(Robot& robot, EntityId destination) {
           .credits = fare,
           .metro = trip.metro,
           .fromStation = trip.fromStation,
+          .viaStation = trip.viaStation,
           .toStation = trip.toStation});
 }
 
@@ -735,6 +742,15 @@ std::string World::Describe(const SimEvent& event) const {
         case EventKind::Departed:
             if (event.metro) {
                 const auto& stations = state_.city.stations;
+                if (event.viaStation != event.toStation) {
+                    return std::format(
+                        "{}  {} left {} for {} ({} min, by metro from {} to {}, "
+                        "changing at {})",
+                        when, who, room, DescribeRoom(event.otherRoom), event.minutes,
+                        stations.at(event.fromStation).name,
+                        stations.at(event.toStation).name,
+                        stations.at(event.viaStation).name);
+                }
                 return std::format(
                     "{}  {} left {} for {} ({} min, by metro from {} to {})",
                     when, who, room, DescribeRoom(event.otherRoom),
@@ -940,6 +956,7 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                              robot.boardsAt <= robot.alightsAt &&
                              robot.alightsAt <= robot.nextActionAt &&
                              robot.rideFrom < city.stations.size() &&
+                             robot.rideVia < city.stations.size() &&
                              robot.rideTo < city.stations.size()));
             }
             return false;
