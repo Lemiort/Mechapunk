@@ -34,6 +34,22 @@ void SetOwner(sim::WorldState& state, sim::EntityId room, sim::EntityId owner) {
     }
 }
 
+// A studio nobody lives in.
+sim::EntityId VacantStudio(const sim::World& world) {
+    std::set<std::uint64_t> homes;
+    for (const sim::Robot& robot : world.State().robots) {
+        homes.insert(robot.apartment.value);
+    }
+    for (const sim::Building& building : world.State().city.buildings) {
+        for (const sim::Room& room : building.rooms) {
+            if (room.apartmentClass == sim::ApartmentClass::Studio && !homes.contains(room.id.value)) {
+                return room.id;
+            }
+        }
+    }
+    return {};
+}
+
 sim::World Load(sim::WorldState state) {
     auto world = sim::World::FromState(std::move(state));
     EXPECT_TRUE(world.has_value()) << world.error();
@@ -228,7 +244,12 @@ TEST(Careers, OwnersBehindOnUpkeepSellAndStay) {
     ASSERT_TRUE(index);
     sim::Robot& robot = state.robots[*index];
     const sim::EntityId id = robot.id;
-    const sim::EntityId home = robot.apartment;
+    // It owns and lives in a studio nobody else lives in.
+    const sim::EntityId home = VacantStudio(start);
+    ASSERT_TRUE(home.IsValid());
+    SetOwner(state, home, id);
+    robot.apartment = home;
+    robot.location = home;
     robot.workspace = {};
     robot.commuteAt = sim::kNoCommute;
     robot.savings = 0;

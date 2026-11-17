@@ -24,7 +24,7 @@ namespace mechapunk::sim {
 // them later. Corporations have owners (robots, banks or other
 // corporations) who share their profits.
 
-enum class OrganizationKind : std::uint8_t { Corporation, Bank, CentralBank };
+enum class OrganizationKind : std::uint8_t { Corporation, Bank, CentralBank, Government };
 
 // What a corporation lives on.
 enum class Sector : std::uint8_t {
@@ -34,6 +34,7 @@ enum class Sector : std::uint8_t {
     Utilities,  // Power and water: paid upkeep for every lived-in apartment.
     Transit,    // The metro: paid fares.
     Banking,    // Banks and the central bank: paid back with interest.
+    Government, // The city's housing office: dorm rents.
 };
 
 struct Share {
@@ -122,6 +123,7 @@ struct DayCounters {
     std::int64_t jobsFound{};
     std::int64_t movedUp{};
     std::int64_t evictions{};
+    std::int64_t movedInTogether{};
     std::int64_t newFriendships{};
     std::int64_t newRivalries{};
     std::int64_t arrivals{};
@@ -156,6 +158,7 @@ struct DailyStats {
     std::int64_t robotSavings{};  // Held by banks for robots.
     std::int64_t corporationMoney{};
     std::int64_t bankMoney{};
+    std::int64_t governmentMoney{};
     std::int64_t createdTotal{};
     std::int64_t destroyedTotal{};
     std::int64_t robotDebt{};
@@ -180,6 +183,10 @@ struct DailyStats {
     std::int64_t corporateApartments{};
     std::int64_t vacantApartments{};
     std::int64_t shareholders{};  // Robots owning part of an organization.
+    // Robots living in each class of apartment, ApartmentClass order from
+    // dorm rooms; and robots sharing a home with someone.
+    std::array<std::int64_t, 5> residentsByClass{};
+    std::int64_t sharing{};
 };
 
 struct Economy {

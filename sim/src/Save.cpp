@@ -48,6 +48,13 @@ struct glz::meta<mechapunk::sim::RoomKind> {
         Arcade, "shop", Shop, "clinic", Clinic, "blackMarket", BlackMarket);
 };
 template <>
+struct glz::meta<mechapunk::sim::ApartmentClass> {
+    using enum mechapunk::sim::ApartmentClass;
+    static constexpr auto value =
+        enumerate("none", None, "dorm", Dorm, "studio", Studio, "oneBedroom", OneBedroom,
+                  "twoBedroom", TwoBedroom, "penthouse", Penthouse);
+};
+template <>
 struct glz::meta<mechapunk::sim::RobotActivity> {
     using enum mechapunk::sim::RobotActivity;
     static constexpr auto value =
@@ -74,20 +81,22 @@ struct glz::meta<mechapunk::sim::MemoryKind> {
         "evicted", Evicted, "lostFriend", LostFriend, "arrivedInCity",
         ArrivedInCity, "gotBadPart", GotBadPart, "boughtProperty",
         BoughtProperty, "soldHome", SoldHome, "tookLoan", TookLoan,
-        "inherited", Inherited);
+        "inherited", Inherited, "movedInTogether", MovedInTogether);
 };
 template <>
 struct glz::meta<mechapunk::sim::OrganizationKind> {
     using enum mechapunk::sim::OrganizationKind;
     static constexpr auto value = enumerate("corporation", Corporation, "bank", Bank,
-                                            "centralBank", CentralBank);
+                                            "centralBank", CentralBank, "government",
+                                            Government);
 };
 template <>
 struct glz::meta<mechapunk::sim::Sector> {
     using enum mechapunk::sim::Sector;
     static constexpr auto value =
         enumerate("industry", Industry, "venues", Venues, "housing", Housing, "utilities",
-                  Utilities, "transit", Transit, "banking", Banking);
+                  Utilities, "transit", Transit, "banking", Banking, "government",
+                  Government);
 };
 template <>
 struct glz::meta<mechapunk::sim::EmissionReason> {
@@ -136,6 +145,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 10,
               .summary = "daily budgets",
               .apply = &migrations::V10ToV11},
+    Migration{.fromVersion = 11,
+              .summary = "apartment classes and the city's housing office",
+              .apply = &migrations::V11ToV12},
 };
 }  // namespace
 

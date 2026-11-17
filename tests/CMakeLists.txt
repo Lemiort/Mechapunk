@@ -5,6 +5,7 @@ add_executable(sim_tests
     CareersTests.cpp
     CityTests.cpp
     EconomyTests.cpp
+    HousingTests.cpp
     LifeCycleTests.cpp
     MetroTests.cpp
     RandomTests.cpp

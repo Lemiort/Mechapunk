@@ -31,6 +31,10 @@ constexpr std::int64_t kRobotDebtShifts = 5;
 // does, and the nights of rent it keeps after paying.
 constexpr std::uint32_t kBuyPercent = 3;
 constexpr std::int64_t kBuyReserveNights = 20;
+// A mortgage needs this much of the price down, and lends at most this many
+// shifts' pay.
+constexpr std::int64_t kDepositPercent = 20;
+constexpr std::int64_t kMortgageShifts = 60;
 // Each night, the chance a robot sells an apartment nobody lives in.
 constexpr std::uint32_t kSellVacantPercent = 20;
 constexpr std::uint32_t kMinPayPercent = 50;
@@ -89,6 +93,7 @@ std::string_view SectorName(Sector sector) noexcept {
         case Sector::Utilities: return "utilities";
         case Sector::Transit: return "transit";
         case Sector::Banking: return "banking";
+        case Sector::Government: return "government";
     }
     return "";
 }
@@ -142,6 +147,7 @@ void World::FoundEconomy(std::uint64_t seed) {
         found(std::string{name}, OrganizationKind::Bank, Sector::Banking);
     }
     found("Habitat Trust", OrganizationKind::Corporation, Sector::Housing);
+    found("City Housing Office", OrganizationKind::Government, Sector::Government);
     found("Gridline Power & Water", OrganizationKind::Corporation, Sector::Utilities);
     found("Metro Authority", OrganizationKind::Corporation, Sector::Transit);
 
@@ -204,17 +210,14 @@ void World::FoundEconomy(std::uint64_t seed) {
         }
     }
 
-    // Robots own the apartments they live in; the trust owns the rest.
-    Organization& trust = economy.organizations.at(banks.back() + 1);
-    std::unordered_map<std::uint64_t, EntityId> resident;
-    for (const Robot& robot : state_.robots) {
-        resident.try_emplace(robot.apartment.value, robot.id);
-    }
+    // The city's housing office owns the dorms everyone starts in; the
+    // trust owns every other apartment, to let or sell.
+    const EntityId trust = economy.organizations.at(banks.back() + 1).id;
+    const EntityId office = economy.organizations.at(banks.back() + 2).id;
     for (Building& building : state_.city.buildings) {
         for (Room& room : building.rooms) {
             if (room.kind == RoomKind::Apartment) {
-                const auto found = resident.find(room.id.value);
-                room.owner = found != resident.end() ? found->second : trust.id;
+                room.owner = room.apartmentClass == ApartmentClass::Dorm ? office : trust;
             }
         }
     }
@@ -226,6 +229,7 @@ void World::FoundEconomy(std::uint64_t seed) {
             case Sector::Housing:
             case Sector::Utilities:
             case Sector::Transit:
+            case Sector::Government:
                 organization.credits += 1000 + (population / 2);
                 break;
             case Sector::Banking:
@@ -245,7 +249,8 @@ void World::FoundEconomy(std::uint64_t seed) {
     }
     const EntityId central = economy.organizations.front().id;
     for (Organization& organization : economy.organizations) {
-        organization.bank = organization.kind == OrganizationKind::Corporation
+        organization.bank = organization.kind == OrganizationKind::Corporation ||
+                                    organization.kind == OrganizationKind::Government
                                 ? economy.organizations.at(banks.at(random.UniformInt(
                                       0, static_cast<std::uint32_t>(banks.size() - 1)))).id
                                 : (organization.kind == OrganizationKind::Bank ? central : EntityId{});
@@ -263,8 +268,9 @@ void World::FoundEconomy(std::uint64_t seed) {
 
     // Owners: one to three robots or banks for every corporation and bank.
     for (Organization& organization : economy.organizations) {
-        if (organization.kind == OrganizationKind::CentralBank) {
-            continue;
+        if (organization.kind == OrganizationKind::CentralBank ||
+            organization.kind == OrganizationKind::Government) {
+            continue;  // Public: nobody's to own.
         }
         const std::uint32_t owners = random.UniformInt(1, 3);
         for (std::uint32_t index = 0; index < owners; ++index) {
@@ -692,6 +698,52 @@ void World::TradeProperty() {
             loan.owed -= repaid;
         }
     }
+    // Robots with a job and a fifth of the price saved buy their first
+    // home with a mortgage: an empty studio or flat of the trust's, and
+    // they move in.
+    std::unordered_set<std::uint64_t> taken = lived;
+    for (Robot& robot : state_.robots) {
+        const auto home = rooms_.Find(robot.apartment);
+        if (!home || home->room->owner == robot.id || !robot.workspace.IsValid() ||
+            robot.activity == RobotActivity::Walking || LoanOf(robot.id) != nullptr ||
+            robot.rentOwed > 0 || state_.random.UniformInt(1, 100) > kBuyPercent) {
+            continue;
+        }
+        const std::int64_t means = robot.credits + robot.savings;
+        const std::int64_t mortgage = kMortgageShifts * PayOf(robot);
+        // The dearest it can put a fifth down on, keeping a month's bills.
+        const Room* best = nullptr;
+        for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+            const Room& room = *apartment.room;
+            if (room.owner != housing_ || taken.contains(room.id.value) ||
+                Sleeps(room.apartmentClass) != 1 || room.rent <= home->room->rent) {
+                continue;
+            }
+            const std::int64_t price = PriceOf(room);
+            const std::int64_t deposit = price * kDepositPercent / 100;
+            if (means < deposit + (kBuyReserveNights * UpkeepOf(room)) || price - deposit > mortgage ||
+                (best != nullptr && room.rent <= best->rent)) {
+                continue;
+            }
+            best = &room;
+        }
+        if (best == nullptr) {
+            continue;
+        }
+        const std::int64_t price = PriceOf(*best);
+        const std::int64_t own = std::min(means - (kBuyReserveNights * UpkeepOf(*best)), price);
+        Withdraw(robot, own - robot.credits);
+        Lend(robot.bank, robot.id, price - std::min(own, robot.credits));
+        Transfer(best->id, robot.id, price);
+        taken.insert(best->id.value);
+        robot.apartment = best->id;
+        Remember(robot, MemoryKind::MovedUp, {}, best->id);
+        if (robot.activity == RobotActivity::Resting) {
+            StartWalk(robot, best->id);  // Moving into its own home tonight.
+        }
+    }
+    CountResidents();
+
     // Robots with savings buy: first the home they rent from the trust,
     // then a let apartment of the trust's to collect its rent.
     std::vector<EntityId> letByTrust;
@@ -842,12 +894,12 @@ void World::SettleEconomy() {
         if (spare <= 0) {
             continue;
         }
-        // A bank's credits are mostly its savers' money: it pays out only
-        // from the interest it earned.
-        std::int64_t payout = spare * kDividendPercent / 100;
-        if (organization.kind == OrganizationKind::Bank) {
-            payout = std::min(payout, organization.today.revenue * kDividendPercent / 100);
-        }
+        // Dividends come out of the day's profit, never the capital; a
+        // bank's credits are mostly its savers' money besides.
+        const Books& books = organization.today;
+        const std::int64_t profit =
+            books.revenue - (books.wages + books.supplies + books.upkeep + books.rent);
+        std::int64_t payout = std::min(spare, profit) * kDividendPercent / 100;
         if (payout <= 0) {
             continue;
         }
@@ -919,6 +971,9 @@ void World::RecordStatistics() {
             case OrganizationKind::Corporation:
                 stats.corporationMoney += organization.credits;
                 break;
+            case OrganizationKind::Government:
+                stats.governmentMoney += organization.credits;
+                break;
             default:
                 stats.bankMoney += organization.credits;
                 break;
@@ -977,6 +1032,10 @@ void World::RecordStatistics() {
         stats.lonely += friendly ? 0 : 1;
         const auto home = rooms_.Find(robot.apartment);
         stats.broke += robot.credits + robot.savings < RentOf(robot) ? 1 : 0;
+        if (home && home->room->apartmentClass != ApartmentClass::None) {
+            ++stats.residentsByClass.at(static_cast<std::size_t>(home->room->apartmentClass) - 1);
+            stats.sharing += ResidentsOf(robot.apartment) > 1 ? 1 : 0;
+        }
         stats.behindOnBills += robot.rentOwed > 0 ? 1 : 0;
         if (home && home->room->owner == robot.id) {
             ++stats.homeowners;
@@ -1026,7 +1085,7 @@ void World::RecordStatistics() {
     }
     stats.giniWealth = GiniPerMille(std::move(wealth));
     stats.moneySupply = stats.robotMoney + stats.corporationMoney + stats.bankMoney +
-                        state.economy.supplyMarket;
+                        stats.governmentMoney + state.economy.supplyMarket;
     stats.createdTotal = state.economy.created;
     stats.destroyedTotal = state.economy.destroyed;
     state_.history.push_back(stats);

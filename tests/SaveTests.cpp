@@ -177,14 +177,27 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v11-city.json";
+        kFixtureDirectory / "saves" / "v12-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
-    // Saved with venue staff,
+    // Saved with robots still in dorms and others moved on,
+    std::set<sim::ApartmentClass> lived;
+    for (const sim::Robot& robot : state->robots) {
+        for (const sim::Building& building : state->city.buildings) {
+            for (const sim::Room& room : building.rooms) {
+                if (room.id == robot.apartment) {
+                    lived.insert(room.apartmentClass);
+                }
+            }
+        }
+    }
+    EXPECT_TRUE(lived.contains(sim::ApartmentClass::Dorm));
+    EXPECT_GE(lived.size(), 2U);
+    // venue staff,
     EXPECT_TRUE(std::ranges::any_of(state->robots, [&](const sim::Robot& robot) {
         for (const sim::Building& building : state->city.buildings) {
             for (const sim::Room& room : building.rooms) {
@@ -517,6 +530,32 @@ TEST(Save, Version10FixtureMigratesAndRuns) {
     for (const sim::Robot& robot : state->robots) {
         EXPECT_EQ(robot.spentToday, 0) << robot.name;
     }
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 11 save's apartments all become studios, and the city gets a
+// housing office with nothing to its name yet; then it keeps running.
+TEST(Save, Version11FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v11-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    for (const sim::Building& building : state->city.buildings) {
+        for (const sim::Room& room : building.rooms) {
+            EXPECT_EQ(room.apartmentClass, room.kind == sim::RoomKind::Apartment
+                                               ? sim::ApartmentClass::Studio
+                                               : sim::ApartmentClass::None);
+        }
+    }
+    EXPECT_TRUE(std::ranges::any_of(state->economy.organizations, [](const sim::Organization& each) {
+        return each.kind == sim::OrganizationKind::Government;
+    }));
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(2 * sim::kMinutesPerDay);

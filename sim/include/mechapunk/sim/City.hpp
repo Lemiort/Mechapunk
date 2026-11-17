@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -49,6 +50,27 @@ enum class RoomKind : std::uint8_t {
     BlackMarket,  // Cheap repairs at night, sometimes with a dodgy part.
 };
 
+// Classes of apartment, from a government dorm room to a whole floor. Each
+// is bigger and dearer than the one before; a habitat floor holds
+// apartments of one class.
+enum class ApartmentClass : std::uint8_t {
+    None,  // Not an apartment.
+    Dorm,
+    Studio,
+    OneBedroom,
+    TwoBedroom,
+    Penthouse,
+};
+
+// "dorm room", "studio", "one-bedroom flat", ...
+[[nodiscard]] std::string_view ApartmentClassName(ApartmentClass kind) noexcept;
+// Apartments of a class on one floor: 12 dorm rooms down to 1 penthouse.
+[[nodiscard]] std::uint32_t ApartmentsPerFloor(ApartmentClass kind) noexcept;
+// Robots an apartment sleeps: one a bedroom; dorm rooms and studios one.
+[[nodiscard]] std::uint32_t Sleeps(ApartmentClass kind) noexcept;
+// Floor area in square meters.
+[[nodiscard]] std::uint32_t AreaOf(ApartmentClass kind) noexcept;
+
 // One room on one floor. Ids come from the world's entity counter, so a room
 // can be referenced directly, and robots always know which room they are in.
 struct Room {
@@ -63,6 +85,8 @@ struct Room {
     std::uint32_t rent{};
     // The robot or organization it belongs to.
     EntityId owner;
+    // Apartments only.
+    ApartmentClass apartmentClass{ApartmentClass::None};
 };
 
 // Daily working hours of a workplace.

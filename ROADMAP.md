@@ -69,6 +69,11 @@ Also done since the plan was written:
   till) paid from their takings. Robots spend on a daily budget from their
   pay and from savings beyond a rainy-day target, and supplies have a
   market price that follows industry's books.
+- Classes of home, each bigger and dearer: dorm rooms (34 m², twelve a
+  floor), studios, one-bedroom and two-bedroom flats, and penthouses that
+  take a whole floor. A new city starts everyone in the city housing
+  office's dorms; robots rent their way out, friends share a flat with a
+  bedroom each, and robots with a job buy their first home with a mortgage.
 - Transit: an elevated metro on a timetable. Every station row and column
   is a line with two tracks, on two levels so lines cross. Two-ended trains
   turn back over a crossover in the tail track past each end station, run

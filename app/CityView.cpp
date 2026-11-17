@@ -921,9 +921,12 @@ std::size_t CityView::SpotFor(sim::EntityId robot, sim::EntityId room, bool home
     // Guests use the first spots, staff the last staffSpots.
     const auto [first, last] = SpotRange(count, staffSpots, staff);
     if (home) {
+        // Each resident has its own bed and seat, in the order of their ids.
         const double minute = std::fmod(tick, static_cast<double>(sim::kMinutesPerDay));
         const bool night = minute >= kBedtime || minute < kWakeUp;
-        return std::min<std::size_t>(night ? 0 : 1, count - 1);
+        const auto found = residentIndex_.find(robot.value);
+        const std::size_t resident = found != residentIndex_.end() ? found->second : 0;
+        return std::min<std::size_t>((2 * resident) + (night ? 0 : 1), count - 1);
     }
     if (const auto found = assignedSpots_.find(robot.value);
         found != assignedSpots_.end() && found->second.room == room &&
@@ -1265,9 +1268,23 @@ void CityView::SubmitBox(RenderQueue& queue, vec3 minimum, vec3 maximum,
     }
 }
 
+void CityView::IndexResidents(const WorldFrame& frame) {
+    if (residentsTick_ == frame.tick && !residentIndex_.empty()) {
+        return;
+    }
+    residentsTick_ = frame.tick;
+    residentIndex_.clear();
+    std::unordered_map<std::uint64_t, std::size_t> counts;
+    // Frames list robots by id, so flatmates are numbered in id order.
+    for (const RobotFrame& robot : frame.robots) {
+        residentIndex_[robot.id.value] = counts[robot.apartment.value]++;
+    }
+}
+
 void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
                       double renderTick, const Selection& selection,
                       float streetFigureScale) {
+    IndexResidents(frame);
     robotMarkers_.clear();
     roomTiles_.clear();
     litLamps_.clear();
@@ -1428,13 +1445,15 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
         }
         // At bedtime robots at home walk from the sofa to the bed, and back
         // when they get up.
-        const auto homeWalk = [&]() -> std::optional<std::pair<vec3, vec3>> {
-            if (!room.home || room.spots.size() < 2) {
+        const auto homeWalk = [&](sim::EntityId robot) -> std::optional<std::pair<vec3, vec3>> {
+            const auto found = residentIndex_.find(robot.value);
+            const std::size_t bed = 2 * (found != residentIndex_.end() ? found->second : 0);
+            if (!room.home || room.spots.size() < bed + 2) {
                 return std::nullopt;
             }
             double since = minute - kBedtime;
-            std::size_t from = 1;
-            std::size_t to = 0;
+            std::size_t from = bed + 1;
+            std::size_t to = bed;
             if (since < 0.0 || since >= kHomeWalkMinutes) {
                 since = minute - kWakeUp;
                 std::swap(from, to);
@@ -1468,7 +1487,7 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
         };
         for (std::size_t index = 0; index < inside->second.size(); ++index) {
             const sim::EntityId robot = inside->second[index];
-            if (const auto walking = homeWalk()) {
+            if (const auto walking = homeWalk(robot)) {
                 const bool selected = robot == selection.robot;
                 const auto [origin, direction] = *walking;
                 const float phase =

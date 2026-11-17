@@ -318,6 +318,12 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
             day.giniWealth, day.topTenthShare, day.bottomHalfShare, day.homeowners,
             day.tenants, day.landlords, day.corporateApartments, day.vacantApartments,
             counted.propertySales, day.broke, day.behindOnBills);
+        std::println(
+            "   homes: {} in dorms, {} in studios, {} in flats, {} in two-bedroom flats, {} in "
+            "penthouses; {} sharing ({} moved in together); supplies at {}%",
+            day.residentsByClass[0], day.residentsByClass[1], day.residentsByClass[2],
+            day.residentsByClass[3], day.residentsByClass[4], day.sharing,
+            counted.movedInTogether, day.supplyPercent);
     }
 }
 

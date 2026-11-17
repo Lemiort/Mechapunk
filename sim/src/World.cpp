@@ -141,23 +141,27 @@ void Apply(Needs& needs, const NeedEffects& effects) {
 }
 
 // Picks a room of `kind` with space left, starting from a random one.
-EntityId AssignRoom(const RoomIndex& rooms, RoomKind kind,
-                    std::unordered_map<std::uint64_t, std::uint32_t>& used,
+// A dorm bed for a new robot; everyone starts out in the city's dorms.
+EntityId AssignDorm(const RoomIndex& rooms, std::unordered_map<std::uint64_t, std::uint32_t>& used,
                     Pcg32& random) {
-    const std::vector<RoomRef>& candidates = rooms.RoomsOfKind(kind);
-    if (candidates.empty()) {
-        throw std::logic_error("Generated city has no room of a needed kind");
+    std::vector<const Room*> dorms;
+    for (const RoomRef& apartment : rooms.RoomsOfKind(RoomKind::Apartment)) {
+        if (apartment.room->apartmentClass == ApartmentClass::Dorm) {
+            dorms.push_back(apartment.room);
+        }
     }
-    const auto start = random.UniformInt(
-        0, static_cast<std::uint32_t>(candidates.size() - 1));
-    for (std::size_t offset = 0; offset < candidates.size(); ++offset) {
-        const Room& room = *candidates[(start + offset) % candidates.size()].room;
+    if (dorms.empty()) {
+        throw std::logic_error("Generated city has no dorm rooms");
+    }
+    const auto start = random.UniformInt(0, static_cast<std::uint32_t>(dorms.size() - 1));
+    for (std::size_t offset = 0; offset < dorms.size(); ++offset) {
+        const Room& room = *dorms[(start + offset) % dorms.size()];
         if (used[room.id.value] < room.capacity) {
             ++used[room.id.value];
             return room.id;
         }
     }
-    throw std::logic_error("Generated city has too little capacity");
+    throw std::logic_error("Generated city has too few dorm beds");
 }
 // A job for a new robot: a venue short of staff on the shift it would work,
 // or failing that a workspace with room. Venues are staffed first, so every
@@ -208,6 +212,7 @@ World::World(WorldState state)
       rooms_(state_.city),
       metro_(state_.city) {
     IndexEconomy();
+    CountResidents();
     for (const Robot& robot : state_.robots) {
         if (robot.activity == RobotActivity::Visiting) {
             ++reserved_[robot.location.value];
@@ -239,8 +244,7 @@ World World::Generate(const WorldParams& params) {
         Robot robot;
         robot.name = RandomRobotName(population);
         robot.id = state.ids.Allocate();
-        robot.apartment =
-            AssignRoom(rooms, RoomKind::Apartment, used, population);
+        robot.apartment = AssignDorm(rooms, used, population);
         robot.workspace = AssignJob(rooms, robot.id, staff, population);
         robot.location = robot.apartment;
         robot.punctualityMinutes = population.UniformInt(
@@ -286,6 +290,7 @@ World World::Generate(const WorldParams& params) {
     World world(std::move(state));
     world.FoundEconomy(params.seed);
     world.IndexEconomy();
+    world.CountResidents();
     for (Robot& robot : world.state_.robots) {
         world.ScheduleNextCommute(robot);
     }
@@ -737,13 +742,28 @@ Tick World::LatestHomeTick(const Robot& robot) {
 }
 
 std::int64_t World::RentOf(const Robot& robot) const {
-    // Tenants pay rent; owners pay the upkeep of their home.
+    // Tenants share the rent; owners pay the upkeep of their home.
     const auto apartment = rooms_.Find(robot.apartment);
     if (!apartment) {
         return 0;
     }
-    return apartment->room->owner == robot.id ? UpkeepOf(*apartment->room)
-                                               : apartment->room->rent;
+    if (apartment->room->owner == robot.id) {
+        return UpkeepOf(*apartment->room);
+    }
+    const std::int64_t sharers = std::max<std::uint32_t>(1, ResidentsOf(robot.apartment));
+    return (static_cast<std::int64_t>(apartment->room->rent) + sharers - 1) / sharers;
+}
+
+std::uint32_t World::ResidentsOf(EntityId apartment) const {
+    const auto found = residents_.find(apartment.value);
+    return found != residents_.end() ? found->second : 0;
+}
+
+void World::CountResidents() {
+    residents_.clear();
+    for (const Robot& robot : state_.robots) {
+        ++residents_[robot.apartment.value];
+    }
 }
 
 void World::CollectRent() {

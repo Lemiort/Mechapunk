@@ -529,7 +529,10 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
                                 rules->price);
         }
     } else if (room.kind == sim::RoomKind::Apartment) {
-        ImGui::TextDisabled("%u cr a night, worth %lld cr", room.rent,
+        const std::string kind{sim::ApartmentClassName(room.apartmentClass)};
+        ImGui::TextDisabled("A %s of %u m2, sleeps %u; %u cr a night, worth %lld cr",
+                            kind.c_str(), sim::AreaOf(room.apartmentClass),
+                            sim::Sleeps(room.apartmentClass), room.rent,
                             static_cast<long long>(room.rent * sim::kPriceNights));
     }
     if (frame.economy != nullptr) {

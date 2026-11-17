@@ -294,6 +294,9 @@ private:
     void StartWalk(Robot& robot, EntityId destination);
     void ScheduleNextCommute(Robot& robot);
     [[nodiscard]] Tick LatestHomeTick(const Robot& robot);
+    // Robots living in an apartment.
+    [[nodiscard]] std::uint32_t ResidentsOf(EntityId apartment) const;
+    void CountResidents();
     // Going to a venue as a guest, not to work there.
     [[nodiscard]] bool IsGuestTrip(const Robot& robot, EntityId destination) const;
     void CollectRent();
@@ -400,6 +403,8 @@ private:
     // For every street node, its nearest station and the walk there.
     std::vector<std::uint32_t> nearestStation_;
     std::vector<std::uint32_t> metersToStation_;
+    // Robots living in each apartment.
+    std::unordered_map<std::uint64_t, std::uint32_t> residents_;
     // The loan of each borrower, as an index into economy.loans.
     std::unordered_map<std::uint64_t, std::size_t> loanOf_;
     EntityId centralBank_;

@@ -33,27 +33,34 @@ const sim::Organization* Find(const sim::WorldState& state, sim::Sector sector) 
 }
 }  // namespace
 
-// Corporations own every workspace and venue, robots the apartments they
-// live in, and the housing trust the rest; every corporation and bank has
-// owners and a bank to borrow from.
+// Corporations own every workspace and venue, the city's housing office the
+// dorms everyone starts in, and the housing trust every other apartment;
+// every corporation and bank has owners and a bank to borrow from.
 TEST(Economy, EverythingHasAnOwnerFromTheStart) {
     const sim::World world = sim::World::Generate({.seed = 4, .robots = 400});
     const sim::WorldState& state = world.State();
-    std::unordered_set<std::uint64_t> homes;
     for (const sim::Robot& robot : state.robots) {
-        homes.insert(robot.apartment.value);
         EXPECT_NE(world.FindOrganization(robot.bank), nullptr);
+        const auto home = world.Rooms().Find(robot.apartment);
+        ASSERT_TRUE(home.has_value());
+        EXPECT_EQ(home->room->apartmentClass, sim::ApartmentClass::Dorm) << robot.name;
     }
     const sim::Organization* trust = Find(state, sim::Sector::Housing);
     ASSERT_NE(trust, nullptr);
+    const sim::Organization* office = nullptr;
+    for (const sim::Organization& organization : state.economy.organizations) {
+        if (organization.kind == sim::OrganizationKind::Government) {
+            office = &organization;
+        }
+    }
+    ASSERT_NE(office, nullptr);
     for (const sim::Building& building : state.city.buildings) {
         for (const sim::Room& room : building.rooms) {
             if (room.kind == sim::RoomKind::Apartment) {
-                if (homes.contains(room.id.value)) {
-                    EXPECT_NE(world.FindRobot(room.owner), nullptr) << room.name;
-                } else {
-                    EXPECT_EQ(room.owner, trust->id) << room.name;
-                }
+                EXPECT_EQ(room.owner, room.apartmentClass == sim::ApartmentClass::Dorm
+                                          ? office->id
+                                          : trust->id)
+                    << room.name;
                 continue;
             }
             const sim::Organization* owner = world.FindOrganization(room.owner);
@@ -79,7 +86,8 @@ TEST(Economy, EverythingHasAnOwnerFromTheStart) {
         }
     }
     for (const sim::Organization& organization : state.economy.organizations) {
-        if (organization.kind != sim::OrganizationKind::CentralBank) {
+        if (organization.kind != sim::OrganizationKind::CentralBank &&
+            organization.kind != sim::OrganizationKind::Government) {
             EXPECT_FALSE(organization.owners.empty()) << organization.name;
             EXPECT_NE(world.FindOrganization(organization.bank), nullptr) << organization.name;
         }
@@ -213,8 +221,18 @@ TEST(Economy, ScrappedRobotsLeaveTheirThingsBehind) {
     robot.wear = sim::kMaxWear - 1;
     robot.bonds.clear();
     const sim::EntityId id = robot.id;
-    const sim::EntityId home = robot.apartment;
     const sim::EntityId bank = robot.bank;
+    // It owns a studio it lets out.
+    sim::EntityId home;
+    for (sim::Building& building : state.city.buildings) {
+        for (sim::Room& room : building.rooms) {
+            if (!home.IsValid() && room.apartmentClass == sim::ApartmentClass::Studio) {
+                room.owner = id;
+                home = room.id;
+            }
+        }
+    }
+    ASSERT_TRUE(home.IsValid());
     auto world = sim::World::FromState(std::move(state));
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(1);

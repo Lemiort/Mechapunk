@@ -267,14 +267,25 @@ void DrawProperty(const std::vector<sim::DailyStats>& history) {
         Row("Homeowners", std::format("{} ({})", day.homeowners, Share(day.homeowners, day.population)));
         Row("Tenants", std::format("{}", day.tenants));
         Row("Landlords", std::format("{}", day.landlords));
-        Row("Let by corporations", std::format("{}", day.corporateApartments));
+        Row("Let by organizations", std::format("{}", day.corporateApartments));
         Row("Vacant", std::format("{}", day.vacantApartments));
         Row("Shareholders", std::format("{}", day.shareholders));
+        Row("In dorms / studios / flats / two-bedroom / penthouses",
+            std::format("{} / {} / {} / {} / {}", day.residentsByClass[0], day.residentsByClass[1],
+                        day.residentsByClass[2], day.residentsByClass[3], day.residentsByClass[4]));
+        Row("Sharing a home", std::format("{} ({} moved in together that day)", day.sharing,
+                                          day.counted.movedInTogether));
         Row("Sales that day", std::format("{} for {}", day.counted.propertySales,
                                           Credits(day.counted.propertySalesValue)));
         ImGui::EndTable();
     }
     PlotCount("Homeowners", history, [](const auto& d) { return d.homeowners; });
+    PlotCount("In dorms", history, [](const auto& d) { return d.residentsByClass[0]; });
+    PlotCount("In studios", history, [](const auto& d) { return d.residentsByClass[1]; });
+    PlotCount("In one-bedroom flats", history, [](const auto& d) { return d.residentsByClass[2]; });
+    PlotCount("In two-bedroom flats", history, [](const auto& d) { return d.residentsByClass[3]; });
+    PlotCount("In penthouses", history, [](const auto& d) { return d.residentsByClass[4]; });
+    PlotCount("Sharing a home", history, [](const auto& d) { return d.sharing; });
     PlotCount("Tenants", history, [](const auto& d) { return d.tenants; });
     PlotCount("Landlords", history, [](const auto& d) { return d.landlords; });
     PlotCount("Let by corporations", history, [](const auto& d) { return d.corporateApartments; });

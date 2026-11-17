@@ -177,6 +177,12 @@ void World::ReviewJobs() {
     }
 }
 
+namespace {
+// Each night, the chance in percent that a robot living alone in a rented
+// home asks its closest friend to move in together.
+constexpr std::uint32_t kShareHomePercent = 3;
+}  // namespace
+
 void World::ReviewHomes() {
     std::unordered_set<std::uint64_t> taken;
     for (const Robot& robot : state_.robots) {
@@ -263,6 +269,62 @@ void World::ReviewHomes() {
             Remember(robot, MemoryKind::MovedUp, {}, *nicer);
         }
     }
+
+    // Friends who rent move in together, into a flat with a bedroom each,
+    // when each can afford their share for a while.
+    for (Robot& robot : state_.robots) {
+        if (robot.activity == RobotActivity::Walking ||
+            state_.random.UniformInt(1, 100) > kShareHomePercent) {
+            continue;
+        }
+        const auto home = rooms_.Find(robot.apartment);
+        if (!home || home->room->owner == robot.id || ResidentsOf(robot.apartment) > 1) {
+            continue;
+        }
+        // Its closest friend who rents and lives alone.
+        Robot* mate = nullptr;
+        std::int32_t closest = 0;
+        for (const Bond& bond : robot.bonds) {
+            if (bond.level != BondLevel::Friend && bond.level != BondLevel::CloseFriend) {
+                continue;
+            }
+            Robot* other = MutableRobot(bond.robot);
+            if (other == nullptr || other->activity == RobotActivity::Walking ||
+                bond.affinity <= closest) {
+                continue;
+            }
+            const auto theirs = rooms_.Find(other->apartment);
+            if (!theirs || theirs->room->owner == other->id ||
+                ResidentsOf(other->apartment) > 1) {
+                continue;
+            }
+            closest = bond.affinity;
+            mate = other;
+        }
+        if (mate == nullptr) {
+            continue;
+        }
+        const std::int64_t means = std::min(robot.credits + robot.savings, mate->credits + mate->savings);
+        const auto shared = pick(
+            [](const Room& a, const Room& b) { return a.rent > b.rent; },
+            [&](const Room& room) {
+                if (room.capacity < 2) {
+                    return false;
+                }
+                const std::int64_t share = (room.rent + room.capacity - 1) / room.capacity;
+                return share * kAffordNights <= means;
+            });
+        if (!shared) {
+            continue;
+        }
+        move(robot, *shared);
+        move(*mate, *shared);
+        Remember(robot, MemoryKind::MovedInTogether, mate->id, *shared);
+        Remember(*mate, MemoryKind::MovedInTogether, robot.id, *shared);
+        CountResidents();
+    }
+    CountResidents();
+
 }
 
 }  // namespace mechapunk::sim

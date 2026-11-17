@@ -25,22 +25,28 @@ namespace {
 constexpr std::uint32_t kUnreachable = std::numeric_limits<std::uint32_t>::max();
 // One candidate street segment in this many is considered for removal.
 constexpr std::uint32_t kStreetRemovalOdds = 10;
-// Habitats at the city's edge have 30 to 60 apartments, five to ten floors;
-// toward the middle they rise to 90 to 180, up to thirty floors.
-constexpr std::uint32_t kMinApartments = 30;
-constexpr std::uint32_t kMaxApartments = 60;
-constexpr std::uint32_t kMinCentralApartments = 90;
-constexpr std::uint32_t kMaxCentralApartments = 180;
+// Habitats at the city's edge have five to ten floors of homes; toward the
+// middle they rise to fifteen to thirty.
+constexpr std::uint32_t kMinFloors = 5;
+constexpr std::uint32_t kMaxFloors = 10;
+constexpr std::uint32_t kMinCentralFloors = 15;
+constexpr std::uint32_t kMaxCentralFloors = 30;
 // Tall habitats get one more store, and bigger stores, so there is as much
-// room in venues for each resident as in a habitat of kTypicalApartments
+// room in venues for each resident as in a habitat of kTypicalResidents
 // with an average number of stores.
-constexpr std::uint32_t kApartmentsForExtraStore = 100;
-constexpr double kTypicalApartments = 45.0;
-constexpr std::uint32_t kApartmentsPerFloor = 6;
-// Daily rent of a habitat's lowest apartments; each floor up costs a credit
-// more.
+constexpr std::uint32_t kResidentsForExtraStore = 100;
+constexpr double kTypicalResidents = 45.0;
+// Daily rent of a habitat's lowest studios; each floor up costs a credit
+// more. Other classes cost a multiple, in percent; dorm rooms are cheap
+// whatever the floor.
 constexpr std::uint32_t kMinBaseRent = 25;
 constexpr std::uint32_t kMaxBaseRent = 40;
+constexpr std::uint32_t kDormRent = 8;
+// A new city has a dorm bed for every robot, and homes on the market for
+// this share of them, in percent.
+constexpr std::uint32_t kMarketHomesPercent = 60;
+// Habitats this central or more have penthouses on top.
+constexpr double kLuxuryCentrality = 0.3;
 constexpr std::uint32_t kMinStores = 2;
 constexpr std::uint32_t kMaxStores = 3;
 // Workplaces grow toward the middle the same way.
@@ -171,17 +177,20 @@ std::uint32_t GridSizeFor(std::uint32_t residents) {
     constexpr std::uint32_t kMinGridSize = 4;
     // Sizes at the average centrality of a grid's intersections, about 0.45.
     const double averageCentrality = 0.45 * Urbanity(residents);
-    const double averageApartments =
-        ((kMinApartments + kMaxApartments) / 2.0) +
-        ((((kMinCentralApartments + kMaxCentralApartments) -
-           (kMinApartments + kMaxApartments)) / 2.0) * averageCentrality);
+    const double averageFloors =
+        ((kMinFloors + kMaxFloors) / 2.0) +
+        ((((kMinCentralFloors + kMaxCentralFloors) - (kMinFloors + kMaxFloors)) / 2.0) *
+         averageCentrality);
     const double averageJobs =
         ((kMinWorkplaceJobs + kMaxWorkplaceJobs) / 2.0) +
         ((((kMinCentralJobs + kMaxCentralJobs) -
            (kMinWorkplaceJobs + kMaxWorkplaceJobs)) / 2.0) * averageCentrality);
+    // Dormitories sleep 12 a floor, other habitats about 5.
     constexpr double kBuildingsPerNode = 3.0;
-    const double buildings = std::ceil(residents / averageApartments) +
-                             std::ceil(residents / averageJobs);
+    const double habitats = std::ceil(residents / (12.0 * averageFloors)) +
+                            std::ceil(residents * (kMarketHomesPercent / 100.0) /
+                                      (5.0 * averageFloors));
+    const double buildings = habitats + std::ceil(residents / averageJobs);
     const auto size =
         static_cast<std::uint32_t>(std::ceil(std::sqrt(buildings / kBuildingsPerNode)));
     return std::max(kMinGridSize, size);
@@ -206,32 +215,73 @@ constexpr std::array kStoreOrder{
     RoomKind::Clinic,     RoomKind::Bar,         RoomKind::Arcade,
     RoomKind::Shop,       RoomKind::BlackMarket};
 
-// Ground-floor stores and apartments above. Store kinds rotate through every
-// venue kind so each city has some of each.
+std::uint32_t RentPercent(ApartmentClass kind) {
+    switch (kind) {
+        case ApartmentClass::OneBedroom: return 150;
+        case ApartmentClass::TwoBedroom: return 240;
+        case ApartmentClass::Penthouse: return 600;
+        default: return 100;
+    }
+}
+
+std::string_view RoomLabel(ApartmentClass kind) {
+    switch (kind) {
+        case ApartmentClass::Dorm: return "Dorm Room";
+        case ApartmentClass::Studio: return "Studio";
+        case ApartmentClass::OneBedroom: return "Flat";
+        case ApartmentClass::TwoBedroom: return "Two-Bedroom Flat";
+        case ApartmentClass::Penthouse: return "Penthouse";
+        default: return "Apartment";
+    }
+}
+
+// Ground-floor stores and homes above. A dormitory is dorm rooms on every
+// floor; other habitats have studios low down, flats above, two-bedroom
+// flats near the top, and in the middle of the city penthouses on top.
+// Store kinds rotate through every venue kind so each city has some of each.
 Building MakeHabitat(const CityParams& params, Pcg32& random,
                      std::vector<std::uint32_t>& buildingsAt,
                      EntityIdAllocator& ids, std::uint32_t number,
-                     std::uint32_t& storeRotation) {
+                     std::uint32_t& storeRotation, bool dormitory) {
     Building building{.id = ids.Allocate(),
-                      .name = std::format("Hab Block {}", number),
+                      .name = std::format("{} {}", dormitory ? "Dormitory" : "Hab Block", number),
                       .kind = BuildingKind::Habitat,
                       .entrance = RandomNodeInColumns(params, random, 0,
-                                                      params.gridSize / 2,
+                                                      dormitory ? params.gridSize / 4
+                                                                : params.gridSize / 2,
                                                       buildingsAt),
                       .floors = 1,
                       .shift = {},
                       .rooms = {}};
     const double centrality =
         Centrality(building.entrance, params.gridSize) * Urbanity(params.residents);
-    const std::uint32_t apartments = random.UniformInt(
-        Lerp(kMinApartments, kMinCentralApartments, centrality),
-        Lerp(kMaxApartments, kMaxCentralApartments, centrality));
+    const std::uint32_t floors = random.UniformInt(Lerp(kMinFloors, kMinCentralFloors, centrality),
+                                                   Lerp(kMaxFloors, kMaxCentralFloors, centrality));
+    std::vector<ApartmentClass> classes;
+    const bool luxury = !dormitory && centrality >= kLuxuryCentrality;
+    for (std::uint32_t floor = 1; floor <= floors; ++floor) {
+        if (dormitory) {
+            classes.push_back(ApartmentClass::Dorm);
+        } else if (luxury && floor + 2 > floors) {
+            classes.push_back(ApartmentClass::Penthouse);
+        } else if (floor * 3 <= floors) {
+            classes.push_back(ApartmentClass::Studio);
+        } else if (floor * 3 <= floors * 2) {
+            classes.push_back(ApartmentClass::OneBedroom);
+        } else {
+            classes.push_back(ApartmentClass::TwoBedroom);
+        }
+    }
+    std::uint32_t residents = 0;
+    for (const ApartmentClass kind : classes) {
+        residents += ApartmentsPerFloor(kind) * Sleeps(kind);
+    }
     const std::uint32_t stores = random.UniformInt(kMinStores, kMaxStores) +
-                                 (apartments >= kApartmentsForExtraStore ? 1 : 0);
+                                 (residents >= kResidentsForExtraStore ? 1 : 0);
     constexpr double kAverageStores = (kMinStores + kMaxStores) / 2.0;
     const double capacityScale =
-        std::max(1.0, (static_cast<double>(apartments) * kAverageStores) /
-                          (kTypicalApartments * static_cast<double>(stores)));
+        std::max(1.0, (static_cast<double>(residents) * kAverageStores) /
+                          (kTypicalResidents * static_cast<double>(stores)));
     for (std::uint32_t store = 0; store < stores; ++store) {
         const RoomKind kind = kStoreOrder.at(storeRotation++ % kStoreOrder.size());
         const VenueRules& rules = *FindVenueRules(kind);
@@ -246,18 +296,24 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
                  std::lround(static_cast<double>(capacity) * capacityScale))});
     }
     const std::uint32_t baseRent = random.UniformInt(kMinBaseRent, kMaxBaseRent);
-    for (std::uint32_t index = 0; index < apartments; ++index) {
-        const std::uint32_t floor = 1 + (index / kApartmentsPerFloor);
-        building.rooms.push_back(
-            {.id = ids.Allocate(),
-             .name = std::format("Apartment {}-{:02}", floor,
-                                 (index % kApartmentsPerFloor) + 1),
-             .kind = RoomKind::Apartment,
-             .floor = floor,
-             .capacity = 1,
-             .rent = baseRent + floor});
-        building.floors = floor + 1;
+    for (std::uint32_t floor = 1; floor <= floors; ++floor) {
+        const ApartmentClass kind = classes[floor - 1];
+        const std::uint32_t perFloor = ApartmentsPerFloor(kind);
+        for (std::uint32_t index = 0; index < perFloor; ++index) {
+            building.rooms.push_back(
+                {.id = ids.Allocate(),
+                 .name = perFloor == 1 ? std::format("{} {}", RoomLabel(kind), floor)
+                                       : std::format("{} {}-{:02}", RoomLabel(kind), floor, index + 1),
+                 .kind = RoomKind::Apartment,
+                 .floor = floor,
+                 .capacity = Sleeps(kind),
+                 .rent = kind == ApartmentClass::Dorm
+                             ? kDormRent + (floor / 4)
+                             : (baseRent + floor) * RentPercent(kind) / 100,
+                 .apartmentClass = kind});
+        }
     }
+    building.floors = floors + 1;
     return building;
 }
 
@@ -401,15 +457,29 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
         }
     }
 
-    std::uint32_t apartments = 0;
+    // Dormitories until every robot has a dorm bed, and habitats until
+    // there are homes on the market for kMarketHomesPercent of them,
+    // whichever is shorter of its goal first.
+    std::uint64_t dormBeds = 0;
+    std::uint64_t marketBeds = 0;
+    const std::uint64_t marketGoal =
+        (static_cast<std::uint64_t>(params.residents) * kMarketHomesPercent) / 100;
     std::uint32_t habitats = 0;
     std::uint32_t storeRotation = 0;
     std::vector<std::uint32_t> buildingsAt(city.nodes.size(), 0);
-    while (apartments < params.residents) {
-        Building habitat =
-            MakeHabitat(params, random, buildingsAt, ids, ++habitats, storeRotation);
-        apartments += static_cast<std::uint32_t>(std::ranges::count(
-            habitat.rooms, RoomKind::Apartment, &Room::kind));
+    while (dormBeds < params.residents || marketBeds < marketGoal) {
+        const bool dormitory =
+            dormBeds < params.residents &&
+            (marketBeds >= marketGoal ||
+             dormBeds * marketGoal <= marketBeds * static_cast<std::uint64_t>(params.residents));
+        Building habitat = MakeHabitat(params, random, buildingsAt, ids, ++habitats,
+                                       storeRotation, dormitory);
+        for (const Room& room : habitat.rooms) {
+            if (room.kind == RoomKind::Apartment) {
+                (room.apartmentClass == ApartmentClass::Dorm ? dormBeds : marketBeds) +=
+                    room.capacity;
+            }
+        }
         city.buildings.push_back(std::move(habitat));
     }
 
@@ -499,6 +569,52 @@ const RoutePlanner::Tree& RoutePlanner::TreeFrom(std::uint32_t origin) {
         .emplace(origin, Tree{.distances = std::move(distances),
                               .previous = std::move(previous)})
         .first->second;
+}
+
+
+std::string_view ApartmentClassName(ApartmentClass kind) noexcept {
+    switch (kind) {
+        case ApartmentClass::Dorm: return "dorm room";
+        case ApartmentClass::Studio: return "studio";
+        case ApartmentClass::OneBedroom: return "one-bedroom flat";
+        case ApartmentClass::TwoBedroom: return "two-bedroom flat";
+        case ApartmentClass::Penthouse: return "penthouse";
+        case ApartmentClass::None: break;
+    }
+    return "";
+}
+
+std::uint32_t ApartmentsPerFloor(ApartmentClass kind) noexcept {
+    switch (kind) {
+        case ApartmentClass::Dorm: return 12;
+        case ApartmentClass::Studio: return 6;
+        case ApartmentClass::OneBedroom: return 4;
+        case ApartmentClass::TwoBedroom: return 2;
+        case ApartmentClass::Penthouse: return 1;
+        case ApartmentClass::None: break;
+    }
+    return 0;
+}
+
+std::uint32_t Sleeps(ApartmentClass kind) noexcept {
+    switch (kind) {
+        case ApartmentClass::TwoBedroom: return 2;
+        case ApartmentClass::Penthouse: return 3;
+        case ApartmentClass::None: return 0;
+        default: return 1;
+    }
+}
+
+std::uint32_t AreaOf(ApartmentClass kind) noexcept {
+    switch (kind) {
+        case ApartmentClass::Dorm: return 34;
+        case ApartmentClass::Studio: return 69;
+        case ApartmentClass::OneBedroom: return 103;
+        case ApartmentClass::TwoBedroom: return 206;
+        case ApartmentClass::Penthouse: return 460;
+        case ApartmentClass::None: break;
+    }
+    return 0;
 }
 
 }  // namespace mechapunk::sim

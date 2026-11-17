@@ -76,6 +76,7 @@ enum class MemoryKind : std::uint8_t {
     SoldHome,       // room: the apartment, still lived in as a tenant.
     TookLoan,
     Inherited,      // robot: the scrapped friend.
+    MovedInTogether,  // robot: the friend; room: the flat they share.
 };
 
 struct Memory {

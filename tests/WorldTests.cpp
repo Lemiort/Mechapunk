@@ -314,7 +314,8 @@ TEST(World, RobotsGoOutAgainAfterGettingHomeFromWork) {
         }
     });
     world.RunFor(7 * sim::kMinutesPerDay);
-    EXPECT_GT(outAgain, 100U);
+    // Fewer than once: robots on a budget go out a second time less often.
+    EXPECT_GT(outAgain, 60U);
 }
 
 // Venues and rest keep needs up: after two weeks only a few robots have run
@@ -435,8 +436,9 @@ TEST(World, DescribesEventsWithRoomsAndBuildings) {
     world.RunFor(sim::kMinutesPerDay);
     ASSERT_FALSE(lines.empty());
     EXPECT_EQ(lines.front().rfind("Day 1 ", 0), 0U) << lines.front();
-    EXPECT_NE(lines.front().find(" left Apartment "), std::string::npos)
+    // Everyone starts out in a dorm.
+    EXPECT_NE(lines.front().find(" left Dorm Room "), std::string::npos)
         << lines.front();
-    EXPECT_NE(lines.front().find(", Hab Block "), std::string::npos)
+    EXPECT_NE(lines.front().find(", Dormitory "), std::string::npos)
         << lines.front();
 }

@@ -529,4 +529,56 @@ std::expected<void, std::string> V10ToV11(SaveDocument& world) try {
         std::format("the version 10 world is malformed ({})", error.what()));
 }
 
+
+std::expected<void, std::string> V11ToV12(SaveDocument& world) try {
+    constexpr std::array<std::string_view, 7> kBookKeys{
+        "revenue", "wages", "supplies", "upkeep", "rent", "dividends", "repaid"};
+    for (SaveDocument& building : world["city"]["buildings"].get_array()) {
+        for (SaveDocument& room : building["rooms"].get_array()) {
+            room["apartmentClass"] =
+                room["kind"].get_string() == "apartment" ? "studio" : "none";
+        }
+    }
+    // The city's housing office, with nothing yet: older cities have no
+    // dorms.
+    SaveDocument& economy = world["economy"];
+    std::uint64_t bank = 0;
+    for (SaveDocument& organization : economy["organizations"].get_array()) {
+        if (bank == 0 && organization["kind"].get_string() == "bank") {
+            bank = organization["id"].as<std::uint64_t>();
+        }
+    }
+    SaveDocument office = Object{};
+    const std::uint64_t id = world["ids"]["next"].as<std::uint64_t>();
+    world["ids"]["next"] = id + 1;
+    office["id"] = id;
+    office["name"] = "City Housing Office";
+    office["kind"] = "government";
+    office["sector"] = "government";
+    office["credits"] = std::int64_t{0};
+    office["owners"] = Array{};
+    office["bank"] = bank;
+    office["payPercent"] = std::uint64_t{100};
+    for (const char* books : {"today", "yesterday"}) {
+        SaveDocument zero = Object{};
+        for (const std::string_view key : kBookKeys) {
+            zero[std::string{key}] = std::int64_t{0};
+        }
+        office[books] = std::move(zero);
+    }
+    economy["organizations"].get_array().push_back(std::move(office));
+    world["today"]["movedInTogether"] = std::int64_t{0};
+    for (SaveDocument& day : world["history"].get_array()) {
+        day["counted"]["movedInTogether"] = std::int64_t{0};
+        day["governmentMoney"] = std::int64_t{0};
+        day["residentsByClass"] = Array{std::int64_t{0}, std::int64_t{0}, std::int64_t{0},
+                                        std::int64_t{0}, std::int64_t{0}};
+        day["sharing"] = std::int64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 11 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

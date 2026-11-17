@@ -212,6 +212,8 @@ std::string MemoryText(MemoryKind kind, std::string_view other,
             return "took a loan";
         case MemoryKind::Inherited:
             return std::format("inherited everything {} had", other);
+        case MemoryKind::MovedInTogether:
+            return at(std::format("moved in with {}", other), "to");
     }
     return "remembered something";
 }
@@ -375,6 +377,7 @@ void World::Remember(Robot& robot, MemoryKind kind, EntityId other,
         case MemoryKind::FoundJob: ++today.jobsFound; break;
         case MemoryKind::MovedUp: ++today.movedUp; break;
         case MemoryKind::Evicted: ++today.evictions; break;
+        case MemoryKind::MovedInTogether: ++today.movedInTogether; break;
         case MemoryKind::BecameFriends: ++today.newFriendships; break;
         case MemoryKind::BecameRivals: ++today.newRivalries; break;
         case MemoryKind::GotBadPart: ++today.badParts; break;

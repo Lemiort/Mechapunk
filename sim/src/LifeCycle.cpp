@@ -106,6 +106,7 @@ void World::Scrap(EntityId id) {
         departed, {.id = robot.id, .name = robot.name, .scrappedAt = state_.tick});
     state_.robots.erase(found);
     ++populationVersion_;
+    CountResidents();
 
     // Friends remember; everyone forgets the bond.
     for (Robot& other : state_.robots) {
@@ -128,11 +129,19 @@ void World::AddNewcomer() {
     for (const Robot& robot : state_.robots) {
         homes.insert(robot.apartment.value);
     }
+    // Newcomers start in a free dorm room if there is one.
     std::vector<EntityId> freeHomes;
+    std::vector<EntityId> freeDorms;
     for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
         if (!homes.contains(apartment.room->id.value)) {
             freeHomes.push_back(apartment.room->id);
+            if (apartment.room->apartmentClass == ApartmentClass::Dorm) {
+                freeDorms.push_back(apartment.room->id);
+            }
         }
+    }
+    if (!freeDorms.empty()) {
+        freeHomes = std::move(freeDorms);
     }
     if (freeHomes.empty()) {
         return;  // Nowhere to live: nobody moves in.
@@ -178,6 +187,7 @@ void World::AddNewcomer() {
     // Ids only grow, so the newcomer goes last and robots stay sorted.
     state_.robots.push_back(std::move(robot));
     ++populationVersion_;
+    CountResidents();
     Robot& arrived = state_.robots.back();
     ++state_.today.arrivals;
     // It brings its savings from outside: new money in the city.

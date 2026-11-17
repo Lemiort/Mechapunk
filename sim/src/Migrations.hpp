@@ -52,4 +52,8 @@ namespace mechapunk::sim::migrations {
 // look for work; no format change is needed for that.
 [[nodiscard]] std::expected<void, std::string> V10ToV11(SaveDocument& world);
 
+// Version 11 to 12: apartments get a class; every older apartment is a
+// studio. The city gets a housing office, with no dorms yet.
+[[nodiscard]] std::expected<void, std::string> V11ToV12(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

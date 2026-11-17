@@ -245,6 +245,8 @@ private:
     // The spot a robot takes in `room`, which has `count` spots, at
     // `tick`: at home the bed by night and the sofa by day, elsewhere the
     // one it was given in that room on the open floor, else its favourite.
+    // Numbers flatmates 0, 1, 2 by id for the frame, for their beds and seats.
+    void IndexResidents(const WorldFrame& frame);
     // Staff working in the room take its last staffSpots spots; guests the
     // others.
     [[nodiscard]] std::size_t SpotFor(sim::EntityId robot, sim::EntityId room,
@@ -300,6 +302,8 @@ private:
         std::vector<sim::Leg> legs;
     };
     std::unordered_map<std::uint64_t, RideLegs> rideLegs_;
+    std::unordered_map<std::uint64_t, std::size_t> residentIndex_;
+    sim::Tick residentsTick_{};
     RenderAssets& assets_;
     std::vector<StaticItem> statics_;
     // Statics drawn as batches, made once by BuildStaticBatches. A batch
