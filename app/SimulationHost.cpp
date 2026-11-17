@@ -133,10 +133,10 @@ void SimulationHost::RequestStep() {
     }
 }
 
-void SimulationHost::SetSpeed(double minutesPerSecond) {
-    speed_ = minutesPerSecond;
+void SimulationHost::SetSpeed(double timeScale) {
+    speed_ = timeScale;
     if (thread_ != nullptr) {
-        thread_->SetTimeScale(minutesPerSecond);
+        thread_->SetTimeScale(timeScale);
     }
 }
 

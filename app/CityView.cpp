@@ -54,6 +54,8 @@ constexpr std::uint64_t kDecorationStream = 100;
 // Robots in apartments sleep in this part of the day, else sit on the sofa.
 constexpr double kBedtime = (21.0 * 60.0) + 30.0;
 constexpr double kWakeUp = 7.0 * 60.0;
+// Game minutes a robot takes to walk between its sofa and its bed.
+constexpr double kHomeWalkMinutes = 0.5;
 
 constexpr vec3 kHabitatNeon{0.1F, 0.9F, 1.0F};
 constexpr vec3 kWorkplaceNeon{1.0F, 0.2F, 0.8F};
@@ -583,43 +585,130 @@ void CityView::AddElevatedLines() {
     }
 }
 
+namespace {
+// A train slides into its first platform this long before it waits there,
+// waits kTrainWaitMinutes with its doors open, rides, waits again at its
+// last platform and slides out.
+constexpr double kTrainSlideMinutes = 0.5;
+constexpr double kTrainWaitMinutes = 1.0;
+constexpr float kTrainSlideMeters = 60.0F;
+// The two cars' middles, ahead of and behind the train's middle.
+constexpr std::array<float, 2> kCarOffsets{-6.8F, 6.8F};
+constexpr float kCarFloorMeters = 0.45F;
+// Rider places: up to 4.5 m either way of a car's middle, 0.7 m either side.
+constexpr float kAboardAlongMeters = 4.5F;
+constexpr float kAboardSideMeters = 0.7F;
+// A door's inside and outside, across the car from its middle.
+constexpr float kDoorInsideMeters = 1.1F;
+constexpr float kDoorOutsideMeters = 2.0F;
+
+vec3 RightOf(vec3 forward) {
+    return glm::normalize(glm::cross(forward, vec3{0.0F, 1.0F, 0.0F}));
+}
+
+float Ease(float t) { return t * t * (3.0F - (2.0F * t)); }
+}  // namespace
+
+std::optional<CityView::TrainPose> CityView::TrainAt(std::uint32_t from,
+                                                     std::uint32_t to,
+                                                     sim::Tick boardsAt,
+                                                     sim::Tick alightsAt,
+                                                     double tick) const {
+    if (from >= city_.stations.size() || to >= city_.stations.size() ||
+        alightsAt <= boardsAt) {
+        return std::nullopt;
+    }
+    const double departs = static_cast<double>(boardsAt + sim::kMetroWaitMinutes);
+    const double arrives = static_cast<double>(alightsAt);
+    const double comesIn = departs - kTrainWaitMinutes - kTrainSlideMinutes;
+    const double leaves = arrives + kTrainWaitMinutes + kTrainSlideMinutes;
+    if (tick < comesIn || tick >= leaves) {
+        return std::nullopt;
+    }
+    // Along the row of the first station, then the column of the last.
+    const vec3 start = StationPlatform(from);
+    const vec3 end = StationPlatform(to);
+    const vec3 turn{end.x, start.y, start.z};
+    const float first = glm::distance(start, turn);
+    const float total = first + glm::distance(turn, end);
+    const auto direction = [](vec3 a, vec3 b, vec3 fallback) {
+        const vec3 offset = b - a;
+        return glm::length(offset) > 1e-6F ? glm::normalize(offset) : fallback;
+    };
+    const vec3 lastLeg = direction(turn, end, direction(start, turn, {0.0F, 0.0F, 1.0F}));
+    const vec3 firstLeg = direction(start, turn, lastLeg);
+    const float slide = kTrainSlideMeters * kS;
+    if (tick < departs - kTrainWaitMinutes) {
+        // Slowing into the platform.
+        const auto t = static_cast<float>((tick - comesIn) / kTrainSlideMinutes);
+        const float eased = 1.0F - ((1.0F - t) * (1.0F - t));
+        return TrainPose{.position = start - (firstLeg * (slide * (1.0F - eased))),
+                         .forward = firstLeg};
+    }
+    if (tick < departs) {
+        return TrainPose{.position = start, .forward = firstLeg};
+    }
+    if (tick < arrives) {
+        const float travelled =
+            Ease(static_cast<float>((tick - departs) / std::max(arrives - departs, 1e-6))) *
+            total;
+        if (travelled < first) {
+            return TrainPose{.position = glm::mix(start, turn, first > 0.0F ? travelled / first : 1.0F),
+                             .forward = firstLeg};
+        }
+        return TrainPose{.position = glm::mix(turn, end, (travelled - first) /
+                                                            std::max(total - first, 1e-6F)),
+                         .forward = lastLeg};
+    }
+    if (tick < arrives + kTrainWaitMinutes) {
+        return TrainPose{.position = end, .forward = lastLeg};
+    }
+    // Pulling away.
+    const auto t = static_cast<float>((tick - arrives - kTrainWaitMinutes) / kTrainSlideMinutes);
+    return TrainPose{.position = end + (lastLeg * (slide * t * t)), .forward = lastLeg};
+}
+
+vec3 CityView::PlaceAboard(sim::EntityId robot, const TrainPose& train) const {
+    const std::uint64_t hash = robot.value * 0x9E3779B97F4A7C15ULL;
+    const float car = kCarOffsets.at(hash & 1U);
+    const float along = ((static_cast<float>((hash >> 8U) & 0xFFU) / 255.0F) * 2.0F - 1.0F) *
+                        kAboardAlongMeters;
+    const float side = ((hash >> 16U) & 1U) != 0 ? kAboardSideMeters : -kAboardSideMeters;
+    return train.position + (train.forward * ((car + along) * kS)) +
+           (RightOf(train.forward) * (side * kS)) + vec3{0.0F, kCarFloorMeters * kS, 0.0F};
+}
+
+std::pair<vec3, vec3> CityView::DoorFor(sim::EntityId robot, const TrainPose& train,
+                                        vec3 from) const {
+    const std::uint64_t hash = robot.value * 0x9E3779B97F4A7C15ULL;
+    const float car = kCarOffsets.at(hash & 1U);
+    const vec3 right = RightOf(train.forward);
+    const float side = glm::dot(from - train.position, right) >= 0.0F ? 1.0F : -1.0F;
+    const vec3 middle = train.position + (train.forward * (car * kS));
+    const vec3 floor{0.0F, kCarFloorMeters * kS, 0.0F};
+    return {middle + (right * (side * kDoorOutsideMeters * kS)),
+            middle + (right * (side * kDoorInsideMeters * kS)) + floor};
+}
+
 void CityView::SubmitTrains(RenderQueue& queue, const WorldFrame& frame,
                             double renderTick) {
     // Riders who boarded together share a train.
     std::set<std::tuple<std::uint32_t, std::uint32_t, sim::Tick>> trains;
     for (const RobotFrame& robot : frame.robots) {
         if (robot.alightsAt <= robot.boardsAt ||
-            robot.rideFrom >= city_.stations.size() ||
-            robot.rideTo >= city_.stations.size()) {
-            continue;
-        }
-        const double departs = static_cast<double>(robot.boardsAt + sim::kMetroWaitMinutes);
-        const double arrives = static_cast<double>(robot.alightsAt);
-        if (renderTick < departs || renderTick >= arrives ||
             !trains.insert({robot.rideFrom, robot.rideTo, robot.boardsAt}).second) {
             continue;
         }
-        // Along the row of the first station, then the column of the last.
-        const vec3 from = StationPlatform(robot.rideFrom);
-        const vec3 to = StationPlatform(robot.rideTo);
-        const vec3 turn{to.x, from.y, from.z};
-        const float first = glm::distance(from, turn);
-        const float total = first + glm::distance(turn, to);
-        const float travelled =
-            static_cast<float>((renderTick - departs) / std::max(arrives - departs, 1e-6)) *
-            total;
-        const bool alongRow = travelled < first;
-        const vec3 position = alongRow
-                                  ? glm::mix(from, turn, first > 0.0F ? travelled / first : 1.0F)
-                                  : glm::mix(turn, to, (travelled - first) /
-                                                           std::max(total - first, 1e-6F));
-        const vec3 direction = alongRow ? turn - from : to - turn;
-        const float yaw = glm::degrees(std::atan2(direction.x, direction.z));
-        const vec3 forward = glm::length(direction) > 0.0F ? glm::normalize(direction)
-                                                           : vec3{0.0F, 0.0F, 1.0F};
-        for (const float car : {-6.8F, 6.8F}) {
+        const auto train = TrainAt(robot.rideFrom, robot.rideTo, robot.boardsAt,
+                                   robot.alightsAt, renderTick);
+        if (!train) {
+            continue;
+        }
+        const float yaw = glm::degrees(std::atan2(train->forward.x, train->forward.z));
+        for (const float car : kCarOffsets) {
             SubmitModel(queue, Prop(PropKind::TrainCar),
-                        position + (forward * (car * kS)), yaw, 0.0F, vec3(1.0F), kS);
+                        train->position + (train->forward * (car * kS)), yaw, 0.0F,
+                        vec3(1.0F), kS);
         }
     }
 }
@@ -705,8 +794,8 @@ const CityView::RoomWays* CityView::WaysOf(sim::EntityId room) {
     return &roomWays_.emplace(room.value, std::move(ways)).first->second;
 }
 
-std::size_t CityView::SpotFor(sim::EntityId robot, bool home, std::size_t count,
-                              double tick, bool assigned) const {
+std::size_t CityView::SpotFor(sim::EntityId robot, sim::EntityId room, bool home,
+                              std::size_t count, double tick) const {
     if (count == 0) {
         return 0;
     }
@@ -715,42 +804,61 @@ std::size_t CityView::SpotFor(sim::EntityId robot, bool home, std::size_t count,
         const bool night = minute >= kBedtime || minute < kWakeUp;
         return std::min<std::size_t>(night ? 0 : 1, count - 1);
     }
-    if (assigned) {
-        if (const auto found = assignedSpots_.find(robot.value);
-            found != assignedSpots_.end() && found->second < count) {
-            return found->second;
-        }
+    if (const auto found = assignedSpots_.find(robot.value);
+        found != assignedSpots_.end() && found->second.room == room &&
+        found->second.spot < count) {
+        return found->second.spot;
     }
     return static_cast<std::size_t>((robot.value * 2654435761ULL) >> 11U) % count;
 }
 
 void CityView::AssignSpots(const WorldFrame& frame, const FloorPlan& plan) {
-    assignedSpots_.clear();
+    // Robots in a room or heading to it, earliest arrival first.
     std::unordered_map<std::uint64_t, std::vector<std::pair<sim::Tick, std::uint64_t>>>
         visitors;
+    std::unordered_map<std::uint64_t, std::size_t> spotCounts;
     for (const RoomPlan& room : plan.rooms) {
         if (!room.home && !room.spots.empty()) {
             visitors[room.room.value];
+            spotCounts[room.room.value] = room.spots.size();
         }
     }
+    std::unordered_map<std::uint64_t, AssignedSpot> next;
     for (const RobotFrame& robot : frame.robots) {
-        const sim::EntityId room = robot.activity == sim::RobotActivity::Walking
-                                       ? robot.destination
-                                       : robot.location;
+        const bool walking = robot.activity == sim::RobotActivity::Walking;
+        const sim::EntityId room = walking ? robot.destination : robot.location;
         if (const auto found = visitors.find(room.value); found != visitors.end()) {
             found->second.emplace_back(robot.arrivesAt, robot.id.value);
         }
-    }
-    for (const RoomPlan& room : plan.rooms) {
-        const auto found = visitors.find(room.room.value);
-        if (found == visitors.end()) {
-            continue;
+        // A robot on its way out keeps the spot it left from.
+        if (walking) {
+            if (const auto kept = assignedSpots_.find(robot.id.value);
+                kept != assignedSpots_.end() && kept->second.room == robot.location) {
+                next[robot.id.value] = kept->second;
+            }
         }
-        std::ranges::sort(found->second);
-        const std::size_t count = room.spots.size();
+    }
+    for (auto& [roomValue, robots] : visitors) {
+        std::ranges::sort(robots);
+        const std::size_t count = spotCounts.at(roomValue);
+        const sim::EntityId room{roomValue};
         std::vector<bool> taken(count, false);
-        for (const auto& [arrives, id] : found->second) {
-            const std::size_t favourite = SpotFor(sim::EntityId{id}, false, count, 0.0, false);
+        std::vector<std::uint64_t> newcomers;
+        // Robots keep the spots they already had.
+        for (const auto& [arrives, id] : robots) {
+            const auto had = assignedSpots_.find(id);
+            if (had != assignedSpots_.end() && had->second.room == room &&
+                had->second.spot < count && !taken[had->second.spot]) {
+                taken[had->second.spot] = true;
+                next[id] = had->second;
+            } else {
+                newcomers.push_back(id);
+            }
+        }
+        // Newcomers take their favourite free spot, or the next free one.
+        for (const std::uint64_t id : newcomers) {
+            const std::size_t favourite =
+                static_cast<std::size_t>((id * 2654435761ULL) >> 11U) % count;
             std::size_t spot = favourite;
             for (std::size_t step = 0; step < count; ++step) {
                 const std::size_t candidate = (favourite + step) % count;
@@ -759,10 +867,13 @@ void CityView::AssignSpots(const WorldFrame& frame, const FloorPlan& plan) {
                     break;
                 }
             }
-            taken[spot] = true;
-            assignedSpots_[id] = spot;
+            if (spot < count) {
+                taken[spot] = true;
+            }
+            next[id] = {.room = room, .spot = spot};
         }
     }
+    assignedSpots_ = std::move(next);
 }
 
 std::shared_ptr<const Material> CityView::PartMaterial(const PropPart& part,
@@ -1046,7 +1157,9 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
         }
         const vec3 position = placed->position;
         const vec3 direction = placed->direction;
-        const float scale = indoors ? kS : figureScale;
+        // Indoors and on trains at life size; in the street larger, so
+        // robots stay visible from afar.
+        const float scale = indoors || placed->aboard ? kS : figureScale;
         const bool selected = robot.id == selection.robot;
         // Legs swing once per 1.5 m walked.
         const float walked = static_cast<float>(
@@ -1062,8 +1175,9 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
                 carried = Carried::Parcel;
             }
         }
-        SubmitModel(queue, RobotFigure(Pose::Walking, phase,
-                                       selected ? kSelected : Accent(robot.id), carried),
+        SubmitModel(queue, RobotFigure(placed->riding ? Pose::Standing : Pose::Walking,
+                                       phase, selected ? kSelected : Accent(robot.id),
+                                       carried),
                     position, yaw, 0.0F, vec3(1.0F),
                     scale * (selected ? 1.2F : 1.0F));
         robotMarkers_.push_back(
@@ -1167,10 +1281,65 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
         if (inside == occupants.end() || room.spots.empty()) {
             continue;
         }
+        // At bedtime robots at home walk from the sofa to the bed, and back
+        // when they get up.
+        const auto homeWalk = [&]() -> std::optional<std::pair<vec3, vec3>> {
+            if (!room.home || room.spots.size() < 2) {
+                return std::nullopt;
+            }
+            double since = minute - kBedtime;
+            std::size_t from = 1;
+            std::size_t to = 0;
+            if (since < 0.0 || since >= kHomeWalkMinutes) {
+                since = minute - kWakeUp;
+                std::swap(from, to);
+            }
+            if (since < 0.0 || since >= kHomeWalkMinutes) {
+                return std::nullopt;
+            }
+            // Back out of one spot the way the robot came in, and into the
+            // other the same way.
+            const Spot& first = room.spots[from];
+            const Spot& second = room.spots[to];
+            std::vector<vec3> points{first.position};
+            points.insert(points.end(), first.approach.rbegin(), first.approach.rend());
+            points.insert(points.end(), second.approach.begin(), second.approach.end());
+            points.push_back(second.position);
+            float length = 0.0F;
+            for (std::size_t index = 1; index < points.size(); ++index) {
+                length += glm::distance(points[index - 1], points[index]);
+            }
+            float remaining = static_cast<float>(since / kHomeWalkMinutes) * length;
+            for (std::size_t index = 1; index < points.size(); ++index) {
+                const float step = glm::distance(points[index - 1], points[index]);
+                if (remaining <= step && step > 0.0F) {
+                    const vec3 a = ToWorld(shape, current, points[index - 1]);
+                    const vec3 b = ToWorld(shape, current, points[index]);
+                    return std::pair{glm::mix(a, b, remaining / step), glm::normalize(b - a)};
+                }
+                remaining -= step;
+            }
+            return std::nullopt;
+        };
         for (std::size_t index = 0; index < inside->second.size(); ++index) {
             const sim::EntityId robot = inside->second[index];
+            if (const auto walking = homeWalk()) {
+                const bool selected = robot == selection.robot;
+                const auto [origin, direction] = *walking;
+                const float phase =
+                    static_cast<float>(renderTick * 75.0 / 0.75) * std::numbers::pi_v<float>;
+                SubmitModel(queue,
+                            RobotFigure(Pose::Walking, phase,
+                                        selected ? kSelected : Accent(robot)),
+                            origin, glm::degrees(std::atan2(direction.x, direction.z)),
+                            0.0F, vec3(1.0F), kS);
+                robotMarkers_.push_back({.id = robot,
+                                         .position = origin + vec3{0.0F, 0.9F * kS, 0.0F},
+                                         .radius = 0.6F * kS});
+                continue;
+            }
             const Spot& spot = room.spots.at(
-                SpotFor(robot, room.home, room.spots.size(), renderTick, true));
+                SpotFor(robot, room.room, room.home, room.spots.size(), renderTick));
             const bool selected = robot == selection.robot;
             const bool lying = spot.pose == Pose::Lying;
             const vec3 origin = ToWorld(shape, current, spot.position);
@@ -1326,8 +1495,8 @@ std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& rob
     const auto leave = [&] {
         if (const RoomWays* ways = WaysOf(robot.location)) {
             const std::size_t spot =
-                SpotFor(robot.id, ways->home, ways->fromSpot.size(),
-                        static_cast<double>(robot.departedAt), false);
+                SpotFor(robot.id, robot.location, ways->home, ways->fromSpot.size(),
+                        static_cast<double>(robot.departedAt));
             const Walk& way = ways->fromSpot.empty() ? ways->fromDoor : ways->fromSpot[spot];
             walk_.insert(walk_.end(), way.begin(), way.end());
         } else if (const auto shape = shapes_.find(robot.from.value);
@@ -1338,8 +1507,8 @@ std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& rob
     const auto arrive = [&] {
         if (const RoomWays* ways = WaysOf(robot.destination)) {
             const std::size_t spot =
-                SpotFor(robot.id, ways->home, ways->fromSpot.size(),
-                        static_cast<double>(robot.arrivesAt), true);
+                SpotFor(robot.id, robot.destination, ways->home, ways->fromSpot.size(),
+                        static_cast<double>(robot.arrivesAt));
             const Walk& way = ways->fromSpot.empty() ? ways->fromDoor : ways->fromSpot[spot];
             walk_.insert(walk_.end(), way.rbegin(), way.rend());
         } else if (const auto shape = shapes_.find(robot.to.value);
@@ -1352,6 +1521,7 @@ std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& rob
     // from the other platform.
     double start = static_cast<double>(robot.departedAt);
     double end = static_cast<double>(robot.arrivesAt);
+    bool boarding = false;
     if (robot.alightsAt > robot.boardsAt) {
         const double departs = static_cast<double>(robot.boardsAt + sim::kMetroWaitMinutes);
         if (renderTick < static_cast<double>(robot.boardsAt)) {
@@ -1361,14 +1531,51 @@ std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& rob
             exact(StationStairsTop(robot.rideFrom));
             exact(PlatformSpot(robot.id, robot.rideFrom));
             end = static_cast<double>(robot.boardsAt);
-        } else if (renderTick < departs) {
+        } else if (renderTick < departs - kTrainWaitMinutes) {
             return Placement{.position = PlatformSpot(robot.id, robot.rideFrom),
                              .direction = {0.0F, 0.0F, 1.0F},
                              .building = {}};
+        } else if (renderTick < departs) {
+            // Into the waiting train: to the nearer door and on to a place.
+            const auto train = TrainAt(robot.rideFrom, robot.rideTo, robot.boardsAt,
+                                       robot.alightsAt, renderTick);
+            if (!train) {
+                return std::nullopt;
+            }
+            const vec3 spot = PlatformSpot(robot.id, robot.rideFrom);
+            const auto [outside, inside] = DoorFor(robot.id, *train, spot);
+            exact(spot);
+            exact(outside);
+            exact(inside);
+            exact(PlaceAboard(robot.id, *train));
+            start = departs - kTrainWaitMinutes;
+            end = departs;
+            boarding = true;
         } else if (renderTick < static_cast<double>(robot.alightsAt)) {
-            return std::nullopt;  // On the train.
+            const auto train = TrainAt(robot.rideFrom, robot.rideTo, robot.boardsAt,
+                                       robot.alightsAt, renderTick);
+            if (!train) {
+                return std::nullopt;
+            }
+            return Placement{.position = PlaceAboard(robot.id, *train),
+                             .direction = RightOf(train->forward),
+                             .building = {},
+                             .aboard = true,
+                             .riding = true};
         } else {
-            exact(PlatformSpot(robot.id, robot.rideTo));
+            // Out of the train through the door nearer the platform spot,
+            // which waits a minute with its doors open.
+            const auto train = TrainAt(robot.rideFrom, robot.rideTo, robot.boardsAt,
+                                       robot.alightsAt,
+                                       static_cast<double>(robot.alightsAt));
+            const vec3 spot = PlatformSpot(robot.id, robot.rideTo);
+            if (train) {
+                const auto [outside, inside] = DoorFor(robot.id, *train, spot);
+                exact(PlaceAboard(robot.id, *train));
+                exact(inside);
+                exact(outside);
+            }
+            exact(spot);
             exact(StationStairsTop(robot.rideTo));
             exact(StationStairsBottom(robot.rideTo));
             street(StationRoute(robot.to, robot.rideTo), true);
@@ -1398,7 +1605,8 @@ std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& rob
                         (spread * glm::mix(a.spread, b.spread, t)),
             .direction = length > 0.0F ? segment / length : vec3{0.0F, 0.0F, 1.0F},
             .building = indoors ? a.building : sim::EntityId{},
-            .floor = std::min(a.floor, b.floor)};
+            .floor = std::min(a.floor, b.floor),
+            .aboard = boarding};
     };
     if (walk_.size() < 2) {
         return at(walk_.front(), walk_.front(), 0.0F);

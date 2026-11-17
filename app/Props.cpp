@@ -224,12 +224,35 @@ PropModel Make(PropKind kind) {
             Legs(m, 2.0F, 0.8F, 0.85F, kDarkWood, 0.06F);
             break;
         case PropKind::TrainCar:
-            m = {Box(0, 0.2F, 0, 2.8F, 2.9F, 13.0F, kDarkMetal),
-                 Box(0, 3.1F, 0, 2.6F, 0.15F, 12.6F, kMetal),
-                 Glass(-1.41F, 1.4F, 0, 0.04F, 1.0F, 12.0F),
-                 Glass(1.41F, 1.4F, 0, 0.04F, 1.0F, 12.0F),
-                 Box(-1.42F, 0.9F, 0, 0.03F, 0.08F, 12.6F, kNeonCyan),
-                 Box(1.42F, 0.9F, 0, 0.03F, 0.08F, 12.6F, kNeonCyan),
+            // Hollow, so riders show through the windows: a floor at
+            // 0.45 m, side panels below and above a band of glass, end
+            // walls, and a roof. Each side has a door gap in the middle.
+            m = {Box(0, 0.2F, 0, 2.8F, 0.25F, 13.0F, kDarkMetal),
+                 Box(-1.35F, 0.45F, -3.9F, 0.1F, 0.95F, 5.2F, kDarkMetal),
+                 Box(-1.35F, 0.45F, 3.9F, 0.1F, 0.95F, 5.2F, kDarkMetal),
+                 Box(1.35F, 0.45F, -3.9F, 0.1F, 0.95F, 5.2F, kDarkMetal),
+                 Box(1.35F, 0.45F, 3.9F, 0.1F, 0.95F, 5.2F, kDarkMetal),
+                 Glass(-1.38F, 1.4F, -3.9F, 0.04F, 1.0F, 5.2F),
+                 Glass(-1.38F, 1.4F, 3.9F, 0.04F, 1.0F, 5.2F),
+                 Glass(1.38F, 1.4F, -3.9F, 0.04F, 1.0F, 5.2F),
+                 Glass(1.38F, 1.4F, 3.9F, 0.04F, 1.0F, 5.2F),
+                 Box(-1.35F, 2.4F, -3.9F, 0.1F, 0.7F, 5.2F, kDarkMetal),
+                 Box(-1.35F, 2.4F, 3.9F, 0.1F, 0.7F, 5.2F, kDarkMetal),
+                 Box(1.35F, 2.4F, -3.9F, 0.1F, 0.7F, 5.2F, kDarkMetal),
+                 Box(1.35F, 2.4F, 3.9F, 0.1F, 0.7F, 5.2F, kDarkMetal),
+                 Box(-1.35F, 2.6F, 0, 0.1F, 0.5F, 2.6F, kDarkMetal),
+                 Box(1.35F, 2.6F, 0, 0.1F, 0.5F, 2.6F, kDarkMetal),
+                 Box(0, 0.45F, -6.45F, 2.8F, 2.65F, 0.1F, kDarkMetal),
+                 Box(0, 0.45F, 6.45F, 2.8F, 2.65F, 0.1F, kDarkMetal),
+                 // A glass roof between steel edges, so riders show from
+                 // above as well.
+                 Glass(0, 3.1F, 0, 2.4F, 0.1F, 12.6F),
+                 Box(-1.3F, 3.1F, 0, 0.2F, 0.15F, 13.0F, kMetal),
+                 Box(1.3F, 3.1F, 0, 0.2F, 0.15F, 13.0F, kMetal),
+                 Box(-1.42F, 0.9F, -3.9F, 0.03F, 0.08F, 5.2F, kNeonCyan),
+                 Box(-1.42F, 0.9F, 3.9F, 0.03F, 0.08F, 5.2F, kNeonCyan),
+                 Box(1.42F, 0.9F, -3.9F, 0.03F, 0.08F, 5.2F, kNeonCyan),
+                 Box(1.42F, 0.9F, 3.9F, 0.03F, 0.08F, 5.2F, kNeonCyan),
                  Box(0, 0, -4.5F, 2.2F, 0.25F, 1.6F, kBlack),
                  Box(0, 0, 4.5F, 2.2F, 0.25F, 1.6F, kBlack)};
             break;

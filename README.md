@@ -50,7 +50,8 @@ Run the tests with `ctest --test-dir build/build/Release --output-on-failure`.
 it exists, and otherwise starts a new city. It saves there when you quit.
 Start over with `--new`, or pick a city with `--seed N --robots N` (10000
 robots by default; the street grid grows with the population); use
-`--save FILE` for another save file. A save that cannot be read is moved
+`--save FILE` for another save file, and `--follow ID` to follow a robot
+from the start. A save that cannot be read is moved
 aside to `FILE.broken` instead of being overwritten.
 
 | Input             | Action                                         |
@@ -64,7 +65,7 @@ aside to `FILE.broken` instead of being overwritten.
 | WASD / arrows     | Move the camera (stops following)              |
 | Space             | Pause or resume                                |
 | N                 | One minute forward while paused (hold to repeat) |
-| 1–6               | Speed x0.5, x1, x10, x60, x300 or x1200; at x1 a game minute takes two seconds |
+| 1–5               | Speed x1, x2, x10, x100 or x1000; x1 is real time, a game minute per real minute |
 | F5                | Save now                                       |
 | F12               | Screenshot to `screenshots/`                   |
 | Esc               | Close the selection, then save and quit        |
@@ -270,11 +271,18 @@ walking all the way. A ride costs 4 cr; robots budget for the fare home,
 and a robot that cannot spare the fare without missing tonight's rent walks
 instead. In a city of 10000, about one trip in five is by metro.
 
-Riders climb the stairs, wait in the open corners of the platform, and
-ride a two-car train with everyone who boarded with them; the train runs
-along the row and turns down the column to their stop, where they climb
-down. The robot panel says which part of the trip they are on, and
-following one keeps the camera at the platform while it rides.
+Riders climb the stairs and wait in the open corners of the platform. Their
+two-car train slides in a minute before it leaves; each rider walks to the
+nearer door and on to its own place in one of the cars, which have glass
+roofs and windows. The train runs along the row and turns down the column
+to their stop, waits a minute while riders walk out to the platform and
+down the stairs, and slides away. The robot panel says which part of the
+trip they are on, and following one keeps the camera on it, in the train
+too.
+
+Robots don't jump between places: one keeps its seat or spot in a room for
+as long as it stays, walks out from it, and at home walks from the sofa to
+bed at bedtime and back in the morning.
 
 ### Aging, clinics and newcomers
 

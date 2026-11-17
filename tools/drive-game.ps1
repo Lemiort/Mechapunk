@@ -5,7 +5,7 @@
 #   $p = Start-Process build/build/Release/mechapunk.exe -ArgumentList "--new","--save","scratch.json" `
 #        -WorkingDirectory build/build/Release -RedirectStandardOutput tools/out.txt -PassThru
 #   $p.Id | Set-Content tools/pid.txt
-# Keys (VK, scan): space 0x20 0x39, 1-6 speeds 0x31 0x02 .. 0x36 0x07,
+# Keys (VK, scan): space 0x20 0x39, 1-5 speeds 0x31 0x02 .. 0x35 0x06,
 # Q 0x51 0x10, E 0x45 0x12, Esc 0x1B 0x01. `shot` reads the saved name from
 # out.txt, the game's redirected output.
 # Commands (several may follow each other):

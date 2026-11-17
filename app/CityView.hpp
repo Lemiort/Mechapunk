@@ -167,6 +167,15 @@ private:
         glm::vec3 direction;
         sim::EntityId building;  // None outdoors.
         std::uint32_t floor{};
+        // Boarding or riding a train: drawn life size, standing once aboard.
+        bool aboard{false};
+        bool riding{false};
+    };
+    // Where a train is: the middle of its two cars on the track, and the
+    // way it faces.
+    struct TrainPose {
+        glm::vec3 position;
+        glm::vec3 forward;
     };
 
     [[nodiscard]] glm::vec3 NodePosition(sim::NodeId node) const;
@@ -185,6 +194,20 @@ private:
     [[nodiscard]] std::shared_ptr<const Material> PartMaterial(const PropPart& part,
                                                                glm::vec3 tint) const;
     // Trains carrying the riders on board in `frame`.
+    // The train of a ride at `tick`: sliding into the first platform,
+    // waiting there, riding, waiting at the last platform and sliding out.
+    // Nothing while it is not at either station or on its way.
+    [[nodiscard]] std::optional<TrainPose> TrainAt(std::uint32_t from,
+                                                   std::uint32_t to,
+                                                   sim::Tick boardsAt,
+                                                   sim::Tick alightsAt,
+                                                   double tick) const;
+    // A rider's place in the train, and the door it uses, given the side
+    // of the train it comes from (+1 right, -1 left).
+    [[nodiscard]] glm::vec3 PlaceAboard(sim::EntityId robot,
+                                        const TrainPose& train) const;
+    [[nodiscard]] std::pair<glm::vec3, glm::vec3> DoorFor(
+        sim::EntityId robot, const TrainPose& train, glm::vec3 from) const;
     void SubmitTrains(RenderQueue& queue, const WorldFrame& frame,
                       double renderTick);
     // Intersections walked through from a building to a station.
@@ -200,14 +223,16 @@ private:
                                                          double renderTick);
     // The ways out of a room, made once; nothing for an unknown room.
     const RoomWays* WaysOf(sim::EntityId room);
-    // The spot a robot takes in a room with `count` spots at `tick`: at
-    // home the bed by night and the sofa by day, elsewhere the one assigned
-    // this frame when `assigned` and it has one, else its favourite.
-    [[nodiscard]] std::size_t SpotFor(sim::EntityId robot, bool home,
-                                      std::size_t count, double tick,
-                                      bool assigned) const;
+    // The spot a robot takes in `room`, which has `count` spots, at
+    // `tick`: at home the bed by night and the sofa by day, elsewhere the
+    // one it was given in that room on the open floor, else its favourite.
+    [[nodiscard]] std::size_t SpotFor(sim::EntityId robot, sim::EntityId room,
+                                      bool home, std::size_t count,
+                                      double tick) const;
     // Gives the robots in or walking to the rooms of `plan` a spot each, in
-    // order of arrival, so nobody shares one while another is free.
+    // order of arrival, so nobody shares one while another is free. A robot
+    // keeps its spot from frame to frame, and a robot walking out keeps the
+    // one it left from.
     void AssignSpots(const WorldFrame& frame, const FloorPlan& plan);
     const FloorPlan& PlanOf(sim::EntityId building, std::uint32_t floor);
     // Converts floor-plan meters to world units for a building and floor.
@@ -259,7 +284,14 @@ private:
     std::map<std::pair<std::uint64_t, std::uint32_t>, std::vector<glm::vec3>>
         stationRoutes_;
     std::map<std::uint64_t, RoomWays> roomWays_;
-    std::unordered_map<std::uint64_t, std::size_t> assignedSpots_;
+    // Spots of robots in, heading to or just leaving the rooms of the open
+    // floor, by robot. A robot keeps its spot while it stays, and starts
+    // its walk out from it.
+    struct AssignedSpot {
+        sim::EntityId room;
+        std::size_t spot{};
+    };
+    std::unordered_map<std::uint64_t, AssignedSpot> assignedSpots_;
     Walk walk_;  // Scratch for RobotPosition.
     std::vector<NeonSign> neonSigns_;
     std::vector<Neon> neons_;

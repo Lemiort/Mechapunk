@@ -92,9 +92,8 @@ struct WorldFrame {
 // the thread runs; the render thread only sees published WorldFrames.
 class SimulationHost {
 public:
-    // Real seconds per simulated minute at speed 1, so robots walk at a
-    // pace the eye can follow.
-    static constexpr double kSecondsPerMinute = 2.0;
+    // Real seconds per simulated minute at speed 1: real time.
+    static constexpr double kSecondsPerMinute = 60.0;
 
     explicit SimulationHost(sim::World world);
     ~SimulationHost();
@@ -128,7 +127,8 @@ public:
     [[nodiscard]] bool IsPaused() const;
     void RequestStep();
     // Simulated minutes per real second.
-    void SetSpeed(double minutesPerSecond);
+    // How many times faster than real time the city runs.
+    void SetSpeed(double timeScale);
     [[nodiscard]] double Speed() const noexcept { return speed_; }
 
     // Saves the world between two steps; the simulation pauses for the

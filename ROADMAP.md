@@ -161,11 +161,11 @@ game:
 - Indoor walks avoid walls (checked by `layout_tests`) but can clip through
   furniture in some rooms, such as charging bays with no aisle.
 - Everyone takes the stairs; the elevator is decoration.
-- A robot leaving a room starts from its favourite spot, so it can jump
-  when it had been given a different spot.
-- At home, robots switch between bed and sofa without walking.
 - The fifth building at an intersection sits a block away, and its walk to
   the intersection cuts diagonally.
 - Shopping bags show only while walking straight out of the shop.
 - Not yet seen in the running game: bags, bar bottles, robots on the
-  stairs, robots waiting on platforms.
+  stairs.
+- Trains still appear from nowhere: each slides into its first platform
+  and out of its last one, but doesn't come from or go to a depot.
+- Robots inside closed buildings aren't drawn (nobody can see them).

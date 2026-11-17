@@ -51,7 +51,8 @@ using namespace mechapunk;
 constexpr int kWindowWidth = 1600;
 constexpr int kWindowHeight = 900;
 // Speeds for keys 1 to 6; at x1 a game minute takes two real seconds.
-constexpr std::array<double, 6> kSpeeds{0.5, 1.0, 10.0, 60.0, 300.0, 1200.0};
+// Times real time: at x1 a game minute takes a real minute.
+constexpr std::array<double, 5> kSpeeds{1.0, 2.0, 10.0, 100.0, 1000.0};
 constexpr double kOrbitDegreesPerPixel = 0.25;
 constexpr float kPanPerSecond = 40.0F;
 constexpr double kMessageSeconds = 3.0;
@@ -75,6 +76,8 @@ struct Options {
     std::uint64_t seed{1};
     std::uint32_t robots{10000};
     std::filesystem::path savePath{"mechapunk-save.json"};
+    // A robot to select and follow from the start, by id; 0 for none.
+    std::uint64_t follow{0};
 };
 
 std::optional<Options> ParseOptions(std::span<char*> arguments) {
@@ -97,10 +100,11 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
             options.startNew = true;
         } else if (name == "--save" && hasValue) {
             options.savePath = arguments[++index];
+        } else if (name == "--follow" && hasValue && parse(options.follow)) {
         } else {
             spdlog::error(
                 "Usage: mechapunk [--new] [--seed N] [--robots N] "
-                "[--save FILE]");
+                "[--save FILE] [--follow ROBOT_ID]");
             return std::nullopt;
         }
     }
@@ -146,6 +150,11 @@ public:
           rain_(renderer_.MakeRain(CityView::kUnitsPerMeter)),
           lastFrameAt_(glfwGetTime()) {
         city_.AddLights(scene_);
+        if (options.follow != 0) {
+            selection_.robot = sim::EntityId{options.follow};
+            following_ = true;
+            jumpTo_ = selection_.robot;
+        }
         glfwSetWindowUserPointer(&window_, this);
         glfwSetKeyCallback(&window_, &Game::OnKey);
         glfwSetScrollCallback(&window_, &Game::OnScroll);
@@ -605,7 +614,7 @@ private:
                 ImGui::BulletText("Click a building, room or robot to inspect");
                 ImGui::BulletText("Q / E: floor down / up");
                 ImGui::BulletText("Drag: orbit   Wheel: zoom   WASD: move");
-                ImGui::BulletText("Space: pause   N: step   1-6: speed");
+                ImGui::BulletText("Space: pause   N: step   1-5: speed");
                 ImGui::BulletText("Double-click a robot or its name: look at it");
                 ImGui::BulletText("F: follow the selected robot");
                 ImGui::BulletText("F5: save   F12: screenshot");
