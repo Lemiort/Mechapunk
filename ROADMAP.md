@@ -84,6 +84,10 @@ Also done since the plan was written:
   units open as the venues the city is short of, or as workspaces in
   workplaces while many robots look for work. The city view follows: store
   signs, lights and interiors change with the units.
+- City Hall: it owns the dorms and the metro, takes a tenth of every wage,
+  a property tax on homes and a fifth of corporate profits, supports every
+  robot out of work, and spends what it can spare on public works, which
+  buy supplies from industry.
 - Transit: an elevated metro on a timetable. Every station row and column
   is a line with two tracks, on two levels so lines cross. Two-ended trains
   turn back over a crossover in the tail track past each end station, run
@@ -164,9 +168,8 @@ game:
 
 ## Recommended next: M6 (scale and depth)
 
-- **City government.** Taxes on wages and property, support for robots out
-  of work, a metro run by the city with drivers on its payroll, and later
-  police. A stabiliser for the economy, as in real cities.
+- **Transit staff.** Drivers in the trains' cabs and staff at the stations,
+  on City Hall's payroll; later police.
 - **Central bank rate.** Interest that rises while the central bank has to
   create money and falls while money is short.
 - **Gangs.** Rival or friendly to each other, always rivals of the police;

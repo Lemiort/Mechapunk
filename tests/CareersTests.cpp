@@ -111,10 +111,12 @@ TEST(Careers, WagesFollowTheJobLevel) {
         // The level's wage, at the share of it the employer pays now.
         const sim::Organization* employer = world.FindOrganization(room->room->owner);
         ASSERT_NE(employer, nullptr);
-        EXPECT_EQ(event.credits,
-                  static_cast<std::int64_t>(
-                      sim::WageAtLevel(sim::JobShift(*room, robot->id).wage, robot->jobLevel)) *
-                      employer->payPercent / 100);
+        // The level's wage at the employer's share of it, less the wage tax.
+        const std::int64_t wage =
+            static_cast<std::int64_t>(
+                sim::WageAtLevel(sim::JobShift(*room, robot->id).wage, robot->jobLevel)) *
+            employer->payPercent / 100;
+        EXPECT_EQ(event.credits, wage - (wage * sim::kWageTaxPercent / 100));
         ++shifts;
     });
     world.RunFor(3 * sim::kMinutesPerDay);

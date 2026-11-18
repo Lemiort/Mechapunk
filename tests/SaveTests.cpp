@@ -177,13 +177,15 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v14-city.json";
+        kFixtureDirectory / "saves" / "v15-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
+    // Saved with City Hall collecting taxes,
+    EXPECT_GT(state->history.back().counted.wageTax, 0);
     // Saved with venues asking more and less than usual, rents moved,
     EXPECT_TRUE(std::ranges::any_of(state->city.buildings, [](const sim::Building& building) {
         return std::ranges::any_of(building.rooms, [](const sim::Room& room) {
@@ -606,5 +608,25 @@ TEST(Save, Version13FixtureMigratesAndRuns) {
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 14 save's housing office becomes City Hall and takes over the
+// metro; then it keeps running and collecting taxes.
+TEST(Save, Version14FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v14-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_TRUE(std::ranges::any_of(state->economy.organizations, [](const sim::Organization& each) {
+        return each.kind == sim::OrganizationKind::Government && each.name == "City Hall";
+    }));
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_GT(world->State().history.back().counted.wageTax, 0);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

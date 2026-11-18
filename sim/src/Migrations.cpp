@@ -623,4 +623,41 @@ std::expected<void, std::string> V13ToV14(SaveDocument& world) try {
         std::format("the version 13 world is malformed ({})", error.what()));
 }
 
+
+std::expected<void, std::string> V14ToV15(SaveDocument& world) try {
+    constexpr std::array<std::string_view, 5> kCounters{
+        "wageTax", "propertyTax", "profitTax", "benefits", "publicSpending"};
+    SaveDocument& economy = world["economy"];
+    std::uint64_t city = 0;
+    for (SaveDocument& organization : economy["organizations"].get_array()) {
+        if (organization["kind"].get_string() == "government") {
+            organization["name"] = "City Hall";
+            city = organization["id"].as<std::uint64_t>();
+        }
+        organization["today"]["taxes"] = std::int64_t{0};
+        organization["yesterday"]["taxes"] = std::int64_t{0};
+    }
+    for (SaveDocument& organization : economy["organizations"].get_array()) {
+        if (organization["sector"].get_string() == "transit" && city != 0) {
+            SaveDocument share = Object{};
+            share["owner"] = city;
+            share["shares"] = std::uint64_t{100};
+            organization["owners"] = Array{std::move(share)};
+        }
+    }
+    for (const std::string_view key : kCounters) {
+        world["today"][std::string{key}] = std::int64_t{0};
+    }
+    for (SaveDocument& day : world["history"].get_array()) {
+        for (const std::string_view key : kCounters) {
+            day["counted"][std::string{key}] = std::int64_t{0};
+        }
+        day["governmentDebt"] = std::int64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 14 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

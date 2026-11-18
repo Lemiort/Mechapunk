@@ -63,4 +63,8 @@ namespace mechapunk::sim::migrations {
 // Version 13 to 14: no venue or workspace has been quiet yet.
 [[nodiscard]] std::expected<void, std::string> V13ToV14(SaveDocument& world);
 
+// Version 14 to 15: the city's housing office becomes City Hall, which owns
+// the metro; nobody has paid taxes yet.
+[[nodiscard]] std::expected<void, std::string> V14ToV15(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

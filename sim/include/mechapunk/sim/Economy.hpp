@@ -51,6 +51,7 @@ struct Books {
     std::int64_t rent{};      // Paid for apartments it bought from robots.
     std::int64_t dividends{};
     std::int64_t repaid{};    // Paid back on loans.
+    std::int64_t taxes{};     // Paid to City Hall on profits and property.
 };
 
 struct Organization {
@@ -126,6 +127,11 @@ struct DayCounters {
     std::int64_t movedInTogether{};
     std::int64_t venuesOpened{};
     std::int64_t venuesClosed{};
+    std::int64_t wageTax{};
+    std::int64_t propertyTax{};
+    std::int64_t profitTax{};
+    std::int64_t benefits{};
+    std::int64_t publicSpending{};
     std::int64_t newFriendships{};
     std::int64_t newRivalries{};
     std::int64_t arrivals{};
@@ -166,6 +172,7 @@ struct DailyStats {
     std::int64_t robotDebt{};
     std::int64_t corporationDebt{};
     std::int64_t bankDebt{};  // Owed to the central bank.
+    std::int64_t governmentDebt{};
     std::int64_t indebtedRobots{};
     std::int64_t meanCredits{};
     std::int64_t medianCredits{};
@@ -218,6 +225,15 @@ struct Economy {
     // while few homes of a class stand empty and fall while many do.
     std::array<std::int64_t, 4> rentPercent{100, 100, 100, 100};
 };
+
+// City Hall's taxes, in percent: of every wage, withheld on payday; of a
+// home's rent each night, paid by its owner; and of a day's profit, paid by
+// corporations and banks. It pays kBenefit credits a night to every robot
+// out of work.
+inline constexpr std::int64_t kWageTaxPercent = 10;
+inline constexpr std::int64_t kPropertyTaxPercent = 5;
+inline constexpr std::int64_t kProfitTaxPercent = 20;
+inline constexpr std::int64_t kBenefit = 40;
 
 // The price of an apartment: so many nights of its rent.
 inline constexpr std::int64_t kPriceNights = 100;

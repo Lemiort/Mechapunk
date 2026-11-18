@@ -131,8 +131,9 @@ TEST(Economy, WagesAndSalesMoveBetweenAccounts) {
     });
     world.RunFor(sim::kMinutesPerDay);
     const sim::DailyStats& day = world.State().history.back();
+    // Robots are paid their wages less City Hall's tax.
     EXPECT_GT(wages, 0);
-    EXPECT_EQ(day.counted.wages, wages);
+    EXPECT_EQ(day.counted.wages - day.counted.wageTax, wages);
     EXPECT_GT(day.counted.venueSales, 0);
     EXPECT_GT(day.counted.supplies, 0);
     // Industry and venues employ robots; between them they paid every wage.
@@ -147,7 +148,14 @@ TEST(Economy, WagesAndSalesMoveBetweenAccounts) {
             venueWages += organization.yesterday.wages;
         }
     }
-    EXPECT_EQ(employersWages, wages);
+    // Employers paid every wage; City Hall paid support to robots out of work.
+    std::int64_t support = 0;
+    for (const sim::Organization& organization : world.State().economy.organizations) {
+        if (organization.kind == sim::OrganizationKind::Government) {
+            support = organization.yesterday.wages;
+        }
+    }
+    EXPECT_EQ(employersWages - support, day.counted.wages);
     EXPECT_GT(venueWages, 0);
     EXPECT_GT(industryRevenue, 0);
 }
@@ -243,6 +251,45 @@ TEST(Economy, ScrappedRobotsLeaveTheirThingsBehind) {
     for (const sim::Organization& organization : world->State().economy.organizations) {
         for (const sim::Share& share : organization.owners) {
             EXPECT_NE(share.owner, id);
+        }
+    }
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// City Hall takes a tenth of every wage and a share of rents and profits,
+// owns the metro, and supports every robot out of work.
+TEST(Economy, CityHallTaxesAndSupports) {
+    sim::World start = sim::World::Generate({.seed = 9, .robots = 300});
+    start.RunFor(sim::kMinutesPerDay + (23 * 60));
+    sim::WorldState state = start.State();
+    int laidOff = 0;
+    for (sim::Robot& robot : state.robots) {
+        if (robot.activity == sim::RobotActivity::Resting && laidOff < 3) {
+            robot.workspace = {};
+            robot.commuteAt = sim::kNoCommute;
+            ++laidOff;
+        }
+    }
+    auto world = sim::World::FromState(std::move(state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(61);  // Past midnight.
+    const sim::DailyStats& day = world->State().history.back();
+    // A tenth, give or take rounding on each wage.
+    EXPECT_NEAR(static_cast<double>(day.counted.wageTax) * 100.0 /
+                    static_cast<double>(day.counted.wages),
+                static_cast<double>(sim::kWageTaxPercent), 1.0);
+    EXPECT_GT(day.counted.propertyTax, 0);
+    // Robots still out of work after the night's hiring got support.
+    std::int64_t jobless = 0;
+    for (const sim::Robot& robot : world->State().robots) {
+        jobless += robot.workspace.IsValid() ? 0 : 1;
+    }
+    EXPECT_EQ(day.counted.benefits, jobless * sim::kBenefit);
+    for (const sim::Organization& organization : world->State().economy.organizations) {
+        if (organization.sector == sim::Sector::Transit) {
+            ASSERT_EQ(organization.owners.size(), 1U);
+            EXPECT_EQ(world->FindOrganization(organization.owners.front().owner)->kind,
+                      sim::OrganizationKind::Government);
         }
     }
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));

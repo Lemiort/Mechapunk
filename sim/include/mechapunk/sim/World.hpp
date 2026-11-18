@@ -372,8 +372,14 @@ private:
     void PaySupplies(Organization& buyer, std::int64_t revenue);
     // What a robot spends beyond the price on a visit.
     [[nodiscard]] std::int64_t LuxuryOf(const Robot& robot, std::int64_t price) const;
-    // A shift's pay: the job level's wage at the employer's share of it.
+    // A shift's pay: the job level's wage at the employer's share of it,
+    // before tax.
     [[nodiscard]] std::int64_t PayOf(const Robot& robot) const;
+    // What a robot keeps of that once the wage tax is withheld.
+    [[nodiscard]] std::int64_t NetPayOf(const Robot& robot) const;
+    // At midnight: taxes on profits, support for robots out of work, and
+    // public works with whatever City Hall has to spare.
+    void RunCityHall();
     // What a robot means to spend on outings in a day.
     [[nodiscard]] std::int64_t BudgetOf(const Robot& robot) const;
     void Lend(EntityId lender, EntityId borrower, std::int64_t amount);
@@ -429,6 +435,7 @@ private:
     // The loan of each borrower, as an index into economy.loans.
     std::unordered_map<std::uint64_t, std::size_t> loanOf_;
     EntityId centralBank_;
+    EntityId cityHall_;
     EntityId housing_;
     EntityId utilities_;
     EntityId transit_;

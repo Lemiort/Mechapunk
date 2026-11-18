@@ -155,6 +155,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 13,
               .summary = "venues and workspaces opening and closing",
               .apply = &migrations::V13ToV14},
+    Migration{.fromVersion = 14,
+              .summary = "City Hall: taxes, support and the city's metro",
+              .apply = &migrations::V14ToV15},
 };
 }  // namespace
 

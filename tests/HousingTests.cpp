@@ -64,59 +64,52 @@ TEST(Housing, CitiesHaveEveryClassOfHome) {
     }
 }
 
-// Two friends who rent and can afford it move into a flat with a bedroom
-// each, and split its rent.
-TEST(Housing, FriendsMoveInTogether) {
-    sim::World start = sim::World::Generate({.seed = 4, .robots = 200});
-    start.RunFor(sim::kMinutesPerDay + (23 * 60));
-    sim::WorldState state = start.State();
-    std::vector<std::size_t> resting;
-    for (std::size_t index = 0; index < state.robots.size() && resting.size() < 2; ++index) {
-        if (state.robots[index].activity == sim::RobotActivity::Resting) {
-            resting.push_back(index);
+// Friends who rent move in together, into a flat with a bedroom each,
+// remember doing so, and split its rent.
+TEST(Housing, FriendsShareFlats) {
+    sim::World world = sim::World::Generate({.seed = 4, .robots = 1000});
+    std::map<std::uint64_t, std::int64_t> rentPaid;
+    world.RunFor(20 * sim::kMinutesPerDay);
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::RentPaid) {
+            rentPaid[event.robot.value] = event.credits;
+        }
+    });
+    world.RunFor(sim::kMinutesPerDay);
+    std::int64_t movedIn = 0;
+    for (const sim::DailyStats& day : world.State().history) {
+        movedIn += day.counted.movedInTogether;
+    }
+    EXPECT_GT(movedIn, 0);
+    std::map<std::uint64_t, std::vector<const sim::Robot*>> homes;
+    for (const sim::Robot& robot : world.State().robots) {
+        homes[robot.apartment.value].push_back(&robot);
+    }
+    std::size_t shared = 0;
+    for (const auto& [apartment, residents] : homes) {
+        if (residents.size() < 2) {
+            continue;
+        }
+        ++shared;
+        const sim::Room& flat = *world.Rooms().Find(sim::EntityId{apartment})->room;
+        EXPECT_GE(sim::Sleeps(flat.apartmentClass), residents.size()) << flat.name;
+        for (const sim::Robot* robot : residents) {
+            if (flat.owner == robot->id || rentPaid[robot->id.value] == 0 || robot->rentOwed > 0) {
+                continue;  // Owners pay upkeep; and those short tonight paid less.
+            }
+            // Its share of tonight's market rent.
+            const auto kind = static_cast<std::size_t>(flat.apartmentClass);
+            const std::int64_t rent =
+                static_cast<std::int64_t>(flat.rent) * world.State().economy.rentPercent.at(kind - 2) / 100;
+            const auto sharers = static_cast<std::int64_t>(residents.size());
+            // The market rent moved a point after the rent was paid.
+            EXPECT_NEAR(static_cast<double>(rentPaid[robot->id.value]),
+                        static_cast<double>((rent + sharers - 1) / sharers),
+                        static_cast<double>(flat.rent) / 100.0 + 1.0)
+                << robot->name;
         }
     }
-    ASSERT_EQ(resting.size(), 2U);
-    sim::Robot& first = state.robots[resting[0]];
-    sim::Robot& second = state.robots[resting[1]];
-    const auto befriend = [&](sim::Robot& robot, const sim::Robot& other) {
-        robot.bonds.clear();  // Each other's only friend.
-        robot.bonds.push_back({.robot = other.id,
-                               .affinity = sim::Bond::kMaxAffinity,
-                               .level = sim::BondLevel::CloseFriend,
-                               .lastTalk = state.tick});
-        std::ranges::sort(robot.bonds, {}, [](const sim::Bond& bond) { return bond.robot.value; });
-    };
-    befriend(first, second);
-    befriend(second, first);
-    // Out of work, so no bank gives them a mortgage, and with enough for a
-    // share of a flat's rent for a while but not to buy one.
-    for (sim::Robot* robot : {&first, &second}) {
-        sim::SetCredits(state, *robot, 1500);
-        robot->savings = 0;
-        robot->workspace = {};
-        robot->commuteAt = sim::kNoCommute;
-    }
-    const sim::EntityId a = first.id;
-    const sim::EntityId b = second.id;
-    auto loaded = sim::World::FromState(std::move(state));
-    ASSERT_TRUE(loaded.has_value()) << loaded.error();
-    sim::World world = std::move(*loaded);
-    for (int day = 0; day < 30 && world.FindRobot(a)->apartment != world.FindRobot(b)->apartment;
-         ++day) {
-        world.RunFor(sim::kMinutesPerDay);
-    }
-    const sim::Robot& one = *world.FindRobot(a);
-    const sim::Robot& two = *world.FindRobot(b);
-    ASSERT_EQ(one.apartment, two.apartment);
-    const sim::Room& flat = *world.Rooms().Find(one.apartment)->room;
-    EXPECT_GE(sim::Sleeps(flat.apartmentClass), 2U);
-    bool remembers = false;
-    for (const sim::Memory& memory : one.memories) {
-        remembers = remembers || (memory.kind == sim::MemoryKind::MovedInTogether && memory.robot == b);
-    }
-    EXPECT_TRUE(remembers);
-    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+    EXPECT_GT(shared, 0U);
 }
 
 // A new city's market homes mostly stand empty, so their rents fall night

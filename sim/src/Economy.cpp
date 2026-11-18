@@ -178,7 +178,7 @@ void World::FoundEconomy(std::uint64_t seed) {
         found(std::string{name}, OrganizationKind::Bank, Sector::Banking);
     }
     found("Habitat Trust", OrganizationKind::Corporation, Sector::Housing);
-    found("City Housing Office", OrganizationKind::Government, Sector::Government);
+    found("City Hall", OrganizationKind::Government, Sector::Government);
     found("Gridline Power & Water", OrganizationKind::Corporation, Sector::Utilities);
     found("Metro Authority", OrganizationKind::Corporation, Sector::Transit);
 
@@ -321,6 +321,12 @@ void World::FoundEconomy(std::uint64_t seed) {
         }
         std::ranges::sort(organization.owners, {}, [](const Share& share) { return share.owner.value; });
     }
+    // The metro belongs to the city.
+    for (Organization& organization : economy.organizations) {
+        if (organization.sector == Sector::Transit) {
+            organization.owners = {{.owner = office, .shares = 100}};
+        }
+    }
 }
 
 void World::IndexEconomy() {
@@ -331,6 +337,9 @@ void World::IndexEconomy() {
     for (const Organization& organization : state_.economy.organizations) {
         if (organization.kind == OrganizationKind::CentralBank) {
             centralBank_ = organization.id;
+        }
+        if (organization.kind == OrganizationKind::Government) {
+            cityHall_ = organization.id;
         }
         switch (organization.sector) {
             case Sector::Housing: housing_ = organization.id; break;
@@ -551,9 +560,15 @@ std::int64_t World::PayOf(const Robot& robot) const {
     return static_cast<std::int64_t>(WageOf(robot)) * percent / 100;
 }
 
+std::int64_t World::NetPayOf(const Robot& robot) const {
+    const std::int64_t wage = PayOf(robot);
+    return wage - (wage * kWageTaxPercent / 100);
+}
+
 std::int64_t World::BudgetOf(const Robot& robot) const {
+    // Out of work, a robot lives on City Hall's support.
     const std::int64_t pay =
-        robot.workspace.IsValid() ? PayOf(robot) * kWorkDaysPerWeek / kDaysPerWeek : 0;
+        robot.workspace.IsValid() ? NetPayOf(robot) * kWorkDaysPerWeek / kDaysPerWeek : kBenefit;
     const std::int64_t target = kSavingsTargetNights * RentOf(robot);
     const std::int64_t spare = std::max<std::int64_t>(0, robot.savings - target);
     return (pay * kBudgetPercent / 100) + (spare / kSavingsSpendDays) + kBaseBudget;
@@ -577,15 +592,23 @@ void World::PayWage(Robot& robot) {
     if (employer == nullptr) {
         throw std::logic_error("A workspace without an owner");
     }
+    // The employer pays the wage, City Hall's share of it straight to City
+    // Hall.
     const std::int64_t wage = PayOf(robot);
+    const std::int64_t tax = wage * kWageTaxPercent / 100;
     employer->today.wages += wage;
-    PayOrBorrow(*employer, robot.id, wage);
+    PayOrBorrow(*employer, robot.id, wage - tax);
+    PayOrBorrow(*MutableOrganization(employer->id), cityHall_, tax);
+    if (Organization* city = MutableOrganization(cityHall_)) {
+        city->today.revenue += tax;
+    }
     state_.today.wages += wage;
+    state_.today.wageTax += tax;
     Emit({.tick = state_.tick,
           .kind = EventKind::ShiftEnded,
           .robot = robot.id,
           .room = robot.workspace,
-          .credits = wage});
+          .credits = wage - tax});
 }
 
 std::int64_t World::PriceOf(const Room& apartment) const {
@@ -762,6 +785,53 @@ void World::ReviewUnits() {
     }
 }
 
+void World::RunCityHall() {
+    Organization* city = MutableOrganization(cityHall_);
+    if (city == nullptr) {
+        return;
+    }
+    // A fifth of every corporation's and bank's profit today.
+    for (Organization& organization : state_.economy.organizations) {
+        if (organization.kind != OrganizationKind::Corporation &&
+            organization.kind != OrganizationKind::Bank) {
+            continue;
+        }
+        const Books& books = organization.today;
+        const std::int64_t profit =
+            books.revenue - (books.wages + books.supplies + books.upkeep + books.rent + books.taxes);
+        const std::int64_t tax = std::min(organization.credits, std::max<std::int64_t>(0, profit) *
+                                                                    kProfitTaxPercent / 100);
+        if (tax <= 0) {
+            continue;
+        }
+        Pay(organization.id, cityHall_, tax);
+        organization.today.taxes += tax;
+        city->today.revenue += tax;
+        state_.today.profitTax += tax;
+    }
+    // Support for every robot out of work, borrowed if the treasury is bare.
+    for (Robot& robot : state_.robots) {
+        if (!robot.workspace.IsValid()) {
+            PayOrBorrow(*city, robot.id, kBenefit);
+            city->today.wages += kBenefit;
+            state_.today.benefits += kBenefit;
+        }
+    }
+    // Public works: half of what City Hall has beyond twice its reserve
+    // buys supplies from industry, unless it is in debt.
+    const std::int64_t reserve = std::max<std::int64_t>(
+        kCorporationFloor * 5, 3 * (city->today.wages + city->today.upkeep));
+    const std::int64_t spare = city->credits - (2 * reserve);
+    if (spare > 0 && LoanOf(cityHall_) == nullptr) {
+        const std::int64_t works = spare / 2;
+        city->credits -= works;
+        city->today.supplies += works;
+        state_.economy.supplyMarket += works;
+        state_.today.supplies += works;
+        state_.today.publicSpending += works;
+    }
+}
+
 void World::SetPrices() {
     // A venue that had three times its places in guests asks more; one
     // that had fewer guests than places, less.
@@ -895,7 +965,7 @@ std::int64_t World::ReserveOf(const Organization& organization) const {
         return kBankFloor + (held * kBankReservePercent / 100);
     }
     const auto costs = [](const Books& books) {
-        return books.wages + books.supplies + books.upkeep + books.rent;
+        return books.wages + books.supplies + books.upkeep + books.rent + books.taxes;
     };
     return std::max(kCorporationFloor,
                     std::max(costs(organization.today), costs(organization.yesterday)));
@@ -1131,6 +1201,8 @@ void World::SettleEconomy() {
         }
     }
 
+    RunCityHall();
+
     // Dividends from what organizations without debts have to spare.
     for (Organization& organization : economy.organizations) {
         if (organization.kind == OrganizationKind::CentralBank || organization.owners.empty() ||
@@ -1235,6 +1307,8 @@ void World::RecordStatistics() {
             ++stats.indebtedRobots;
         } else if (loan.lender == centralBank_) {
             stats.bankDebt += loan.owed;
+        } else if (loan.borrower == cityHall_) {
+            stats.governmentDebt += loan.owed;
         } else {
             stats.corporationDebt += loan.owed;
         }

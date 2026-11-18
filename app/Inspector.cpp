@@ -461,8 +461,9 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
                     pay = pay * employer->payPercent / 100;
                 }
             }
+            pay -= pay * sim::kWageTaxPercent / 100;  // After City Hall's share.
             const std::string job = std::format(
-                "{}{}, {}-{}, {} cr a shift", sim::JobTitle(robot.jobLevel),
+                "{}{}, {}-{}, {} cr a shift after tax", sim::JobTitle(robot.jobLevel),
                 sim::IsVenue(work->room->kind) ? " on the staff" : "",
                 sim::FormatClock(shift.startMinute),
                 sim::FormatClock((shift.startMinute + shift.lengthMinutes) % sim::kMinutesPerDay),

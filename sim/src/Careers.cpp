@@ -181,6 +181,9 @@ namespace {
 // Each night, the chance in percent that a robot living alone in a rented
 // home asks its closest friend to move in together.
 constexpr std::uint32_t kShareHomePercent = 10;
+// Sharing is how robots afford more sooner: each needs only this many
+// nights of its share saved, where moving alone takes kAffordNights.
+constexpr std::int64_t kShareAffordNights = 10;
 }  // namespace
 
 void World::ReviewHomes() {
@@ -316,7 +319,7 @@ void World::ReviewHomes() {
                     return false;
                 }
                 const std::int64_t share = (RentFor(room) + room.capacity - 1) / room.capacity;
-                return share * kAffordNights <= means;
+                return share * kShareAffordNights <= means;
             });
         if (!shared) {
             continue;

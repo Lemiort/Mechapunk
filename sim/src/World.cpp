@@ -834,6 +834,25 @@ void World::CollectRent() {
         received(utilities_, paid);
         state_.today.upkeep += paid;
     }
+    // Owners pay City Hall's property tax on every home they own.
+    Organization* city = MutableOrganization(cityHall_);
+    for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+        const Room& room = *apartment.room;
+        if (room.owner == cityHall_ || city == nullptr) {
+            continue;
+        }
+        const std::int64_t tax = RentFor(room) * kPropertyTaxPercent / 100;
+        std::int64_t paid = tax;
+        if (Organization* owner = MutableOrganization(room.owner)) {
+            owner->today.taxes += tax;
+            PayOrBorrow(*owner, cityHall_, tax);
+        } else if (Robot* robot = MutableRobot(room.owner)) {
+            paid = PayBill(*robot, cityHall_, tax);
+        }
+        city = MutableOrganization(cityHall_);
+        city->today.revenue += paid;
+        state_.today.propertyTax += paid;
+    }
 }
 
 

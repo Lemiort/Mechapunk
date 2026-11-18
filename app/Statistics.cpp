@@ -184,6 +184,23 @@ void DrawEconomy(const std::vector<sim::DailyStats>& history) {
         Row("Written off", Credits(counted.writtenOff));
         ImGui::EndTable();
     }
+    ImGui::SeparatorText("City Hall");
+    if (BeginFacts("city")) {
+        Row("Wage / property / profit tax",
+            std::format("{} / {} / {}", Credits(counted.wageTax), Credits(counted.propertyTax),
+                        Credits(counted.profitTax)));
+        Row("Support for robots out of work", Credits(counted.benefits));
+        Row("Public works", Credits(counted.publicSpending));
+        Row("Treasury / owed", std::format("{} / {}", Credits(day.governmentMoney),
+                                           Credits(day.governmentDebt)));
+        ImGui::EndTable();
+    }
+    PlotCredits("Taxes", history, [](const auto& d) {
+        return d.counted.wageTax + d.counted.propertyTax + d.counted.profitTax;
+    });
+    PlotCredits("Support and public works", history,
+                [](const auto& d) { return d.counted.benefits + d.counted.publicSpending; });
+    PlotCredits("Treasury", history, [](const auto& d) { return d.governmentMoney; });
     PlotCredits("Wages", history, [](const auto& d) { return d.counted.wages; });
     PlotCredits("Venue sales", history, [](const auto& d) { return d.counted.venueSales; });
     PlotCount("Industry pay, % of base", history, [](const auto& d) { return d.averagePayPercent; });
