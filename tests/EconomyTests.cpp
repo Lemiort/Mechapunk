@@ -294,3 +294,29 @@ TEST(Economy, CityHallTaxesAndSupports) {
     }
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }
+
+// While the central bank need not create money, its rate falls.
+TEST(Economy, TheCentralBankRateFallsWhileMoneyIsSteady) {
+    sim::World world = sim::World::Generate({.seed = 10, .robots = 400});
+    world.RunFor(6 * sim::kMinutesPerDay);
+    EXPECT_LT(world.State().economy.policyRate, sim::kStartingPolicyRate);
+    EXPECT_GE(world.State().economy.policyRate, sim::kMinPolicyRate);
+    EXPECT_EQ(world.State().history.back().policyRate, world.State().economy.policyRate);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
+// At midnight savers earn half the central bank's rate on their savings.
+TEST(Economy, SaversEarnInterest) {
+    sim::World start = sim::World::Generate({.seed = 10, .robots = 400});
+    start.RunFor(sim::kMinutesPerDay - 1);
+    sim::WorldState state = start.State();
+    state.robots.front().savings = 20000;
+    const sim::EntityId saver = state.robots.front().id;
+    const std::int64_t rate = state.economy.policyRate;
+    auto world = sim::World::FromState(std::move(state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(1);
+    EXPECT_GE(world->FindRobot(saver)->savings + world->FindRobot(saver)->credits,
+              20000 + (20000 * rate / 2 / 10000));
+    EXPECT_GT(world->State().history.back().counted.savingsInterest, 0);
+}

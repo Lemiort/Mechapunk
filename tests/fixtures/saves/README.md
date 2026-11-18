@@ -20,6 +20,7 @@ every fixture, so old saves keep working as the format evolves.
 | `v13-city.json` | 13     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v13-city.json` (game 0.13.0) |
 | `v14-city.json` | 14     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v14-city.json` (game 0.14.0) |
 | `v15-city.json` | 15     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v15-city.json` (game 0.15.0) |
+| `v16-city.json` | 16     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v16-city.json` (game 0.16.0) |
 
 `v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
 working. `v2-city.json` stops at Day 2 19:00, with robots resting, walking,
@@ -56,6 +57,8 @@ than usual and market rents moved by empty homes.
 counting their quiet nights.
 `v15-city.json` stops at the same moment with City Hall collecting taxes,
 supporting robots out of work and owning the metro.
+`v16-city.json` stops at the same moment with the central bank's rate
+moved and savers earning interest.
 `Version1FixtureMigratesAndRuns` loads the v1
 fixture through the migration, checks every robot kept its home and
 workplace, and runs two days of evenings; `Version2FixtureMigratesAndRuns`
@@ -79,6 +82,8 @@ that v12 venues ask their base prices and market rents start at their base.
 `Version13FixtureMigratesAndRuns` checks that v13 rooms start with no quiet
 nights. `Version14FixtureMigratesAndRuns` checks that the v14 housing office
 becomes City Hall and starts collecting taxes.
+`Version15FixtureMigratesAndRuns` checks that a v15 central bank starts at
+the old fixed rate.
 
 ## Changing the save format
 

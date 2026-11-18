@@ -320,9 +320,11 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
             counted.propertySales, day.broke, day.behindOnBills);
         std::println(
             "   city hall: {} in wage tax, {} property tax, {} profit tax; {} support, {} public "
-            "works; {} in the treasury, {} owed",
+            "works; {} in the treasury, {} owed; central bank rate {}/10000 a night, {} interest on "
+            "savings",
             counted.wageTax, counted.propertyTax, counted.profitTax, counted.benefits,
-            counted.publicSpending, day.governmentMoney, day.governmentDebt);
+            counted.publicSpending, day.governmentMoney, day.governmentDebt, day.policyRate,
+            counted.savingsInterest);
         std::println(
             "   homes: {} in dorms, {} in studios, {} in flats, {} in two-bedroom flats, {} in "
             "penthouses; {} sharing ({} moved in together); supplies at {}%; rents {}/{}/{}/{}/{}, "

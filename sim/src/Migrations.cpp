@@ -660,4 +660,18 @@ std::expected<void, std::string> V14ToV15(SaveDocument& world) try {
         std::format("the version 14 world is malformed ({})", error.what()));
 }
 
+
+std::expected<void, std::string> V15ToV16(SaveDocument& world) try {
+    world["economy"]["policyRate"] = std::int64_t{10};
+    world["today"]["savingsInterest"] = std::int64_t{0};
+    for (SaveDocument& day : world["history"].get_array()) {
+        day["counted"]["savingsInterest"] = std::int64_t{0};
+        day["policyRate"] = std::int64_t{10};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 15 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

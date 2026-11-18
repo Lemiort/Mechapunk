@@ -132,6 +132,7 @@ struct DayCounters {
     std::int64_t profitTax{};
     std::int64_t benefits{};
     std::int64_t publicSpending{};
+    std::int64_t savingsInterest{};
     std::int64_t newFriendships{};
     std::int64_t newRivalries{};
     std::int64_t arrivals{};
@@ -173,6 +174,7 @@ struct DailyStats {
     std::int64_t corporationDebt{};
     std::int64_t bankDebt{};  // Owed to the central bank.
     std::int64_t governmentDebt{};
+    std::int64_t policyRate{};  // In 1/10000 a night.
     std::int64_t indebtedRobots{};
     std::int64_t meanCredits{};
     std::int64_t medianCredits{};
@@ -204,6 +206,14 @@ struct DailyStats {
     std::int64_t emptyUnits{};
 };
 
+// The central bank's rate, in units of 1/10000 a night: it starts here and
+// stays within the bounds. Banks lend at the rate plus their margin and pay
+// savers half the rate.
+inline constexpr std::int64_t kStartingPolicyRate = 10;
+inline constexpr std::int64_t kMinPolicyRate = 2;
+inline constexpr std::int64_t kMaxPolicyRate = 50;
+inline constexpr std::int64_t kBankMargin = 5;
+
 struct Economy {
     // Sorted by id.
     std::vector<Organization> organizations;
@@ -224,6 +234,9 @@ struct Economy {
     // order from studios, in percent of an apartment's base rent. They rise
     // while few homes of a class stand empty and fall while many do.
     std::array<std::int64_t, 4> rentPercent{100, 100, 100, 100};
+    // The central bank's rate, in 1/10000 a night. It rises while the
+    // central bank has to create money and falls while it need not.
+    std::int64_t policyRate{kStartingPolicyRate};
 };
 
 // City Hall's taxes, in percent: of every wage, withheld on payday; of a
@@ -242,8 +255,6 @@ inline constexpr std::int64_t kPriceNights = 100;
 inline constexpr std::int64_t kUpkeepPercent = 50;
 // Robots sell to the housing trust at this much of the price, in percent.
 inline constexpr std::int64_t kSellPercent = 90;
-// Interest added to every loan each night, in units of 1/10000.
-inline constexpr std::int64_t kInterestPerNight = 10;
 // Days of statistics kept.
 inline constexpr std::size_t kHistoryDays = 400;
 // Emissions kept in the log.

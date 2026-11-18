@@ -380,6 +380,8 @@ private:
     // At midnight: taxes on profits, support for robots out of work, and
     // public works with whatever City Hall has to spare.
     void RunCityHall();
+    // At midnight: interest on savings, and the central bank's rate.
+    void SetPolicyRate();
     // What a robot means to spend on outings in a day.
     [[nodiscard]] std::int64_t BudgetOf(const Robot& robot) const;
     void Lend(EntityId lender, EntityId borrower, std::int64_t amount);

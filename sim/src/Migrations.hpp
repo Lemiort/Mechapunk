@@ -67,4 +67,8 @@ namespace mechapunk::sim::migrations {
 // the metro; nobody has paid taxes yet.
 [[nodiscard]] std::expected<void, std::string> V14ToV15(SaveDocument& world);
 
+// Version 15 to 16: the central bank's rate starts at the old fixed rate of
+// 10/10000 a night.
+[[nodiscard]] std::expected<void, std::string> V15ToV16(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

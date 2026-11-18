@@ -177,7 +177,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v15-city.json";
+        kFixtureDirectory / "saves" / "v16-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -628,5 +628,21 @@ TEST(Save, Version14FixtureMigratesAndRuns) {
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_GT(world->State().history.back().counted.wageTax, 0);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 15 save's central bank starts at the old fixed rate.
+TEST(Save, Version15FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v15-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_EQ(state->economy.policyRate, 10);
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(2 * sim::kMinutesPerDay);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

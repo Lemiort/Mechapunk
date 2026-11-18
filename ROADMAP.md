@@ -88,6 +88,10 @@ Also done since the plan was written:
   a property tax on homes and a fifth of corporate profits, supports every
   robot out of work, and spends what it can spare on public works, which
   buy supplies from industry.
+- A central bank rate: up while the central bank has to create money, down
+  while it need not. Banks lend at the rate plus a margin, pay savers half
+  of it, and grant mortgages only while the interest is a third of pay or
+  less, so a high rate cools lending.
 - Transit: an elevated metro on a timetable. Every station row and column
   is a line with two tracks, on two levels so lines cross. Two-ended trains
   turn back over a crossover in the tail track past each end station, run
@@ -170,8 +174,6 @@ game:
 
 - **Transit staff.** Drivers in the trains' cabs and staff at the stations,
   on City Hall's payroll; later police.
-- **Central bank rate.** Interest that rises while the central bank has to
-  create money and falls while money is short.
 - **Gangs.** Rival or friendly to each other, always rivals of the police;
   members rob robots outside their gang. Unions later.
 - **Construction.** The city grows: new buildings on park corners as the

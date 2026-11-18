@@ -167,6 +167,10 @@ void DrawEconomy(const std::vector<sim::DailyStats>& history) {
     PlotCredits("Corporations' credits", history, [](const auto& d) { return d.corporationMoney; });
     PlotCredits("Banks' credits", history, [](const auto& d) { return d.bankMoney; });
     ImGui::SeparatorText("Debts");
+    PlotCount("Central bank rate, 1/10000 a night", history,
+              [](const auto& d) { return d.policyRate; });
+    PlotCredits("Interest paid on savings", history,
+                [](const auto& d) { return d.counted.savingsInterest; });
     PlotCredits("Robots owe", history, [](const auto& d) { return d.robotDebt; });
     PlotCredits("Corporations owe", history, [](const auto& d) { return d.corporationDebt; });
     PlotCredits("Banks owe the central bank", history, [](const auto& d) { return d.bankDebt; });

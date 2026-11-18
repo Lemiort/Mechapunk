@@ -785,6 +785,32 @@ void World::ReviewUnits() {
     }
 }
 
+void World::SetPolicyRate() {
+    Economy& economy = state_.economy;
+    // Savers earn half the rate on what their bank holds for them: the bank
+    // owes them more, no money moves until they take it out.
+    for (Robot& robot : state_.robots) {
+        const std::int64_t interest = robot.savings * economy.policyRate / 2 / 10000;
+        Organization* bank = MutableOrganization(robot.bank);
+        if (interest <= 0 || bank == nullptr) {
+            continue;
+        }
+        robot.savings += interest;
+        bank->today.wages += interest;  // A cost of the bank's, like wages.
+        state_.today.savingsInterest += interest;
+    }
+    // Up a point while the central bank created over a thousandth of the
+    // money in the city today, down a point after a day it created under a
+    // ten-thousandth (newcomers' savings, say).
+    const std::int64_t money = std::max<std::int64_t>(1, economy.created - economy.destroyed);
+    const std::int64_t created = state_.today.created - state_.today.destroyed;
+    if (created * 1000 > money) {
+        economy.policyRate = std::min(kMaxPolicyRate, economy.policyRate + 1);
+    } else if (created * 10000 < money) {
+        economy.policyRate = std::max(kMinPolicyRate, economy.policyRate - 1);
+    }
+}
+
 void World::RunCityHall() {
     Organization* city = MutableOrganization(cityHall_);
     if (city == nullptr) {
@@ -1044,9 +1070,14 @@ void World::TradeProperty() {
         }
         const std::int64_t price = PriceOf(*best);
         const std::int64_t own = std::min(means - (kBuyReserveNights * UpkeepOf(*best)), price);
-        // A bank lends only what it can spare beyond its reserve.
+        // A bank lends only what it can spare beyond its reserve, and only
+        // while the interest takes no more than a third of the robot's pay.
         const Organization* bank = FindOrganization(robot.bank);
-        if (bank == nullptr || bank->credits - (price - own) < ReserveOf(*bank)) {
+        const std::int64_t mortgageOwed = price - own;
+        const std::int64_t nightly =
+            mortgageOwed * (state_.economy.policyRate + kBankMargin) / 10000;
+        if (bank == nullptr || bank->credits - mortgageOwed < ReserveOf(*bank) ||
+            nightly * 3 > NetPayOf(robot)) {
             continue;
         }
         Withdraw(robot, own - robot.credits);
@@ -1127,7 +1158,10 @@ void World::SettleEconomy() {
 
     // Interest, then repayments from whatever borrowers can spare.
     for (Loan& loan : economy.loans) {
-        const std::int64_t interest = (loan.owed * kInterestPerNight + 9999) / 10000;
+        // The central bank lends at its rate; banks add their margin.
+        const std::int64_t rate =
+            economy.policyRate + (loan.lender == centralBank_ ? 0 : kBankMargin);
+        const std::int64_t interest = (loan.owed * rate + 9999) / 10000;
         loan.owed += interest;
         state_.today.interest += interest;
         if (Organization* lender = MutableOrganization(loan.lender)) {
@@ -1202,6 +1236,7 @@ void World::SettleEconomy() {
     }
 
     RunCityHall();
+    SetPolicyRate();
 
     // Dividends from what organizations without debts have to spare.
     for (Organization& organization : economy.organizations) {
@@ -1328,6 +1363,7 @@ void World::RecordStatistics() {
     }
     stats.averagePayPercent = industry > 0 ? payPercent / industry : 100;
     stats.supplyPercent = state.economy.supplyPercent;
+    stats.policyRate = state.economy.policyRate;
     {
         std::array<std::int64_t, 5> rents{};
         std::array<std::int64_t, 5> counts{};
