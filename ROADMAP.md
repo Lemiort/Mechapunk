@@ -1,6 +1,8 @@
 # Mechapunk roadmap
 
-Where the game and its engine stand, and what is left, as of 2026-11-17.
+Where the game and its engine stand, and what is left, as of 2026-11-18.
+Plans for every remaining task, with data structures and file pointers,
+are in `docs/IMPLEMENTATION_GUIDE.md`.
 The goal is a cyberpunk robot city at Dwarf Fortress level of detail: every
 building, room, store and robot can be seen and inspected.
 
@@ -20,8 +22,8 @@ building, room, store and robot can be seen and inspected.
   RAII wrappers around them. NEE's `ImGuiOverlay` is fine.
 - Saves are glaze JSON with frozen migrations. Any change to saved state
   bumps the save version, adds a migration and a fixture (see
-  `tests/fixtures/saves/README.md`). The current save version is 8, game
-  version 0.8.0.
+  `tests/fixtures/saves/README.md`). The current save version is 16, game
+  version 0.16.0.
 
 ### Building and testing
 
@@ -53,7 +55,7 @@ The game build rebuilds `external/NEE/build/Release` first. Quit a running
 | M3 Needs and the economy | Done: charge, condition, social, fun; wages, rent, debt, venues, evenings out, days off |
 | M4 Social life | Done: interests, talks, bonds (friend, close friend, rival), memories. The "chronicle" is only the inspector's recent events, which are not saved |
 | M5 Atmosphere | Done: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces, HDR, tone mapping, bloom, weather and rain |
-| M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers), a closed economy with banks, a central bank, corporations, property, venue staff, daily budgets and a market price for supplies, and daily statistics. **Missing: venues opening and closing with demand, gangs, simulation level of detail, construction** |
+| M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers), a closed economy with banks, a central bank, corporations, property, venue staff, daily budgets and a market price for supplies, venues and workspaces opening and closing with demand, City Hall with taxes and support, a central bank rate, and daily statistics. **Missing: police and metro drivers, gangs, chronicle, construction, simulation level of detail** |
 
 Also done since the plan was written:
 

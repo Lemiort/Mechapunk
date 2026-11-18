@@ -1,0 +1,16 @@
+# Mechapunk
+
+A cyberpunk robot city simulation (C++23, own engine NEE). Read
+`docs/IMPLEMENTATION_GUIDE.md` first: build and test commands, the rules
+that must never break (determinism, money adds up, save migrations, no
+teleporting robots), the architecture map, and plans for every remaining
+task. `ROADMAP.md` has the milestones and known gaps.
+
+Quick reference:
+- Build: `cmake --build build/build/Release`; test: `ctest --test-dir build/build/Release`.
+- Headless check: `build/build/Release/mechapunk-sim.exe --seed 1 --robots 10000 --days 40 --quiet`.
+- Any change to saved state: bump the save version, add a frozen migration,
+  a new fixture and tests (guide, rule 3).
+- Commit game work to `master` and push; NEE only through pull requests.
+- Do not drive or screenshot the game window unless the user says the
+  machine is free.
