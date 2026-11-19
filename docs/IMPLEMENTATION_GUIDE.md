@@ -173,6 +173,17 @@ each saved change follows rule 3.
 
 ### A. City staff: police and metro drivers (City Hall payroll)
 
+> **Status: done** (commit 8af52a3 plus the fixes after it). Officers patrol
+> on the hour (`World::Patrol`), stay `kPatrolStayMinutes` at the venue and
+> only set out when they can be back before the shift ends. Drivers are
+> planned by `Metro::PlanDriverRun` and drawn by `CityView::DriverPlacement`:
+> they walk from the crew room to the platform, board through the front door,
+> ride at `TrainState::cab` (which moves smoothly while the train reverses),
+> get off at the last stop at their first station before the shift ends and
+> walk back. Drivers ranked beyond the line's trains, or with no train in
+> their shift, stay in the crew room. Old saves (before v17) have no depots,
+> so they never get drivers.
+
 Why: gangs need police as their rivals; the user asked for metro drivers
 (optional). Both are City Hall jobs paid from taxes.
 

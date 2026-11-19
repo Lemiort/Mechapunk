@@ -52,6 +52,8 @@ std::string KindLabel(sim::RoomKind kind) {
     switch (kind) {
         case sim::RoomKind::Apartment: return "apartment";
         case sim::RoomKind::VacantStore: return "empty unit, to let";
+        case sim::RoomKind::PoliceStation: return "police station";
+        case sim::RoomKind::CrewRoom: return "metro crew room";
         default: return "workspace";
     }
 }

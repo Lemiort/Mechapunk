@@ -297,6 +297,9 @@ private:
     void UpdateNeeds();
     void Act(Robot& robot);
     void Arrive(Robot& robot);
+    // An officer at the station: out to a venue on the hour, or wait.
+    void Patrol(Robot& robot, Tick shiftEnd);
+    [[nodiscard]] Tick NextPatrolAt(const Robot& robot) const;
     void Decide(Robot& robot);
     void StartWalk(Robot& robot, EntityId destination);
     void ScheduleNextCommute(Robot& robot);

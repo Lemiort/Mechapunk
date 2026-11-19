@@ -463,6 +463,10 @@ TEST(World, OfficersPatrolVenuesAndReturnToTheirStations) {
     std::unordered_set<std::uint64_t> outOnPatrol;  // Officers with a live patrol last minute.
     int onPatrol = 0;      // Officers with a live patrol, summed over the run.
     int backAtStation = 0;  // Patrol round trips that ended at the station.
+    int started = 0;        // Patrols set off on the second day.
+    int offTheHour = 0;     // Of those, how many left other than on the hour.
+    int lookingRound = 0;   // Officer-minutes spent at a venue, working.
+    std::unordered_set<std::uint64_t> onDuty;  // Officers who worked on day 2.
     for (sim::Tick minute = 0; minute < 2 * sim::kMinutesPerDay; ++minute) {
         const auto& state = world.State();
         std::unordered_set<std::uint64_t> stations;  // The city can grow.
@@ -487,6 +491,17 @@ TEST(World, OfficersPatrolVenuesAndReturnToTheirStations) {
             if (robot.patrol.IsValid()) {
                 ++onPatrol;
                 nowOut.insert(robot.id.value);
+                if (outOnPatrol.count(robot.id.value) == 0 && minute >= sim::kMinutesPerDay) {
+                    ++started;
+                    offTheHour += (minute % 60 == 0) ? 0 : 1;
+                }
+                if (robot.activity == sim::RobotActivity::Working &&
+                    robot.location == robot.patrol && robot.location != robot.workspace) {
+                    ++lookingRound;
+                }
+            }
+            if (minute >= sim::kMinutesPerDay && robot.activity == sim::RobotActivity::Working) {
+                onDuty.insert(robot.id.value);
             }
         }
         outOnPatrol = std::move(nowOut);
@@ -494,5 +509,11 @@ TEST(World, OfficersPatrolVenuesAndReturnToTheirStations) {
     }
     EXPECT_GT(onPatrol, 0);
     EXPECT_GT(backAtStation, 0);
+    // Out every hour of a shift that leaves time to get back, not every
+    // other hour: up to eight a shift, at least four on average.
+    EXPECT_GE(started, 4 * static_cast<int>(onDuty.size()));
+    EXPECT_EQ(offTheHour, 0);
+    // And they look round each venue for a while, not turn on the doorstep.
+    EXPECT_GE(lookingRound, 10 * started);
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }

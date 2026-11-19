@@ -228,6 +228,7 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
     if (time < first) {
         state.phase = TrainState::Phase::LeavingDepot;
         state.progress = (time - leaves) / kDepotMinutes;
+        state.cab = 1.0;  // Out of the depot toward the first platform.
         return state;
     }
     if (time >= back + kDepotMinutes) {
@@ -236,9 +237,18 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
     if (time >= back) {
         state.phase = TrainState::Phase::EnteringDepot;
         state.progress = (time - back) / kDepotMinutes;
+        state.cab = -1.0;  // Back past the first platform into the depot.
         return state;
     }
     state.phase = TrainState::Phase::Running;
+    // Driven from the front, except while reversing in a tail track.
+    bool reversing = false;
+    const auto driven = [&]() -> TrainState {
+        if (!reversing) {
+            state.cab = state.towardEnd ? 1.0 : -1.0;
+        }
+        return state;
+    };
     const double into = std::fmod(time - first, metro.roundTripMinutes);
     const std::size_t count = metro.stations.size();
     const double length = metro.meters.back();
@@ -250,13 +260,13 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
                            ((into - from) * kTrainMetersPerMinute);
             state.side = -1.0;
             state.towardEnd = true;
-            return state;
+            return driven();
         }
         if (into < metro.upDeparts[index]) {
             state.meters = metro.meters[index];
             state.side = -1.0;
             state.towardEnd = true;
-            return state;
+            return driven();
         }
     }
     // Turning in a tail track: in, stop and cross over diagonally back out.
@@ -275,6 +285,8 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
             const double from = outward > 0.0 ? -1.0 : 1.0;
             state.side = from + ((-2.0 * from) * cross);
             state.towardEnd = since < half ? outward > 0.0 : outward < 0.0;
+            reversing = true;
+            state.cab = outward * (1.0 - (2.0 * since / kReverseMinutes));
             return;
         }
         since -= kReverseMinutes;
@@ -284,7 +296,7 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
     };
     if (into < metro.downArrives[count - 1]) {
         turn(into - metro.upDeparts[count - 1], length, 1.0);
-        return state;
+        return driven();
     }
     for (std::size_t step = 0; step < count; ++step) {
         const std::size_t index = count - 1 - step;
@@ -294,17 +306,17 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
                            ((into - from) * kTrainMetersPerMinute);
             state.side = 1.0;
             state.towardEnd = false;
-            return state;
+            return driven();
         }
         if (into < metro.downDeparts[index]) {
             state.meters = metro.meters[index];
             state.side = 1.0;
             state.towardEnd = false;
-            return state;
+            return driven();
         }
     }
     turn(into - metro.downDeparts[0], 0.0, -1.0);
-    return state;
+    return driven();
 }
 
 TrainState Metro::TrainAt(std::uint32_t line, std::uint32_t train, double time) const {
@@ -326,6 +338,48 @@ std::vector<TrainState> Metro::TrainsAt(double time) const {
         }
     }
     return trains;
+}
+
+
+std::optional<DriverRun> Metro::PlanDriverRun(std::uint32_t line, double readyAt,
+                                              std::uint32_t rank, double latestOff) const {
+    if (line >= lines_.size() || lines_[line].stations.size() < 2) {
+        return std::nullopt;
+    }
+    const MetroLine& metro = lines_[line];
+    const std::uint32_t first = metro.stations[0];
+    const std::uint32_t second = metro.stations[1];
+    // Drivers ready together take successive departures, one train each.
+    std::optional<Leg> leg = Ride(line, first, second, readyAt);
+    for (std::uint32_t skip = 0; skip < rank && leg; ++skip) {
+        leg = Ride(line, first, second, leg->departs - kDwellMinutes + 1e-6);
+    }
+    if (!leg) {
+        return std::nullopt;
+    }
+    // The train is back at the same platform at the start of each of its
+    // round trips; the last one it still runs, by latestOff, is the stop to
+    // hand it over.
+    std::optional<double> off;
+    for (std::uint32_t trip = 1;; ++trip) {
+        const double at = leg->roundTripStart + (static_cast<double>(trip) * metro.roundTripMinutes);
+        if (at > latestOff) {
+            break;
+        }
+        const TrainState state = TrainAt(line, leg->train, at + 0.01);
+        if (state.phase != TrainState::Phase::Running || std::abs(state.meters) >= 0.5 ||
+            state.side >= 0.0) {
+            break;  // Into the depot for the night: the last stop was the one before.
+        }
+        off = at;
+    }
+    if (!off) {
+        return std::nullopt;
+    }
+    return DriverRun{.train = leg->train,
+                     .boards = leg->departs - kDwellMinutes,
+                     .departs = leg->departs,
+                     .alights = *off};
 }
 
 }  // namespace mechapunk::sim

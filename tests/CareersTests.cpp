@@ -153,9 +153,11 @@ TEST(Careers, GoodWorkIsPromoted) {
 TEST(Careers, WornDownWorkersAreFiredAndHiredAgain) {
     const sim::World city = WorkingCity();
     sim::WorldState state = city.State();
-    const auto index = FindIndex(state, [](const sim::Robot& robot) {
+    // Its shift must start soon: over days off it would recover before it.
+    const sim::Tick now = city.CurrentTick();
+    const auto index = FindIndex(state, [&](const sim::Robot& robot) {
         return robot.activity == sim::RobotActivity::Resting &&
-               robot.commuteAt != sim::kNoCommute;
+               robot.commuteAt != sim::kNoCommute && robot.shiftStartsAt < now + 720;
     });
     ASSERT_TRUE(index);
     sim::Robot& robot = state.robots[*index];

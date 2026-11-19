@@ -873,7 +873,6 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
                 const float x = width * (static_cast<float>(officer) + 1.0F) / 3.0F;
                 Place(plan, PropKind::Desk, f.At(x, deskU), f.Dir(0, 1));
                 Place(plan, PropKind::Chair, f.At(x, deskU + 0.7F), f.Dir(0, -1), fabric);
-                spots.push_back(MakeSpot(f, x, deskU + 0.7F, {0, -1}, Pose::Sitting, 0.5F));
             }
             const float barTop = 2.2F;
             const float halfBar = kGlassThickness * 0.5F;
@@ -902,7 +901,6 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
             for (int seat = 0; seat < 2; ++seat) {
                 const float x = middle + ((static_cast<float>(seat) - 0.5F) * 1.6F);
                 Place(plan, PropKind::Chair, f.At(x, 3.0F), f.Dir(0, -1), fabric);
-                spots.push_back(MakeSpot(f, x, 3.0F, {0, -1}, Pose::Sitting, 0.5F));
             }
             break;
         }
@@ -915,6 +913,12 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
     const std::uint32_t staff = std::min<std::uint32_t>(sim::StaffPerShift(room), 3);
     const auto worker = [&](float x, float u, vec2 facing, std::vector<vec3> approach = {}) {
         area.spots.push_back(Via(MakeSpot(f, x, u, facing, Pose::Standing), std::move(approach)));
+        ++area.staffSpots;
+    };
+    // Staff who sit at their work: officers at their desks, drivers in the
+    // briefing seats.
+    const auto seated = [&](float x, float u, vec2 facing) {
+        area.spots.push_back(MakeSpot(f, x, u, facing, Pose::Sitting, 0.5F));
         ++area.staffSpots;
     };
     for (std::uint32_t index = 0; index < staff; ++index) {
@@ -937,6 +941,22 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
                 break;
             case sim::RoomKind::BlackMarket:
                 worker(0.3F, 1.5F + (3.2F * i), {1, 0});
+                break;
+            case sim::RoomKind::PoliceStation:
+                // Two desks, then behind the front desk.
+                if (index < 2) {
+                    seated(width * (i + 1.0F) / 3.0F, 7.7F, {0, -1});
+                } else {
+                    worker(middle, kDepth - 3.8F, {0, 1});
+                }
+                break;
+            case sim::RoomKind::CrewRoom:
+                // The two briefing seats, then standing by the board.
+                if (index < 2) {
+                    seated(middle + ((i - 0.5F) * 1.6F), 3.0F, {0, -1});
+                } else {
+                    worker(middle + 1.8F, 1.6F, {-1, 0});
+                }
                 break;
             default:
                 // An attendant by the door.

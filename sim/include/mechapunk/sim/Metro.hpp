@@ -66,6 +66,15 @@ struct Leg {
     double roundTripStart{};
 };
 
+// A metro driver's run in one shift: the train it takes over at its line's
+// first station, and the stop there where it hands the train back.
+struct DriverRun {
+    std::uint32_t train{};
+    double boards{};   // Doors open at the first station, up track.
+    double departs{};
+    double alights{};  // The train stands at the same platform again.
+};
+
 // Where a train is, for drawing.
 struct TrainState {
     enum class Phase : std::uint8_t { InDepot, LeavingDepot, Running, EnteringDepot };
@@ -79,6 +88,10 @@ struct TrainState {
     double meters{};
     double side{-1.0};
     bool towardEnd{true};
+    // The end the driver drives from, along the line: +1 toward its end, -1
+    // toward its start. While a train reverses in a tail track the driver
+    // walks to the other end, and this passes smoothly between the two.
+    double cab{1.0};
     // LeavingDepot and EnteringDepot: how far, 0 to 1, from the depot.
     double progress{};
 };
@@ -114,6 +127,13 @@ public:
     // One train of a line at `time`.
     [[nodiscard]] TrainState TrainAt(std::uint32_t line, std::uint32_t train,
                                      double time) const;
+    // The run of the rank-th driver ready at the line's first station at
+    // `readyAt`: the rank-th train to leave it from then, ridden until the
+    // last time that train stands at the same platform by `latestOff`.
+    // Nothing when no such train runs (at night, or a shift too short).
+    [[nodiscard]] std::optional<DriverRun> PlanDriverRun(std::uint32_t line, double readyAt,
+                                                         std::uint32_t rank,
+                                                         double latestOff) const;
     // The station where a row line and a column line cross.
     [[nodiscard]] std::optional<std::uint32_t> Crossing(std::uint32_t rowLine,
                                                         std::uint32_t columnLine) const;

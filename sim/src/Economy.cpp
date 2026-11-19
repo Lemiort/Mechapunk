@@ -184,8 +184,12 @@ void World::FoundEconomy(std::uint64_t seed) {
 
     // Industry: corporations of about four workplaces each.
     std::vector<Building*> workplaces;
+    // Metro depots belong to the Metro Authority, not to industry.
     for (Building& building : state_.city.buildings) {
-        if (building.kind == BuildingKind::Workplace) {
+        const bool depot = std::ranges::all_of(building.rooms, [](const Room& room) {
+            return room.kind == RoomKind::CrewRoom;
+        });
+        if (building.kind == BuildingKind::Workplace && !depot) {
             workplaces.push_back(&building);
         }
     }
@@ -243,7 +247,11 @@ void World::FoundEconomy(std::uint64_t seed) {
 
     // The city's housing office owns the dorms everyone starts in; the
     // trust owns every other apartment, to let or sell.
-    const EntityId trust = economy.organizations.at(banks.back() + 1).id;
+    const auto trustIt = std::ranges::find_if(
+        economy.organizations, [](const Organization& organization) {
+            return organization.sector == Sector::Housing;
+        });
+    const EntityId trust = trustIt->id;
     const auto officeIt = std::ranges::find_if(
         economy.organizations, [](const Organization& organization) {
             return organization.kind == OrganizationKind::Government;
@@ -258,8 +266,7 @@ void World::FoundEconomy(std::uint64_t seed) {
     }
 
     // City Hall owns every police station; the Metro Authority owns every
-    // crew room. Assigned here, after the workplace loop above, so depot
-    // crew rooms do not stay owned by their random industry corporation.
+    // crew room.
     const auto transitIt = std::ranges::find_if(
         economy.organizations, [](const Organization& organization) {
             return organization.sector == Sector::Transit;

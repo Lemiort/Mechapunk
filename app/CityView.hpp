@@ -251,10 +251,40 @@ private:
     const std::vector<glm::vec3>& StationRoute(sim::EntityId building,
                                                std::uint32_t station);
     void AddStations();
-    // A crew-room robot's place on shift: on its platform before its train
-    // leaves, in the cab of that train for the 480-minute shift.
+    // A metro driver's shift: from the crew room up to its line's first
+    // platform, into the cab of its train through the front door, driving
+    // it until the last time it stands at that platform before the shift
+    // ends, then back. Planned once per shift; nothing when it has no train.
+    struct DriverPlan {
+        std::uint32_t line{};
+        std::uint32_t station{};
+        sim::LineAxis axis{};
+        sim::EntityId room;
+        sim::EntityId building;
+        double leaves{};      // Out of the crew room.
+        double onPlatform{};  // Waiting for the doors to open.
+        sim::DriverRun run;
+        double back{};        // In the crew room again.
+    };
+    struct CachedDriverPlan {
+        double clockIn{};
+        std::uint32_t rank{};
+        std::optional<DriverPlan> plan;
+    };
+    // The line a crew room's depot serves.
+    [[nodiscard]] std::optional<std::uint32_t> CrewLineOf(sim::EntityId crewRoom) const;
+    [[nodiscard]] std::optional<DriverPlan> PlanDriver(const RobotFrame& robot) const;
+    // Whether a driver on shift is out of its crew room.
+    [[nodiscard]] bool DriverAway(const RobotFrame& robot, double renderTick) const;
+    // Where the driver of a train stands: its driving end.
+    [[nodiscard]] glm::vec3 CabOf(std::uint32_t line, const sim::TrainState& state) const;
+    // A driver's place while out of the crew room; nothing while in it.
     [[nodiscard]] std::optional<Placement> DriverPlacement(const RobotFrame& robot,
                                                            double renderTick);
+    // Along walk_ from start to end, at renderTick.
+    [[nodiscard]] std::optional<Placement> FollowWalk(const RobotFrame& robot, double start,
+                                                      double end, double renderTick,
+                                                      bool boarding) const;
     // Position along the walk and the direction of travel; nothing while
     // the robot rides the metro.
     [[nodiscard]] std::optional<Placement> RobotPosition(const RobotFrame& robot,
@@ -356,6 +386,8 @@ private:
     // Metro drivers on shift, by id: the rank of their train in its line,
     // rebuilt each frame before robots are drawn.
     std::unordered_map<std::uint64_t, std::uint32_t> driverRank_;
+    mutable std::unordered_map<std::uint64_t, std::uint32_t> crewLines_;  // Crew room to line.
+    mutable std::unordered_map<std::uint64_t, CachedDriverPlan> driverPlans_;
     std::vector<NeonSign> neonSigns_;
     std::vector<UnitSign> unitSigns_;
     std::vector<Neon> neons_;

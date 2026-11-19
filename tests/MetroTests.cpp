@@ -156,3 +156,52 @@ TEST(Metro, TrainsStandAtThePlatformTheyLeaveFrom) {
         }
     }
 }
+
+// Drivers ready together at a line's first station take successive trains,
+// and hand each back at the same platform before their shift ends.
+TEST(Metro, DriversTakeSuccessiveTrainsAndHandThemBack) {
+    const sim::Metro metro(City().State().city);
+    const sim::MetroLine& line = metro.Lines().front();
+    const double ready = kNoon;
+    const double latestOff = kNoon + (7.0 * 60.0);
+    std::set<std::uint32_t> trains;
+    double lastBoards = ready;
+    for (std::uint32_t rank = 0; rank < line.trains; ++rank) {
+        const auto run = metro.PlanDriverRun(0, ready, rank, latestOff);
+        ASSERT_TRUE(run.has_value()) << rank;
+        EXPECT_GE(run->boards, lastBoards);
+        lastBoards = run->boards;
+        EXPECT_TRUE(trains.insert(run->train).second) << "train taken twice";
+        EXPECT_GT(run->alights, run->departs);
+        EXPECT_LE(run->alights, latestOff);
+        // The train stands at the first station's up platform then.
+        const sim::TrainState at = metro.TrainAt(0, run->train, run->alights + 0.01);
+        EXPECT_EQ(at.phase, sim::TrainState::Phase::Running);
+        EXPECT_NEAR(at.meters, 0.0, 0.5);
+        EXPECT_LT(at.side, 0.0);
+    }
+    // No trains between 01:00 and 05:00: a driver ready at 02:00 cannot hand a
+    // train back by 03:00.
+    EXPECT_FALSE(metro.PlanDriverRun(0, 2.0 * 60.0, 0, 3.0 * 60.0).has_value());
+}
+
+// A driver changes ends while the train reverses, so the cab moves between
+// them smoothly rather than flipping, and is at the front otherwise.
+TEST(Metro, TheCabChangesEndsSmoothly) {
+    const sim::Metro metro(City().State().city);
+    const sim::MetroLine& line = metro.Lines().front();
+    constexpr double kStep = 0.005;
+    double last = metro.TrainAt(0, 0, kNoon).cab;
+    bool between = false;
+    for (double time = kNoon; time < kNoon + line.roundTripMinutes; time += kStep) {
+        const sim::TrainState state = metro.TrainAt(0, 0, time);
+        EXPECT_LE(std::abs(state.cab - last), (2.0 * kStep / sim::kReverseMinutes) + 1e-9) << time;
+        if (std::abs(state.cab) < 0.99) {
+            between = true;
+        } else {
+            EXPECT_EQ(state.cab > 0.0, state.towardEnd) << time;
+        }
+        last = state.cab;
+    }
+    EXPECT_TRUE(between);
+}
