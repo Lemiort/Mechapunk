@@ -147,6 +147,18 @@ constexpr std::array<std::string_view, 4> kClinicNames{
     "Chassis General", "Mercy Mechanics", "St. Solder's", "Overhaul Ward"};
 constexpr std::array<std::string_view, 4> kBlackMarketNames{
     "The Back Door", "Grey Parts", "Under the Bridge", "No Questions"};
+
+// Staff for rooms that are not venues: two officers or drivers per shift.
+constexpr StaffRules kPoliceStaff{.shiftStarts = {Hour(6), Hour(14), Hour(22)},
+                                  .shifts = 3,
+                                  .lengthMinutes = 480,
+                                  .wage = 120,
+                                  .guestsPerWorker = 1};
+constexpr StaffRules kCrewStaff{.shiftStarts = {Hour(6), Hour(14), Hour(22)},
+                                .shifts = 3,
+                                .lengthMinutes = 480,
+                                .wage = 120,
+                                .guestsPerWorker = 1};
 }  // namespace
 
 const VenueRules* FindVenueRules(RoomKind kind) noexcept {
@@ -173,6 +185,21 @@ const VenueRules* FindVenueRules(RoomKind kind) noexcept {
             return nullptr;
     }
     return nullptr;
+}
+
+const StaffRules* FindStaffRules(RoomKind kind) noexcept {
+    const VenueRules* venue = FindVenueRules(kind);
+    if (venue != nullptr) {
+        return &venue->staff;
+    }
+    switch (kind) {
+        case RoomKind::PoliceStation:
+            return &kPoliceStaff;
+        case RoomKind::CrewRoom:
+            return &kCrewStaff;
+        default:
+            return nullptr;
+    }
 }
 
 bool IsVenue(RoomKind kind) noexcept { return FindVenueRules(kind) != nullptr; }
@@ -226,23 +253,25 @@ std::span<const std::string_view> VenueNames(RoomKind kind) noexcept {
 
 
 std::uint32_t StaffPerShift(const Room& venue) noexcept {
-    const VenueRules* rules = FindVenueRules(venue.kind);
+    const StaffRules* rules = FindStaffRules(venue.kind);
     if (rules == nullptr) {
         return 0;
     }
-    return std::max<std::uint32_t>(1, venue.capacity / rules->staff.guestsPerWorker);
+    return std::max<std::uint32_t>(1, venue.capacity / rules->guestsPerWorker);
 }
 
 std::uint32_t JobsAt(const Room& room) noexcept {
     if (room.kind == RoomKind::Workspace) {
         return room.capacity;
     }
-    const VenueRules* rules = FindVenueRules(room.kind);
-    return rules != nullptr ? StaffPerShift(room) * rules->staff.shifts : 0;
+    if (const StaffRules* staff = FindStaffRules(room.kind)) {
+        return StaffPerShift(room) * staff->shifts;
+    }
+    return 0;
 }
 
-std::uint32_t ShiftSlot(EntityId robot, const VenueRules& rules) noexcept {
-    return static_cast<std::uint32_t>((robot.value * 2654435761ULL >> 8U) % rules.staff.shifts);
+std::uint32_t ShiftSlot(EntityId robot, const StaffRules& rules) noexcept {
+    return static_cast<std::uint32_t>((robot.value * 2654435761ULL >> 8U) % rules.shifts);
 }
 
 }  // namespace mechapunk::sim

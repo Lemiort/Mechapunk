@@ -68,13 +68,15 @@ struct VenueRules {
 [[nodiscard]] std::uint32_t MinutesUntilClose(const VenueRules& rules,
                                               std::uint32_t minuteOfDay) noexcept;
 
+// Staff rules for venues, police stations and crew rooms.
+[[nodiscard]] const StaffRules* FindStaffRules(RoomKind kind) noexcept;
 // Workers a venue needs on each of its shifts.
 [[nodiscard]] std::uint32_t StaffPerShift(const Room& venue) noexcept;
 // Jobs in a room: a workspace's capacity, a venue's staff on all shifts.
 [[nodiscard]] std::uint32_t JobsAt(const Room& room) noexcept;
 // Which of its venue's shifts a robot works: fixed by the robot, so a
 // venue hires for the shift a newcomer can take.
-[[nodiscard]] std::uint32_t ShiftSlot(EntityId robot, const VenueRules& rules) noexcept;
+[[nodiscard]] std::uint32_t ShiftSlot(EntityId robot, const StaffRules& rules) noexcept;
 
 // Every venue kind, for generation.
 [[nodiscard]] std::span<const RoomKind> VenueKinds() noexcept;

@@ -159,7 +159,11 @@ TEST(Careers, WornDownWorkersAreFiredAndHiredAgain) {
     });
     ASSERT_TRUE(index);
     sim::Robot& robot = state.robots[*index];
-    robot.performance = sim::kFiringPerformance + 1;
+    // Start exactly on the firing line: the worn-down penalty at clock-in
+    // then guarantees the shift ends at or below it, whatever the random
+    // shift score is. A single point above it made this test depend on the
+    // score draw (and on unrelated RNG use elsewhere in the simulation).
+    robot.performance = sim::kFiringPerformance;
     robot.needs.condition = 0;
     robot.wear = 0;
     const auto workspace = city.Rooms().Find(robot.workspace);

@@ -35,6 +35,7 @@ const sim::Organization* Find(const sim::WorldState& state, sim::Sector sector) 
 
 // Corporations own every workspace and venue, the city's housing office the
 // dorms everyone starts in, and the housing trust every other apartment;
+// City Hall owns the police stations, and the Metro Authority the crew rooms;
 // every corporation and bank has owners and a bank to borrow from.
 TEST(Economy, EverythingHasAnOwnerFromTheStart) {
     const sim::World world = sim::World::Generate({.seed = 4, .robots = 400});
@@ -65,8 +66,11 @@ TEST(Economy, EverythingHasAnOwnerFromTheStart) {
             }
             const sim::Organization* owner = world.FindOrganization(room.owner);
             ASSERT_NE(owner, nullptr) << room.name;
-            EXPECT_EQ(owner->sector, room.kind == sim::RoomKind::Workspace ? sim::Sector::Industry
-                                                                           : sim::Sector::Venues);
+            const sim::Sector expected = room.kind == sim::RoomKind::Workspace ? sim::Sector::Industry
+                : room.kind == sim::RoomKind::CrewRoom ? sim::Sector::Transit
+                    : room.kind == sim::RoomKind::PoliceStation ? sim::Sector::Government
+                        : sim::Sector::Venues;
+            EXPECT_EQ(owner->sector, expected);
         }
     }
     // Every venue has its staff, on every shift.
@@ -319,4 +323,89 @@ TEST(Economy, SaversEarnInterest) {
     EXPECT_GE(world->FindRobot(saver)->savings + world->FindRobot(saver)->credits,
               20000 + (20000 * rate / 2 / 10000));
     EXPECT_GT(world->State().history.back().counted.savingsInterest, 0);
+}
+
+namespace {
+// The city's public buildings: police stations run by City Hall and metro
+// crew rooms run by the Metro Authority. FoundEconomy assigns them to those
+// organizations (sim/src/Economy.cpp), and any station opened later goes to
+// City Hall too (World::OpenUnit); nothing ever closes or reassigns them.
+
+bool PublicRoomsArePublic(const sim::World& world) {
+    for (const sim::RoomRef& ref : world.Rooms().RoomsOfKind(sim::RoomKind::PoliceStation)) {
+        const sim::Organization* owner = world.FindOrganization(ref.room->owner);
+        if (!owner || owner->name != "City Hall") {
+            return false;
+        }
+    }
+    for (const sim::RoomRef& ref : world.Rooms().RoomsOfKind(sim::RoomKind::CrewRoom)) {
+        const sim::Organization* owner = world.FindOrganization(ref.room->owner);
+        if (!owner || owner->name != "Metro Authority") {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Robots whose workspace is a police station or crew room. OpeningsFor now
+// offers these rooms through StaffPerShift, so staff are hired as expected.
+std::uint32_t PublicBuildingStaff(const sim::World& world) {
+    std::uint32_t staff = 0;
+    for (const sim::Robot& robot : world.State().robots) {
+        if (!robot.workspace.IsValid()) {
+            continue;
+        }
+        const auto job = world.Rooms().Find(robot.workspace);
+        if (job && (job->room->kind == sim::RoomKind::PoliceStation ||
+                    job->room->kind == sim::RoomKind::CrewRoom)) {
+            ++staff;
+        }
+    }
+    return staff;
+}
+
+const sim::Organization* OrganizationNamed(const sim::WorldState& state, const char* name) {
+    for (const sim::Organization& organization : state.economy.organizations) {
+        if (organization.name == name) {
+            return &organization;
+        }
+    }
+    return nullptr;
+}
+}  // namespace
+
+// City Hall owns the police stations and the Metro Authority the metro crew
+// rooms. After two days of hiring, robots are staffed in both, money adds up,
+// and each owner's wage ledger is non-zero.
+TEST(Economy, StationsAndDepotsAreOwnedAndStaffed) {
+    sim::World world = sim::World::Generate({.seed = 11, .robots = 4000});
+    EXPECT_GT(world.Rooms().RoomsOfKind(sim::RoomKind::PoliceStation).size(), 0U);
+    EXPECT_GT(world.Rooms().RoomsOfKind(sim::RoomKind::CrewRoom).size(), 0U);
+    EXPECT_TRUE(PublicRoomsArePublic(world));
+    // Two days of shifts, hiring and layoffs; the review that opens new
+    // stations keeps them City Hall's (World::OpenUnit).
+    world.RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+    EXPECT_TRUE(PublicRoomsArePublic(world));
+    EXPECT_GT(PublicBuildingStaff(world), 0U);
+}
+
+// Wages are posted to the owner of a robot's workspace room when its shift
+// ends (World::PayWage). Both City Hall and Metro Authority now pay wages for
+// police stations and crew rooms respectively.
+TEST(Economy, CityHallAndTransitPayStaffWages) {
+    sim::World world = sim::World::Generate({.seed = 12, .robots = 4000});
+    EXPECT_GT(world.Rooms().RoomsOfKind(sim::RoomKind::PoliceStation).size(), 0U);
+    EXPECT_GT(world.Rooms().RoomsOfKind(sim::RoomKind::CrewRoom).size(), 0U);
+    world.RunFor(2 * sim::kMinutesPerDay);
+    const sim::WorldState& state = world.State();
+    ASSERT_TRUE(sim::ValidateWorldState(state));
+    EXPECT_GT(PublicBuildingStaff(world), 0U);
+    // Both organizations should have paid wages for their staff.
+    const auto* cityHall = OrganizationNamed(state, "City Hall");
+    const auto* authority = OrganizationNamed(state, "Metro Authority");
+    ASSERT_NE(cityHall, nullptr);
+    ASSERT_NE(authority, nullptr);
+    EXPECT_GT(cityHall->yesterday.wages, 0LL);
+    EXPECT_GT(authority->yesterday.wages, 0LL);
 }

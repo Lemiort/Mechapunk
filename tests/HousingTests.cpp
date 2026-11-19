@@ -211,7 +211,9 @@ TEST(Housing, QuietVenuesClose) {
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }
 
-// An empty unit opens again, as the kind of venue the city is short of.
+// An empty unit opens again, as the kind of venue the city is short of;
+// while no police station exists yet and the population can support one
+// (stations * 2000 < population), City Hall takes the unit first.
 TEST(Housing, EmptyUnitsOpenAsVenuesInDemand) {
     sim::World start = sim::World::Generate({.seed = 6, .robots = 400});
     start.RunFor(sim::kMinutesPerDay - 1);
@@ -241,6 +243,9 @@ TEST(Housing, EmptyUnitsOpenAsVenuesInDemand) {
          ++night) {
         world->RunFor(sim::kMinutesPerDay);
     }
-    EXPECT_TRUE(sim::IsVenue(world->Rooms().Find(id)->room->kind));
+    const sim::RoomKind kind = world->Rooms().Find(id)->room->kind;
+    // At this city size (400 robots) the station rule fires before any venue
+    // opens, so a police station is an expected outcome as well.
+    EXPECT_TRUE(sim::IsVenue(kind) || kind == sim::RoomKind::PoliceStation);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

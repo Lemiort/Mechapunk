@@ -51,6 +51,8 @@ enum class RoomKind : std::uint8_t {
     // A ground-floor unit standing empty: a venue that closed, or a
     // workspace given up, until someone opens it again.
     VacantStore,
+    PoliceStation,
+    CrewRoom,
 };
 
 // Classes of apartment, from a government dorm room to a whole floor. Each

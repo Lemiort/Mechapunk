@@ -21,6 +21,7 @@ every fixture, so old saves keep working as the format evolves.
 | `v14-city.json` | 14     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v14-city.json` (game 0.14.0) |
 | `v15-city.json` | 15     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v15-city.json` (game 0.15.0) |
 | `v16-city.json` | 16     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v16-city.json` (game 0.16.0) |
+| `v17-city.json` | 17     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v17-city.json` (game 0.17.0) |
 
 `v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
 working. `v2-city.json` stops at Day 2 19:00, with robots resting, walking,
@@ -59,6 +60,8 @@ counting their quiet nights.
 supporting robots out of work and owning the metro.
 `v16-city.json` stops at the same moment with the central bank's rate
 moved and savers earning interest.
+`v17-city.json` stops at the same moment with police stations and metro
+depots, whose staff have no patrols yet.
 `Version1FixtureMigratesAndRuns` loads the v1
 fixture through the migration, checks every robot kept its home and
 workplace, and runs two days of evenings; `Version2FixtureMigratesAndRuns`

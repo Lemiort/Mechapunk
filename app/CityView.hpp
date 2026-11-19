@@ -251,6 +251,10 @@ private:
     const std::vector<glm::vec3>& StationRoute(sim::EntityId building,
                                                std::uint32_t station);
     void AddStations();
+    // A crew-room robot's place on shift: on its platform before its train
+    // leaves, in the cab of that train for the 480-minute shift.
+    [[nodiscard]] std::optional<Placement> DriverPlacement(const RobotFrame& robot,
+                                                           double renderTick);
     // Position along the walk and the direction of travel; nothing while
     // the robot rides the metro.
     [[nodiscard]] std::optional<Placement> RobotPosition(const RobotFrame& robot,
@@ -349,6 +353,9 @@ private:
     };
     std::unordered_map<std::uint64_t, AssignedSpot> assignedSpots_;
     Walk walk_;  // Scratch for RobotPosition.
+    // Metro drivers on shift, by id: the rank of their train in its line,
+    // rebuilt each frame before robots are drawn.
+    std::unordered_map<std::uint64_t, std::uint32_t> driverRank_;
     std::vector<NeonSign> neonSigns_;
     std::vector<UnitSign> unitSigns_;
     std::vector<Neon> neons_;

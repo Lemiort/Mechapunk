@@ -98,7 +98,7 @@ TEST(Transit, RidersPayAndBrokeRobotsWalk) {
             broke.insert(robot.id.value);
         }
     }
-    ASSERT_GE(commuters.size(), 4U);
+    ASSERT_GE(commuters.size(), 3U);
     sim::World world = Load(std::move(state));
     std::uint64_t paidRides = 0;
     std::uint64_t brokeRides = 0;

@@ -123,9 +123,17 @@ vec3 StoreNeon(sim::RoomKind kind) {
             return {0.6F, 1.0F, 0.9F};
         case sim::RoomKind::BlackMarket:
             return {0.9F, 0.08F, 0.08F};
+        case sim::RoomKind::PoliceStation:
+            return {0.3F, 0.6F, 1.0F};
         default:
             return {1.0F, 1.0F, 1.0F};
     }
+}
+
+// A ground-floor sign that glows in its colour: every venue, plus the police
+// station (not a venue, but not "to let" either).
+bool KindHasNeonSign(sim::RoomKind kind) {
+    return sim::IsVenue(kind) || kind == sim::RoomKind::PoliceStation;
 }
 constexpr vec3 kSunColor{1.0F, 0.86F, 0.7F};
 constexpr vec3 kDaySky{0.45F, 0.47F, 0.55F};
@@ -1277,12 +1285,12 @@ void CityView::SubmitBox(RenderQueue& queue, vec3 minimum, vec3 maximum,
 
 bool CityView::UnitIsVenue(std::size_t unit) const {
     const auto room = rooms_.Find(unitSigns_.at(unit).room);
-    return room && sim::IsVenue(room->room->kind);
+    return room && KindHasNeonSign(room->room->kind);
 }
 
 vec3 CityView::UnitColor(std::size_t unit) const {
     const auto room = rooms_.Find(unitSigns_.at(unit).room);
-    return room && sim::IsVenue(room->room->kind) ? StoreNeon(room->room->kind) : vec3(0.0F);
+    return room && KindHasNeonSign(room->room->kind) ? StoreNeon(room->room->kind) : vec3(0.0F);
 }
 
 void CityView::UpdateCity(const sim::City& city) {
@@ -1301,7 +1309,7 @@ void CityView::SubmitUnitSigns(RenderQueue& queue) const {
         if (!room) {
             continue;
         }
-        const bool venue = sim::IsVenue(room->room->kind);
+        const bool venue = KindHasNeonSign(room->room->kind);
         if (!venue && room->room->kind != sim::RoomKind::VacantStore) {
             continue;
         }
@@ -1355,9 +1363,35 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
     }
 
     const float figureScale = kS * streetFigureScale;
+    // Drivers on shift, grouped by crew room (one per line) and sorted by
+    // id: within a line the n-th driver takes that line's train n. Ranking
+    // them all together would send several drivers of one line to the same
+    // train, and drivers of other lines to trains they do not drive.
+    driverRank_.clear();
+    std::unordered_map<std::uint64_t, std::vector<sim::EntityId>> byCrew;
     for (const RobotFrame& robot : frame.robots) {
-        if (robot.activity != sim::RobotActivity::Walking ||
-            !robot.from.IsValid()) {
+        if (robot.activity != sim::RobotActivity::Working ||
+            !robot.workspace.IsValid()) {
+            continue;
+        }
+        const auto crew = rooms_.Find(robot.workspace);
+        if (!crew || crew->room->kind != sim::RoomKind::CrewRoom) {
+            continue;
+        }
+        byCrew[robot.workspace.value].push_back(robot.id);
+    }
+    for (auto& [crew, drivers] : byCrew) {
+        std::ranges::sort(drivers);
+        for (std::size_t rank = 0; rank < drivers.size(); ++rank) {
+            driverRank_[drivers[rank].value] = static_cast<std::uint32_t>(rank);
+        }
+    }
+    for (const RobotFrame& robot : frame.robots) {
+        // Drivers on shift are drawn too, although they are not walking.
+        const bool driver = driverRank_.contains(robot.id.value);
+        if (!driver &&
+            (robot.activity != sim::RobotActivity::Walking ||
+             !robot.from.IsValid())) {
             continue;
         }
         const auto placed = RobotPosition(robot, renderTick);
@@ -1688,9 +1722,64 @@ const std::vector<vec3>& CityView::Route(sim::EntityId from, sim::EntityId to) {
     return routeCache_.emplace(key, std::move(points)).first->second;
 }
 
+std::optional<CityView::Placement> CityView::DriverPlacement(const RobotFrame& robot,
+                                                             double renderTick) {
+    // Only drivers on shift have a rank; everyone else skips the rest.
+    const auto rank = driverRank_.find(robot.id.value);
+    if (rank == driverRank_.end()) {
+        return std::nullopt;
+    }
+    const auto crew = rooms_.Find(robot.workspace);
+    if (!crew || crew->room->kind != sim::RoomKind::CrewRoom) {
+        return std::nullopt;
+    }
+    // The station at their depot's corner, and the line that serves it.
+    std::uint32_t station = 0;
+    bool hasStation = false;
+    for (std::size_t index = 0; index < city_.stations.size(); ++index) {
+        if (city_.stations[index].node == crew->building->entrance) {
+            station = static_cast<std::uint32_t>(index);
+            hasStation = true;
+            break;
+        }
+    }
+    std::optional<std::uint32_t> line = metro_.LineOf(station, sim::LineAxis::Row);
+    const sim::LineAxis axis = line ? sim::LineAxis::Row : sim::LineAxis::Column;
+    if (!line) {
+        line = metro_.LineOf(station, sim::LineAxis::Column);
+    }
+    if (!hasStation || !line) {
+        return std::nullopt;  // Their corner serves no line: nothing to drive.
+    }
+    const sim::MetroLine& metro = metro_.Lines().at(*line);
+    if (metro.trains == 0) {
+        return std::nullopt;
+    }
+    const std::uint32_t train = std::min(rank->second, metro.trains - 1);
+    const double start = static_cast<double>(robot.shiftStartsAt);
+    const double end = start + 480;
+    if (renderTick < start + 2) {
+        // Waiting on its platform for the train it will drive.
+        return Placement{.position = PlatformSpot(robot.id, station, axis, -1.0F),
+                         .direction = AlongOf(axis),
+                         .building = {}};
+    }
+    if (renderTick < end) {
+        // In the cab of its train for the shift.
+        const TrainPose pose = TrainPoseOf(metro_.TrainAt(*line, train, renderTick));
+        return Placement{.position = pose.position + pose.forward * (12.0F * kS),
+                         .direction = pose.forward,
+                         .aboard = true,
+                         .riding = true};
+    }
+    // Shift over: the walk home takes over.
+    return std::nullopt;
+}
+
 std::optional<CityView::Placement> CityView::RobotPosition(const RobotFrame& robot,
                                                            double renderTick) {
     walk_.clear();
+    if (auto driver = DriverPlacement(robot, renderTick)) return *driver;
     const auto street = [&](const std::vector<vec3>& points, bool reversed) {
         const auto add = [&](vec3 point) {
             walk_.push_back({.position = point + vec3{0.0F, kStreetHeight, 0.0F},

@@ -176,6 +176,14 @@ EntityId AssignJob(const RoomIndex& rooms, EntityId robot,
             }
         }
     }
+    // Police stations and crew rooms: one slot per capacity, checked via JobKey.
+    for (const RoomKind kind : std::array{RoomKind::PoliceStation, RoomKind::CrewRoom}) {
+        for (const RoomRef& room : rooms.RoomsOfKind(kind)) {
+            if (staff[JobKey(*room.room, robot)] < StaffPerShift(*room.room)) {
+                venues.push_back(room.room);
+            }
+        }
+    }
     if (!venues.empty()) {
         const Room& venue = *venues.at(random.UniformInt(0, static_cast<std::uint32_t>(venues.size() - 1)));
         ++staff[JobKey(venue, robot)];
@@ -306,7 +314,8 @@ std::expected<World, std::string> World::FromState(WorldState state) {
 
 bool World::IsGuestTrip(const Robot& robot, EntityId destination) const {
     const auto room = rooms_.Find(destination);
-    return room && IsVenue(room->room->kind) && destination != robot.workspace;
+    return room && IsVenue(room->room->kind) && destination != robot.workspace &&
+           destination != robot.patrol;
 }
 
 const Robot* World::FindRobot(EntityId id) const noexcept {
@@ -425,9 +434,36 @@ void World::Act(Robot& robot) {
             Arrive(robot);
             break;
         case RobotActivity::Working: {
-            PayWage(robot);
-            EndShift(robot);
-            Decide(robot);
+            if (state_.tick >= robot.shiftStartsAt + ShiftOf(robot).lengthMinutes) {
+                PayWage(robot);
+                EndShift(robot);
+                Decide(robot);
+                break;
+            }
+            // Still on the clock: an officer patrols a venue close by.
+            const auto workspace = rooms_.Find(robot.workspace);
+            if (workspace && workspace->room->kind == RoomKind::PoliceStation &&
+                !robot.patrol.IsValid() && MinuteOfDay(state_.tick) % 60 == 0) {
+                std::vector<EntityId> candidates;
+                for (const RoomKind kind : VenueKinds()) {
+                    for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
+                        const EntityId id = venue.room->id;
+                        if (id != robot.workspace &&
+                            TravelMinutes(robot.location, id) <= 10) {
+                            candidates.push_back(id);
+                        }
+                    }
+                }
+                // Sorted, so the pick below is deterministic.
+                std::sort(candidates.begin(), candidates.end());
+                if (!candidates.empty()) {
+                    robot.patrol = candidates[state_.random.UniformInt(
+                        0, static_cast<std::uint32_t>(candidates.size() - 1))];
+                    StartWalk(robot, robot.patrol);
+                } else {
+                    robot.nextActionAt = state_.tick + 60;
+                }
+            }
             break;
         }
         case RobotActivity::Visiting:
@@ -447,11 +483,45 @@ void World::Arrive(Robot& robot) {
     robot.rideTo = 0;
     robot.boardsAt = 0;
     robot.alightsAt = 0;
+    if (robot.patrol.IsValid() && robot.location == robot.patrol) {
+        // End of a patrol leg: the officer stays on the clock.
+        robot.activity = RobotActivity::Working;
+        // Never schedule past the end of the shift: an officer must wake at
+        // shift end to be paid and to leave, even if a patrol leg is still
+        // under way. Otherwise the last leg would add an extra hour of work.
+        const Tick shiftEnd =
+            robot.shiftStartsAt + ShiftOf(robot).lengthMinutes;
+        if (robot.location == robot.workspace) {
+            // Back at the station, ready for the next hourly dispatch.
+            robot.patrol = EntityId{};
+            robot.nextActionAt = std::min(state_.tick + 60, shiftEnd);
+        } else if (robot.workspace.IsValid()) {
+            // At a venue: turn back toward the station on foot. The walk's
+            // own wake time decides when the officer arrives back; clamping
+            // it to shift end keeps the payday on time.
+            robot.patrol = robot.workspace;
+            StartWalk(robot, robot.patrol);
+            robot.nextActionAt = std::min(robot.nextActionAt, shiftEnd);
+        } else {
+            // Fired between dispatch and arrival: drop the patrol rather than
+            // walking back to a room we no longer hold.
+            robot.patrol = EntityId{};
+            robot.nextActionAt = std::min(state_.tick + 60, shiftEnd);
+        }
+        return;
+    }
     if (robot.workspace.IsValid() && robot.location == robot.workspace) {
         robot.activity = RobotActivity::Working;
-        // A late robot still leaves at the regular end of its shift.
-        robot.nextActionAt = std::max(
-            robot.shiftStartsAt + ShiftOf(robot).lengthMinutes, now);
+        const auto workplace = rooms_.Find(robot.workspace);
+        if (workplace && workplace->room->kind == RoomKind::PoliceStation) {
+            // An officer wakes every hour to patrol, not only at shift end.
+            robot.nextActionAt = std::min(
+                now + 60, robot.shiftStartsAt + ShiftOf(robot).lengthMinutes);
+        } else {
+            // A late robot still leaves at the regular end of its shift.
+            robot.nextActionAt = std::max(
+                robot.shiftStartsAt + ShiftOf(robot).lengthMinutes, now);
+        }
         const auto late = static_cast<std::uint32_t>(
             now > robot.shiftStartsAt ? now - robot.shiftStartsAt : 0);
         if (late > 0) {
@@ -1017,7 +1087,14 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                                     "floors",
                                     building.name));
         }
+        // Metro depots (workplaces whose rooms are all crew rooms) carry no
+        // building-level shift by design; their staff follow room-kind rules,
+        // so the workplace shift checks don't apply to them.
         if (building.kind == BuildingKind::Workplace &&
+            std::any_of(building.rooms.begin(), building.rooms.end(),
+                        [](const Room& room) {
+                            return room.kind != RoomKind::CrewRoom;
+                        }) &&
             (building.shift.startMinute >= kMinutesPerDay ||
              building.shift.lengthMinutes == 0 ||
              building.shift.lengthMinutes >= kMinutesPerDay)) {

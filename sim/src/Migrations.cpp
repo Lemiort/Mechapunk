@@ -674,4 +674,15 @@ std::expected<void, std::string> V15ToV16(SaveDocument& world) try {
         std::format("the version 15 world is malformed ({})", error.what()));
 }
 
+
+std::expected<void, std::string> V16ToV17(SaveDocument& world) try {
+    for (SaveDocument& robot : world["robots"].get_array()) {
+        robot["patrol"] = std::uint64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 16 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

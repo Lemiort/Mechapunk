@@ -244,11 +244,33 @@ void World::FoundEconomy(std::uint64_t seed) {
     // The city's housing office owns the dorms everyone starts in; the
     // trust owns every other apartment, to let or sell.
     const EntityId trust = economy.organizations.at(banks.back() + 1).id;
-    const EntityId office = economy.organizations.at(banks.back() + 2).id;
+    const auto officeIt = std::ranges::find_if(
+        economy.organizations, [](const Organization& organization) {
+            return organization.kind == OrganizationKind::Government;
+        });
+    const EntityId office = officeIt->id;
     for (Building& building : state_.city.buildings) {
         for (Room& room : building.rooms) {
             if (room.kind == RoomKind::Apartment) {
                 room.owner = room.apartmentClass == ApartmentClass::Dorm ? office : trust;
+            }
+        }
+    }
+
+    // City Hall owns every police station; the Metro Authority owns every
+    // crew room. Assigned here, after the workplace loop above, so depot
+    // crew rooms do not stay owned by their random industry corporation.
+    const auto transitIt = std::ranges::find_if(
+        economy.organizations, [](const Organization& organization) {
+            return organization.sector == Sector::Transit;
+        });
+    const EntityId transit = transitIt->id;
+    for (Building& building : state_.city.buildings) {
+        for (Room& room : building.rooms) {
+            if (room.kind == RoomKind::PoliceStation) {
+                room.owner = office;
+            } else if (room.kind == RoomKind::CrewRoom) {
+                room.owner = transit;
             }
         }
     }
@@ -659,37 +681,45 @@ void World::CloseUnit(Room& room) {
 }
 
 void World::OpenUnit(Room& room, RoomKind kind) {
-    // The chain with most venues of the kind takes it on, or for a
-    // workspace the corporation owning the rest of its workplace.
+    // City Hall opens a police station. Otherwise the chain with most
+    // venues of the kind takes it on, or for a workspace the corporation
+    // owning the rest of its workplace.
     std::unordered_map<std::uint64_t, std::uint32_t> held;
     const auto building = rooms_.Find(room.id);
-    if (kind == RoomKind::Workspace) {
-        for (const Room& other : building->building->rooms) {
-            if (other.kind == RoomKind::Workspace) {
-                ++held[other.owner.value];
+    if (kind == RoomKind::PoliceStation) {
+        room.owner = cityHall_;
+    } else {
+        if (kind == RoomKind::Workspace) {
+            for (const Room& other : building->building->rooms) {
+                if (other.kind == RoomKind::Workspace) {
+                    ++held[other.owner.value];
+                }
+            }
+        } else {
+            for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
+                ++held[venue.room->owner.value];
             }
         }
-    } else {
-        for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
-            ++held[venue.room->owner.value];
+        EntityId owner;
+        std::uint32_t most = 0;
+        for (const Organization& organization : state_.economy.organizations) {
+            const auto found = held.find(organization.id.value);
+            const std::uint32_t count = found != held.end() ? found->second : 0;
+            const Sector wanted = kind == RoomKind::Workspace ? Sector::Industry : Sector::Venues;
+            if (organization.sector == wanted && (!owner.IsValid() || count > most)) {
+                owner = organization.id;
+                most = count;
+            }
         }
-    }
-    EntityId owner;
-    std::uint32_t most = 0;
-    for (const Organization& organization : state_.economy.organizations) {
-        const auto found = held.find(organization.id.value);
-        const std::uint32_t count = found != held.end() ? found->second : 0;
-        const Sector wanted = kind == RoomKind::Workspace ? Sector::Industry : Sector::Venues;
-        if (organization.sector == wanted && (!owner.IsValid() || count > most)) {
-            owner = organization.id;
-            most = count;
+        if (owner.IsValid()) {
+            room.owner = owner;
         }
-    }
-    if (owner.IsValid()) {
-        room.owner = owner;
     }
     room.kind = kind;
-    if (const VenueRules* rules = FindVenueRules(kind)) {
+    if (kind == RoomKind::PoliceStation) {
+        room.name = "Police Station";
+        room.capacity = 2;
+    } else if (const VenueRules* rules = FindVenueRules(kind)) {
         room.name = std::string{VenueNames(kind)[state_.random.UniformInt(
             0, static_cast<std::uint32_t>(VenueNames(kind).size() - 1))]};
         room.capacity = state_.random.UniformInt(rules->minCapacity, rules->maxCapacity);
@@ -722,6 +752,9 @@ void World::ReviewUnits() {
         }
     }
     const std::int64_t population = std::max<std::int64_t>(1, static_cast<std::int64_t>(state_.robots.size()));
+    // City Hall keeps one police station per 2000 residents, opening more in
+    // empty units as the city grows.
+    std::int64_t stations = static_cast<std::int64_t>(rooms_.RoomsOfKind(RoomKind::PoliceStation).size());
     const std::int64_t unemployment = unemployed * 100 / population;
     // How much each kind of venue is in demand: its average price, and
     // whether the city has any.
@@ -771,6 +804,10 @@ void World::ReviewUnits() {
                 if (building.kind == BuildingKind::Workplace &&
                     unemployment >= kHighUnemploymentPercent) {
                     OpenUnit(room, RoomKind::Workspace);
+                } else if (stations * 2000 < population) {
+                    // City Hall takes the unit before any venue opens.
+                    OpenUnit(room, RoomKind::PoliceStation);
+                    ++stations;
                 } else if (const auto kind = mostWanted()) {
                     OpenUnit(room, *kind);
                     demand[*kind].first += 100;

@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -452,4 +453,46 @@ TEST(World, DescribesEventsWithRoomsAndBuildings) {
         << lines.front();
     EXPECT_NE(lines.front().find(", Dormitory "), std::string::npos)
         << lines.front();
+}
+
+TEST(World, OfficersPatrolVenuesAndReturnToTheirStations) {
+    // Population level: nobody is scripted. Some of the robots are officers;
+    // over two days they must leave their stations to patrol nearby venues
+    // and come back, so both legs of the loop show up in the population.
+    sim::World world = sim::World::Generate({.seed = 3, .robots = 4000});
+    std::unordered_set<std::uint64_t> outOnPatrol;  // Officers with a live patrol last minute.
+    int onPatrol = 0;      // Officers with a live patrol, summed over the run.
+    int backAtStation = 0;  // Patrol round trips that ended at the station.
+    for (sim::Tick minute = 0; minute < 2 * sim::kMinutesPerDay; ++minute) {
+        const auto& state = world.State();
+        std::unordered_set<std::uint64_t> stations;  // The city can grow.
+        for (const sim::Building& building : state.city.buildings) {
+            for (const sim::Room& room : building.rooms) {
+                if (room.kind == sim::RoomKind::PoliceStation) {
+                    stations.insert(room.id.value);
+                }
+            }
+        }
+        std::unordered_set<std::uint64_t> nowOut;
+        for (const sim::Robot& robot : state.robots) {
+            if (stations.count(robot.workspace.value) == 0) {
+                continue;  // Not an officer.
+            }
+            // Was out on patrol last minute and is at the station again: a
+            // round trip just ended.
+            if (outOnPatrol.count(robot.id.value) != 0 &&
+                !robot.patrol.IsValid() && robot.location == robot.workspace) {
+                ++backAtStation;
+            }
+            if (robot.patrol.IsValid()) {
+                ++onPatrol;
+                nowOut.insert(robot.id.value);
+            }
+        }
+        outOnPatrol = std::move(nowOut);
+        world.Step();
+    }
+    EXPECT_GT(onPatrol, 0);
+    EXPECT_GT(backAtStation, 0);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }

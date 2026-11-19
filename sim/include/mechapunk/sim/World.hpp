@@ -46,6 +46,7 @@ struct Robot {
     EntityId location;
     // Room the robot is walking to; none unless walking.
     EntityId destination;
+    EntityId patrol;  // Venue an officer is patrolling, none at the station.
     Tick departedAt{};
     // Tick of the next scheduled change: leaving, arriving, ending a shift
     // or ending a visit.

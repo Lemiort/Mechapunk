@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include "mechapunk/sim/Metro.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk::sim {
@@ -128,14 +129,34 @@ NodeId RandomNodeInColumns(const CityParams& params, Pcg32& random,
                            std::vector<std::uint32_t>& buildingsAt) {
     constexpr std::uint32_t kCorners = 4;
     constexpr int kTries = 32;
-    NodeId node;
+    NodeId node{};
+    bool found = false;
     for (int attempt = 0; attempt < kTries; ++attempt) {
         const std::uint32_t column = random.UniformInt(firstColumn, lastColumn);
         const std::uint32_t row = random.UniformInt(0, params.gridSize - 1);
         node = NodeId{(row * params.gridSize) + column};
         if (buildingsAt.at(node.value) < kCorners) {
+            found = true;
             break;
         }
+    }
+    // Random probing can miss the last few free corners. Never take an
+    // already full node: a fifth building there would be drawn outside the
+    // block, on top of a neighbouring building's corner.
+    if (!found) {
+        for (std::uint32_t row = 0; row < params.gridSize && !found; ++row) {
+            for (std::uint32_t column = firstColumn; column <= lastColumn; ++column) {
+                const NodeId candidate{(row * params.gridSize) + column};
+                if (buildingsAt.at(candidate.value) < kCorners) {
+                    node = candidate;
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+    if (!found) {
+        throw std::logic_error("Generated city has no free corners");
     }
     ++buildingsAt.at(node.value);
     return node;
@@ -457,6 +478,21 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
         }
     }
 
+    // Reserve one corner for every metro depot before any other building is
+    // placed. A station node can host two depots (a row line and a column
+    // line both start at the inner corner), so count them individually. The
+    // builder cap of four corners then applies to habitats, workplaces and
+    // depots alike, and no building is ever pushed outside its block.
+    Metro metro(city);
+    std::vector<std::uint32_t> depotNodes;
+    for (const MetroLine& line : metro.Lines()) {
+        depotNodes.push_back(city.stations.at(line.stations.front()).node.value);
+    }
+    std::vector<std::uint32_t> buildingsAt(city.nodes.size(), 0);
+    for (const std::uint32_t node : depotNodes) {
+        ++buildingsAt.at(node);
+    }
+
     // Dormitories until every robot has a dorm bed, and habitats until
     // there are homes on the market for kMarketHomesPercent of them,
     // whichever is shorter of its goal first.
@@ -466,7 +502,6 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
         (static_cast<std::uint64_t>(params.residents) * kMarketHomesPercent) / 100;
     std::uint32_t habitats = 0;
     std::uint32_t storeRotation = 0;
-    std::vector<std::uint32_t> buildingsAt(city.nodes.size(), 0);
     while (dormBeds < params.residents || marketBeds < marketGoal) {
         const bool dormitory =
             dormBeds < params.residents &&
@@ -483,6 +518,24 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
         city.buildings.push_back(std::move(habitat));
     }
 
+    // One police station per 3000 robots, taking over a ground-floor store of
+    // each habitat in turn; apartments and workplaces are never touched.
+    const std::uint32_t wanted = params.residents / 3000;
+    std::uint32_t placed = 0;
+    for (Building& building : city.buildings) {
+        if (placed >= wanted || building.kind != BuildingKind::Habitat) continue;
+        for (Room& room : building.rooms) {
+            if (room.floor == 0 && room.kind != RoomKind::Apartment) {
+                room.kind = RoomKind::PoliceStation;
+                room.name = std::format("Police Station {}", ++placed);
+                room.capacity = 2;
+                room.pricePercent = 100;
+                room.visits = 0;
+                break;
+            }
+        }
+    }
+
     std::array<std::uint32_t, kWorkplaceTypes.size()> typeCounts{};
     std::uint32_t jobs = 0;
     while (jobs < params.residents) {
@@ -492,6 +545,30 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
             jobs += room.capacity;
         }
         city.buildings.push_back(std::move(workplace));
+    }
+
+    // One metro depot per line, at its first station's corner: a single crew
+    // room where drivers change shifts, sized for one driver per train (floor
+    // of two) so every run has a staffed cab. Staff rules come from
+    // FindStaffRules, so the building carries no shift of its own. Its corner
+    // was reserved in buildingsAt before the other buildings were placed.
+    std::uint32_t depots = 0;
+    for (const MetroLine& line : metro.Lines()) {
+        const NodeId depotNode{city.stations.at(line.stations.front()).node};
+        Building depot{.id = ids.Allocate(),
+                       .name = std::format("Metro Depot {}", ++depots),
+                       .kind = BuildingKind::Workplace,
+                       .entrance = depotNode,
+                       .floors = 1,
+                       .shift = {},
+                       .rooms = {}};
+        depot.rooms.push_back(
+            {.id = ids.Allocate(),
+             .name = std::format("Crew Room {}", depots),
+             .kind = RoomKind::CrewRoom,
+             .floor = 0,
+             .capacity = std::max<std::uint32_t>(2, line.trains)});
+        city.buildings.push_back(std::move(depot));
     }
     return city;
 }

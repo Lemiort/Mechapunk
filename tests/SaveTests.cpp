@@ -177,7 +177,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v16-city.json";
+        kFixtureDirectory / "saves" / "v17-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -241,6 +241,17 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
         return !robot.bonds.empty() && !robot.memories.empty();
     }));
     EXPECT_GT(state->weather.spells, 10U);
+    // Police stations and metro depots with crew rooms; no robot is on a
+    // patrol yet.
+    EXPECT_TRUE(std::ranges::any_of(state->city.buildings, [](const sim::Building& building) {
+        return std::ranges::any_of(building.rooms, [](const sim::Room& room) {
+            return room.kind == sim::RoomKind::PoliceStation ||
+                   room.kind == sim::RoomKind::CrewRoom;
+        });
+    }));
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_FALSE(robot.patrol.IsValid()) << robot.name;
+    }
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -644,5 +655,24 @@ TEST(Save, Version15FixtureMigratesAndRuns) {
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(2 * sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 16 save predates patrols: every robot's patrol is cleared, and
+// the city keeps running with its police stations and metro depots.
+TEST(Save, Version16FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v16-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_FALSE(robot.patrol.IsValid()) << robot.name;
+    }
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }

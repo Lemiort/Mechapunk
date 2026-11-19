@@ -71,4 +71,8 @@ namespace mechapunk::sim::migrations {
 // 10/10000 a night.
 [[nodiscard]] std::expected<void, std::string> V15ToV16(SaveDocument& world);
 
+// Version 16 to 17: robots gain a venue to patrol; nobody has been assigned
+// one yet.
+[[nodiscard]] std::expected<void, std::string> V16ToV17(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <set>
+#include <unordered_map>
 #include <vector>
+
+#include "mechapunk/sim/World.hpp"
 
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Random.hpp"
@@ -55,6 +59,14 @@ TEST(City, BuildingsHaveFloorsAndRooms) {
     std::set<std::uint64_t> roomIds;
     for (const sim::Building& building : city.buildings) {
         ASSERT_FALSE(building.rooms.empty()) << building.name;
+        // Metro depots are workplaces whose rooms are all crew rooms, by
+        // design: they carry no building-level shift and their staff follow
+        // room-kind rules, so the workplace checks below don't apply.
+        const bool depot = building.kind == sim::BuildingKind::Workplace &&
+            std::all_of(building.rooms.begin(), building.rooms.end(),
+                        [](const sim::Room& room) {
+                            return room.kind == sim::RoomKind::CrewRoom;
+                        });
         for (const sim::Room& room : building.rooms) {
             EXPECT_TRUE(roomIds.insert(room.id.value).second);
             EXPECT_GT(room.id, building.id);
@@ -68,11 +80,13 @@ TEST(City, BuildingsHaveFloorsAndRooms) {
                 if (sim::IsVenue(room.kind)) {
                     venueKinds.insert(room.kind);
                 }
+            } else if (depot) {
+                EXPECT_EQ(room.kind, sim::RoomKind::CrewRoom);
             } else {
                 EXPECT_EQ(room.kind, sim::RoomKind::Workspace);
             }
         }
-        if (building.kind == sim::BuildingKind::Workplace) {
+        if (!depot && building.kind == sim::BuildingKind::Workplace) {
             EXPECT_GT(building.shift.wage, 0U) << building.name;
         }
     }
@@ -152,6 +166,28 @@ TEST(RoutePlanner, FindsShortestGridDistance) {
     EXPECT_EQ(routes.Path(sim::NodeId{1}, sim::NodeId{1}),
               std::vector<sim::NodeId>{sim::NodeId{1}});
     EXPECT_TRUE(routes.Path(sim::NodeId{0}, sim::NodeId{3}).empty());
+}
+
+// The view places a building on one of the four corners of its entrance
+// node, and pushes a fifth building out to a far ring where it overlaps a
+// neighbour. Generation must therefore never put more than four buildings
+// at one intersection, depots included.
+TEST(City, NoIntersectionHasMoreThanFourBuildings) {
+    for (const std::uint64_t seed : {1U, 7U, 33U}) {
+        for (const std::uint32_t residents : {100U, 1000U, 4000U, 10000U}) {
+            const sim::World world = sim::World::Generate(
+                {.seed = seed, .robots = residents});
+            std::unordered_map<std::uint64_t, std::uint32_t> at;
+            for (const sim::Building& building : world.State().city.buildings) {
+                ++at[building.entrance.value];
+            }
+            for (const auto& [node, count] : at) {
+                EXPECT_LE(count, 4U) << "seed=" << seed
+                                     << " residents=" << residents
+                                     << " node=" << node;
+            }
+        }
+    }
 }
 
 TEST(RoutePlanner, PathLengthMatchesDistance) {

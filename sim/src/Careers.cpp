@@ -63,18 +63,18 @@ std::uint32_t World::WageOf(const Robot& robot) const {
 }
 
 Shift JobShift(const RoomRef& job, EntityId robot) noexcept {
-    const VenueRules* rules = FindVenueRules(job.room->kind);
-    if (rules == nullptr) {
+    const StaffRules* staff = FindStaffRules(job.room->kind);
+    if (staff == nullptr) {
         return job.building->shift;
     }
-    const std::uint32_t slot = ShiftSlot(robot, *rules);
-    return {.startMinute = rules->staff.shiftStarts.at(slot),
-            .lengthMinutes = rules->staff.lengthMinutes,
-            .wage = rules->staff.wage};
+    const std::uint32_t slot = ShiftSlot(robot, *staff);
+    return {.startMinute = staff->shiftStarts.at(slot),
+            .lengthMinutes = staff->lengthMinutes,
+            .wage = staff->wage};
 }
 
 std::uint64_t JobKey(const Room& job, EntityId robot) noexcept {
-    const VenueRules* rules = FindVenueRules(job.kind);
+    const StaffRules* rules = FindStaffRules(job.kind);
     return (job.id.value * 4) + (rules != nullptr ? ShiftSlot(robot, *rules) : 0);
 }
 
@@ -112,6 +112,14 @@ std::vector<EntityId> World::OpeningsFor(
         for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
             if (taken(*venue.room) < StaffPerShift(*venue.room)) {
                 openings.push_back(venue.room->id);
+            }
+        }
+    }
+    // Police stations and crew rooms: one slot per capacity, checked via JobKey.
+    for (const RoomKind kind : std::array{RoomKind::PoliceStation, RoomKind::CrewRoom}) {
+        for (const RoomRef& room : rooms_.RoomsOfKind(kind)) {
+            if (taken(*room.room) < StaffPerShift(*room.room)) {
+                openings.push_back(room.room->id);
             }
         }
     }

@@ -864,6 +864,48 @@ void Store(FloorPlan& plan, const sim::Room& room, const Frame& f, float width) 
             LampGrid(plan, f, width, kDepth, room.id, 6.0F);
             plan.rooms.push_back(std::move(area));
             return;
+        case sim::RoomKind::PoliceStation: {
+            // A front desk by the street door, two desks for officers on
+            // shift, and a holding cell of glass bars in the back corner.
+            Place(plan, PropKind::Desk, f.At(middle, kDepth - 3.0F), f.Dir(0, 1));
+            const float deskU = 7.0F;
+            for (int officer = 0; officer < 2; ++officer) {
+                const float x = width * (static_cast<float>(officer) + 1.0F) / 3.0F;
+                Place(plan, PropKind::Desk, f.At(x, deskU), f.Dir(0, 1));
+                Place(plan, PropKind::Chair, f.At(x, deskU + 0.7F), f.Dir(0, -1), fabric);
+                spots.push_back(MakeSpot(f, x, deskU + 0.7F, {0, -1}, Pose::Sitting, 0.5F));
+            }
+            const float barTop = 2.2F;
+            const float halfBar = kGlassThickness * 0.5F;
+            const auto bar = [&](float ax, float au, float bx, float bu) {
+                const vec3 a = f.At(ax, au);
+                const vec3 b = f.At(bx, bu);
+                plan.boxes.push_back(
+                    {.minimum = {std::min(a.x, b.x), 0.0F, std::min(a.z, b.z)},
+                     .maximum = {std::max(a.x, b.x), barTop, std::max(a.z, b.z)},
+                     .color = vec3{0.6F, 0.8F, 0.92F},
+                     .glass = true});
+            };
+            const float cx0 = 0.8F, cx1 = 3.4F, cu0 = 0.5F, cu1 = 3.7F;
+            bar(cx0 - halfBar, cu0, cx0 + halfBar, cu1);
+            bar(cx1 - halfBar, cu0, cx1 + halfBar, cu1);
+            bar(cx0, cu0 - halfBar, cx1, cu0 + halfBar);
+            // The front bar, with a door gap in the middle.
+            bar(cx0, cu1 - halfBar, cx0 + 0.85F, cu1 + halfBar);
+            bar(cx1 - 0.85F, cu1 - halfBar, cx1, cu1 + halfBar);
+            break;
+        }
+        case sim::RoomKind::CrewRoom: {
+            // A briefing corner: a notice board on the back wall and two
+            // seats facing it.
+            Place(plan, PropKind::WallScreen, f.At(middle, 0.4F), f.Dir(0, 1));
+            for (int seat = 0; seat < 2; ++seat) {
+                const float x = middle + ((static_cast<float>(seat) - 0.5F) * 1.6F);
+                Place(plan, PropKind::Chair, f.At(x, 3.0F), f.Dir(0, -1), fabric);
+                spots.push_back(MakeSpot(f, x, 3.0F, {0, -1}, Pose::Sitting, 0.5F));
+            }
+            break;
+        }
         default:
             break;
     }
