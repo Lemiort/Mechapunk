@@ -1,10 +1,11 @@
 # Mechapunk
 
 A cyberpunk robot city simulation (C++23, own engine NEE). Read
-`docs/IMPLEMENTATION_GUIDE.md` first: build and test commands, the rules
-that must never break (determinism, money adds up, save migrations, no
-teleporting robots), the architecture map, and plans for every remaining
-task. `ROADMAP.md` has the milestones and known gaps.
+`docs/IMPLEMENTATION_GUIDE.md` first: how to work with a small context,
+build and test commands, the rules that must never break (determinism,
+money adds up, save migrations, no teleporting robots) and the task list.
+Each task has its own file in `docs/tasks/`, cut into steps of one module
+and one commit each. `ROADMAP.md` has the milestones and known gaps.
 
 The code is split into modules that each fit a small model's context: see
 `docs/MODULES.md` for which files to open for a task, and open only those.

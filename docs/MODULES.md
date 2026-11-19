@@ -4,8 +4,9 @@ Mechapunk is split so that any one task fits a small model's context (about
 57k tokens). A **module** is what a task needs open at once: its sources, the
 headers it leans on, and its tests. Each is at most 25k tokens, leaving room
 for the instructions, the guide's section and the work. Open one module, plus
-the section of `docs/IMPLEMENTATION_GUIDE.md` for the task, and nothing else
-unless a compile error points elsewhere.
+`docs/IMPLEMENTATION_GUIDE.md` and the task file in `docs/tasks/` for the
+step you are doing, and nothing else unless a compile error points
+elsewhere.
 
 `scripts/context_budget.py` holds the list below and checks it (ctest runs it
 as `ContextBudget`): every source file belongs to a module, no file is over
@@ -32,6 +33,68 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
 | ui | 24k | `main.cpp`, `Inspector.hpp`, `Inspector.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
+
+## What lives where
+
+### Simulation library (`sim/`, namespace `mechapunk::sim`)
+
+Every `World` member is implemented in one of several source files, by
+topic. Helpers shared between those files live in a private
+`*Internal.hpp` next to them; helpers used by one file stay in its
+anonymous namespace. `docs/MODULES.md` says which files to open for a task.
+
+| File | What lives there |
+| --- | --- |
+| `World.hpp` | `Robot`, `WorldState`, `EventKind`/`SimEvent`, the `World` class (every member, grouped by the file implementing it) |
+| `World.cpp` | Construction, `FromState`, `Step` (the midnight order), `RunFor`, `UpdateNeeds`, `IsGuestTrip`, `WalkOf` |
+| `Behaviour.cpp` | A robot's day: `Act`, `Arrive`, `Decide`, `StartWalk`, commutes, `PlanAtHome`, officers' `Patrol` |
+| `Generation.cpp` | `World::Generate`, `AssignDorm`, `AssignJob`, robot names |
+| `Residents.cpp` | `RentOf`, `ResidentsOf`, `CountResidents`, `CollectRent` |
+| `Describe.cpp` | `Describe`, `DescribeRoom`: event and room text |
+| `Validation.cpp` | `ValidateWorldState` |
+| `City.hpp/.cpp` | Streets, stations, buildings, rooms, `RoomKind`, `ApartmentClass`, `GenerateCity`, `RoomIndex`, `RoutePlanner` |
+| `Venues.hpp/.cpp` | `VenueRules` per venue kind (hours, price, effects, capacity), `StaffRules` (also police and crew rooms), `FindStaffRules`, `StaffPerShift`, `JobsAt`, `ShiftSlot` |
+| `Careers.hpp/.cpp` | Wages, promotions, firing, `ReviewJobs`, `ReviewHomes` (eviction, moving up, friends moving in together), `JobShift`, `JobKey`, `OpeningsFor` |
+| `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
+| `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
+| `Founding.cpp` | `FoundEconomy` (organizations, owners, starting money), `IndexEconomy` |
+| `Money.cpp` | Accounts and all money movement: `Pay`, `ChangeMoney`, `Lend`, `Withdraw`, `PayBill`, `PayOrBorrow`, `Sell`, `PayWage`, budgets |
+| `Units.cpp` | Prices and rents, `CloseUnit`, `OpenUnit`, `ReviewUnits`, `SetPrices` |
+| `Property.cpp` | `Transfer`, `Bequeath`, `TradeProperty` (sales, mortgages) |
+| `Settlement.cpp` | `SettleEconomy`, `RunCityHall`, `SetPolicyRate` |
+| `EconomyStatistics.cpp` | `RecordStatistics`, `GiniPerMille`, sector and emission names |
+| `Social.hpp/.cpp` | Interests, bonds, memories (`MemoryKind`, `MemoryText`), talks, `Remember` (also counts daily statistics) |
+| `LifeCycle.cpp` | Aging, wear, `Scrap` (with `Bequeath`), `AddNewcomer` |
+| `Transit.cpp`, `Metro.hpp/.cpp` | Trip planning, the metro network, timetable, trains, `PlanDriverRun` |
+| `Weather.*`, `Random.*`, `GameTime.*`, `Ids.hpp` | As named |
+| `Save.hpp/.cpp` | glaze JSON, enum names, the migration list |
+| `Migrations.cpp` | Migrations from version 9 on: append new ones here |
+| `MigrationsEarly.cpp` | Frozen migrations 1 to 9 |
+
+### Game (`app/`, namespace `mechapunk`)
+
+| File | What lives there |
+| --- | --- |
+| `SimulationHost` | Runs the World on a worker thread; publishes an immutable `WorldFrame` after each step: `RobotFrame`s, shared `RobotSocial`, `RobotDirectory`, `EconomyFrame` (organizations, loans, emissions, history, room owners; refreshed every 10 minutes), and `city` + `cityVersion` when rooms changed. |
+| `CityView.hpp` | The `CityView` class: everything drawn |
+| `CityView.cpp` | Construction, `UpdateCity`, `Submit` (the frame: robots, signs, trains, interior), picking, routes |
+| `CityStatic.cpp` | Static batches: buildings, facades, parks, street lamps |
+| `CityMetro.cpp` | Elevated lines, stations, stairs, platforms, trains, doors, `LegsOf`, `StationRoute` |
+| `CityRobots.cpp` | Spots in rooms, ways out of rooms, `RobotPosition`, `FollowWalk` |
+| `CityDrivers.cpp` | Metro drivers: `PlanDriver`, `DriverPlacement`, `CabOf` |
+| `CityInteriors.cpp` | The open floor: `PlanOf`, `SubmitInterior`, props, unit signs |
+| `CityLights.cpp` | `AddLights`, `UpdateLights` |
+| `CityViewInternal.hpp` | Constants and helpers shared by the `City*.cpp` files (colours, `Accent`, sizes) |
+| `Interior.cpp` | `PlanFloor` (which plan a floor gets), `WayOut` paths |
+| `InteriorKit.hpp` | Sizes, walls, windows, `Frame`, spots, lamps: the pieces of every plan |
+| `InteriorHomes.cpp` | Dorm rooms, studios, flats, penthouses |
+| `InteriorStores.cpp` | Ground-floor stores: venues, empty units, police stations, crew rooms |
+| `InteriorWorkplaces.cpp` | Workspaces fitted out for their trade |
+| `Props` | Box models of every prop and the robot figure. |
+| `Inspector` | Inspector window for the selected building, room or robot. |
+| `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank tabs, plots from `DailyStats`. |
+| `main.cpp` | Window, input, camera, panels, applying frames. |
+
 
 ## Which module for which task
 

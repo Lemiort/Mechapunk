@@ -1,8 +1,8 @@
 # Mechapunk roadmap
 
-Where the game and its engine stand, and what is left, as of 2026-11-18.
-Plans for every remaining task, with data structures and file pointers,
-are in `docs/IMPLEMENTATION_GUIDE.md`.
+Where the game and its engine stand, and what is left, as of 2026-11-19.
+Plans for every remaining task, cut into steps that fit a small model,
+are in `docs/tasks/`, indexed by `docs/IMPLEMENTATION_GUIDE.md`.
 The goal is a cyberpunk robot city at Dwarf Fortress level of detail: every
 building, room, store and robot can be seen and inspected.
 
@@ -22,8 +22,8 @@ building, room, store and robot can be seen and inspected.
   RAII wrappers around them. NEE's `ImGuiOverlay` is fine.
 - Saves are glaze JSON with frozen migrations. Any change to saved state
   bumps the save version, adds a migration and a fixture (see
-  `tests/fixtures/saves/README.md`). The current save version is 16, game
-  version 0.16.0.
+  `tests/fixtures/saves/README.md`). The current save version is 17, game
+  version 0.17.0.
 
 ### Building and testing
 
@@ -55,7 +55,7 @@ The game build rebuilds `external/NEE/build/Release` first. Quit a running
 | M3 Needs and the economy | Done: charge, condition, social, fun; wages, rent, debt, venues, evenings out, days off |
 | M4 Social life | Done: interests, talks, bonds (friend, close friend, rival), memories. The "chronicle" is only the inspector's recent events, which are not saved |
 | M5 Atmosphere | Done: day and night, neon signs, street lamps, room lamps, walking animation, emissive surfaces, HDR, tone mapping, bloom, weather and rain |
-| M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers), a closed economy with banks, a central bank, corporations, property, venue staff, daily budgets and a market price for supplies, venues and workspaces opening and closing with demand, City Hall with taxes and support, a central bank rate, and daily statistics. **Missing: police and metro drivers, gangs, chronicle, construction, simulation level of detail** |
+| M6 Scale and depth | **Partly done**: simulation on a worker thread, breakdowns and repairs (wear, clinics, black markets, scrapping, newcomers), a closed economy with banks, a central bank, corporations, property, venue staff, daily budgets and a market price for supplies, venues and workspaces opening and closing with demand, City Hall with taxes and support, a central bank rate, daily statistics, police officers who patrol venues, and metro drivers who walk to their trains and drive them. **Missing: organization pages and links everywhere in the interface, gangs, chronicle, construction, simulation level of detail** |
 
 Also done since the plan was written:
 
@@ -174,8 +174,8 @@ game:
 
 ## Recommended next: M6 (scale and depth)
 
-- **Transit staff.** Drivers in the trains' cabs and staff at the stations,
-  on City Hall's payroll; later police.
+- **Interface.** Organizations in the inspector with their property and
+  workers; every name, organization, building and room a link.
 - **Gangs.** Rival or friendly to each other, always rivals of the police;
   members rob robots outside their gang. Unions later.
 - **Construction.** The city grows: new buildings on park corners as the
@@ -207,7 +207,8 @@ game:
 - Shopping bags show only while walking straight out of the shop.
 - Not yet seen in the running game: bags, bar bottles, robots on the
   stairs.
-- Trains have no drivers yet, and no limit on riders.
+- Trains have no limit on riders. Saves from before version 17 have no
+  metro depots, so their trains never get drivers.
 - The economy settles with industry paying near full wages, but banks lend
   more than they hold, so the central bank creates money slowly, and wealth
   inequality creeps up as owners pull ahead of robots still in dorms. The
