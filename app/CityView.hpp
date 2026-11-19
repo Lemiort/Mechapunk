@@ -42,6 +42,9 @@ struct Selection {
     std::uint32_t floor{};
     sim::EntityId room;
     sim::EntityId robot;
+    // The organization shown in the inspector; the camera and the cutaway
+    // ignore it.
+    sim::EntityId organization;
 };
 
 // What a click hit: a robot, a room of the open building, or a building.

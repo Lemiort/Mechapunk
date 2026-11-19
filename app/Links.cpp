@@ -6,6 +6,33 @@
 
 namespace mechapunk {
 
+namespace {
+
+// The colour of every clickable name, so the player sees what is a link.
+constexpr ImVec4 kLink{0.4F, 0.7F, 1.0F, 1.0F};
+
+std::string BuildingName(const CityView& city, sim::EntityId building) {
+    if (const sim::Building* found = city.City().FindBuilding(building)) {
+        return found->name;
+    }
+    return "somewhere";
+}
+
+// Every link: light blue text with the same tooltip. Returns where a click
+// leads, or nothing when the item was not clicked.
+std::optional<InspectorRequest> Link(std::string_view label) {
+    ImGui::PushStyleColor(ImGuiCol_Text, kLink);
+    const bool clicked = ImGui::Selectable(label.data());
+    ImGui::PopStyleColor();
+    ImGui::SetItemTooltip("Show in the inspector");
+    if (!clicked) {
+        return std::nullopt;
+    }
+    return InspectorRequest{};
+}
+
+}  // namespace
+
 std::string RoomLabel(const CityView& city, sim::EntityId room) {
     const auto found = city.Rooms().Find(room);
     if (!found) {
@@ -31,16 +58,69 @@ Selection ShowRoom(const CityView& city, sim::EntityId room) {
 }
 
 // A clickable room name; returns where clicking it leads.
-std::optional<Selection> RoomLink(const CityView& city, sim::EntityId room,
-                                  std::string_view prefix) {
+std::optional<InspectorRequest> RoomLink(const CityView& city, sim::EntityId room,
+                                         std::string_view prefix) {
     const std::string label = std::format("{}{}##room{}", prefix,
                                           RoomLabel(city, room), room.value);
-    std::optional<Selection> result;
-    if (ImGui::Selectable(label.c_str())) {
-        result = ShowRoom(city, room);
+    if (auto link = Link(label)) {
+        return InspectorRequest{.selection = ShowRoom(city, room)};
     }
-    ImGui::SetItemTooltip("Show this room");
-    return result;
+    return std::nullopt;
+}
+
+// A building's name: a click opens the building at its ground floor.
+std::optional<InspectorRequest> BuildingLink(const CityView& city,
+                                             sim::EntityId building,
+                                             std::string_view prefix) {
+    const std::string label =
+        std::format("{}{}##building{}", prefix, BuildingName(city, building),
+                    building.value);
+    if (auto link = Link(label)) {
+        return InspectorRequest{.selection = {.building = building, .floor = 0}};
+    }
+    return std::nullopt;
+}
+
+// An organization's name: a click shows it in the inspector.
+std::optional<InspectorRequest> OrganizationLink(const WorldFrame& frame,
+                                                 sim::EntityId organization,
+                                                 std::string_view prefix) {
+    const std::string label =
+        std::format("{}{}##organization{}", prefix,
+                    SimulationHost::AccountName(frame, organization),
+                    organization.value);
+    if (auto link = Link(label)) {
+        return InspectorRequest{.selection = {.organization = organization}};
+    }
+    return std::nullopt;
+}
+
+// The name of any account: a robot or an organization is clickable, a
+// remembered scrapped robot and no one at all are plain text.
+std::optional<InspectorRequest> AccountLink(const WorldFrame& frame,
+                                            const CityView& city,
+                                            sim::EntityId account,
+                                            std::string_view prefix) {
+    if (account.IsValid()) {
+        if (SimulationHost::FindRobot(frame, account) != nullptr) {
+            return RobotLink(
+                std::format("{}{}", prefix,
+                            SimulationHost::AccountName(frame, account)),
+                ShowRobot(frame, city, account));
+        }
+        if (frame.economy != nullptr &&
+            frame.economy->FindOrganization(account) != nullptr) {
+            return OrganizationLink(frame, account, prefix);
+        }
+    }
+    // A robot that was scrapped since the player met it, or no one at all:
+    // there is nothing to link to.
+    const std::string name = account.IsValid()
+                                 ? SimulationHost::AccountName(frame, account)
+                                 : "nobody";
+    ImGui::TextDisabled("%.*s%s", static_cast<int>(prefix.size()), prefix.data(),
+                        name.c_str());
+    return std::nullopt;
 }
 
 // Selects a robot and shows the room it is in, if it is in one.
@@ -61,8 +141,13 @@ Selection ShowRobot(const WorldFrame& frame, const CityView& city,
 std::optional<InspectorRequest> RobotLink(const std::string& name,
                                           const Selection& target,
                                           ImGuiSelectableFlags flags) {
-    if (!ImGui::Selectable(name.c_str(), false,
-                           flags | ImGuiSelectableFlags_AllowDoubleClick)) {
+    ImGui::PushStyleColor(ImGuiCol_Text, kLink);
+    const bool clicked =
+        ImGui::Selectable(name.c_str(), false,
+                          flags | ImGuiSelectableFlags_AllowDoubleClick);
+    ImGui::PopStyleColor();
+    ImGui::SetItemTooltip("Show in the inspector");
+    if (!clicked) {
         return std::nullopt;
     }
     return InspectorRequest{

@@ -56,7 +56,7 @@ root `CMakeLists.txt`.
   `--markdown` output) and the "Which module" rows for the inspector.
 - Nothing visible changes. Commit: "Move inspector links into their own file".
 
-### - [ ] A2. Links for every kind of object (inspector module)
+### - [x] A2. Links for every kind of object (inspector module)
 
 Open: `app/Links.hpp`, `app/Links.cpp`, `app/CityView.hpp` (only
 `Selection`), `app/Inspector.cpp`, `app/main.cpp` (only the block that

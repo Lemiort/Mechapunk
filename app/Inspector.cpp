@@ -243,9 +243,9 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
                                           const SimulationHost& host,
                                           bool& following) {
     std::optional<InspectorRequest> result;
-    const auto follow = [&](std::optional<Selection> link) {
+    const auto follow = [&](const std::optional<InspectorRequest>& link) {
         if (link) {
-            result = InspectorRequest{.selection = *link};
+            result = *link;
         }
     };
     Title(Name(frame, robot.id));
@@ -622,6 +622,20 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
     }
     return result;
 }
+
+// The organization's page; for now it only has its name.
+std::optional<InspectorRequest> DrawOrganization(const Selection& selection,
+                                                 const WorldFrame& frame) {
+    Title(SimulationHost::AccountName(frame, selection.organization));
+    if (frame.economy == nullptr ||
+        frame.economy->FindOrganization(selection.organization) == nullptr) {
+        ImGui::TextDisabled("The organization is gone.");
+    } else {
+        ImGui::TextDisabled("Coming soon");
+    }
+    return std::nullopt;
+}
+
 }  // namespace
 
 std::optional<InspectorRequest> DrawInspector(const Selection& selection,
@@ -629,8 +643,8 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
                                               const CityView& city,
                                               const SimulationHost& host,
                                               bool& following) {
-    if (!selection.building.IsValid() && !selection.robot.IsValid() &&
-        !selection.room.IsValid()) {
+    if (!selection.organization.IsValid() && !selection.building.IsValid() &&
+        !selection.robot.IsValid() && !selection.room.IsValid()) {
         return std::nullopt;
     }
     const ImGuiViewport& viewport = *ImGui::GetMainViewport();
@@ -651,6 +665,9 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
                 Selection next = selection;
                 next.robot = {};
                 next.room = {};
+                // A room or robot may still be selected together with the
+                // organization, which a 3D click sets without clearing it.
+                next.organization = {};
                 result = InspectorRequest{.selection = next};
             }
         }
@@ -662,6 +679,8 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
             }
         } else if (selection.room.IsValid()) {
             clicked = DrawRoom(selection, frame, city, host);
+        } else if (selection.organization.IsValid()) {
+            clicked = DrawOrganization(selection, frame);
         } else {
             clicked = DrawBuilding(selection, frame, city, host);
         }

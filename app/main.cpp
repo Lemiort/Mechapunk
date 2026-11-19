@@ -414,10 +414,20 @@ private:
     }
 
     // Applies a selection chosen in the inspector, moving the camera to the
-    // building and floor it shows.
+    // building and floor it shows. An organization alone is selected in place:
+    // it keeps the open building, floor and camera, so the city view does not
+    // jump; any concrete object clears it.
     void ApplySelection(const Selection& next) {
+        if (next.organization.IsValid() && !next.robot.IsValid() &&
+            !next.room.IsValid() && !next.building.IsValid()) {
+            selection_.organization = next.organization;
+            selection_.robot = {};
+            selection_.room = {};
+            return;
+        }
         if (!next.building.IsValid()) {
             selection_ = next;
+            selection_.organization = {};
             return;
         }
         if (next.building != selection_.building) {
@@ -427,6 +437,7 @@ private:
         selection_.floor = std::min(next.floor, floors > 0 ? floors - 1 : 0);
         selection_.room = next.room;
         selection_.robot = next.robot;
+        selection_.organization = {};
         camera_.FocusTarget(
             city_.FloorCenter(selection_.building, selection_.floor));
     }
