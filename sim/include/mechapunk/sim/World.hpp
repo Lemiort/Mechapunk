@@ -355,7 +355,8 @@ private:
     [[nodiscard]] std::vector<EntityId> OpeningsFor(
         EntityId robot, const std::unordered_map<std::uint64_t, std::uint32_t>& staff) const;
     void Emit(const SimEvent& event) const;
-    // Money, in Economy.cpp.
+    // The economy, in Founding.cpp, Money.cpp, Units.cpp, Property.cpp,
+    // Settlement.cpp and EconomyStatistics.cpp (see docs/MODULES.md).
     void FoundEconomy(std::uint64_t seed);
     void IndexEconomy();
     [[nodiscard]] Organization* MutableOrganization(EntityId id) noexcept;

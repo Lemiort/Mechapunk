@@ -19,7 +19,12 @@ add_executable(mechapunk-sim tools/sim_runner/main.cpp)
 target_link_libraries(mechapunk-sim PRIVATE mechapunk::sim)
 
 # Floor plans and prop models: geometry only, shared by the game and tests.
-add_library(mechapunk_layout STATIC app/Interior.cpp app/Props.cpp)
+add_library(mechapunk_layout STATIC
+    app/Interior.cpp
+    app/InteriorHomes.cpp
+    app/InteriorStores.cpp
+    app/InteriorWorkplaces.cpp
+    app/Props.cpp)
 target_include_directories(mechapunk_layout PUBLIC app)
 target_link_libraries(mechapunk_layout PUBLIC nee::nee mechapunk::sim)
 
@@ -29,6 +34,12 @@ endif()
 
 add_executable(mechapunk
     app/CityView.cpp
+    app/CityDrivers.cpp
+    app/CityInteriors.cpp
+    app/CityLights.cpp
+    app/CityMetro.cpp
+    app/CityRobots.cpp
+    app/CityStatic.cpp
     app/GameRenderer.cpp
     app/Inspector.cpp
     app/Statistics.cpp

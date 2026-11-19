@@ -3,11 +3,18 @@
 add_library(mechapunk_sim STATIC
     src/Careers.cpp
     src/Economy.cpp
+    src/EconomyStatistics.cpp
+    src/Founding.cpp
+    src/Money.cpp
+    src/Property.cpp
+    src/Settlement.cpp
+    src/Units.cpp
     src/City.cpp
     src/GameTime.cpp
     src/LifeCycle.cpp
     src/Metro.cpp
     src/Migrations.cpp
+    src/MigrationsEarly.cpp
     src/Random.cpp
     src/Save.cpp
     src/Social.cpp
@@ -15,6 +22,11 @@ add_library(mechapunk_sim STATIC
     src/Venues.cpp
     src/Weather.cpp
     src/World.cpp
+    src/Behaviour.cpp
+    src/Describe.cpp
+    src/Generation.cpp
+    src/Residents.cpp
+    src/Validation.cpp
 )
 add_library(mechapunk::sim ALIAS mechapunk_sim)
 target_include_directories(mechapunk_sim PUBLIC include)

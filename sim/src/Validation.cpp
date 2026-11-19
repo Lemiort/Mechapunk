@@ -1,0 +1,231 @@
+// ValidateWorldState: checks a loaded or running world for broken invariants.
+
+#include "mechapunk/sim/World.hpp"
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <cstdint>
+#include <expected>
+#include <format>
+#include <functional>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+#include "Names.hpp"
+#include "mechapunk/sim/Venues.hpp"
+
+#include "WorldInternal.hpp"
+
+namespace mechapunk::sim {
+
+std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
+    const auto fail = [](std::string message) {
+        return std::unexpected(std::move(message));
+    };
+    const City& city = state.city;
+    if (city.nodes.empty()) {
+        return fail("The city has no street nodes");
+    }
+    for (std::size_t index = 0; index < city.nodes.size(); ++index) {
+        if (city.nodes[index].id.value != index) {
+            return fail(std::format("Street node {} has id {}", index,
+                                    city.nodes[index].id.value));
+        }
+    }
+    const auto nodeCount = city.nodes.size();
+    for (const CityEdge& edge : city.edges) {
+        if (edge.from.value >= nodeCount || edge.to.value >= nodeCount ||
+            edge.lengthMeters == 0) {
+            return fail(std::format("Invalid street {} -> {}",
+                                    edge.from.value, edge.to.value));
+        }
+    }
+
+    // Every id is unique across buildings, rooms and robots.
+    std::unordered_set<std::uint64_t> ids;
+    const auto claim = [&](EntityId id) {
+        return id.IsValid() && id.value < state.ids.next &&
+               ids.insert(id.value).second;
+    };
+    EntityId previous;
+    for (const Building& building : city.buildings) {
+        if (!claim(building.id) || building.id <= previous) {
+            return fail(std::format("Building '{}' has an invalid, repeated "
+                                    "or out-of-order id {}",
+                                    building.name, building.id.value));
+        }
+        previous = building.id;
+        if (building.entrance.value >= nodeCount || building.floors == 0) {
+            return fail(std::format("Building '{}' has no valid entrance or "
+                                    "floors",
+                                    building.name));
+        }
+        // Metro depots (workplaces whose rooms are all crew rooms) carry no
+        // building-level shift by design; their staff follow room-kind rules,
+        // so the workplace shift checks don't apply to them.
+        if (building.kind == BuildingKind::Workplace &&
+            std::any_of(building.rooms.begin(), building.rooms.end(),
+                        [](const Room& room) {
+                            return room.kind != RoomKind::CrewRoom;
+                        }) &&
+            (building.shift.startMinute >= kMinutesPerDay ||
+             building.shift.lengthMinutes == 0 ||
+             building.shift.lengthMinutes >= kMinutesPerDay)) {
+            return fail(std::format("Workplace '{}' has an invalid shift",
+                                    building.name));
+        }
+        EntityId previousRoom;
+        for (const Room& room : building.rooms) {
+            if (!claim(room.id) || room.id <= previousRoom) {
+                return fail(std::format("Room '{}' in '{}' has an invalid, "
+                                        "repeated or out-of-order id {}",
+                                        room.name, building.name,
+                                        room.id.value));
+            }
+            previousRoom = room.id;
+            if (room.floor >= building.floors || room.capacity == 0) {
+                return fail(std::format("Room '{}' in '{}' has an invalid "
+                                        "floor or capacity",
+                                        room.name, building.name));
+            }
+        }
+    }
+
+    std::unordered_set<std::uint32_t> stationNodes;
+    for (const Station& station : city.stations) {
+        if (station.node.value >= nodeCount ||
+            !stationNodes.insert(station.node.value).second) {
+            return fail(std::format("Station '{}' is not at a street node of its own",
+                                    station.name));
+        }
+    }
+
+    RoutePlanner routes(city);
+    if (!city.buildings.empty()) {
+        const NodeId origin = city.buildings.front().entrance;
+        for (const Building& building : city.buildings) {
+            if (!routes.DistanceMeters(origin, building.entrance)) {
+                return fail(std::format("Building '{}' cannot be reached",
+                                        building.name));
+            }
+        }
+    }
+
+    const RoomIndex rooms(city);
+    std::unordered_map<std::uint64_t, std::uint32_t> occupants;
+    const auto roomOfKind = [&](EntityId id,
+                                RoomKind kind) -> const Room* {
+        const auto found = rooms.Find(id);
+        return found && found->room->kind == kind ? found->room : nullptr;
+    };
+    previous = EntityId{};
+    for (const Robot& robot : state.robots) {
+        if (!claim(robot.id) || robot.id <= previous) {
+            return fail(std::format("Robot '{}' has an invalid, repeated or "
+                                    "out-of-order id {}",
+                                    robot.name, robot.id.value));
+        }
+        previous = robot.id;
+        // At least one working day a week.
+        constexpr std::uint32_t kWholeWeek = (1U << kDaysPerWeek) - 1;
+        if ((robot.daysOff & kWholeWeek) == kWholeWeek ||
+            robot.daysOff > kWholeWeek) {
+            return fail(std::format("Robot '{}' has invalid days off",
+                                    robot.name));
+        }
+        const Room* apartment = roomOfKind(robot.apartment, RoomKind::Apartment);
+        // A job at a workspace, or on a venue's staff.
+        const auto job = rooms.Find(robot.workspace);
+        const Room* workspace = job && JobsAt(*job->room) > 0 ? job->room : nullptr;
+        if (apartment == nullptr ||
+            (robot.workspace.IsValid() && workspace == nullptr) ||
+            robot.jobLevel > kMaxJobLevel) {
+            return fail(std::format("Robot '{}' has no valid apartment or "
+                                    "workspace",
+                                    robot.name));
+        }
+        if (++occupants[apartment->id.value] > apartment->capacity ||
+            (workspace != nullptr &&
+             ++occupants[workspace->id.value] > JobsAt(*workspace))) {
+            return fail(std::format("Robot '{}' exceeds the capacity of its "
+                                    "apartment or workspace",
+                                    robot.name));
+        }
+        const auto location = rooms.Find(robot.location);
+        if (!location) {
+            return fail(std::format("Robot '{}' is in a missing room",
+                                    robot.name));
+        }
+        const bool consistent = [&] {
+            switch (robot.activity) {
+                case RobotActivity::Resting:
+                    return robot.location == robot.apartment;
+                case RobotActivity::Working:
+                    // At work, or an officer looking round a venue.
+                    return robot.workspace.IsValid() &&
+                           (robot.location == robot.workspace ||
+                            (robot.patrol.IsValid() && robot.location == robot.patrol &&
+                             IsVenue(location->room->kind)));
+                case RobotActivity::Visiting:
+                    return IsVenue(location->room->kind);
+                case RobotActivity::Walking:
+                    return rooms.Find(robot.destination).has_value() &&
+                           robot.departedAt <= robot.nextActionAt &&
+                           (robot.alightsAt == 0 ||
+                            (robot.departedAt <= robot.boardsAt &&
+                             robot.boardsAt <= robot.alightsAt &&
+                             robot.alightsAt <= robot.nextActionAt &&
+                             robot.rideFrom < city.stations.size() &&
+                             robot.rideVia < city.stations.size() &&
+                             robot.rideTo < city.stations.size()));
+            }
+            return false;
+        }();
+        if (robot.patrol.IsValid()) {
+            const auto station = rooms.Find(robot.workspace);
+            const bool walking = robot.activity == RobotActivity::Walking &&
+                                 robot.destination == robot.patrol;
+            const bool there = robot.activity == RobotActivity::Working &&
+                               robot.location == robot.patrol;
+            if (!station || station->room->kind != RoomKind::PoliceStation ||
+                (!walking && !there)) {
+                return fail(std::format("Robot '{}' patrols without being an officer on it",
+                                        robot.name));
+            }
+        }
+        if (robot.activity != RobotActivity::Walking && robot.alightsAt != 0) {
+            return fail(std::format("Robot '{}' rides the metro without walking",
+                                    robot.name));
+        }
+        if (!consistent) {
+            return fail(std::format("Robot '{}' is in a room that does not "
+                                    "match what it is doing",
+                                    robot.name));
+        }
+        const auto inRange = [](std::int32_t need) {
+            return need >= 0 && need <= Needs::kMax;
+        };
+        if (!inRange(robot.needs.charge) || !inRange(robot.needs.condition) ||
+            !inRange(robot.needs.social) || !inRange(robot.needs.fun) ||
+            robot.credits < 0 || robot.rentOwed < 0 || robot.wear < 0 ||
+            robot.wear > kMaxWear) {
+            return fail(std::format("Robot '{}' has needs or credits out of "
+                                    "range",
+                                    robot.name));
+        }
+    }
+    if (state.weather.rain > kMaxRain) {
+        return fail("The rain is out of range");
+    }
+    if (auto economy = ValidateEconomy(state); !economy) {
+        return economy;
+    }
+    return ValidateSocial(state);
+}
+
+}  // namespace mechapunk::sim

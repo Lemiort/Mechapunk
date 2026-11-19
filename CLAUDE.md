@@ -6,6 +6,9 @@ that must never break (determinism, money adds up, save migrations, no
 teleporting robots), the architecture map, and plans for every remaining
 task. `ROADMAP.md` has the milestones and known gaps.
 
+The code is split into modules that each fit a small model's context: see
+`docs/MODULES.md` for which files to open for a task, and open only those.
+
 Quick reference:
 - Build: `cmake --build build/build/Release`; test: `ctest --test-dir build/build/Release`.
 - Headless check: `build/build/Release/mechapunk-sim.exe --seed 1 --robots 10000 --days 40 --quiet`.
@@ -14,3 +17,5 @@ Quick reference:
 - Commit game work to `master` and push; NEE only through pull requests.
 - Do not drive or screenshot the game window unless the user says the
   machine is free.
+- Keep modules small: `python scripts/context_budget.py` (also in ctest) must
+  pass; split files by topic as `docs/MODULES.md` describes.

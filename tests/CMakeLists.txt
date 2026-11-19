@@ -25,3 +25,10 @@ gtest_discover_tests(sim_tests)
 add_executable(layout_tests LayoutTests.cpp)
 target_link_libraries(layout_tests PRIVATE mechapunk_layout GTest::gtest_main)
 gtest_discover_tests(layout_tests)
+
+# Every module must fit a small model's context: see docs/MODULES.md.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME ContextBudget
+             COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/context_budget.py)
+endif()

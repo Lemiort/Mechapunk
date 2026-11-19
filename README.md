@@ -101,7 +101,7 @@ someone works there.
 
 Furniture and robots are built from boxes in `app/Props.cpp`, one catalog
 entry per kind, so each can later be replaced by a model. Floor plans are
-laid out in `app/Interior.cpp`, with the way into every room and to every
+laid out in `app/Interior*.cpp`, with the way into every room and to every
 spot in it; `layout_tests` checks that none of them goes through a wall.
 
 Habitats open on their first apartment floor; Q goes down to the stores. The

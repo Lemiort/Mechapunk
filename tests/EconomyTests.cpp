@@ -328,7 +328,7 @@ TEST(Economy, SaversEarnInterest) {
 namespace {
 // The city's public buildings: police stations run by City Hall and metro
 // crew rooms run by the Metro Authority. FoundEconomy assigns them to those
-// organizations (sim/src/Economy.cpp), and any station opened later goes to
+// organizations (sim/src/Founding.cpp), and any station opened later goes to
 // City Hall too (World::OpenUnit); nothing ever closes or reassigns them.
 
 bool PublicRoomsArePublic(const sim::World& world) {
