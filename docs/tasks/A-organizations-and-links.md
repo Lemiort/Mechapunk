@@ -39,7 +39,7 @@ So:
 
 Each step is one commit. Build everything and run `ctest` after each.
 
-### - [ ] A1. Move links into their own files (inspector module)
+### - [x] A1. Move links into their own files (inspector module)
 
 Open: `app/Inspector.cpp`, `app/Inspector.hpp`, `scripts/context_budget.py`,
 root `CMakeLists.txt`.

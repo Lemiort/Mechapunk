@@ -32,7 +32,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | view-interiors | 11k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
-| ui | 24k | `main.cpp`, `Inspector.hpp`, `Inspector.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
+| ui | 14k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
+| inspector | 17k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `SimulationHost.hpp`, `CityView.hpp` |
 
 ## What lives where
 
@@ -92,6 +93,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `InteriorWorkplaces.cpp` | Workspaces fitted out for their trade |
 | `Props` | Box models of every prop and the robot figure. |
 | `Inspector` | Inspector window for the selected building, room or robot. |
+| `Links.hpp/.cpp` | Clickable names in the inspector: `RoomLabel`, `ShowRoom`, `RoomLink`, `ShowRobot`, `RobotLink`. |
 | `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank tabs, plots from `DailyStats`. |
 | `main.cpp` | Window, input, camera, panels, applying frames. |
 
@@ -122,7 +124,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Drawing the open floor of a building | view-interiors | `CityInteriors.cpp` |
 | Furniture and layout of a room kind | floor-plans | `InteriorStores.cpp`, `InteriorHomes.cpp`, `InteriorWorkplaces.cpp` |
 | Prop models, rain, renderer | rendering | `Props.cpp` |
-| Inspector, panels, frames from the simulation | ui | `Inspector.cpp`, `SimulationHost.cpp` |
+| The inspector window and its clickable names | inspector | `Inspector.cpp`, `Links.cpp` |
+| Panels, input, camera; frames from the simulation thread | ui | `main.cpp`, `SimulationHost.cpp` |
 
 A task touching two modules (a new robot field shown in the inspector, say)
 is done in steps, one module at a time: the simulation first with its tests,

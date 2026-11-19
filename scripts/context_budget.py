@@ -61,8 +61,9 @@ MODULES = {
                     "app/InteriorWorkplaces.cpp", "tests/LayoutTests.cpp"],
     "rendering": ["app/GameRenderer.hpp", "app/GameRenderer.cpp", "app/Props.hpp",
                   "app/Props.cpp", "app/Rain.hpp", "app/Rain.cpp", "app/OrbitCamera.hpp"],
-    "ui": ["app/main.cpp", "app/Inspector.hpp", "app/Inspector.cpp",
-           "app/SimulationHost.hpp", "app/SimulationHost.cpp"],
+    "ui": ["app/main.cpp", "app/SimulationHost.hpp", "app/SimulationHost.cpp"],
+    "inspector": ["app/Inspector.hpp", "app/Inspector.cpp", "app/Links.hpp",
+                  "app/Links.cpp", "app/SimulationHost.hpp", "app/CityView.hpp"],
 }
 SOURCE_DIRS = ["sim", "app", "tests", "tools"]
 
