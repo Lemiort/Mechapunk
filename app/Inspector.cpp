@@ -672,7 +672,7 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
         } else if (selection.room.IsValid()) {
             clicked = DrawRoom(selection, frame, city, host);
         } else if (selection.organization.IsValid()) {
-            clicked = DrawOrganization(selection, frame, city, host);
+            clicked = DrawOrganization(selection, frame, city);
         } else {
             clicked = DrawBuilding(selection, frame, city, host);
         }

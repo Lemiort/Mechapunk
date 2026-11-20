@@ -10,6 +10,18 @@
 
 namespace mechapunk {
 
+// Clickable names for the inspector and the statistics window.
+//
+// Every *Link function DRAWS the name itself, every frame, as a light blue
+// selectable as wide as its text, and returns a request only on the frame
+// it is clicked. So never draw the name again when nothing comes back:
+//
+//     ImGui::TextUnformatted("Owner:");
+//     ImGui::SameLine();
+//     if (auto link = AccountLink(frame, city, owner, "")) { result = *link; }
+//
+// Labels end in "##<kind><id>", so equal names never share an ImGui id.
+
 // A room's name with its building, so text reads as a place.
 std::string RoomLabel(const CityView& city, sim::EntityId room);
 
@@ -34,6 +46,15 @@ std::optional<InspectorRequest> OrganizationLink(const WorldFrame& frame,
 std::optional<InspectorRequest> AccountLink(
     const WorldFrame& frame, const CityView& city, sim::EntityId account,
     std::string_view prefix);
+
+// The same for the statistics window, which has no city: a robot's link
+// selects the robot and moves the camera to it.
+std::optional<InspectorRequest> AccountLink(const WorldFrame& frame, sim::EntityId account,
+                                            std::string_view prefix);
+
+// Any text as a link to `target`; `label` must end in a unique "##id".
+std::optional<InspectorRequest> LinkTo(const std::string& label,
+                                       const InspectorRequest& target);
 
 // Selects a robot and shows the room it is in, if it is in one.
 Selection ShowRobot(const WorldFrame& frame, const CityView& city,

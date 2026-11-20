@@ -20,9 +20,13 @@ std::string BuildingName(const CityView& city, sim::EntityId building) {
 
 // Every link: light blue text with the same tooltip. Returns whether it
 // was clicked.
-bool Link(const std::string& label) {
+// As wide as its text, so a link can follow other text on the same line.
+bool Link(const std::string& label, ImGuiSelectableFlags flags = 0) {
     ImGui::PushStyleColor(ImGuiCol_Text, kLink);
-    const bool clicked = ImGui::Selectable(label.data());
+    const ImVec2 size = (flags & ImGuiSelectableFlags_SpanAllColumns) != 0
+                            ? ImVec2{0.0F, 0.0F}
+                            : ImGui::CalcTextSize(label.c_str(), nullptr, true);
+    const bool clicked = ImGui::Selectable(label.c_str(), false, flags, size);
     ImGui::PopStyleColor();
     ImGui::SetItemTooltip("Show in the inspector");
     return clicked;
@@ -92,18 +96,20 @@ std::optional<InspectorRequest> OrganizationLink(const WorldFrame& frame,
     return std::nullopt;
 }
 
-// The name of any account: a robot or an organization is clickable, a
-// remembered scrapped robot and no one at all are plain text.
-std::optional<InspectorRequest> AccountLink(const WorldFrame& frame,
-                                            const CityView& city,
-                                            sim::EntityId account,
-                                            std::string_view prefix) {
+namespace {
+
+// AccountLink with or without the city: with it, a robot's link also opens
+// the building it is in.
+std::optional<InspectorRequest> AnyAccountLink(const WorldFrame& frame, const CityView* city,
+                                               sim::EntityId account,
+                                               std::string_view prefix) {
     if (account.IsValid()) {
         if (SimulationHost::FindRobot(frame, account) != nullptr) {
             return RobotLink(
                 std::format("{}{}", prefix,
                             SimulationHost::AccountName(frame, account)),
-                ShowRobot(frame, city, account));
+                city != nullptr ? ShowRobot(frame, *city, account)
+                                : Selection{.robot = account});
         }
         if (frame.economy != nullptr &&
             frame.economy->FindOrganization(account) != nullptr) {
@@ -117,6 +123,25 @@ std::optional<InspectorRequest> AccountLink(const WorldFrame& frame,
                                  : "nobody";
     ImGui::TextDisabled("%.*s%s", static_cast<int>(prefix.size()), prefix.data(),
                         name.c_str());
+    return std::nullopt;
+}
+
+}  // namespace
+
+std::optional<InspectorRequest> AccountLink(const WorldFrame& frame, const CityView& city,
+                                            sim::EntityId account, std::string_view prefix) {
+    return AnyAccountLink(frame, &city, account, prefix);
+}
+
+std::optional<InspectorRequest> AccountLink(const WorldFrame& frame, sim::EntityId account,
+                                            std::string_view prefix) {
+    return AnyAccountLink(frame, nullptr, account, prefix);
+}
+
+std::optional<InspectorRequest> LinkTo(const std::string& label, const InspectorRequest& target) {
+    if (Link(label)) {
+        return target;
+    }
     return std::nullopt;
 }
 
@@ -141,13 +166,7 @@ std::optional<InspectorRequest> RobotLink(const std::string& name,
     // The suffix keeps same-named robots from sharing an id.
     const std::string label =
         std::format("{}##robot{}", name, target.robot.value);
-    ImGui::PushStyleColor(ImGuiCol_Text, kLink);
-    const bool clicked =
-        ImGui::Selectable(label.data(), false,
-                          flags | ImGuiSelectableFlags_AllowDoubleClick);
-    ImGui::PopStyleColor();
-    ImGui::SetItemTooltip("Show in the inspector");
-    if (!clicked) {
+    if (!Link(label, flags | ImGuiSelectableFlags_AllowDoubleClick)) {
         return std::nullopt;
     }
     return InspectorRequest{

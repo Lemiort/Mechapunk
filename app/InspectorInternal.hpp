@@ -84,10 +84,8 @@ inline std::string SectorLabel(sim::Sector sector) {
     return std::string{sim::SectorName(sector)};
 }
 
-// The organization's page in the inspector, declared here so both
-// Inspector.cpp and OrganizationListsTests.cpp can call it.
+// The organization's page in the inspector, in InspectorOrganization.cpp.
 [[nodiscard]] std::optional<InspectorRequest> DrawOrganization(
-    const Selection& selection, const WorldFrame& frame,
-    const CityView& city, const SimulationHost& host);
+    const Selection& selection, const WorldFrame& frame, const CityView& city);
 
 }  // namespace mechapunk
