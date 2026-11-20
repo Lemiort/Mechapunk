@@ -121,7 +121,7 @@ Lists are built by plain functions, so they can be tested without a window:
 - Add the new files to modules in `context_budget.py` (`inspector`).
 - Commit: "List an organization's property, workers and loans".
 
-### - [ ] A4. The organization page (inspector module)
+### - [x] A4. The organization page (inspector module)
 
 Open: `app/Inspector.cpp` (only `DrawInspector`), `app/Links.hpp`,
 `app/OrganizationLists.hpp`, `app/Statistics.cpp` (only

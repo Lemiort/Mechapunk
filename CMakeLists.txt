@@ -43,6 +43,7 @@ add_executable(mechapunk
     app/CityStatic.cpp
     app/GameRenderer.cpp
     app/Inspector.cpp
+    app/InspectorOrganization.cpp
     app/Links.cpp
     app/Statistics.cpp
     app/Rain.cpp
