@@ -11,8 +11,6 @@ namespace mechapunk {
 // What the statistics window keeps between frames.
 struct StatisticsView {
     bool open{false};
-    // The organization whose details are shown.
-    sim::EntityId organization;
 };
 
 // Draws the city's statistics with Dear ImGui: daily charts of the economy,

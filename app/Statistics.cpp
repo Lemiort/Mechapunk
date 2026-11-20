@@ -328,19 +328,6 @@ void DrawProperty(const std::vector<sim::DailyStats>& history) {
 std::optional<InspectorRequest> DrawOrganizations(StatisticsView& view, const WorldFrame& frame) {
     const EconomyFrame& economy = *frame.economy;
     std::optional<InspectorRequest> request;
-    // Rooms and workers of each organization.
-    std::map<std::uint64_t, std::uint32_t> rooms;
-    if (economy.owners != nullptr) {
-        for (const auto& [room, owner] : *economy.owners) {
-            ++rooms[owner.value];
-        }
-    }
-    std::map<std::uint64_t, std::uint32_t> workers;
-    for (const RobotFrame& robot : frame.robots) {
-        if (robot.workspace.IsValid()) {
-            ++workers[economy.OwnerOf(robot.workspace).value];
-        }
-    }
     constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
                                        ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
     if (ImGui::BeginTable("organizations", 8, kFlags, ImVec2{0.0F, 260.0F})) {
@@ -354,11 +341,9 @@ std::optional<InspectorRequest> DrawOrganizations(StatisticsView& view, const Wo
         for (const sim::Organization& organization : economy.organizations) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
+            // Opens the organization in the inspector.
             if (auto link = OrganizationLink(frame, organization.id, "")) {
                 request = *link;
-            } else {
-                std::string orgName = SimulationHost::AccountName(frame, organization.id);
-                ImGui::TextUnformatted(orgName.c_str());
             }
             ImGui::TableSetColumnIndex(1);
             ImGui::TextUnformatted(organization.kind == sim::OrganizationKind::CentralBank
@@ -420,39 +405,8 @@ void DrawCentralBank(const WorldFrame& frame, const std::vector<sim::DailyStats>
             ImGui::TableSetColumnIndex(0);
             ImGui::TextUnformatted(sim::FormatTime(emission->tick).c_str());
             ImGui::TableSetColumnIndex(1);
-            {
-                sim::EntityId account = emission->account;
-                std::string accName = SimulationHost::AccountName(frame, account);
-                bool foundRobot = false;
-                if (frame.economy != nullptr) {
-                    if (SimulationHost::FindRobot(frame, account) != nullptr) {
-                        foundRobot = true;
-                    } else if (frame.economy->FindOrganization(account) != nullptr) {
-                        Selection sel{.organization = account};
-                        std::string label = std::format("{}##organization{}", accName, account.value);
-                        ImVec4 kLink{0.4F, 0.7F, 1.0F, 1.0F};
-                        ImGui::PushStyleColor(ImGuiCol_Text, kLink);
-                        bool clicked = ImGui::Selectable(label.c_str());
-                        ImGui::PopStyleColor();
-                        if (clicked) {
-                            *request = InspectorRequest{.selection = sel};
-                        }
-                        continue;
-                    }
-                }
-                if (foundRobot) {
-                    Selection sel{.robot = account};
-                    std::string label = std::format("{}##robot{}", accName, account.value);
-                    ImVec4 kLink{0.4F, 0.7F, 1.0F, 1.0F};
-                    ImGui::PushStyleColor(ImGuiCol_Text, kLink);
-                    bool clicked = ImGui::Selectable(label.c_str());
-                    ImGui::PopStyleColor();
-                    if (clicked) {
-                        *request = InspectorRequest{.selection = sel, .jumpToRobot = true};
-                    }
-                } else {
-                    ImGui::TextUnformatted(accName.c_str());
-                }
+            if (auto link = AccountLink(frame, emission->account, "")) {
+                *request = *link;
             }
             ImGui::TableSetColumnIndex(2);
             ImGui::TextColored(emission->amount >= 0 ? kBad : kGood, "%s%s",

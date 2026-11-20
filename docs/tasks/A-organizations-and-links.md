@@ -1,6 +1,8 @@
 # Task A: organizations in the inspector, and every name a link
 
-Status: open. No save change: everything shown is already in `WorldFrame`.
+Status: done except the user's check in the game. A review found and fixed
+an empty workers list, empty property tables and names drawn twice.
+ No save change: everything shown is already in `WorldFrame`.
 
 ## What the user asked for
 
@@ -182,12 +184,12 @@ and turn each into the matching link. Known places:
 
 ## Done when
 
-- [ ] Clicking any robot, organization, building or room name anywhere in
+- [x] Clicking any robot, organization, building or room name anywhere in
   the inspector or the statistics window shows it in the inspector.
-- [ ] An organization's page lists its rooms by building and its workers,
+- [x] An organization's page lists its rooms by building and its workers,
   with counts, and stays smooth with the Habitat Trust (thousands of rooms).
-- [ ] `layout_tests` cover the lists; all tests and `ContextBudget` pass.
-- [ ] The guide's task table marks A done; `docs/MODULES.md` lists the new
+- [x] `layout_tests` cover the lists; all tests and `ContextBudget` pass.
+- [x] The guide's task table marks A done; `docs/MODULES.md` lists the new
   files.
 - [ ] The user has checked it in the game (ask them; do not drive the
   window yourself).

@@ -168,6 +168,18 @@ Which file holds what: `docs/MODULES.md`.
   broke robots, homes.
 - Dear ImGui needs unique ids: two robots can share a name, so every
   clickable label ends in `##<kind><id>`.
+- A test must never skip itself (`GTEST_SKIP`) because it found no data:
+  ctest counts a skip as a pass, and that hid a function that always
+  returned an empty list. Make the data the test needs, or assert it exists.
+- Every `*Link` function in `app/Links.hpp` draws the name itself and
+  returns something only when clicked. Never add an `else` that draws the
+  name again; put text before a link and `ImGui::SameLine()` between them.
+- In an ImGui table, call `TableNextColumn()` after `TableNextRow()` before
+  drawing the first cell. Long lists use `ImGuiListClipper` for every
+  length, not only past some size.
+- Interface code cannot be seen by a model (no driving the game window), so
+  put the logic in plain functions with tests (`app/OrganizationLists.*`
+  is the example) and keep the drawing code simple.
 
 ## 6. Economy constants worth knowing
 
@@ -196,7 +208,7 @@ Do them in this order; each file lists its steps and which are done.
 
 | Task | File | Modules | Save change |
 | --- | --- | --- | --- |
-| A. Organizations in the inspector; every name a link | `docs/tasks/A-organizations-and-links.md` | inspector, statistics | no |
+| A. Organizations in the inspector; every name a link (done; user to check in game) | `docs/tasks/A-organizations-and-links.md` | inspector, statistics | no |
 | B. Gangs | `docs/tasks/B-gangs.md` | saves, gangs (new), social, inspector | yes |
 | C. Chronicle | `docs/tasks/C-chronicle.md` | saves, world, statistics | yes |
 | D. Construction | `docs/tasks/D-construction.md` | saves, generation, property, view-core | yes |
