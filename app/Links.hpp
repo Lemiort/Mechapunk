@@ -20,7 +20,9 @@ namespace mechapunk {
 //     ImGui::SameLine();
 //     if (auto link = AccountLink(frame, city, owner, "")) { result = *link; }
 //
-// Labels end in "##<kind><id>", so equal names never share an ImGui id.
+// Labels end in "##<kind><id>", so equal names never share an ImGui id, and
+// a link drawn twice in one frame (the same room twice on a page) gets a
+// separate id for each repeat, so it never conflicts with itself.
 
 // A room's name with its building, so text reads as a place.
 std::string RoomLabel(const CityView& city, sim::EntityId room);

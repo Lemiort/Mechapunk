@@ -1,6 +1,7 @@
 #include "Links.hpp"
 
 #include <format>
+#include <unordered_map>
 
 #include "mechapunk/sim/Venues.hpp"
 
@@ -20,8 +21,24 @@ std::string BuildingName(const CityView& city, sim::EntityId building) {
 
 // Every link: light blue text with the same tooltip. Returns whether it
 // was clicked.
+// How many times each label was drawn this frame. A page may link the same
+// object twice (a robot's room in "at ..." and in "Work: ..."; a bank that
+// is both its savings bank and its lender), and two items with one id
+// conflict in ImGui. Each repeat gets its own id: the label's number of
+// earlier uses, which stays the same from frame to frame.
+int RepeatOf(const std::string& label) {
+    static int frame = -1;
+    static std::unordered_map<std::string, int> uses;
+    if (ImGui::GetFrameCount() != frame) {
+        frame = ImGui::GetFrameCount();
+        uses.clear();
+    }
+    return uses[label]++;
+}
+
 // As wide as its text, so a link can follow other text on the same line.
 bool Link(const std::string& label, ImGuiSelectableFlags flags = 0) {
+    ImGui::PushID(RepeatOf(label));
     ImGui::PushStyleColor(ImGuiCol_Text, kLink);
     const ImVec2 size = (flags & ImGuiSelectableFlags_SpanAllColumns) != 0
                             ? ImVec2{0.0F, 0.0F}
@@ -29,6 +46,7 @@ bool Link(const std::string& label, ImGuiSelectableFlags flags = 0) {
     const bool clicked = ImGui::Selectable(label.c_str(), false, flags, size);
     ImGui::PopStyleColor();
     ImGui::SetItemTooltip("Show in the inspector");
+    ImGui::PopID();
     return clicked;
 }
 

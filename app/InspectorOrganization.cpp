@@ -172,7 +172,7 @@ std::optional<InspectorRequest> DrawOrganization(const Selection& selection,
         ImGui::SameLine();
         follow(BuildingLink(city, sim::EntityId{building}, ""));
         if (open) {
-            if (ImGui::BeginTable("rooms", 5, kListFlags, ListSize(rooms.size()))) {
+            if (ImGui::BeginTable("list", 5, kListFlags, ListSize(rooms.size()))) {
                 ImGui::TableSetupScrollFreeze(0, 1);
                 ImGui::TableSetupColumn("Room", ImGuiTableColumnFlags_WidthStretch, 3.0F);
                 ImGui::TableSetupColumn("Kind", ImGuiTableColumnFlags_WidthStretch, 2.0F);
