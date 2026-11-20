@@ -88,7 +88,7 @@ applies requests).
   jump.
 - Commit: "Add links to buildings, organizations and any account".
 
-### - [ ] A3. Who owns what and who works where (layout library, testable)
+### - [x] A3. Who owns what and who works where (layout library, testable)
 
 Open: `app/SimulationHost.hpp` (only `RobotFrame` and `EconomyFrame`),
 `sim/include/mechapunk/sim/City.hpp` (only `RoomIndex`), root

@@ -33,7 +33,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
 | ui | 14k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
-| inspector | 17k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `SimulationHost.hpp`, `CityView.hpp` |
+| inspector | 22k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp`, `SimulationHost.hpp`, `CityView.hpp` |
 
 ## What lives where
 

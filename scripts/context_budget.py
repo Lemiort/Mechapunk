@@ -63,7 +63,9 @@ MODULES = {
                   "app/Props.cpp", "app/Rain.hpp", "app/Rain.cpp", "app/OrbitCamera.hpp"],
     "ui": ["app/main.cpp", "app/SimulationHost.hpp", "app/SimulationHost.cpp"],
     "inspector": ["app/Inspector.hpp", "app/Inspector.cpp", "app/Links.hpp",
-                  "app/Links.cpp", "app/SimulationHost.hpp", "app/CityView.hpp"],
+                  "app/Links.cpp", "app/OrganizationLists.hpp", "app/OrganizationLists.cpp",
+                  "tests/OrganizationListsTests.cpp", "app/SimulationHost.hpp",
+                  "app/CityView.hpp"],
 }
 SOURCE_DIRS = ["sim", "app", "tests", "tools"]
 
