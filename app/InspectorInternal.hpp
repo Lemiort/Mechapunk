@@ -6,11 +6,14 @@
 #include <cstdint>
 #include <format>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include <imgui.h>
 
+#include "CityView.hpp"
+#include "Inspector.hpp"
 #include "mechapunk/sim/Careers.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "SimulationHost.hpp"
@@ -80,5 +83,11 @@ inline void Row(const char* label, const std::string& value) {
 inline std::string SectorLabel(sim::Sector sector) {
     return std::string{sim::SectorName(sector)};
 }
+
+// The organization's page in the inspector, declared here so both
+// Inspector.cpp and OrganizationListsTests.cpp can call it.
+[[nodiscard]] std::optional<InspectorRequest> DrawOrganization(
+    const Selection& selection, const WorldFrame& frame,
+    const CityView& city, const SimulationHost& host);
 
 }  // namespace mechapunk

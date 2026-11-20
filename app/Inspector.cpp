@@ -1,5 +1,6 @@
 #include "Inspector.hpp"
 #include "Links.hpp"
+#include "InspectorInternal.hpp"
 
 #include <imgui.h>
 
@@ -41,32 +42,6 @@ constexpr float kAffinityWidth = 90.0F;
 // Rows of relationships shown before the table scrolls.
 constexpr float kVisibleBonds = 6.0F;
 constexpr float kMinRecentHeight = 160.0F;
-
-std::string FloorName(std::uint32_t floor) {
-    return floor == 0 ? "ground floor" : std::format("floor {}", floor);
-}
-
-std::string KindLabel(sim::RoomKind kind) {
-    if (const sim::VenueRules* rules = sim::FindVenueRules(kind)) {
-        return std::string{rules->label};
-    }
-    switch (kind) {
-        case sim::RoomKind::Apartment: return "apartment";
-        case sim::RoomKind::VacantStore: return "empty unit, to let";
-        case sim::RoomKind::PoliceStation: return "police station";
-        case sim::RoomKind::CrewRoom: return "metro crew room";
-        default: return "workspace";
-    }
-}
-
-std::string Clock(sim::Tick tick) {
-    return sim::FormatClock(sim::MinuteOfDay(tick));
-}
-
-std::string Name(const WorldFrame& frame, sim::EntityId robot) {
-    const RobotInfo* info = SimulationHost::FindRobotInfo(frame, robot);
-    return info != nullptr ? info->name : "unknown robot";
-}
 
 // Robots in each room right now, in id order.
 std::map<std::uint64_t, std::vector<const RobotFrame*>> Occupants(
@@ -349,19 +324,34 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
     }
     if (frame.economy != nullptr) {
         const EconomyFrame& economy = *frame.economy;
-        const std::string bank = SimulationHost::AccountName(frame, robot.bank);
-        ImGui::Text("Savings: %lld cr at %s", static_cast<long long>(robot.savings), bank.c_str());
+        std::string bankName = SimulationHost::AccountName(frame, robot.bank);
+        ImGui::Text("Savings: %lld cr at ", static_cast<long long>(robot.savings));
+        if (auto link = OrganizationLink(frame, robot.bank, "")) {
+            result = *link;
+        } else {
+            ImGui::TextDisabled("%s", bankName.c_str());
+        }
         if (const sim::Loan* loan = economy.LoanOf(robot.id)) {
-            ImGui::TextColored(kWarning, "Owes %lld cr to %s", static_cast<long long>(loan->owed),
-                               SimulationHost::AccountName(frame, loan->lender).c_str());
+            ImGui::TextColored(kWarning, "Owes %lld cr to ", static_cast<long long>(loan->owed));
+            const std::string lenderName = SimulationHost::AccountName(frame, loan->lender);
+            if (auto link = AccountLink(frame, city, loan->lender, "")) {
+                result = *link;
+            } else {
+                ImGui::TextDisabled("%s", lenderName.c_str());
+            }
         }
         // Its home, apartments it lets, and organizations it owns part of.
         const sim::EntityId landlord = economy.OwnerOf(robot.apartment);
         if (landlord == robot.id) {
             ImGui::TextUnformatted("Owns its home");
         } else if (landlord.IsValid()) {
-            ImGui::Text("Rents its home from %s",
-                        SimulationHost::AccountName(frame, landlord).c_str());
+            ImGui::TextDisabled("Rents its home from ");
+            if (auto link = AccountLink(frame, city, landlord, "")) {
+                result = *link;
+            } else {
+                std::string landlordName = SimulationHost::AccountName(frame, landlord);
+                ImGui::TextDisabled("%s", landlordName.c_str());
+            }
         }
         std::uint32_t let = 0;
         if (economy.owners != nullptr) {
@@ -379,7 +369,16 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
             }
         }
         if (!shares.empty()) {
-            ImGui::TextWrapped("Owns part of %s", shares.c_str());
+            ImGui::TextWrapped("Owns part of ");
+            for (const sim::Organization& organization : economy.organizations) {
+                if (std::ranges::contains(organization.owners, robot.id, &sim::Share::owner)) {
+                    if (auto link = OrganizationLink(frame, organization.id, "")) {
+                        result = *link;
+                    } else {
+                        ImGui::TextDisabled("%s", organization.name.c_str());
+                    }
+                }
+            }
         }
     }
 
@@ -460,6 +459,9 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
     }
     const sim::Room& room = *found->room;
     Title(room.name);
+    if (auto link = BuildingLink(city, found->building->id, "")) {
+        result = *link;
+    }
     ImGui::Text("%s in %s, %s", KindLabel(room.kind).c_str(),
                 found->building->name.c_str(), FloorName(room.floor).c_str());
     if (const sim::VenueRules* rules = sim::FindVenueRules(room.kind)) {
@@ -483,16 +485,22 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
     }
     if (frame.economy != nullptr) {
         const sim::EntityId owner = frame.economy->OwnerOf(room.id);
-        const std::string name = SimulationHost::AccountName(frame, owner);
+        std::string name = SimulationHost::AccountName(frame, owner);
         if (SimulationHost::FindRobot(frame, owner) != nullptr) {
             Selection next = selection;
             next.robot = owner;
             next.room = {};
-            if (auto link = RobotLink(std::format("Owner: {}", name), next, 0)) {
-                result = link;
+            ImGui::TextUnformatted("Owner: ");
+            if (auto link = RobotLink(std::format("{}{}", "", name), next, 0)) {
+                result = *link;
             }
         } else {
-            ImGui::Text("Owner: %s", name.c_str());
+            ImGui::TextDisabled("Owner: ");
+            if (auto link = AccountLink(frame, city, owner, "")) {
+                result = *link;
+            } else {
+                ImGui::TextDisabled("%s", name.c_str());
+            }
         }
     }
 
@@ -545,6 +553,9 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
         return result;
     }
     Title(building->name);
+    if (auto link = BuildingLink(city, selection.building, "")) {
+        result = *link;
+    }
     const bool habitat = building->kind == sim::BuildingKind::Habitat;
     ImGui::Text("%s, %u floors", habitat ? "Habitat" : "Workplace",
                 building->floors);
@@ -589,11 +600,8 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
             ImGui::PushID(static_cast<int>(room.id.value));
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            if (ImGui::Selectable(room.name.c_str())) {
-                Selection next = selection;
-                next.room = room.id;
-                next.robot = {};
-                result = InspectorRequest{.selection = next};
+            if (auto link = RoomLink(city, room.id, "")) {
+                result = *link;
             }
             ImGui::TableNextColumn();
             if (room.kind == sim::RoomKind::Apartment) {
@@ -621,19 +629,6 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
         ImGui::EndTable();
     }
     return result;
-}
-
-// The organization's page; for now it only has its name.
-std::optional<InspectorRequest> DrawOrganization(const Selection& selection,
-                                                 const WorldFrame& frame) {
-    Title(SimulationHost::AccountName(frame, selection.organization));
-    if (frame.economy == nullptr ||
-        frame.economy->FindOrganization(selection.organization) == nullptr) {
-        ImGui::TextDisabled("The organization is gone.");
-    } else {
-        ImGui::TextDisabled("Coming soon");
-    }
-    return std::nullopt;
 }
 
 }  // namespace
@@ -677,7 +672,7 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
         } else if (selection.room.IsValid()) {
             clicked = DrawRoom(selection, frame, city, host);
         } else if (selection.organization.IsValid()) {
-            clicked = DrawOrganization(selection, frame);
+            clicked = DrawOrganization(selection, frame, city, host);
         } else {
             clicked = DrawBuilding(selection, frame, city, host);
         }

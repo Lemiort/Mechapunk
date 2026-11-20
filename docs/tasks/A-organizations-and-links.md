@@ -153,7 +153,7 @@ Open: `app/Inspector.cpp` (only `DrawInspector`), `app/Links.hpp`,
      with the amount owed; and the number of robots saving with it.
 - Commit: "Show organizations in the inspector with property and workers".
 
-### - [ ] A5. Make every reference a link (inspector and statistics)
+### - [x] A5. Make every reference a link (inspector and statistics)
 
 Open: `app/Inspector.cpp`, `app/Statistics.cpp`, `app/Links.hpp`. Work one
 file at a time if the context is tight (two commits are fine).

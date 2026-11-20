@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "Links.hpp"
+
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 
@@ -352,9 +354,11 @@ std::optional<InspectorRequest> DrawOrganizations(StatisticsView& view, const Wo
         for (const sim::Organization& organization : economy.organizations) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
-            if (ImGui::Selectable(organization.name.c_str(), view.organization == organization.id,
-                                  ImGuiSelectableFlags_SpanAllColumns)) {
-                view.organization = organization.id;
+            if (auto link = OrganizationLink(frame, organization.id, "")) {
+                request = *link;
+            } else {
+                std::string orgName = SimulationHost::AccountName(frame, organization.id);
+                ImGui::TextUnformatted(orgName.c_str());
             }
             ImGui::TableSetColumnIndex(1);
             ImGui::TextUnformatted(organization.kind == sim::OrganizationKind::CentralBank
@@ -378,46 +382,11 @@ std::optional<InspectorRequest> DrawOrganizations(StatisticsView& view, const Wo
         }
         ImGui::EndTable();
     }
-    const sim::Organization* selected = economy.FindOrganization(view.organization);
-    if (selected == nullptr) {
-        ImGui::TextDisabled("Select an organization for its owners and books.");
-        return request;
-    }
-    ImGui::SeparatorText(selected->name.c_str());
-    if (BeginFacts("organization")) {
-        Row("Credits", Credits(selected->credits));
-        Row("Borrows from", SimulationHost::AccountName(frame, selected->bank));
-        Row("Rooms owned", std::format("{}", rooms[selected->id.value]));
-        Row("Workers", std::format("{}", workers[selected->id.value]));
-        const sim::Books& books = selected->yesterday;
-        Row("Yesterday: revenue / wages / supplies",
-            std::format("{} / {} / {}", Credits(books.revenue), Credits(books.wages), Credits(books.supplies)));
-        Row("Yesterday: upkeep / dividends / repaid",
-            std::format("{} / {} / {}", Credits(books.upkeep), Credits(books.dividends), Credits(books.repaid)));
-        ImGui::EndTable();
-    }
-    std::uint64_t shares = 0;
-    for (const sim::Share& share : selected->owners) {
-        shares += share.shares;
-    }
-    ImGui::TextUnformatted("Owners:");
-    for (const sim::Share& share : selected->owners) {
-        const std::string name = SimulationHost::AccountName(frame, share.owner);
-        const std::string label = std::format("{} ({})##{}", name,
-                                              Share(share.shares, static_cast<std::int64_t>(shares)),
-                                              share.owner.value);
-        if (SimulationHost::FindRobot(frame, share.owner) != nullptr) {
-            if (ImGui::Selectable(label.c_str())) {
-                request = InspectorRequest{.selection = {.robot = share.owner}, .jumpToRobot = true};
-            }
-        } else if (ImGui::Selectable(label.c_str())) {
-            view.organization = share.owner;
-        }
-    }
     return request;
 }
 
-void DrawCentralBank(const WorldFrame& frame, const std::vector<sim::DailyStats>& history) {
+void DrawCentralBank(const WorldFrame& frame, const std::vector<sim::DailyStats>& history,
+                     std::optional<InspectorRequest>* request) {
     const EconomyFrame& economy = *frame.economy;
     const std::int64_t expected = economy.created - economy.destroyed;
     const std::int64_t held = MoneyInAccounts(frame);
@@ -451,7 +420,40 @@ void DrawCentralBank(const WorldFrame& frame, const std::vector<sim::DailyStats>
             ImGui::TableSetColumnIndex(0);
             ImGui::TextUnformatted(sim::FormatTime(emission->tick).c_str());
             ImGui::TableSetColumnIndex(1);
-            ImGui::TextUnformatted(SimulationHost::AccountName(frame, emission->account).c_str());
+            {
+                sim::EntityId account = emission->account;
+                std::string accName = SimulationHost::AccountName(frame, account);
+                bool foundRobot = false;
+                if (frame.economy != nullptr) {
+                    if (SimulationHost::FindRobot(frame, account) != nullptr) {
+                        foundRobot = true;
+                    } else if (frame.economy->FindOrganization(account) != nullptr) {
+                        Selection sel{.organization = account};
+                        std::string label = std::format("{}##organization{}", accName, account.value);
+                        ImVec4 kLink{0.4F, 0.7F, 1.0F, 1.0F};
+                        ImGui::PushStyleColor(ImGuiCol_Text, kLink);
+                        bool clicked = ImGui::Selectable(label.c_str());
+                        ImGui::PopStyleColor();
+                        if (clicked) {
+                            *request = InspectorRequest{.selection = sel};
+                        }
+                        continue;
+                    }
+                }
+                if (foundRobot) {
+                    Selection sel{.robot = account};
+                    std::string label = std::format("{}##robot{}", accName, account.value);
+                    ImVec4 kLink{0.4F, 0.7F, 1.0F, 1.0F};
+                    ImGui::PushStyleColor(ImGuiCol_Text, kLink);
+                    bool clicked = ImGui::Selectable(label.c_str());
+                    ImGui::PopStyleColor();
+                    if (clicked) {
+                        *request = InspectorRequest{.selection = sel, .jumpToRobot = true};
+                    }
+                } else {
+                    ImGui::TextUnformatted(accName.c_str());
+                }
+            }
             ImGui::TableSetColumnIndex(2);
             ImGui::TextColored(emission->amount >= 0 ? kBad : kGood, "%s%s",
                                emission->amount >= 0 ? "+" : "", Credits(emission->amount).c_str());
@@ -497,7 +499,7 @@ std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const World
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Central bank")) {
-                DrawCentralBank(frame, history);
+                DrawCentralBank(frame, history, &request);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
