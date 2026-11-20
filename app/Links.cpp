@@ -3,11 +3,23 @@
 #include <format>
 #include <unordered_map>
 
+#include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk {
 
 namespace {
+
+// Gang colour as an ImVec4.
+inline ImVec4 GangColour(std::uint32_t colour) {
+    std::uint8_t r = (colour >> 16U) & 0xFF;
+    std::uint8_t g = (colour >> 8U) & 0xFF;
+    std::uint8_t b = colour & 0xFF;
+    return ImVec4{static_cast<float>(r) / 255.0F,
+                  static_cast<float>(g) / 255.0F,
+                  static_cast<float>(b) / 255.0F,
+                  1.0F};
+}
 
 // The colour of every clickable name, so the player sees what is a link.
 constexpr ImVec4 kLink{0.4F, 0.7F, 1.0F, 1.0F};
@@ -190,6 +202,45 @@ std::optional<InspectorRequest> RobotLink(const std::string& name,
     return InspectorRequest{
         .selection = target,
         .jumpToRobot = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)};
+}
+
+// A gang's name with a colour swatch; clicking it shows the gang page.
+std::optional<InspectorRequest> GangLink(const WorldFrame& frame,
+                                         sim::EntityId gang,
+                                         std::string_view prefix) {
+    if (frame.gangs == nullptr) {
+        ImGui::TextDisabled("%.*s%s", static_cast<int>(prefix.size()),
+                            prefix.data(), "unknown gang");
+        return std::nullopt;
+    }
+
+    // Look up the gang.
+    const sim::Gang* found = nullptr;
+    for (const auto& g : *frame.gangs) {
+        if (g.id == gang) {
+            found = &g;
+            break;
+        }
+    }
+    if (!found) {
+        ImGui::TextDisabled("%.*s%s", static_cast<int>(prefix.size()), prefix.data(),
+                            "unknown gang");
+        return std::nullopt;
+    }
+
+    // Draw a small colour swatch, then the name as a link. The PushID keeps
+    // the swatch's id out of the one the name gets.
+    const ImVec4 col = GangColour(found->color);
+    ImGui::PushID(static_cast<int>(gang.value));
+    const ImVec2 swatch{16.0F, 16.0F};
+    ImGui::ColorButton("##swatch", col, ImGuiColorEditFlags_NoTooltip, swatch);
+    ImGui::SameLine();
+    const bool clicked = Link(std::format("{}{}", prefix, found->name));
+    ImGui::PopID();
+    if (clicked) {
+        return InspectorRequest{.selection = {.gang = gang}};
+    }
+    return std::nullopt;
 }
 
 }  // namespace mechapunk

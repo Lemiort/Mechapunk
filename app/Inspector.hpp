@@ -24,4 +24,8 @@ struct InspectorRequest {
     const Selection& selection, const WorldFrame& frame, const CityView& city,
     const SimulationHost& host, bool& following);
 
+// Draws the gang detail page in the inspector.
+[[nodiscard]] std::optional<InspectorRequest> DrawGangPage(
+    const Selection& selection, const WorldFrame& frame, const CityView& city);
+
 }  // namespace mechapunk

@@ -12,3 +12,6 @@ Status: optional. The user wants more detail, never less.
   (`SubmitTransparentMesh`), so its interior shows through.
 - [ ] F3. Later: a cube map or a simple room box behind lit windows of
   closed buildings.
+
+No details step: windows add nothing new to inspect. Clicking a lit window
+of a closed building could open that apartment in the inspector later.

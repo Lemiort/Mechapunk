@@ -236,6 +236,10 @@ void SimulationHost::Publish() {
         economy->owners = owners_;
         economy_ = std::move(economy);
     }
+    if (gangs_ == nullptr || frame.tick % kSocialPeriod == 0) {
+        gangs_ = std::make_shared<const std::vector<sim::Gang>>(world_.State().gangs);
+    }
+    frame.gangs = gangs_;
     frame.economy = economy_;
     if (cityFrame_ == nullptr || cityVersion_ != world_.CityVersion()) {
         cityFrame_ = std::make_shared<const sim::City>(world_.State().city);
@@ -266,7 +270,10 @@ void SimulationHost::Publish() {
                               .rideFrom = robot.rideFrom,
                               .rideTo = robot.rideTo,
                               .boardsAt = robot.boardsAt,
-                              .alightsAt = robot.alightsAt};
+                              .alightsAt = robot.alightsAt,
+                              .gangColor = 0,
+                              .gang = robot.gang,
+                              .arrests = robot.arrests};
         switch (robot.activity) {
             case sim::RobotActivity::Resting:
                 ++frame.resting;
@@ -289,6 +296,15 @@ void SimulationHost::Publish() {
                 robotFrame.to = to->building->id;
                 robotFrame.departedAt = walk->departedAt;
                 robotFrame.arrivesAt = walk->arrivesAt;
+            }
+        }
+        // Look up gang colour for this robot.
+        if (robot.gang.value != 0 && gangs_ != nullptr) {
+            for (const sim::Gang& gang : *gangs_) {
+                if (gang.id == robot.gang) {
+                    robotFrame.gangColor = gang.color;
+                    break;
+                }
             }
         }
         frame.robots.push_back(robotFrame);

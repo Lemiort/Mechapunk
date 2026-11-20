@@ -46,7 +46,30 @@ Open: `Chronicle.cpp`, `ChronicleTests.cpp`, `World.cpp` (only `Emit`).
   building and organization in an entry is a link (task A helpers).
 - Robot page: a "History" section with that robot's entries. Commit.
 
+### - [ ] C4. Chronicle details (inspector, statistics)
+
+Follow the guide's section 9 (detail pages). Open: a new
+`app/ChronicleLists.hpp/.cpp` and `tests/ChronicleListsTests.cpp`,
+`app/Statistics.cpp` (the Chronicle tab), `app/Inspector.cpp` (robot,
+room and building pages), `app/InspectorOrganization.cpp`.
+
+- `ChronicleLists` (plain, tested): entries about a robot, a room, a
+  building (any of its rooms) and an organization (rooms it owns, robots it
+  employs, money it was given), newest first; and a filter by kind and by
+  day range.
+- **Chronicle tab**: filter buttons by kind (people, work, homes, venues,
+  crime, money) and a day range; a search box for a robot's name; each
+  entry's time, its text, and every robot, room, building and organization
+  in it as links, clipped.
+- **History sections**: the robot page ("History"), the room and building
+  pages ("What happened here") and the organization page ("History"), each
+  a clipped list of its entries with links.
+- An entry about a robot that was scrapped shows its name as plain text
+  (`AccountLink` already does this).
+- Tests for every list function; add the new files to the budget script.
+
 ## Done when
 
 - [ ] The chronicle is saved, migrated, tested, and shown with links.
+- [ ] Robots, rooms, buildings and organizations show their own history.
 - [ ] The guide's task table marks C done.

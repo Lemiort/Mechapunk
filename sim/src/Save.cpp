@@ -71,6 +71,12 @@ struct glz::meta<mechapunk::sim::BondLevel> {
                   "closeFriend", CloseFriend, "rival", Rival);
 };
 template <>
+struct glz::meta<mechapunk::sim::Stance> {
+    using enum mechapunk::sim::Stance;
+    static constexpr auto value =
+        enumerate("friendly", Friendly, "neutral", Neutral, "rival", Rival);
+};
+template <>
 struct glz::meta<mechapunk::sim::MemoryKind> {
     using enum mechapunk::sim::MemoryKind;
     static constexpr auto value = enumerate(
@@ -82,7 +88,9 @@ struct glz::meta<mechapunk::sim::MemoryKind> {
         "evicted", Evicted, "lostFriend", LostFriend, "arrivedInCity",
         ArrivedInCity, "gotBadPart", GotBadPart, "boughtProperty",
         BoughtProperty, "soldHome", SoldHome, "tookLoan", TookLoan,
-        "inherited", Inherited, "movedInTogether", MovedInTogether);
+        "inherited", Inherited, "movedInTogether", MovedInTogether,
+        "joinedGang", JoinedGang, "leftGang", LeftGang, "wasRobbed",
+        WasRobbed, "robbedSomeone", RobbedSomeone, "arrested", Arrested);
 };
 template <>
 struct glz::meta<mechapunk::sim::OrganizationKind> {
@@ -164,6 +172,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 16,
               .summary = "police and metro staff",
               .apply = &migrations::V16ToV17},
+    Migration{.fromVersion = 17,
+              .summary = "gangs and crime statistics",
+              .apply = &migrations::V17ToV18},
 };
 }  // namespace
 

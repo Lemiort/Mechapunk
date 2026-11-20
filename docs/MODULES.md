@@ -15,25 +15,26 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | Module | Tokens | Files |
 |---|---:|---|
 | world | 21k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
-| generation | 21k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
-| validation | 10k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
+| generation | 22k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
+| validation | 11k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 22k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 22k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Units.cpp`, `Property.cpp`, `HousingTests.cpp` |
-| statistics | 13k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `Statistics.cpp` |
+| statistics | 15k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `Statistics.cpp` |
 | careers | 18k | `World.hpp`, `Careers.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
-| social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `LifeCycle.cpp`, `SocialTests.cpp`, `LifeCycleTests.cpp` |
+| social | 21k | `World.hpp`, `Social.hpp`, `Social.cpp`, `LifeCycle.cpp`, `SocialTests.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 18k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
+| saves | 19k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
 | saves-frozen | 5k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 11k | `World.hpp`, `main.cpp` |
-| view-core | 17k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
-| view-robots | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
+| view-core | 18k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
+| view-robots | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
 | view-interiors | 11k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
-| ui | 14k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
-| inspector | 25k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp`, `SimulationHost.hpp`, `CityView.hpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp` |
+| ui | 15k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
+| inspector | 23k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp`, `SimulationHost.hpp`, `CityView.hpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
+| gangs | 13k | `Gangs.hpp`, `Gangs.cpp`, `GangTests.cpp`, `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
 
 ## What lives where
 
@@ -46,7 +47,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 
 | File | What lives there |
 | --- | --- |
-| `World.hpp` | `Robot`, `WorldState`, `EventKind`/`SimEvent`, the `World` class (every member, grouped by the file implementing it) |
+| `World.hpp` | `Robot`, `WorldState`, `EventKind`/`SimEvent`, gangs (`Gang`, `Stance`), the `World` class (every member, grouped by the file implementing it) |
 | `World.cpp` | Construction, `FromState`, `Step` (the midnight order), `RunFor`, `UpdateNeeds`, `IsGuestTrip`, `WalkOf` |
 | `Behaviour.cpp` | A robot's day: `Act`, `Arrive`, `Decide`, `StartWalk`, commutes, `PlanAtHome`, officers' `Patrol` |
 | `Generation.cpp` | `World::Generate`, `AssignDorm`, `AssignJob`, robot names |
@@ -56,6 +57,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `City.hpp/.cpp` | Streets, stations, buildings, rooms, `RoomKind`, `ApartmentClass`, `GenerateCity`, `RoomIndex`, `RoutePlanner` |
 | `Venues.hpp/.cpp` | `VenueRules` per venue kind (hours, price, effects, capacity), `StaffRules` (also police and crew rooms), `FindStaffRules`, `StaffPerShift`, `JobsAt`, `ShiftSlot` |
 | `Careers.hpp/.cpp` | Wages, promotions, firing, `ReviewJobs`, `ReviewHomes` (eviction, moving up, friends moving in together), `JobShift`, `JobKey`, `OpeningsFor` |
+| `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
 | `Founding.cpp` | `FoundEconomy` (organizations, owners, starting money), `IndexEconomy` |

@@ -54,6 +54,8 @@ constexpr std::uint64_t kCareerStream = 5;
 
 constexpr std::uint64_t kAgeStream = 6;
 
+constexpr std::uint64_t kGangStream = 7;
+
 // Robots in a new city are up to about a year old.
 constexpr std::uint32_t kMaxStartingAge = 360;
 
@@ -211,6 +213,8 @@ World World::Generate(const WorldParams& params) {
 
     state.random = Pcg32::FromSeed(params.seed, kRuntimeStream);
     World world(std::move(state));
+    Pcg32 gangRandom = Pcg32::FromSeed(params.seed, kGangStream);
+    world.FoundGangs(gangRandom);
     world.FoundEconomy(params.seed);
     world.IndexEconomy();
     world.CountResidents();

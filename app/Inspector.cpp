@@ -391,6 +391,25 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
         }
     }
 
+    // Gang membership.
+    if (frame.gangs != nullptr && robot.gang.IsValid()) {
+        const sim::Gang* gang = nullptr;
+        for (const sim::Gang& g : *frame.gangs) {
+            if (g.id == robot.gang) {
+                gang = &g;
+                break;
+            }
+        }
+        if (gang) {
+            ImGui::SeparatorText("Gang");
+            follow(GangLink(frame, gang->id, ""));
+        }
+    }
+    if (robot.arrests > 0) {
+        ImGui::SeparatorText("Arrests");
+        ImGui::TextDisabled("%u", robot.arrests);
+    }
+
     if (const RobotInfo* info = SimulationHost::FindRobotInfo(frame, robot.id)) {
         ImGui::SeparatorText("Home and work");
         follow(RoomLink(city, robot.apartment, "Home: "));
@@ -691,6 +710,8 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
             clicked = DrawRoom(selection, frame, city, host);
         } else if (selection.organization.IsValid()) {
             clicked = DrawOrganization(selection, frame, city);
+        } else if (selection.gang.IsValid()) {
+            clicked = DrawGangPage(selection, frame, city);
         } else {
             clicked = DrawBuilding(selection, frame, city, host);
         }

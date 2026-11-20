@@ -13,10 +13,14 @@
 #include <string>
 #include <vector>
 
+#include "GangLists.hpp"
 #include "Links.hpp"
 
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/GameTime.hpp"
+#include "mechapunk/sim/Gangs.hpp"
+
+#include "SimulationHost.hpp"
 
 namespace mechapunk {
 
@@ -417,9 +421,124 @@ void DrawCentralBank(const WorldFrame& frame, const std::vector<sim::DailyStats>
         ImGui::EndTable();
     }
 }
+
+void DrawCrime(const std::vector<sim::DailyStats>& history, const WorldFrame& frame,
+               const CityView& city) {
+    if (history.empty()) {
+        ImGui::TextDisabled("Statistics start at the end of the first day.");
+        return;
+    }
+    const sim::DailyStats& day = history.back();
+    const sim::DayCounters& counted = day.counted;
+
+    ImGui::SeparatorText("Crime");
+    if (BeginFacts("crime")) {
+        Row("Robberies", std::format("{} ({} cr)", counted.robberies, Credits(counted.robbedCredits)));
+        Row("Arrests", std::format("{}", counted.arrests));
+        Row("Gang fights", std::format("{}", counted.fights));
+        Row("Robots in gangs today", std::to_string(day.gangMembers));
+        ImGui::EndTable();
+    }
+
+    PlotCount("Robberies", history, [](const auto& d) { return d.counted.robberies; });
+    PlotCredits("Stolen credits", history,
+                [](const auto& d) { return d.counted.robbedCredits; });
+    PlotCount("Arrests", history, [](const auto& d) { return d.counted.arrests; });
+    PlotCount("Gang fights", history, [](const auto& d) { return d.counted.fights; });
+
+    ImGui::SeparatorText("Gangs");
+    if (frame.gangs == nullptr || frame.gangs->empty()) {
+        ImGui::TextDisabled("No gangs yet.");
+    } else {
+        constexpr ImGuiTableFlags kFlags =
+            ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV;
+        if (ImGui::BeginTable("gangs", 5, kFlags, ImVec2{0.0F, 350.0F})) {
+            for (const char* column : {"Gang", "Colour", "Members", "Robberies", "Turf / Relations"}) {
+                ImGui::TableSetupColumn(column, ImGuiTableColumnFlags_WidthStretch, 0.8F);
+            }
+            ImGui::TableHeadersRow();
+
+            // Collect gang members per gang from frame data, using RobotFrame.gang.
+            std::vector<std::int64_t> memberCounts(frame.gangs->size(), 0);
+            for (const RobotFrame& robot : frame.robots) {
+                if (robot.gang == sim::EntityId{}) continue;
+                for (std::size_t i = 0; i < frame.gangs->size(); ++i) {
+                    if ((*frame.gangs)[i].id == robot.gang) {
+                        ++memberCounts[static_cast<std::size_t>(i)];
+                    }
+                }
+            }
+
+            for (std::uint64_t i = 0; i < frame.gangs->size(); ++i) {
+                const sim::Gang& gang = (*frame.gangs)[static_cast<std::size_t>(i)];
+                ImGui::TableNextRow();
+                // Gang name as a clickable link.
+                ImGui::TableSetColumnIndex(0);
+                GangLink(frame, gang.id, "");
+
+                // Colour swatch and hex string.
+                ImGui::TableSetColumnIndex(1);
+                ImGui::PushID(static_cast<int>(gang.id.value));
+                const ImVec4 gangColour{static_cast<float>((gang.color >> 16) & 0xFF) / 255.0F,
+                                        static_cast<float>((gang.color >> 8) & 0xFF) / 255.0F,
+                                        static_cast<float>(gang.color & 0xFF) / 255.0F,
+                                        1.0F};
+                ImGui::ColorButton("##swatch", gangColour,
+                                   ImGuiColorEditFlags_NoTooltip, ImVec2{24.0F, 16.0F});
+                ImGui::PopID();
+                ImGui::SameLine();
+                std::string colourStr = std::format("#{:06X}", gang.color);
+                ImGui::TextUnformatted(colourStr.c_str());
+
+                ImGui::TableSetColumnIndex(2);
+                std::string members = std::to_string(memberCounts[static_cast<std::size_t>(i)]);
+                ImGui::TextUnformatted(members.c_str());
+
+                // Robberies today by members.
+                ImGui::TableSetColumnIndex(3);
+                std::vector<GangCrime> crimes = GangCrimes(frame, gang.id);
+                std::int64_t robberiesToday = 0;
+                for (const auto& crime : crimes) {
+                    if (crime.text.find("Robbed ") == 0) {
+                        ++robberiesToday;
+                    }
+                }
+                ImGui::TextUnformatted(std::to_string(robberiesToday).c_str());
+
+                // Turf and relations.
+                ImGui::TableSetColumnIndex(4);
+                if (gang.turf.value != 0) {
+                    BuildingLink(city, gang.turf, "");
+                } else {
+                    ImGui::TextDisabled("no turf");
+                }
+                for (const auto& rel : gang.relations) {
+                    ImGui::SameLine();
+                    ImGui::Text(" ");
+                    switch (rel.stance) {
+                        case sim::Stance::Friendly:
+                            ImGui::TextColored(ImVec4{0.45F, 0.9F, 0.45F, 1.0F}, "friendly");
+                            break;
+                        case sim::Stance::Rival:
+                            ImGui::TextColored(ImVec4{0.85F, 0.3F, 0.25F, 1.0F}, "rival");
+                            break;
+                        default:
+                            ImGui::TextDisabled("neutral");
+                            break;
+                    }
+                    ImGui::SameLine();
+                    GangLink(frame, rel.gang, "");
+                }
+            }
+            ImGui::EndTable();
+        }
+    }
+}
+
 }  // namespace
 
-std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const WorldFrame& frame) {
+std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const WorldFrame& frame,
+                                               const CityView& city) {
     if (!view.open || frame.economy == nullptr) {
         return std::nullopt;
     }
@@ -454,6 +573,10 @@ std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const World
             }
             if (ImGui::BeginTabItem("Central bank")) {
                 DrawCentralBank(frame, history, &request);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Crime")) {
+                DrawCrime(history, frame, city);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

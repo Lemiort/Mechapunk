@@ -368,4 +368,32 @@ std::expected<void, std::string> V16ToV17(SaveDocument& world) try {
         std::format("the version 16 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V17ToV18(SaveDocument& world) try {
+    // Gangs are empty for now; FoundGangs creates them after loading.
+    if (!world.contains("gangs")) {
+        world["gangs"] = SaveDocument::array_t{};
+    }
+    // Robots start with no gang and zero arrests.
+    for (SaveDocument& robot : world["robots"].get_array()) {
+        robot["gang"] = std::uint64_t{0};
+        robot["arrests"] = std::uint32_t{0};
+    }
+    // Counters in today and every history element.
+    for (std::string_view counter : {"robberies", "robbedCredits", "arrests",
+                                     "fights", "joinedGangs", "leftGangs"}) {
+        world["today"][counter] = std::int64_t{0};
+        for (SaveDocument& day : world["history"].get_array()) {
+            day["counted"][counter] = std::int64_t{0};
+        }
+    }
+    // Gang members in every history element.
+    for (SaveDocument& day : world["history"].get_array()) {
+        day["gangMembers"] = std::int64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 17 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

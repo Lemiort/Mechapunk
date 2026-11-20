@@ -45,6 +45,8 @@ struct Selection {
     // The organization shown in the inspector; the camera and the cutaway
     // ignore it.
     sim::EntityId organization;
+    // A gang selected from the Statistics window or a member's page.
+    sim::EntityId gang;
 };
 
 // What a click hit: a robot, a room of the open building, or a building.

@@ -77,6 +77,11 @@ enum class MemoryKind : std::uint8_t {
     TookLoan,
     Inherited,      // robot: the scrapped friend.
     MovedInTogether,  // robot: the friend; room: the flat they share.
+    JoinedGang,     // room: its home; otherRobot: the friend who invited it.
+    LeftGang,       // room: its home.
+    WasRobbed,      // room: where; credits: what was taken; otherRobot: robber.
+    RobbedSomeone,  // credits: what it took; otherRobot: victim; room: where.
+    Arrested,       // room: the venue; otherRobot: victim (if an officer).
 };
 
 struct Memory {

@@ -52,9 +52,37 @@ The static batches are built once (`CityStatic.cpp`). Add
 under construction is a scaffold of thin boxes, one floor per
 `floorsDone`.
 
+### - [ ] D5. Construction details (inspector, statistics)
+
+Follow the guide's section 9 (detail pages). Open: a new
+`app/InspectorProject.cpp`, `app/ProjectLists.hpp/.cpp` and
+`tests/ProjectListsTests.cpp`, `app/Links.*`, `app/Inspector.cpp`
+(building page), `app/InspectorOrganization.cpp`, `app/Statistics.cpp`,
+`app/SimulationHost.hpp/.cpp` (projects into `WorldFrame`).
+
+- `WorldFrame` gains the projects (a shared list, copied only when they
+  change); `Selection` gains `project`; `ProjectLink`.
+- `ProjectLists` (plain, tested): builders of a project (robots whose job
+  is its site office), projects of an organization, the lot or building a
+  project is on.
+- **Project page**: what is built (habitat or workplace) and where
+  (`BuildingLink`); owner (`OrganizationLink`); progress (floors done of
+  floors, days left, as a bar); what it has cost so far and costs a night;
+  why it was started (low vacancy or too few jobs, with the number);
+  builders as a clipped table (name, level, shift, now).
+- **Links back**: a building under construction says "Being built:
+  <ProjectLink>" and lists its builders; the organization page gets a
+  "Building now" list; a builder's robot page shows its project as a link.
+- **Statistics**: a "Construction" section in the Property tab: projects
+  started, finished, builders employed, by day, and a table of current
+  projects with links.
+- Tests for every list function; add the new files to the budget script.
+
 ## Done when
 
 - [ ] New homes and workplaces are built when short, by builders, paid from
   supplies; money adds up over 40 days at 10000 robots.
 - [ ] The view shows scaffolds and finished buildings without a restart.
+- [ ] Every project has an inspector page with its builders, linked from its
+  building, owner and builders.
 - [ ] The guide's task table marks D done.

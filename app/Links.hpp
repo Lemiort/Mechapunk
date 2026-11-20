@@ -68,4 +68,9 @@ std::optional<InspectorRequest> RobotLink(
     const std::string& name, const Selection& target,
     ImGuiSelectableFlags flags = 0);
 
+// A gang's name: a click shows it in the inspector.
+std::optional<InspectorRequest> GangLink(const WorldFrame& frame,
+                                         sim::EntityId gang,
+                                         std::string_view prefix);
+
 }  // namespace mechapunk

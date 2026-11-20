@@ -242,6 +242,13 @@ void World::RecordStatistics() {
         stats.topTenthShare = positive > 0 ? top * 1000 / positive : 0;
         stats.bottomHalfShare = positive > 0 ? bottom * 1000 / positive : 0;
     }
+    // Gangs and crime statistics.
+    std::int64_t gangMembers = 0;
+    for (const Robot& robot : state_.robots) {
+        if (robot.gang.value != 0) ++gangMembers;
+    }
+    stats.gangMembers = gangMembers;
+
     stats.giniWealth = GiniPerMille(std::move(wealth));
     stats.moneySupply = stats.robotMoney + stats.corporationMoney + stats.bankMoney +
                         stats.governmentMoney + state.economy.supplyMarket;

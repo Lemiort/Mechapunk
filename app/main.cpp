@@ -498,7 +498,7 @@ private:
             cityVersion_ = frame->cityVersion;
         }
         if (frame != nullptr) {
-            if (const auto picked = DrawStatistics(statistics_, *frame)) {
+            if (const auto picked = DrawStatistics(statistics_, *frame, city_)) {
                 ApplySelection(picked->selection);
                 jumpTo_ = picked->selection.robot;
             }

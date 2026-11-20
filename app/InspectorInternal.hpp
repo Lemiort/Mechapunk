@@ -88,4 +88,8 @@ inline std::string SectorLabel(sim::Sector sector) {
 [[nodiscard]] std::optional<InspectorRequest> DrawOrganization(
     const Selection& selection, const WorldFrame& frame, const CityView& city);
 
+// The gang's page in the inspector, in InspectorGang.cpp.
+[[nodiscard]] std::optional<InspectorRequest> DrawGangPage(
+    const Selection& selection, const WorldFrame& frame, const CityView& city);
+
 }  // namespace mechapunk

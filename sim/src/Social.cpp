@@ -214,6 +214,17 @@ std::string MemoryText(MemoryKind kind, std::string_view other,
             return std::format("inherited everything {} had", other);
         case MemoryKind::MovedInTogether:
             return at(std::format("moved in with {}", other), "to");
+        case MemoryKind::JoinedGang:
+            return std::format("joined a gang");
+        case MemoryKind::LeftGang:
+            return "left the gang";
+        case MemoryKind::WasRobbed:
+            return std::format("was robbed by {}", other);
+        case MemoryKind::RobbedSomeone:
+            return place.empty() ? std::string{"robbed someone"}
+                                 : std::format("robbed someone at {}", place);
+        case MemoryKind::Arrested:
+            return std::format("arrested for robbing");
     }
     return "remembered something";
 }
@@ -273,6 +284,7 @@ void World::Socialize() {
             busy[self] = true;
             busy[slot] = true;
             Talk(robot, state_.robots[present[slot]]);
+            ConsiderCrime(robot, state_.robots[present[slot]]);
         }
     }
 }
@@ -381,6 +393,9 @@ void World::Remember(Robot& robot, MemoryKind kind, EntityId other,
         case MemoryKind::BecameFriends: ++today.newFriendships; break;
         case MemoryKind::BecameRivals: ++today.newRivalries; break;
         case MemoryKind::GotBadPart: ++today.badParts; break;
+        case MemoryKind::WasRobbed: break;   // counted in ConsiderCrime when robbery happens.
+        case MemoryKind::RobbedSomeone: break;  // counted when robbery happens.
+        case MemoryKind::Arrested: break;    // counted in ConsiderCrime when arrest happens.
         default: break;
     }
     robot.memories.push_back(

@@ -87,9 +87,20 @@ python scripts/context_budget.py                                                
    2. Write `VNToVN+1` at the end of `sim/src/Migrations.cpp`, declare it
       in `Migrations.hpp`, register it in `kMigrations` in `Save.cpp`. It
       edits the untyped JSON and never calls game code. Reading uses
-      `error_on_missing_keys`, so **every new key must be added**, also in
-      every element of `world.history` (`DailyStats` and its `counted`
-      `DayCounters`) and every organization's `today`/`yesterday` books.
+      `error_on_missing_keys`, so **every new key must be added**. Where a
+      new field goes depends on its type:
+
+      | New field in | JSON paths to add it to |
+      | --- | --- |
+      | `Robot` | every `world.robots[i]` |
+      | `WorldState` | `world` |
+      | `Economy` | `world.economy` |
+      | `DayCounters` | `world.today` and every `world.history[i].counted` |
+      | `DailyStats` | every `world.history[i]` |
+      | `Books` | every `world.economy.organizations[i].today` and `.yesterday` |
+
+      `V15ToV16` in `Migrations.cpp` is a short example covering
+      `DayCounters` and `DailyStats`.
       Never edit a released migration.
    3. New enum values get a name in the `glz::meta` specializations at the
       top of `Save.cpp`.
@@ -209,10 +220,42 @@ Do them in this order; each file lists its steps and which are done.
 | Task | File | Modules | Save change |
 | --- | --- | --- | --- |
 | A. Organizations in the inspector; every name a link (done; user to check in game) | `docs/tasks/A-organizations-and-links.md` | inspector, statistics | no |
-| B. Gangs | `docs/tasks/B-gangs.md` | saves, gangs (new), social, inspector | yes |
+| B. Gangs (B1-B8 done; details split B9a-B9e, B9a done) | `docs/tasks/B-gangs.md` | gangs, inspector, statistics | done (v18) |
 | C. Chronicle | `docs/tasks/C-chronicle.md` | saves, world, statistics | yes |
 | D. Construction | `docs/tasks/D-construction.md` | saves, generation, property, view-core | yes |
 | E. Simulation level of detail | `docs/tasks/E-level-of-detail.md` | world | maybe |
 | F. See-through windows | `docs/tasks/F-windows.md` | view-core, view-interiors | no |
 | G. Unions | `docs/tasks/G-unions.md` | money, careers | yes |
 | H. Engine (NEE, pull requests only) | `docs/tasks/H-engine.md` | external | no |
+
+## 9. Detail pages (the pattern from task A)
+
+The user wants every new thing in the game to be inspectable in detail and
+every name to lead somewhere. Each task that adds a kind of thing (a gang, a
+chronicle entry, a construction project, a union) ends with a **details**
+step that does what task A did for organizations:
+
+1. **A page in the inspector** for the new thing: `Selection` gains its
+   id; `DrawInspector` dispatches to `Draw<Thing>` in its own
+   `app/Inspector<Thing>.cpp` (declared in `InspectorInternal.hpp`). The
+   page has a title, its facts, and its **lists** (members, rooms,
+   entries...), each a scrolling table at most 12 rows high drawn with
+   `ImGuiListClipper` for every length (`InspectorOrganization.cpp` is the
+   model to copy).
+2. **A link** `<Thing>Link` in `app/Links.*`, built on the private `Link()`
+   there (link colour, tooltip, `##<kind><id>` label, repeat-safe ids).
+   Never call `ImGui::Selectable` or `ColorButton` with an empty or shared
+   label yourself.
+3. **Links back**: every page that relates to the new thing names it as a
+   link (a robot to its gang, a building to the project on it, an
+   organization to its union), and every robot, building, room and
+   organization on the new page is a link.
+4. **Testable lists**: the code that picks and sorts a page's rows is a plain
+   function in `app/<Thing>Lists.hpp/.cpp`, in the `mechapunk_layout`
+   library, with tests in `layout_tests` that build a `WorldFrame` from a
+   generated city (`tests/OrganizationListsTests.cpp` shows how) and never
+   skip. The drawing code only draws what those functions return.
+5. **Frame data by id, not by look-alike**: put the thing's id in
+   `RobotFrame` (or a shared list in `WorldFrame`), never match on a name
+   or a colour.
+6. Add the new files to modules in `scripts/context_budget.py`.

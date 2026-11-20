@@ -75,4 +75,8 @@ namespace mechapunk::sim::migrations {
 // one yet.
 [[nodiscard]] std::expected<void, std::string> V16ToV17(SaveDocument& world);
 
+// Version 17 to 18: gangs and crime statistics; every robot starts with no
+// gang and zero arrests, counters are all zero.
+[[nodiscard]] std::expected<void, std::string> V17ToV18(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

@@ -110,7 +110,13 @@ inline float SunHeight(double minuteOfDay) {
     return static_cast<float>(std::sin(phase * std::numbers::pi));
 }
 
-inline vec3 Accent(sim::EntityId robot) {
+inline vec3 Accent(sim::EntityId robot, std::uint32_t gangColor) {
+    if (gangColor != 0) {
+        return vec3{
+            static_cast<float>((gangColor >> 16) & 0xFF) / 255.0F,
+            static_cast<float>((gangColor >> 8) & 0xFF) / 255.0F,
+            static_cast<float>(gangColor & 0xFF) / 255.0F};
+    }
     return kRobotAccents.at(static_cast<std::size_t>(
         (robot.value * 2654435761ULL >> 9U) % kRobotAccents.size()));
 }

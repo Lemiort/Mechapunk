@@ -342,7 +342,7 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
             }
         }
         SubmitModel(queue, RobotFigure(placed->riding ? Pose::Standing : Pose::Walking,
-                                       phase, selected ? kSelected : Accent(robot.id),
+                                       phase, selected ? kSelected : Accent(robot.id, robot.gangColor),
                                        carried),
                     position, yaw, 0.0F, vec3(1.0F),
                     scale * (selected ? 1.2F : 1.0F));
