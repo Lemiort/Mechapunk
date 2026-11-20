@@ -220,7 +220,7 @@ Do them in this order; each file lists its steps and which are done.
 | Task | File | Modules | Save change |
 | --- | --- | --- | --- |
 | A. Organizations in the inspector; every name a link (done; user to check in game) | `docs/tasks/A-organizations-and-links.md` | inspector, statistics | no |
-| B. Gangs (B1-B8 done; details split B9a-B9e, B9a-B9b done) | `docs/tasks/B-gangs.md` | gangs, inspector, statistics | done (v18) |
+| B. Gangs (B1-B8 done; details split B9a-B9e, B9a-B9c done) | `docs/tasks/B-gangs.md` | gangs, inspector, statistics | done (v18) |
 | C. Chronicle | `docs/tasks/C-chronicle.md` | saves, world, statistics | yes |
 | D. Construction | `docs/tasks/D-construction.md` | saves, generation, property, view-core | yes |
 | E. Simulation level of detail | `docs/tasks/E-level-of-detail.md` | world | maybe |

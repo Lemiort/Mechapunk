@@ -1,7 +1,7 @@
 # Task B: gangs
 
 Status: B1-B6 done; review fixes B7-B8 done (with leftovers, see B9e);
-gang details B9 split into B9a-B9e on 2026-11-20 (B9a-B9b done, rest open).
+gang details B9 split into B9a-B9e on 2026-11-20 (B9a-B9c done, rest open).
 Save change done (v18). Do task A first: the inspector uses its links.
 
 ## What the user asked for
@@ -312,21 +312,26 @@ Open: `app/InspectorGang.cpp`, `app/Links.*`.
 - **Rivals in its turf now**: draw `RivalsInTurf`; delete the page's
   own city-wide scan that lists rivals anywhere.
 
-### - [ ] B9c. Links back (inspector)
+### - [x] B9c. Links back (inspector)
 
 Open: `app/Inspector.cpp` (building and room pages only), `app/Links.*`,
-`app/GangLists.*` (add `MembersInRoom(frame, room)` and its test).
+`scripts/context_budget.py`.
 
-Warning: the `inspector` module is at ~25k tokens, at its budget ceiling.
-If adding to `Inspector.cpp` pushes `ContextBudget` over, split a file
-by topic first (docs/MODULES.md, "Splitting a file").
+Budget note, corrected at work: splitting a file cannot lower a module's
+total, so instead the organization-list files (`OrganizationLists.hpp/.cpp`
+and their tests) moved to a new `organization-lists` module (like the gangs
+module holds `GangLists`), leaving `inspector` at ~21k.
 
-- Building page: when `TurfOf(frame, building)` answers, say "Turf of
+- Building page: when `TurfOf(frame, building)` answers, "Turf of
   <GangLink>".
-- Room page: the gang members whose `location` is this room, each name
-  with its `GangLink`.
+- Room page: the occupants table (task A lists everyone present already)
+  gains a "Gang" column: members get their `GangLink`, others "-". A separate
+  `MembersInRoom` list would only repeat names already in that table.
 - Robot page: "Arrests: N" once, on its own line, also for robots who
-  left their gang (B8b asked; check it is so).
+  left their gang (B8b asked; it had been a section header with a bare
+  number, only shown when in a gang).
+- No new tests: pure drawing over frame data already covered; `ContextBudget`
+  must pass with the new module row.
 
 ### - [ ] B9d. The Crime tab counts (statistics)
 

@@ -33,7 +33,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
 | ui | 15k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
-| inspector | 24k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
+| organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
+| inspector | 21k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
 | gangs | 13k | `Gangs.hpp`, `Gangs.cpp`, `GangTests.cpp`, `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
 
 ## What lives where
@@ -127,6 +128,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Furniture and layout of a room kind | floor-plans | `InteriorStores.cpp`, `InteriorHomes.cpp`, `InteriorWorkplaces.cpp` |
 | Prop models, rain, renderer | rendering | `Props.cpp` |
 | The inspector window and its clickable names | inspector | `Inspector.cpp`, `Links.cpp` |
+| Which rows an organization page shows, sorted | organization-lists | `app/OrganizationLists.cpp` |
 | Panels, input, camera; frames from the simulation thread | ui | `main.cpp`, `SimulationHost.cpp` |
 
 A task touching two modules (a new robot field shown in the inspector, say)

@@ -1,6 +1,7 @@
 #include "Inspector.hpp"
 #include "Links.hpp"
 #include "InspectorInternal.hpp"
+#include "GangLists.hpp"
 
 #include <imgui.h>
 
@@ -406,8 +407,8 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
         }
     }
     if (robot.arrests > 0) {
-        ImGui::SeparatorText("Arrests");
-        ImGui::TextDisabled("%u", robot.arrests);
+        // Once, on its own line; robots that left their gang still see it.
+        ImGui::Text("Arrests: %u", robot.arrests);
     }
 
     if (const RobotInfo* info = SimulationHost::FindRobotInfo(frame, robot.id)) {
@@ -534,12 +535,13 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
                        ImVec2{-1.0F, 0.0F}, occupancy.c_str());
 
     if (count > 0 &&
-        ImGui::BeginTable("occupants", 2,
+        ImGui::BeginTable("occupants", 3,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
                               ImGuiTableFlags_ScrollY)) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Robot");
         ImGui::TableSetupColumn("Until", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("Gang", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableHeadersRow();
         for (const RobotFrame* robot : inside->second) {
             ImGui::PushID(static_cast<int>(robot->id.value));
@@ -555,6 +557,15 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
             }
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(Clock(robot->nextActionAt).c_str());
+            // A gang member present in this room, named by its gang's link.
+            ImGui::TableNextColumn();
+            if (robot->gang.IsValid()) {
+                if (auto link = GangLink(frame, robot->gang, "")) {
+                    result = link;
+                }
+            } else {
+                ImGui::TextDisabled("-");
+            }
             ImGui::PopID();
         }
         ImGui::EndTable();
@@ -616,6 +627,15 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
             ImGui::TextDisabled("%u room%s", rooms, rooms == 1 ? "" : "s");
         }
         ImGui::Unindent();
+    }
+
+    // A building a gang has claimed as its turf.
+    if (const auto turfGang = TurfOf(frame, selection.building); turfGang != std::nullopt) {
+        ImGui::TextUnformatted("Turf of");
+        ImGui::SameLine();
+        if (auto link = GangLink(frame, *turfGang, "")) {
+            result = *link;
+        }
     }
 
     const auto occupants = Occupants(frame);
