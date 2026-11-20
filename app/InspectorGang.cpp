@@ -1,3 +1,7 @@
+// The gang's page in the inspector: its colour and facts, its relations, and
+// as scrolling tables its members, the crimes they remember, and the rivals
+// standing on its turf now.
+
 #include "Inspector.hpp"
 #include "InspectorInternal.hpp"
 #include "Links.hpp"
@@ -5,9 +9,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
-#include <optional>
 #include <string>
 #include <vector>
+
+#include <imgui.h>
 
 #include "GangLists.hpp"
 
@@ -15,11 +20,24 @@
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/Ids.hpp"
-#include "mechapunk/sim/Social.hpp"
 
 namespace mechapunk {
 
 namespace {
+
+// Long lists scroll inside a table this many rows high, and only the rows on
+// screen are drawn (ImGuiListClipper), as on the organization's page.
+constexpr int kVisibleRows = 12;
+
+constexpr ImGuiTableFlags kListFlags =
+    ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY;
+
+// Height of a scrolling list of `rows` rows plus its header.
+ImVec2 ListSize(std::size_t rows) {
+    const auto shown =
+        static_cast<float>(std::min<std::size_t>(rows, kVisibleRows)) + 1.5F;
+    return {0.0F, shown * ImGui::GetFrameHeightWithSpacing()};
+}
 
 // Format an RGB colour as a hex string.
 std::string RgbColor(std::uint32_t color) {
@@ -27,19 +45,44 @@ std::string RgbColor(std::uint32_t color) {
 }
 
 // Gang colour as an ImVec4.
-inline ImVec4 GangColour(std::uint32_t colour) {
-    std::uint8_t r = (colour >> 16U) & 0xFF;
-    std::uint8_t g = (colour >> 8U) & 0xFF;
-    std::uint8_t b = colour & 0xFF;
+ImVec4 GangColour(std::uint32_t colour) {
+    const std::uint8_t r = (colour >> 16U) & 0xFF;
+    const std::uint8_t g = (colour >> 8U) & 0xFF;
+    const std::uint8_t b = colour & 0xFF;
     return ImVec4(static_cast<float>(r) / 255.0F,
                   static_cast<float>(g) / 255.0F,
                   static_cast<float>(b) / 255.0F,
                   1.0F);
 }
 
+std::string Credits(std::int64_t value) {
+    return std::format("{} cr", value);
+}
+
+// What a member is doing now, in a few words.
+const char* Doing(const RobotFrame& robot) {
+    switch (robot.activity) {
+        case sim::RobotActivity::Resting: return "at home";
+        case sim::RobotActivity::Working: return "working";
+        case sim::RobotActivity::Visiting: return "out";
+        case sim::RobotActivity::Walking: return "walking";
+    }
+    return "";
+}
+
+// The other robot in a crime row, if any: who the member did it to, or who
+// did it to the member; an arrest named no robot in the memories.
+sim::EntityId Counterpart(const GangCrime& crime) {
+    switch (crime.kind) {
+        case CrimeKind::Robbery:   return crime.victim;
+        case CrimeKind::WasRobbed: return crime.perpetrator;
+        default:                 return sim::EntityId{};
+    }
+}
+
 }  // namespace
 
-// Draw the gang page in the inspector: colour swatch, turf, relations, members.
+// Draw the gang page in the inspector.
 std::optional<InspectorRequest> DrawGangPage(
     const Selection& selection, const WorldFrame& frame, const CityView& city) {
     std::optional<InspectorRequest> result;
@@ -66,22 +109,26 @@ std::optional<InspectorRequest> DrawGangPage(
         return result;
     }
 
-    // Title with colour swatch and hex.
-    ImVec4 col = GangColour(gang->color);
-    ImGui::PushStyleColor(ImGuiCol_Text, col);
-    const std::string title = std::format("{}  {}  {}", RgbColor(gang->color),
-                                          RgbColor(gang->color), gang->name);
-    ImGui::TextUnformatted(title.c_str());
+    // Title: a swatch in the gang's colour, its hex, its name.
+    ImGui::PushID(static_cast<int>(gang->id.value));
+    ImGui::ColorButton("##swatch", GangColour(gang->color),
+                       ImGuiColorEditFlags_NoTooltip, ImVec2{24.0F, 16.0F});
+    ImGui::PopID();
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Text, GangColour(gang->color));
+    ImGui::TextUnformatted(RgbColor(gang->color).c_str());
     ImGui::PopStyleColor();
+    ImGui::SameLine();
+    ImGui::TextUnformatted(gang->name.c_str());
 
     // Turf.
-    if (gang->turf.value != 0) {
-        BuildingLink(city, gang->turf, "Turf: ");
+    if (gang->turf.IsValid()) {
+        follow(BuildingLink(city, gang->turf, "Turf: "));
     } else {
         ImGui::TextDisabled("No turf");
     }
 
-    // Relations table.
+    // Relations, each a gang link with its stance in colour.
     if (!gang->relations.empty()) {
         ImGui::SeparatorText("Relations");
         if (ImGui::BeginTable("relations", 2,
@@ -109,107 +156,136 @@ std::optional<InspectorRequest> DrawGangPage(
         }
     }
 
-    // Members list (clipped).
-    std::vector<const RobotFrame*> members = MembersOf(frame, selection.gang);
-
-    if (!members.empty()) {
-        ImGui::SeparatorText("Members");
-        const float memberHeight =
-            std::min(static_cast<float>(members.size()), 8.0F) *
-            (ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y);
-        if (ImGui::BeginChild("members", ImVec2{0.0F, memberHeight},
-                              ImGuiChildFlags_Borders)) {
-            for (const auto* robot : members) {
-                const std::string name = Name(frame, robot->id);
-                Selection next = selection;
-                next.robot = robot->id;
-                next.room = {};
-                if (auto link = RobotLink(name, next)) {
-                    result = link;
+    // Members: name, age, job, arrests, credits, home, what it is doing.
+    const std::vector<const RobotFrame*> members = MembersOf(frame, selection.gang);
+    std::uint32_t outOfWork = 0;
+    std::uint32_t inDebt = 0;
+    std::uint32_t arrestedBefore = 0;
+    for (const RobotFrame* member : members) {
+        if (!member->workspace.IsValid()) ++outOfWork;
+        if (frame.economy != nullptr) {
+            const sim::Loan* loan = frame.economy->LoanOf(member->id);
+            if (loan != nullptr && loan->owed > 0) ++inDebt;
+        }
+        if (member->arrests > 0) ++arrestedBefore;
+    }
+    ImGui::SeparatorText(
+        std::format("Members: {}, {} out of work, {} in debt, {} arrested before",
+                    members.size(), outOfWork, inDebt, arrestedBefore)
+            .c_str());
+    if (members.empty()) {
+        ImGui::TextDisabled("Nobody is in it now.");
+    } else if (ImGui::BeginTable("members", 7, kListFlags, ListSize(members.size()))) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 2.0F);
+        ImGui::TableSetupColumn("Age", ImGuiTableColumnFlags_WidthStretch, 1.0F);
+        ImGui::TableSetupColumn("Job", ImGuiTableColumnFlags_WidthStretch, 3.0F);
+        ImGui::TableSetupColumn("Arrests", ImGuiTableColumnFlags_WidthStretch, 1.0F);
+        ImGui::TableSetupColumn("Credits", ImGuiTableColumnFlags_WidthStretch, 1.5F);
+        ImGui::TableSetupColumn("Home", ImGuiTableColumnFlags_WidthStretch, 3.0F);
+        ImGui::TableSetupColumn("Now", ImGuiTableColumnFlags_WidthStretch, 1.2F);
+        ImGui::TableHeadersRow();
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(members.size()));
+        while (clipper.Step()) {
+            for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+                const RobotFrame& robot =
+                    *members[static_cast<std::size_t>(row)];
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                follow(RobotLink(Name(frame, robot.id),
+                                 ShowRobot(frame, city, robot.id)));
+                ImGui::TableNextColumn();
+                ImGui::Text("%u days", robot.age);
+                ImGui::TableNextColumn();
+                if (!robot.workspace.IsValid()) {
+                    ImGui::TextDisabled("out of work");
+                } else {
+                    follow(RoomLink(city, robot.workspace, ""));
                 }
+                ImGui::TableNextColumn();
+                ImGui::Text("%u", robot.arrests);
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(Credits(robot.credits).c_str());
+                ImGui::TableNextColumn();
+                if (!robot.apartment.IsValid()) {
+                    ImGui::TextDisabled("no home");
+                } else {
+                    follow(RoomLink(city, robot.apartment, ""));
+                }
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(Doing(robot));
             }
         }
-        ImGui::EndChild();
+        ImGui::EndTable();
     }
 
-    // Recent crimes list (clipped).
-    std::vector<GangCrime> crimes = GangCrimes(frame, selection.gang);
-
-    if (!crimes.empty()) {
-        ImGui::SeparatorText("Recent crimes");
-        const float crimeHeight =
-            std::min(static_cast<float>(crimes.size()), 8.0F) *
-            (ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y);
-        if (ImGui::BeginChild("crimes", ImVec2{0.0F, crimeHeight},
-                              ImGuiChildFlags_Borders)) {
-            for (const auto& crime : crimes) {
+    // Recent crimes from the members' memories, newest first.
+    const std::vector<GangCrime> crimes = GangCrimes(frame, selection.gang);
+    ImGui::SeparatorText(
+        std::format("Recent crimes: {}", crimes.size()).c_str());
+    if (!crimes.empty() && ImGui::BeginTable("crimes", 4, kListFlags, ListSize(crimes.size()))) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("When", ImGuiTableColumnFlags_WidthStretch, 2.5F);
+        ImGui::TableSetupColumn("What", ImGuiTableColumnFlags_WidthStretch, 1.5F);
+        ImGui::TableSetupColumn("Who", ImGuiTableColumnFlags_WidthStretch, 2.0F);
+        ImGui::TableSetupColumn("Where", ImGuiTableColumnFlags_WidthStretch, 3.0F);
+        ImGui::TableHeadersRow();
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(crimes.size()));
+        while (clipper.Step()) {
+            for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+                const GangCrime& crime = crimes[static_cast<std::size_t>(row)];
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(sim::FormatTime(crime.tick).c_str());
+                ImGui::TableNextColumn();
                 ImGui::TextUnformatted(crime.text.c_str());
-                // Show perpetrator and victim as links.
-                if (crime.perpetrator.value != 0) {
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("(");
-                    ImGui::SameLine();
-                    Selection perp_sel = selection;
-                    perp_sel.robot = crime.perpetrator;
-                    perp_sel.room = {};
-                    if (auto link = RobotLink(
-                            Name(frame, crime.perpetrator), perp_sel)) {
-                        result = link;
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextDisabled(")");
+                ImGui::TableNextColumn();
+                const sim::EntityId other = Counterpart(crime);
+                if (!other.IsValid()) {
+                    ImGui::TextDisabled("nobody");
+                } else {
+                    follow(RobotLink(Name(frame, other),
+                                     ShowRobot(frame, city, other)));
+                }
+                ImGui::TableNextColumn();
+                if (!crime.location.IsValid()) {
+                    ImGui::TextDisabled("no room");
+                } else {
+                    follow(RoomLink(city, crime.location, ""));
                 }
             }
         }
-        ImGui::EndChild();
+        ImGui::EndTable();
     }
 
-    // Rivals' members in turf now.
-    if (gang->turf.value != 0 && !gang->relations.empty()) {
-        // Collect rival gang ids.
-        std::vector<sim::EntityId> rival_ids;
-        for (const auto& rel : gang->relations) {
-            if (rel.stance == sim::Stance::Rival) {
-                rival_ids.push_back(rel.gang);
+    // Rival gangs' robots standing in the turf building now.
+    const std::vector<const RobotFrame*> intruders =
+        RivalsInTurf(frame, selection.gang);
+    ImGui::SeparatorText(
+        std::format("Rivals in its turf: {}", intruders.size()).c_str());
+    if (!intruders.empty() &&
+        ImGui::BeginTable("intruders", 2, kListFlags, ListSize(intruders.size()))) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Robot", ImGuiTableColumnFlags_WidthStretch, 2.5F);
+        ImGui::TableSetupColumn("Gang", ImGuiTableColumnFlags_WidthStretch, 1.5F);
+        ImGui::TableHeadersRow();
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(intruders.size()));
+        while (clipper.Step()) {
+            for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+                const RobotFrame& robot =
+                    *intruders[static_cast<std::size_t>(row)];
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                follow(RobotLink(Name(frame, robot.id),
+                                 ShowRobot(frame, city, robot.id)));
+                ImGui::TableNextColumn();
+                follow(GangLink(frame, robot.gang, ""));
             }
         }
-        if (!rival_ids.empty()) {
-            std::vector<const RobotFrame*> intruders;
-            for (const auto& robot : frame.robots) {
-                // Check if this robot is a member of a rival gang.
-                for (sim::EntityId rival_id : rival_ids) {
-                    if (robot.gang == rival_id) {
-                        intruders.push_back(&robot);
-                        break;
-                    }
-                }
-            }
-            std::sort(intruders.begin(), intruders.end(),
-                      [](const RobotFrame* a, const RobotFrame* b) {
-                          return a->id < b->id;
-                      });
-
-            if (!intruders.empty()) {
-                ImGui::SeparatorText("Rivals in turf");
-                const float intruderHeight =
-                    std::min(static_cast<float>(intruders.size()), 8.0F) *
-                    (ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y);
-                if (ImGui::BeginChild("intruders",
-                                      ImVec2{0.0F, intruderHeight},
-                                      ImGuiChildFlags_Borders)) {
-                    for (const auto* robot : intruders) {
-                        const std::string name = Name(frame, robot->id);
-                        Selection next = selection;
-                        next.robot = robot->id;
-                        next.room = {};
-                        if (auto link = RobotLink(name, next)) {
-                            result = link;
-                        }
-                    }
-                }
-                ImGui::EndChild();
-            }
-        }
+        ImGui::EndTable();
     }
 
     return result;

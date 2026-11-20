@@ -1,7 +1,7 @@
 # Task B: gangs
 
 Status: B1-B6 done; review fixes B7-B8 done (with leftovers, see B9e);
-gang details B9 split into B9a-B9e on 2026-11-20 (B9a done, rest open).
+gang details B9 split into B9a-B9e on 2026-11-20 (B9a-B9b done, rest open).
 Save change done (v18). Do task A first: the inspector uses its links.
 
 ## What the user asked for
@@ -299,7 +299,7 @@ Open: `app/GangLists.hpp`, `app/GangLists.cpp`,
   other robot and room are kept; the order; `RivalsInTurf` takes only
   rivals of *this* gang, only inside the turf. Commit.
 
-### - [ ] B9b. The gang page's lists (inspector)
+### - [x] B9b. The gang page's lists (inspector)
 
 Open: `app/InspectorGang.cpp`, `app/Links.*`.
 
@@ -316,6 +316,10 @@ Open: `app/InspectorGang.cpp`, `app/Links.*`.
 
 Open: `app/Inspector.cpp` (building and room pages only), `app/Links.*`,
 `app/GangLists.*` (add `MembersInRoom(frame, room)` and its test).
+
+Warning: the `inspector` module is at ~25k tokens, at its budget ceiling.
+If adding to `Inspector.cpp` pushes `ContextBudget` over, split a file
+by topic first (docs/MODULES.md, "Splitting a file").
 
 - Building page: when `TurfOf(frame, building)` answers, say "Turf of
   <GangLink>".
