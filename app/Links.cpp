@@ -18,17 +18,14 @@ std::string BuildingName(const CityView& city, sim::EntityId building) {
     return "somewhere";
 }
 
-// Every link: light blue text with the same tooltip. Returns where a click
-// leads, or nothing when the item was not clicked.
-std::optional<InspectorRequest> Link(std::string_view label) {
+// Every link: light blue text with the same tooltip. Returns whether it
+// was clicked.
+bool Link(const std::string& label) {
     ImGui::PushStyleColor(ImGuiCol_Text, kLink);
     const bool clicked = ImGui::Selectable(label.data());
     ImGui::PopStyleColor();
     ImGui::SetItemTooltip("Show in the inspector");
-    if (!clicked) {
-        return std::nullopt;
-    }
-    return InspectorRequest{};
+    return clicked;
 }
 
 }  // namespace
@@ -62,7 +59,7 @@ std::optional<InspectorRequest> RoomLink(const CityView& city, sim::EntityId roo
                                          std::string_view prefix) {
     const std::string label = std::format("{}{}##room{}", prefix,
                                           RoomLabel(city, room), room.value);
-    if (auto link = Link(label)) {
+    if (Link(label)) {
         return InspectorRequest{.selection = ShowRoom(city, room)};
     }
     return std::nullopt;
@@ -75,7 +72,7 @@ std::optional<InspectorRequest> BuildingLink(const CityView& city,
     const std::string label =
         std::format("{}{}##building{}", prefix, BuildingName(city, building),
                     building.value);
-    if (auto link = Link(label)) {
+    if (Link(label)) {
         return InspectorRequest{.selection = {.building = building, .floor = 0}};
     }
     return std::nullopt;
@@ -89,7 +86,7 @@ std::optional<InspectorRequest> OrganizationLink(const WorldFrame& frame,
         std::format("{}{}##organization{}", prefix,
                     SimulationHost::AccountName(frame, organization),
                     organization.value);
-    if (auto link = Link(label)) {
+    if (Link(label)) {
         return InspectorRequest{.selection = {.organization = organization}};
     }
     return std::nullopt;
