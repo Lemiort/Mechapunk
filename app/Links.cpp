@@ -141,9 +141,12 @@ Selection ShowRobot(const WorldFrame& frame, const CityView& city,
 std::optional<InspectorRequest> RobotLink(const std::string& name,
                                           const Selection& target,
                                           ImGuiSelectableFlags flags) {
+    // The suffix keeps same-named robots from sharing an id.
+    const std::string label =
+        std::format("{}##robot{}", name, target.robot.value);
     ImGui::PushStyleColor(ImGuiCol_Text, kLink);
     const bool clicked =
-        ImGui::Selectable(name.c_str(), false,
+        ImGui::Selectable(label.data(), false,
                           flags | ImGuiSelectableFlags_AllowDoubleClick);
     ImGui::PopStyleColor();
     ImGui::SetItemTooltip("Show in the inspector");

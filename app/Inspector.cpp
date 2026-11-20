@@ -665,9 +665,6 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
                 Selection next = selection;
                 next.robot = {};
                 next.room = {};
-                // A room or robot may still be selected together with the
-                // organization, which a 3D click sets without clearing it.
-                next.organization = {};
                 result = InspectorRequest{.selection = next};
             }
         }

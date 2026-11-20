@@ -376,14 +376,17 @@ private:
             worldClickAt_ = glfwGetTime();
             selection_.robot = pick->robot;
             selection_.room = {};
+            selection_.organization = {};
         } else if (pick->room.IsValid()) {
             selection_.room = pick->room;
             selection_.robot = {};
+            selection_.organization = {};
         } else if (pick->building != selection_.building) {
             OpenBuilding(pick->building);
         } else {
             selection_.room = {};
             selection_.robot = {};
+            selection_.organization = {};
         }
     }
 
