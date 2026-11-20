@@ -28,9 +28,13 @@ std::vector<const RobotFrame*> WorkersOf(const WorldFrame& frame,
 std::vector<const sim::Loan*> LoansFrom(const EconomyFrame& economy,
                                         sim::EntityId bank);
 
-// Look up the owner of a room from an EconomyFrame's owners map.
+// The owner of a room, or none. EconomyFrame::OwnerOf does the same but is
+// defined in SimulationHost.cpp, which the layout library does not link.
 [[nodiscard]] inline sim::EntityId OwnerOf(const EconomyFrame& economy,
                                            sim::EntityId room) {
+    if (economy.owners == nullptr) {
+        return {};
+    }
     auto it = economy.owners->find(room.value);
     return it != economy.owners->end() ? sim::EntityId{it->second} : sim::EntityId{};
 }

@@ -11,6 +11,9 @@ std::vector<OwnedRoom> RoomsOwnedBy(const EconomyFrame& economy,
                                     const sim::RoomIndex& rooms,
                                     sim::EntityId owner) {
     std::vector<OwnedRoom> result;
+    if (economy.owners == nullptr) {
+        return result;
+    }
     for (const auto& [room_id_value, room_owner] : *economy.owners) {
         if (room_owner == owner) {
             const auto ref = rooms.Find(sim::EntityId{room_id_value});
@@ -33,8 +36,12 @@ std::vector<OwnedRoom> RoomsOwnedBy(const EconomyFrame& economy,
 
 std::vector<const RobotFrame*> WorkersOf(const WorldFrame& frame, sim::EntityId employer) {
     std::vector<const RobotFrame*> workers;
+    if (frame.economy == nullptr || frame.economy->owners == nullptr || !employer.IsValid()) {
+        return workers;
+    }
+    // A robot's workspace is a room; its employer is whoever owns that room.
     for (const auto& robot : frame.robots) {
-        if (robot.workspace == employer) {
+        if (robot.workspace.IsValid() && OwnerOf(*frame.economy, robot.workspace) == employer) {
             workers.push_back(&robot);
         }
     }

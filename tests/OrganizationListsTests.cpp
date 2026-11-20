@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <limits>
+#include <unordered_set>
+
 #include "OrganizationLists.hpp"
 #include "SimulationHost.hpp"
 #include "mechapunk/sim/City.hpp"
@@ -153,76 +156,77 @@ TEST(OrganizationLists, UnknownOwnerEmpty) {
     EXPECT_TRUE(owned.empty());
 }
 
-// WorkersOf: every robot with a job is exactly one worker of its employer.
-TEST(OrganizationLists, EachRobotOneEmployer) {
+// WorkersOf: every robot with a job is listed exactly once, under the
+// organization that owns its job room, sorted by id.
+TEST(OrganizationLists, WorkersAreListedUnderTheirEmployer) {
     const sim::World world = sim::World::Generate({.seed = 3, .robots = 300});
     auto eco = MakeEconomy(world);
     auto frame = MakeWorldFrame(world, eco);
 
-    // Collect all employers and their workers.
-    std::unordered_map<std::uint64_t, std::vector<const RobotFrame*>> by_employer;
-    for (const auto& robot : frame->robots) {
-        if (!robot.workspace.value) continue;  // no workspace = unemployed or out of work.
-        const sim::EntityId employer = OwnerOf(*eco, robot.workspace);
-        EXPECT_FALSE(employer.value == 0);  // every workspace has an owner.
-        by_employer[employer.value].push_back(&robot);
-    }
-
-    // Every robot with a workspace belongs to exactly one organization.
     std::size_t employed = 0;
-    for (const auto& [org_id, workers] : by_employer) {
-        EXPECT_FALSE(workers.empty());
-        employed += workers.size();
+    for (const auto& robot : frame->robots) {
+        employed += robot.workspace.IsValid() ? 1 : 0;
     }
-    EXPECT_GT(employed, 100U);  // most of the 300 robots work.
-}
+    ASSERT_GT(employed, 100U);
 
-// WorkersOf: worker list is sorted by robot id.
-TEST(OrganizationLists, WorkersSorted) {
-    const sim::World world = sim::World::Generate({.seed = 3, .robots = 300});
-    auto eco = MakeEconomy(world);
-    auto frame = MakeWorldFrame(world, eco);
-
-    // Find any organization that has workers and check they are sorted by id.
-    bool found = false;
+    std::size_t listed = 0;
+    std::size_t employers = 0;
+    std::unordered_set<std::uint64_t> seen;
     for (const auto& org : eco->organizations) {
-        auto workers = WorkersOf(*frame, org.id);
-        if (!workers.empty()) {
-            found = true;
-            // Verify sorted order among multiple workers.
-            for (std::size_t i = 1; i < workers.size(); ++i) {
+        const auto workers = WorkersOf(*frame, org.id);
+        employers += workers.empty() ? 0 : 1;
+        for (std::size_t i = 0; i < workers.size(); ++i) {
+            EXPECT_EQ(OwnerOf(*eco, workers[i]->workspace), org.id);
+            EXPECT_TRUE(seen.insert(workers[i]->id.value).second) << "listed twice";
+            if (i > 0) {
                 EXPECT_LT(workers[i - 1]->id.value, workers[i]->id.value);
             }
-            break;
         }
+        listed += workers.size();
     }
-    if (!found) GTEST_SKIP() << "No organizations with workers in this world";
+    EXPECT_EQ(listed, employed);
+    // Industry, venue chains, City Hall (police) and the Metro Authority.
+    EXPECT_GT(employers, 3U);
 }
 
-// LoansFrom: loans are sorted by owed descending then borrower id ascending.
+// WorkersOf: an id that owns nothing, or none at all, has no workers.
+TEST(OrganizationLists, UnknownEmployerHasNoWorkers) {
+    const sim::World world = sim::World::Generate({.seed = 3, .robots = 300});
+    auto eco = MakeEconomy(world);
+    auto frame = MakeWorldFrame(world, eco);
+    EXPECT_TRUE(WorkersOf(*frame, EntityId{std::numeric_limits<std::uint64_t>::max()}).empty());
+    EXPECT_TRUE(WorkersOf(*frame, EntityId{}).empty());
+}
+
+// LoansFrom: only the bank's loans, largest debt first, then by borrower.
+// A new city has no loans yet, so the test makes its own.
 TEST(OrganizationLists, LoansSortedByDebt) {
     const sim::World world = sim::World::Generate({.seed = 3, .robots = 300});
     auto eco = MakeEconomy(world);
+    const EntityId bank{1001};
+    const EntityId other{1002};
+    eco->loans = {
+        {.id = EntityId{1}, .lender = bank, .borrower = EntityId{30}, .owed = 50},
+        {.id = EntityId{2}, .lender = other, .borrower = EntityId{31}, .owed = 900},
+        {.id = EntityId{3}, .lender = bank, .borrower = EntityId{20}, .owed = 70},
+        {.id = EntityId{4}, .lender = bank, .borrower = EntityId{10}, .owed = 50},
+    };
+    const auto loans = LoansFrom(*eco, bank);
+    ASSERT_EQ(loans.size(), 3U);
+    EXPECT_EQ(loans[0]->borrower, EntityId{20});
+    EXPECT_EQ(loans[1]->borrower, EntityId{10});
+    EXPECT_EQ(loans[2]->borrower, EntityId{30});
+}
 
-    // Find any organization that has loans and check sorting.
-    bool found = false;
-    for (const auto& org : eco->organizations) {
-        auto loans = LoansFrom(*eco, org.id);
-        if (!loans.empty()) {
-            found = true;
-            for (std::size_t i = 1; i < loans.size(); ++i) {
-                const auto& prev_owed = loans[i - 1]->owed;
-                const auto& cur_owed = loans[i]->owed;
-                if (prev_owed == cur_owed) {
-                    EXPECT_LE(loans[i - 1]->borrower.value, loans[i]->borrower.value);
-                } else {
-                    EXPECT_GT(prev_owed, cur_owed);  // larger first
-                }
-            }
-            break;
-        }
-    }
-    if (!found) GTEST_SKIP() << "No organizations with loans in this world";
+// Lists stay empty, not crash, before the first economy frame has owners.
+TEST(OrganizationLists, NoOwnersYetGivesEmptyLists) {
+    const sim::World world = sim::World::Generate({.seed = 3, .robots = 300});
+    auto eco = MakeEconomy(world);
+    eco->owners = nullptr;
+    auto frame = MakeWorldFrame(world, eco);
+    const sim::RoomIndex rooms(world.State().city);
+    EXPECT_TRUE(RoomsOwnedBy(*eco, rooms, eco->organizations.front().id).empty());
+    EXPECT_TRUE(WorkersOf(*frame, eco->organizations.front().id).empty());
 }
 
 // LoansFrom: unknown bank returns empty list.
