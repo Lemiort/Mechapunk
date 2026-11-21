@@ -458,16 +458,11 @@ void DrawCrime(const std::vector<sim::DailyStats>& history, const WorldFrame& fr
             }
             ImGui::TableHeadersRow();
 
-            // Collect gang members per gang from frame data, using RobotFrame.gang.
-            std::vector<std::int64_t> memberCounts(frame.gangs->size(), 0);
-            for (const RobotFrame& robot : frame.robots) {
-                if (robot.gang == sim::EntityId{}) continue;
-                for (std::size_t i = 0; i < frame.gangs->size(); ++i) {
-                    if ((*frame.gangs)[i].id == robot.gang) {
-                        ++memberCounts[static_cast<std::size_t>(i)];
-                    }
-                }
-            }
+            // Rows come from the tested GangLists functions (guide §9.4);
+            // the drawing only draws what they return. Rows of
+            // GangCrimes come newest first, so the walk over today's
+            // crimes can stop at the first older one.
+            const auto today = sim::StartOfDay(frame.tick);
 
             for (std::uint64_t i = 0; i < frame.gangs->size(); ++i) {
                 const sim::Gang& gang = (*frame.gangs)[static_cast<std::size_t>(i)];
@@ -491,15 +486,20 @@ void DrawCrime(const std::vector<sim::DailyStats>& history, const WorldFrame& fr
                 ImGui::TextUnformatted(colourStr.c_str());
 
                 ImGui::TableSetColumnIndex(2);
-                std::string members = std::to_string(memberCounts[static_cast<std::size_t>(i)]);
-                ImGui::TextUnformatted(members.c_str());
+                ImGui::TextUnformatted(
+                    std::to_string(MembersOf(frame, gang.id).size()).c_str());
 
-                // Robberies today by members.
+                // Robberies by this gang's members since midnight; counted
+                // by kind, as the text-prefix count went dead when B9a made
+                // `text` the bare act. Rows are newest first, so the walk
+                // stops at the first older night.
                 ImGui::TableSetColumnIndex(3);
-                std::vector<GangCrime> crimes = GangCrimes(frame, gang.id);
                 std::int64_t robberiesToday = 0;
-                for (const auto& crime : crimes) {
-                    if (crime.text.find("Robbed ") == 0) {
+                for (const GangCrime& crime : GangCrimes(frame, gang.id)) {
+                    if (crime.tick < today) {
+                        break;
+                    }
+                    if (crime.kind == CrimeKind::Robbery) {
                         ++robberiesToday;
                     }
                 }

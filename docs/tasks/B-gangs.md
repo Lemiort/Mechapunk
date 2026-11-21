@@ -1,7 +1,7 @@
 # Task B: gangs
 
 Status: B1-B6 done; review fixes B7-B8 done (with leftovers, see B9e);
-gang details B9 split into B9a-B9e on 2026-11-20 (B9a-B9c done, rest open).
+gang details B9 split into B9a-B9e on 2026-11-20 (B9a-B9d done, rest open).
 Save change done (v18). Do task A first: the inspector uses its links.
 
 ## What the user asked for
@@ -333,7 +333,7 @@ module holds `GangLists`), leaving `inspector` at ~21k.
 - No new tests: pure drawing over frame data already covered; `ContextBudget`
   must pass with the new module row.
 
-### - [ ] B9d. The Crime tab counts (statistics)
+### - [x] B9d. The Crime tab counts (statistics)
 
 Open: `app/Statistics.cpp` (`DrawCrime`).
 
@@ -365,6 +365,6 @@ loop), `tests/GangTests.cpp`. Each fix comes with a test.
 
 - [ ] Gangs exist in new and old cities, members join and leave, rob, get
   arrested and fight; money adds up over 40 days at 10000 robots.
-- [ ] Save version 18 with migration, fixture and tests.
+- [x] Save version 18 with migration, fixture and tests.
 - [ ] Crime tab, gang page, gang colours in the city.
 - [ ] The guide's task table marks B done.
