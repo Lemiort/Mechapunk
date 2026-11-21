@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "CityView.hpp"
 #include "Inspector.hpp"
 #include "SimulationHost.hpp"
 #include "mechapunk/sim/Ids.hpp"
@@ -19,6 +20,7 @@ struct StatisticsView {
 // all accounts adds up. Owners' names are clickable: the result selects
 // that robot.
 [[nodiscard]] std::optional<InspectorRequest> DrawStatistics(StatisticsView& view,
-                                                             const WorldFrame& frame);
+                                                              const WorldFrame& frame,
+                                                              const CityView& city);
 
 }  // namespace mechapunk

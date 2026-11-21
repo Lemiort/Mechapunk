@@ -177,7 +177,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v17-city.json";
+        kFixtureDirectory / "saves" / "v18-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -676,3 +676,34 @@ TEST(Save, Version16FixtureMigratesAndRuns) {
     world->RunFor(sim::kMinutesPerDay);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }
+
+// A version 17 save predates gangs: every robot's gang is zero, arrests are
+// zero, and crime counters start at zero; the city keeps running and grows
+// gangs at its first midnight.
+TEST(Save, Version17FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v17-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    for (const sim::Robot& robot : state->robots) {
+        EXPECT_EQ(robot.gang.value, 0U) << robot.name;
+        EXPECT_EQ(robot.arrests, 0U) << robot.name;
+    }
+    EXPECT_TRUE(state->gangs.empty());
+    EXPECT_EQ(state->today.robberies, 0);
+    for (const auto& day : state->history) {
+        EXPECT_EQ(day.counted.robberies, 0);
+        EXPECT_EQ(day.gangMembers, 0);
+    }
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+    // The save had no gangs and grew some at its first midnight, from its own
+    // seed; Gangs.OldSaveGrowsGangsAtMidnight checks what they look like.
+    EXPECT_FALSE(world->State().gangs.empty());
+}
+

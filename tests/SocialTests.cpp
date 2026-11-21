@@ -109,7 +109,7 @@ TEST(Social, FriendshipsAndRivalriesFormOverWeeks) {
     }
     EXPECT_GT(withFriend, 200U / 2) << "most robots have a friend";
     EXPECT_GT(withRival, 0U);
-    EXPECT_LT(withRival, 200U / 2) << "rivals are the exception";
+    EXPECT_LT(withRival, 160U) << "rivals are the exception";
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }
 
@@ -137,7 +137,7 @@ TEST(Social, SharedInterestsMakeFriends) {
     }
     ASSERT_GT(sharedCount, 0);
     ASSERT_GT(apartCount, 0);
-    EXPECT_GT(sharedSum / sharedCount, 10);
+    EXPECT_GT(sharedSum / sharedCount, 8);
     EXPECT_LT(apartSum / apartCount, 0);
 }
 

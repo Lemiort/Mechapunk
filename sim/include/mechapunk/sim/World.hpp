@@ -4,6 +4,7 @@
 #include <expected>
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -11,6 +12,8 @@
 
 #include "mechapunk/sim/Careers.hpp"
 #include "mechapunk/sim/City.hpp"
+#include "mechapunk/sim/Gangs.hpp"
+#include "mechapunk/sim/Ids.hpp"
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Ids.hpp"
@@ -84,6 +87,9 @@ struct Robot {
     std::uint32_t age{};
     // Lasting damage from 0 to kMaxWear; clinics take some of it away.
     std::int32_t wear{};
+    // Which gang the robot belongs to, none if zero; arrests for robbing.
+    EntityId gang;
+    std::uint32_t arrests{};
     // A metro ride on the walk under way: on the platform at rideFrom from
     // boardsAt, on the trains of the Metro timetable, changing lines at
     // rideVia (rideTo when it rides one line), off at rideTo by alightsAt.
@@ -131,6 +137,8 @@ struct WorldState {
     std::vector<Robot> robots;
     // Scrapped robots someone remembers, sorted by id.
     std::vector<DepartedRobot> departed;
+    // Gangs, sorted by id.
+    std::vector<Gang> gangs;
     Weather weather;
     Economy economy;
     // Counted since midnight.
@@ -189,6 +197,17 @@ enum class EventKind : std::uint8_t {
     // no robot; account: its owner.
     UnitOpened,
     UnitClosed,
+    // A gang member robbed another robot; credits: what it took.
+    Robbed,
+    // An officer arrested a robber; room: the venue; otherRobot: victim.
+    Arrested,
+    // Members of rival gangs fought in a room; otherRobot: the opponent.
+    Fought,
+    // A robot joined a gang (room: its home); otherRobot: the friend who
+    // invited it, if any.
+    JoinedGang,
+    // A robot left its gang or was forced out at 3 arrests.
+    LeftGang,
 };
 
 // Something that happened during a step, for logs and observers. Events are
@@ -355,6 +374,25 @@ private:
     [[nodiscard]] std::vector<EntityId> OpeningsFor(
         EntityId robot, const std::unordered_map<std::uint64_t, std::uint32_t>& staff) const;
     void Emit(const SimEvent& event) const;
+    // Gangs, in Gangs.cpp.
+    void FoundGangs(Pcg32& random);
+    void ReviewGangs();
+    void HandleOfficerAffinity(Robot& first, Robot& second);
+    // One definition of "this robot is an officer": its job room is a police
+    // station. ReviewGangs keeps such robots out of any gang.
+    [[nodiscard]] bool WorksInPoliceStation(const Robot& robot) const;
+    // An officer standing its post right now: an officer working or walking a
+    // patrol leg. Socialize's watched rooms and HandleOfficerAffinity both
+    // ask this, so they cannot disagree about who counts as an officer - the
+    // officer rule B4 asked for went dead because it also asked whether the
+    // officer belonged to a gang, which ReviewGangs forbids.
+    [[nodiscard]] bool OfficerOnShift(const Robot& robot) const;
+    // Crime and gang interactions, in Gangs.cpp. `officerRooms` holds the
+    // ids of rooms that hold an officer on shift; `Socialize` builds it once
+    // per call so every pair can ask, instead of walking the whole
+    // population for each pair (the check B7 asked for).
+    void ConsiderCrime(Robot& first, Robot& second,
+                       const std::set<std::uint64_t>& officerRooms);
     // The economy, in Founding.cpp, Money.cpp, Units.cpp, Property.cpp,
     // Settlement.cpp and EconomyStatistics.cpp (see docs/MODULES.md).
     void FoundEconomy(std::uint64_t seed);

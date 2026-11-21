@@ -225,6 +225,57 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
     if (auto economy = ValidateEconomy(state); !economy) {
         return economy;
     }
+    // Gangs sorted by unique id, relations sorted and valid.
+    auto& gangs = state.gangs;
+    for (std::size_t i = 0; i < gangs.size(); ++i) {
+        if (!gangs[i].id.IsValid() ||
+            (i > 0 && gangs[i].id <= gangs[i - 1].id)) {
+            return fail(std::format("Gang '{}' has an invalid or repeated id",
+                                    gangs[i].name));
+        }
+    }
+    // Gang relations: sorted, no self-reference, point to existing gangs.
+    for (const Gang& gang : gangs) {
+        if (!gang.relations.empty()) {
+            for (std::size_t j = 1; j < gang.relations.size(); ++j) {
+                if (gang.relations[j].gang <= gang.relations[j - 1].gang) {
+                    return fail(std::format(
+                        "Gang '{}' has unordered relations", gang.name));
+                }
+            }
+        }
+        for (const GangRelation& rel : gang.relations) {
+            if (rel.gang == gang.id || !std::any_of(gangs.begin(), gangs.end(),
+                    [&](const Gang& each) { return each.id == rel.gang; })) {
+                return fail(std::format(
+                    "Gang '{}' has an invalid relation to {}",
+                    gang.name, rel.gang.value));
+            }
+        }
+    }
+    // Robots' gangs exist; gang turfs are habitat buildings or none.
+    for (const Robot& robot : state.robots) {
+        if (robot.gang.IsValid() && !std::any_of(gangs.begin(), gangs.end(),
+                [&](const Gang& each) { return each.id == robot.gang; })) {
+            return fail(std::format("Robot '{}' references a missing gang {}",
+                                    robot.name, robot.gang.value));
+        }
+    }
+    for (const Gang& gang : gangs) {
+        if (gang.turf.IsValid()) {
+            bool found = false;
+            for (const Building& building : state.city.buildings) {
+                if (building.id == gang.turf && building.kind == BuildingKind::Habitat) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return fail(std::format("Gang '{}' turf is not a habitat",
+                                        gang.name));
+            }
+        }
+    }
     return ValidateSocial(state);
 }
 

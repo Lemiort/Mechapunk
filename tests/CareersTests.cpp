@@ -302,6 +302,12 @@ TEST(Careers, SaversMoveUp) {
     const sim::EntityId id = robot.id;
     const sim::EntityId home = robot.apartment;
 
+    // Disable gangs so robbery doesn't drain the saver's credits.
+    state.gangs.clear();
+    for (sim::Robot& r : state.robots) {
+        r.gang = sim::EntityId{0};
+    }
+
     sim::World world = Load(std::move(state));
     for (int day = 0; day < 40 && world.FindRobot(id)->apartment == home; ++day) {
         world.RunFor(sim::kMinutesPerDay);

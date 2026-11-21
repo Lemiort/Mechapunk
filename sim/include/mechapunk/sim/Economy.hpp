@@ -138,6 +138,13 @@ struct DayCounters {
     std::int64_t arrivals{};
     std::int64_t scrapped{};
     std::int64_t badParts{};
+    // Gangs and crime.
+    std::int64_t robberies{};
+    std::int64_t robbedCredits{};
+    std::int64_t arrests{};
+    std::int64_t fights{};
+    std::int64_t joinedGangs{};
+    std::int64_t leftGangs{};
 };
 
 // The state of the city at the end of a day: how robots live and how the
@@ -204,6 +211,8 @@ struct DailyStats {
     std::int64_t venuePricePercent{};
     std::int64_t openVenues{};
     std::int64_t emptyUnits{};
+    // Gangs and crime statistics.
+    std::int64_t gangMembers{};
 };
 
 // The central bank's rate, in units of 1/10000 a night: it starts here and

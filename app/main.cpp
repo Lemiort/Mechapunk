@@ -419,13 +419,18 @@ private:
     // Applies a selection chosen in the inspector, moving the camera to the
     // building and floor it shows. An organization alone is selected in place:
     // it keeps the open building, floor and camera, so the city view does not
-    // jump; any concrete object clears it.
+    // jump; any concrete object clears it. The gang page is kept or cleared
+    // the same way: a gang link names its turf to move the camera, and the
+    // gang goes with it so the page does not turn into the building's.
     void ApplySelection(const Selection& next) {
         if (next.organization.IsValid() && !next.robot.IsValid() &&
             !next.room.IsValid() && !next.building.IsValid()) {
             selection_.organization = next.organization;
             selection_.robot = {};
             selection_.room = {};
+            // A page selected in place names no gang, so the gang page is
+            // no longer what the player is looking at.
+            selection_.gang = {};
             return;
         }
         if (!next.building.IsValid()) {
@@ -441,6 +446,10 @@ private:
         selection_.room = next.room;
         selection_.robot = next.robot;
         selection_.organization = {};
+        // OpenBuilding replaced the whole selection, so the gang has to be
+        // put back: a gang link names its turf to move the camera and the
+        // gang to choose the page, and both must survive.
+        selection_.gang = next.gang;
         camera_.FocusTarget(
             city_.FloorCenter(selection_.building, selection_.floor));
     }
@@ -498,7 +507,7 @@ private:
             cityVersion_ = frame->cityVersion;
         }
         if (frame != nullptr) {
-            if (const auto picked = DrawStatistics(statistics_, *frame)) {
+            if (const auto picked = DrawStatistics(statistics_, *frame, city_)) {
                 ApplySelection(picked->selection);
                 jumpTo_ = picked->selection.robot;
             }

@@ -3,11 +3,23 @@
 #include <format>
 #include <unordered_map>
 
+#include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 namespace mechapunk {
 
 namespace {
+
+// Gang colour as an ImVec4.
+inline ImVec4 GangColour(std::uint32_t colour) {
+    std::uint8_t r = (colour >> 16U) & 0xFF;
+    std::uint8_t g = (colour >> 8U) & 0xFF;
+    std::uint8_t b = colour & 0xFF;
+    return ImVec4{static_cast<float>(r) / 255.0F,
+                  static_cast<float>(g) / 255.0F,
+                  static_cast<float>(b) / 255.0F,
+                  1.0F};
+}
 
 // The colour of every clickable name, so the player sees what is a link.
 constexpr ImVec4 kLink{0.4F, 0.7F, 1.0F, 1.0F};
@@ -190,6 +202,63 @@ std::optional<InspectorRequest> RobotLink(const std::string& name,
     return InspectorRequest{
         .selection = target,
         .jumpToRobot = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)};
+}
+
+// A gang's colour as a square with an id that survives being drawn twice:
+// the same way a link's id does, by counting this window's earlier squares
+// for that gang. Windows that need the colour on their own (the Crime tab's
+// colour column, next to a hex code and no name) call this instead of
+// ImGui::ColorButton, because a ColorButton("##swatch") inside a PushID of
+// the gang id clashes with the square `GangLink` draws for the same gang
+// in the same frame, and ImGui then treats the two squares as one widget.
+void GangSwatch(std::string_view what, const ImVec4& colour, ImVec2 size) {
+    ImGui::PushID(RepeatOf(std::format("swatch {}", what)));
+    ImGui::ColorButton("##swatch", colour, ImGuiColorEditFlags_NoTooltip, size);
+    ImGui::PopID();
+}
+
+// A gang's name with a colour swatch; clicking it shows the gang page.
+std::optional<InspectorRequest> GangLink(const WorldFrame& frame,
+                                         sim::EntityId gang,
+                                         std::string_view prefix) {
+    if (frame.gangs == nullptr) {
+        ImGui::TextDisabled("%.*s%s", static_cast<int>(prefix.size()),
+                            prefix.data(), "unknown gang");
+        return std::nullopt;
+    }
+
+    // Look up the gang.
+    const sim::Gang* found = nullptr;
+    for (const auto& g : *frame.gangs) {
+        if (g.id == gang) {
+            found = &g;
+            break;
+        }
+    }
+    if (!found) {
+        ImGui::TextDisabled("%.*s%s", static_cast<int>(prefix.size()), prefix.data(),
+                            "unknown gang");
+        return std::nullopt;
+    }
+
+    // A colour square, then the name as a link. Both ids count how many times
+    // this frame already drew that gang, so a gang shown twice (its own row
+    // and another gang's relations) gets two squares and two links instead of
+    // one id twice. The label ends in "##gang<id>", like every other link.
+    GangSwatch(std::format("gang##{}", gang.value), GangColour(found->color));
+    ImGui::SameLine();
+    if (Link(std::format("{}{}##gang{}", prefix, found->name, gang.value))) {
+        // The gang's page, and its turf building opened and looked at, so
+        // clicking a gang somewhere shows the place it owns. A gang with no
+        // turf only selects the page, and the camera stays where it is.
+        Selection next{.gang = gang};
+        if (found->turf.IsValid()) {
+            next.building = found->turf;
+            next.floor = 0;
+        }
+        return InspectorRequest{.selection = next};
+    }
+    return std::nullopt;
 }
 
 }  // namespace mechapunk

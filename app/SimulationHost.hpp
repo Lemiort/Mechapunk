@@ -15,6 +15,7 @@
 #include "SimulationThread.hpp"
 #include "SnapshotBuffer.hpp"
 #include "mechapunk/sim/City.hpp"
+#include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace mechapunk {
@@ -54,9 +55,10 @@ struct RobotFrame {
     std::uint32_t rideTo{};
     sim::Tick boardsAt{};
     sim::Tick alightsAt{};
+    std::uint32_t gangColor{};  // 0 if no gang; shared by frames until population changes.
+    sim::EntityId gang;  // Gang the robot belongs to, none if zero.
+    std::uint32_t arrests{};
 };
-
-// What does not change about a robot while it lives.
 struct RobotInfo {
     std::string name;
     std::uint8_t daysOff{};
@@ -113,6 +115,8 @@ struct WorldFrame {
     // changes; cityVersion counts those changes since the world was loaded.
     std::uint64_t cityVersion{};
     std::shared_ptr<const sim::City> city;
+    // Gangs, published alongside economy data every ten minutes.
+    std::shared_ptr<const std::vector<sim::Gang>> gangs;
 };
 
 // Runs a World on a SimulationThread. The world belongs to the worker while
@@ -187,6 +191,7 @@ private:
     std::uint64_t directoryVersion_{};
     std::shared_ptr<const EconomyFrame> economy_;
     std::shared_ptr<const std::vector<sim::DailyStats>> history_;
+    std::shared_ptr<const std::vector<sim::Gang>> gangs_;
     std::shared_ptr<const std::unordered_map<std::uint64_t, sim::EntityId>> owners_;
     sim::Tick economyDay_{};
     std::shared_ptr<const sim::City> cityFrame_;

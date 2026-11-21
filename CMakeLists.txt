@@ -20,6 +20,7 @@ target_link_libraries(mechapunk-sim PRIVATE mechapunk::sim)
 
 # Floor plans and prop models: geometry only, shared by the game and tests.
 add_library(mechapunk_layout STATIC
+    app/GangLists.cpp
     app/Interior.cpp
     app/InteriorHomes.cpp
     app/InteriorStores.cpp
@@ -43,6 +44,7 @@ add_executable(mechapunk
     app/CityStatic.cpp
     app/GameRenderer.cpp
     app/Inspector.cpp
+    app/InspectorGang.cpp
     app/InspectorOrganization.cpp
     app/Links.cpp
     app/Statistics.cpp

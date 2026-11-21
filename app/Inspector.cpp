@@ -1,6 +1,7 @@
 #include "Inspector.hpp"
 #include "Links.hpp"
 #include "InspectorInternal.hpp"
+#include "GangLists.hpp"
 
 #include <imgui.h>
 
@@ -391,6 +392,25 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
         }
     }
 
+    // Gang membership.
+    if (frame.gangs != nullptr && robot.gang.IsValid()) {
+        const sim::Gang* gang = nullptr;
+        for (const sim::Gang& g : *frame.gangs) {
+            if (g.id == robot.gang) {
+                gang = &g;
+                break;
+            }
+        }
+        if (gang) {
+            ImGui::SeparatorText("Gang");
+            follow(GangLink(frame, gang->id, ""));
+        }
+    }
+    if (robot.arrests > 0) {
+        // Once, on its own line; robots that left their gang still see it.
+        ImGui::Text("Arrests: %u", robot.arrests);
+    }
+
     if (const RobotInfo* info = SimulationHost::FindRobotInfo(frame, robot.id)) {
         ImGui::SeparatorText("Home and work");
         follow(RoomLink(city, robot.apartment, "Home: "));
@@ -515,12 +535,13 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
                        ImVec2{-1.0F, 0.0F}, occupancy.c_str());
 
     if (count > 0 &&
-        ImGui::BeginTable("occupants", 2,
+        ImGui::BeginTable("occupants", 3,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
                               ImGuiTableFlags_ScrollY)) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Robot");
         ImGui::TableSetupColumn("Until", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("Gang", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableHeadersRow();
         for (const RobotFrame* robot : inside->second) {
             ImGui::PushID(static_cast<int>(robot->id.value));
@@ -536,6 +557,15 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
             }
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(Clock(robot->nextActionAt).c_str());
+            // A gang member present in this room, named by its gang's link.
+            ImGui::TableNextColumn();
+            if (robot->gang.IsValid()) {
+                if (auto link = GangLink(frame, robot->gang, "")) {
+                    result = link;
+                }
+            } else {
+                ImGui::TextDisabled("-");
+            }
             ImGui::PopID();
         }
         ImGui::EndTable();
@@ -599,6 +629,15 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
         ImGui::Unindent();
     }
 
+    // A building a gang has claimed as its turf.
+    if (const auto turfGang = TurfOf(frame, selection.building); turfGang != std::nullopt) {
+        ImGui::TextUnformatted("Turf of");
+        ImGui::SameLine();
+        if (auto link = GangLink(frame, *turfGang, "")) {
+            result = *link;
+        }
+    }
+
     const auto occupants = Occupants(frame);
     if (ImGui::BeginTable("rooms", 3,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
@@ -656,8 +695,12 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
                                               const CityView& city,
                                               const SimulationHost& host,
                                               bool& following) {
+    // Nothing selected at all: no window. A gang alone is a page, even with
+    // no building open, which is how a gang clicked in the Statistics window
+    // opens one.
     if (!selection.organization.IsValid() && !selection.building.IsValid() &&
-        !selection.robot.IsValid() && !selection.room.IsValid()) {
+        !selection.robot.IsValid() && !selection.room.IsValid() &&
+        !selection.gang.IsValid()) {
         return std::nullopt;
     }
     const ImGuiViewport& viewport = *ImGui::GetMainViewport();
@@ -691,6 +734,8 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
             clicked = DrawRoom(selection, frame, city, host);
         } else if (selection.organization.IsValid()) {
             clicked = DrawOrganization(selection, frame, city);
+        } else if (selection.gang.IsValid()) {
+            clicked = DrawGangPage(selection, frame, city);
         } else {
             clicked = DrawBuilding(selection, frame, city, host);
         }

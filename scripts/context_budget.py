@@ -62,11 +62,14 @@ MODULES = {
     "rendering": ["app/GameRenderer.hpp", "app/GameRenderer.cpp", "app/Props.hpp",
                   "app/Props.cpp", "app/Rain.hpp", "app/Rain.cpp", "app/OrbitCamera.hpp"],
     "ui": ["app/main.cpp", "app/SimulationHost.hpp", "app/SimulationHost.cpp"],
+    "organization-lists": ["app/OrganizationLists.hpp", "app/OrganizationLists.cpp",
+                           "tests/OrganizationListsTests.cpp"],
     "inspector": ["app/Inspector.hpp", "app/Inspector.cpp", "app/Links.hpp",
-                  "app/Links.cpp", "app/OrganizationLists.hpp", "app/OrganizationLists.cpp",
-                  "tests/OrganizationListsTests.cpp",
-                  "app/InspectorInternal.hpp",
-                  "app/InspectorOrganization.cpp"],
+                  "app/Links.cpp", "app/InspectorInternal.hpp",
+                  "app/InspectorOrganization.cpp", "app/InspectorGang.cpp"],
+    "gangs": [I + "Gangs.hpp", "sim/src/Gangs.cpp", "tests/GangRosterTests.cpp",
+              "tests/GangCrimeTests.cpp", "app/GangLists.hpp", "app/GangLists.cpp",
+              "tests/GangListsTests.cpp"],
 }
 SOURCE_DIRS = ["sim", "app", "tests", "tools"]
 

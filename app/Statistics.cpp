@@ -13,10 +13,14 @@
 #include <string>
 #include <vector>
 
+#include "GangLists.hpp"
 #include "Links.hpp"
 
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/GameTime.hpp"
+#include "mechapunk/sim/Gangs.hpp"
+
+#include "SimulationHost.hpp"
 
 namespace mechapunk {
 
@@ -417,9 +421,136 @@ void DrawCentralBank(const WorldFrame& frame, const std::vector<sim::DailyStats>
         ImGui::EndTable();
     }
 }
+
+// Draws the Crime tab. Links in it report what the player clicked through
+// `request`, as the Central bank tab does: a link only returns on the frame
+// it is clicked, so a drawing function that drops that value has links the
+// player can hover and never use.
+void DrawCrime(const std::vector<sim::DailyStats>& history, const WorldFrame& frame,
+               const CityView& city, std::optional<InspectorRequest>* request) {
+    // One click per frame is all a player can ask for; the last link clicked
+    // wins, as it does on the gang page.
+    const auto follow = [&](const std::optional<InspectorRequest>& link) {
+        if (link) {
+            *request = *link;
+        }
+    };
+    if (history.empty()) {
+        ImGui::TextDisabled("Statistics start at the end of the first day.");
+        return;
+    }
+    const sim::DailyStats& day = history.back();
+    const sim::DayCounters& counted = day.counted;
+
+    ImGui::SeparatorText("Crime");
+    if (BeginFacts("crime")) {
+        Row("Robberies", std::format("{} ({} cr)", counted.robberies, Credits(counted.robbedCredits)));
+        Row("Arrests", std::format("{}", counted.arrests));
+        Row("Gang fights", std::format("{}", counted.fights));
+        Row("Robots in gangs today", std::to_string(day.gangMembers));
+        ImGui::EndTable();
+    }
+
+    PlotCount("Robberies", history, [](const auto& d) { return d.counted.robberies; });
+    PlotCredits("Stolen credits", history,
+                [](const auto& d) { return d.counted.robbedCredits; });
+    PlotCount("Arrests", history, [](const auto& d) { return d.counted.arrests; });
+    PlotCount("Gang fights", history, [](const auto& d) { return d.counted.fights; });
+
+    ImGui::SeparatorText("Gangs");
+    if (frame.gangs == nullptr || frame.gangs->empty()) {
+        ImGui::TextDisabled("No gangs yet.");
+    } else {
+        constexpr ImGuiTableFlags kFlags =
+            ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV;
+
+        // The gang table below reads every gang once per frame through the
+        // tested GangLists functions (guide §9.4): `members` gives the Members
+        // column and `robberiesToday` the Robberies column, how many of this
+        // night's crimes its members remember as robberies. Rows of GangCrimes
+        // come newest first, so the walk stops at the first crime before this
+        // midnight; `frame.gangs` is sorted by id, so a row keeps its place
+        // between frames and the player can click the same gang twice.
+        const auto today = sim::StartOfDay(frame.tick);
+        std::vector<std::vector<const RobotFrame*>> members;
+        std::vector<std::uint32_t> robberiesToday;
+        for (const sim::Gang& gang : *frame.gangs) {
+            members.push_back(MembersOf(frame, gang.id));
+            std::uint32_t robberies = 0;
+            for (const GangCrime& crime : GangCrimes(frame, gang.id)) {
+                if (crime.tick < today) {
+                    break;
+                }
+                if (crime.kind == CrimeKind::Robbery) {
+                    ++robberies;
+                }
+            }
+            robberiesToday.push_back(robberies);
+        }
+
+        if (ImGui::BeginTable("gangs", 5, kFlags, ImVec2{0.0F, 350.0F})) {
+            for (const char* column :
+                {"Gang", "Colour", "Members", "Robberies", "Turf"}) {
+                ImGui::TableSetupColumn(column, ImGuiTableColumnFlags_WidthStretch, 0.8F);
+            }
+            ImGui::TableHeadersRow();
+
+            for (std::size_t index = 0; index < frame.gangs->size(); ++index) {
+                const sim::Gang& gang = (*frame.gangs)[index];
+                ImGui::TableNextRow();
+                // Gang name and colour as a link: opens the gang's page.
+                ImGui::TableSetColumnIndex(0);
+                follow(GangLink(frame, gang.id, ""));
+
+                // Colour again as a square with its hex code. GangSwatch
+                // counts how often this frame drew this gang's square, so the
+                // one here and the one in front of the name stay two widgets.
+                ImGui::TableSetColumnIndex(1);
+                const ImVec4 gangColour{static_cast<float>((gang.color >> 16) & 0xFF) / 255.0F,
+                                        static_cast<float>((gang.color >> 8) & 0xFF) / 255.0F,
+                                        static_cast<float>(gang.color & 0xFF) / 255.0F,
+                                        1.0F};
+                GangSwatch(std::format("gang##{}", gang.id.value), gangColour,
+                           ImVec2{24.0F, 16.0F});
+                ImGui::SameLine();
+                std::string colourStr = std::format("#{:06X}", gang.color);
+                ImGui::TextUnformatted(colourStr.c_str());
+
+                ImGui::TableSetColumnIndex(2);
+                ImGui::TextUnformatted(std::to_string(members[index].size()).c_str());
+
+                // Robberies by this gang's members since midnight; counted
+                // by kind, as the text-prefix count went dead when B9a made
+                // `text` the bare act.
+                ImGui::TableSetColumnIndex(3);
+                ImGui::TextUnformatted(std::to_string(robberiesToday[index]).c_str());
+
+                // Turf. The members, relations and crimes a gang holds are
+                // lists of things, not a figure per gang, so they left this
+                // tab for the gang's own page, which its name in column 0
+                // opens.
+                ImGui::TableSetColumnIndex(4);
+                if (gang.turf.value != 0) {
+                    follow(BuildingLink(city, gang.turf, ""));
+                } else {
+                    ImGui::TextDisabled("no turf");
+                }
+            }
+            ImGui::EndTable();
+        }
+
+        // What a gang holds - its members, its relations, the crimes its
+        // members remember, the rivals standing on its turf - is on the gang's
+        // own page in the inspector, and the name in the table above opens it.
+        ImGui::TextDisabled(
+            "Click a gang's name for its members, relations and crimes.");
+    }
+}
+
 }  // namespace
 
-std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const WorldFrame& frame) {
+std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const WorldFrame& frame,
+                                               const CityView& city) {
     if (!view.open || frame.economy == nullptr) {
         return std::nullopt;
     }
@@ -454,6 +585,10 @@ std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const World
             }
             if (ImGui::BeginTabItem("Central bank")) {
                 DrawCentralBank(frame, history, &request);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Crime")) {
+                DrawCrime(history, frame, city, &request);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

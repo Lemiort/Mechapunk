@@ -334,6 +334,10 @@ void PrintSummary(std::uint64_t day, const sim::World& world,
             counted.movedInTogether, day.supplyPercent, day.averageRent[0], day.averageRent[1],
             day.averageRent[2], day.averageRent[3], day.averageRent[4], day.venuePricePercent,
             day.openVenues, counted.venuesOpened, counted.venuesClosed, day.emptyUnits);
+        std::println(
+            "   crime: {} robberies ({} cr stolen), {} arrests, {} gang fights; {} in gangs",
+            counted.robberies, counted.robbedCredits, counted.arrests, counted.fights,
+            day.gangMembers);
     }
 }
 

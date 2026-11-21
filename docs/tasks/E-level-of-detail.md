@@ -12,3 +12,7 @@ Status: optional. Not urgent: 10000 robots take about 1.5 s per simulated day.
 - [ ] E3. Cache `TravelMinutes` per building pair (an unsaved cache).
 - [ ] E4. Saves are about 40 MB: store `history` and `emissions` more
   compactly (save change, rule 3).
+
+No details step: level of detail adds nothing new to inspect. If E2 changes
+how often needs update, the robot page must still show needs that move
+smoothly (interpolate between updates in the view if they jump).

@@ -126,6 +126,15 @@ std::string World::Describe(const SimEvent& event) const {
         case EventKind::UnitClosed:
             return std::format("{}  A unit closed: {} stands empty", when,
                                DescribeRoom(event.room));
+        case EventKind::Robbed:
+            return std::format("{}  {} robbed {} (took {}) at {}", when, who,
+                               NameOf(event.otherRobot), event.credits,
+                               DescribeRoom(event.room));
+        case EventKind::Arrested:
+            return std::format("{}  An officer arrested {} for robbing", when, who);
+        case EventKind::Fought:
+            return std::format("{}  Members of rival gangs fought at {}", when,
+                               DescribeRoom(event.room));
         case EventKind::WeatherChanged:
             return event.change == 0
                        ? std::format("{}  The rain stopped", when)

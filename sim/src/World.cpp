@@ -124,6 +124,7 @@ void World::Step() {
         AgeRobots();
         ReviewHomes();
         ReviewJobs();
+        ReviewGangs();
         FadeBonds();
     }
     if (state_.tick % kNeedPeriod == 0) {

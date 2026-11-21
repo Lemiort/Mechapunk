@@ -22,7 +22,9 @@ every fixture, so old saves keep working as the format evolves.
 | `v15-city.json` | 15     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v15-city.json` (game 0.15.0) |
 | `v16-city.json` | 16     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v16-city.json` (game 0.16.0) |
 | `v17-city.json` | 17     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v17-city.json` (game 0.17.0) |
+| `v18-city.json` | 18     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v18-city.json` (game 0.18.0) |
 
+All other fixtures stop at the same moment as the older ones: Day 20 Sat 16:50.
 `v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
 working. `v2-city.json` stops at Day 2 19:00, with robots resting, walking,
 working and out at venues. `v3-city.json` stops on Saturday (Day 6) at 19:00,

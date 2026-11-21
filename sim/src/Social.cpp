@@ -14,6 +14,7 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -214,11 +215,34 @@ std::string MemoryText(MemoryKind kind, std::string_view other,
             return std::format("inherited everything {} had", other);
         case MemoryKind::MovedInTogether:
             return at(std::format("moved in with {}", other), "to");
+        case MemoryKind::JoinedGang:
+            return std::format("joined a gang");
+        case MemoryKind::LeftGang:
+            return "left the gang";
+        case MemoryKind::WasRobbed:
+            return std::format("was robbed by {}", other);
+        case MemoryKind::RobbedSomeone:
+            return place.empty() ? std::string{"robbed someone"}
+                                 : std::format("robbed someone at {}", place);
+        case MemoryKind::Arrested:
+            return std::format("arrested for robbing");
     }
     return "remembered something";
 }
 
 void World::Socialize() {
+    // The rooms that hold an officer on shift right now, through World::Officer
+    // -OnShift: the same definition HandleOfficerAffinity uses, so a watched
+    // room and the officer in it cannot be decided two different ways. Built
+    // once per call so ConsiderCrime can look a room up instead of walking
+    // every robot for every pair (B7's speed item).
+    std::set<std::uint64_t> officerRooms;
+    for (const Robot& robot : state_.robots) {
+        if (OfficerOnShift(robot)) {
+            officerRooms.insert(robot.location.value);
+        }
+    }
+
     // Robots sharing a room, in id order within each room and rooms in id
     // order, so random draws happen in a fixed order.
     std::map<std::uint64_t, std::vector<std::size_t>> rooms;
@@ -273,6 +297,7 @@ void World::Socialize() {
             busy[self] = true;
             busy[slot] = true;
             Talk(robot, state_.robots[present[slot]]);
+            ConsiderCrime(robot, state_.robots[present[slot]], officerRooms);
         }
     }
 }
@@ -381,6 +406,9 @@ void World::Remember(Robot& robot, MemoryKind kind, EntityId other,
         case MemoryKind::BecameFriends: ++today.newFriendships; break;
         case MemoryKind::BecameRivals: ++today.newRivalries; break;
         case MemoryKind::GotBadPart: ++today.badParts; break;
+        case MemoryKind::WasRobbed: break;   // counted in ConsiderCrime when robbery happens.
+        case MemoryKind::RobbedSomeone: break;  // counted when robbery happens.
+        case MemoryKind::Arrested: break;    // counted in ConsiderCrime when arrest happens.
         default: break;
     }
     robot.memories.push_back(

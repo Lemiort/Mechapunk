@@ -276,6 +276,7 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
         };
         for (std::size_t index = 0; index < inside->second.size(); ++index) {
             const sim::EntityId robot = inside->second[index];
+            const RobotFrame* robotFrame = SimulationHost::FindRobot(frame, robot);
             if (const auto walking = homeWalk(robot)) {
                 const bool selected = robot == selection.robot;
                 const auto [origin, direction] = *walking;
@@ -283,7 +284,7 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
                     static_cast<float>(renderTick * 75.0 / 0.75) * std::numbers::pi_v<float>;
                 SubmitModel(queue,
                             RobotFigure(Pose::Walking, phase,
-                                        selected ? kSelected : Accent(robot)),
+                                        selected ? kSelected : Accent(robot, robotFrame ? robotFrame->gangColor : 0)),
                             origin, glm::degrees(std::atan2(direction.x, direction.z)),
                             0.0F, vec3(1.0F), kS);
                 robotMarkers_.push_back({.id = robot,
@@ -291,7 +292,6 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
                                          .radius = 0.6F * kS});
                 continue;
             }
-            const RobotFrame* robotFrame = SimulationHost::FindRobot(frame, robot);
             const bool working = robotFrame != nullptr && robotFrame->workspace == room.room;
             const Spot& spot = room.spots.at(SpotFor(robot, room.room, room.home,
                                                      room.spots.size(), renderTick,
@@ -301,7 +301,7 @@ void CityView::SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
             const vec3 origin = ToWorld(shape, current, spot.position);
             SubmitModel(queue,
                         RobotFigure(lying ? Pose::Standing : spot.pose, 0.0F,
-                                    selected ? kSelected : Accent(robot)),
+                                    selected ? kSelected : Accent(robot, robotFrame ? robotFrame->gangColor : 0)),
                         origin, spot.yawDegrees + yawOffset, lying ? -90.0F : 0.0F,
                         vec3(1.0F), kS);
             if (spot.item) {
