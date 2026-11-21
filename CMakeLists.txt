@@ -47,6 +47,7 @@ add_executable(mechapunk
     app/InspectorGang.cpp
     app/InspectorOrganization.cpp
     app/Links.cpp
+    app/StatisticsChronicle.cpp
     app/Statistics.cpp
     app/Rain.cpp
     app/SimulationHost.cpp

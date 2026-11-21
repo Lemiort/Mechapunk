@@ -15,6 +15,7 @@
 
 #include "GangLists.hpp"
 #include "Links.hpp"
+#include "StatisticsInternal.hpp"
 
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/GameTime.hpp"
@@ -589,6 +590,10 @@ std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const World
             }
             if (ImGui::BeginTabItem("Crime")) {
                 DrawCrime(history, frame, city, &request);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Chronicle")) {
+                DrawChronicle(frame, city, &request);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

@@ -19,7 +19,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | validation | 11k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 22k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 22k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Units.cpp`, `Property.cpp`, `HousingTests.cpp` |
-| statistics | 15k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `Statistics.cpp` |
+| statistics | 18k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp` |
 | careers | 18k | `World.hpp`, `Careers.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 21k | `World.hpp`, `Social.hpp`, `Social.cpp`, `LifeCycle.cpp`, `SocialTests.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
@@ -100,7 +100,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Props` | Box models of every prop and the robot figure. |
 | `Inspector` | Inspector window for the selected building, room or robot. |
 | `Links.hpp/.cpp` | Clickable names in the inspector: `RoomLabel`, `ShowRoom`, `RoomLink`, `ShowRobot`, `RobotLink`. |
-| `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank tabs, plots from `DailyStats`. |
+| `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank, Crime and Chronicle tabs, plots from `DailyStats`; the Chronicle tab is drawn in `StatisticsChronicle.cpp`. |
 | `main.cpp` | Window, input, camera, panels, applying frames. |
 
 

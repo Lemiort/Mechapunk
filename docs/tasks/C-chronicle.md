@@ -1,7 +1,7 @@
 # Task C: chronicle (saved city history)
 
 Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
-C3a-C3c, C3a done, C3b, C3c and C4 open. Save change was C1. Do after A
+C3a-C3c, C3a and C3b done, C3c and C4 open. Save change was C1. Do after A
 (links) and B (gang events).
 
 ## What and why
@@ -130,7 +130,7 @@ is unchanged; no sim code touched, so no headless comparison applies. As
 in B8a no test runs `SimulationHost` (`layout_tests` build `WorldFrame`
 by hand), so this step is checked by the build and by C3b and C3c.
 
-### - [ ] C3b. The Chronicle tab (statistics module)
+### - [x] C3b. The Chronicle tab (statistics module)
 
 Open: `app/Statistics.hpp`, `app/Statistics.cpp` (tab dispatch and one
 new Draw function).
@@ -138,6 +138,40 @@ new Draw function).
 - Statistics: a "Chronicle" tab reading `WorldFrame::chronicle`, newest
   first, clipped; every robot, room, building and organization in an
   entry is a link (task A helpers).
+
+Done as (statistics module, one commit): the tab's drawing lives in a
+new `app/StatisticsChronicle.cpp` (the `InspectorGang.cpp` precedent),
+because `Statistics.cpp` was already 8.7k and taking the tab in place
+would put it over the 10k per-file budget; the function is declared
+in a new private header `app/StatisticsInternal.hpp` the way
+`DrawGangPage` is declared in `InspectorInternal.hpp`. `Statistics.hpp`
+itself did not change: the tab dispatch in `DrawStatistics` gained a
+"Chronicle" tab item after "Crime" calling `DrawChronicle(frame, city,
+&request)`.
+
+- The table reads `WorldFrame::chronicle` backwards — saved oldest
+  first, shown newest first — with a frozen header row and
+  `ImGuiListClipper`, so all `kChronicleCap` rows are safe. Columns:
+  When (`sim::FormatTime`), What, Who, Whom, Room, Building, Owner,
+  Credits, table 450 px high as the other statistics tables are.
+- Links, all task A helpers, piped into `request` through `follow` as
+  the Crime tab does. An entry has no building or organization field,
+  so those come from its room: `RoomLink` (its label already carries
+  the building's name), `BuildingLink` for the room's building and
+  `OrganizationLink` for `EconomyFrame::OwnerOf(room)`. Robots go
+  through `AccountLink`, which shows a scrapped one's remembered name
+  as plain text; a room that has since closed reads "a room that is
+  gone".
+- The What column: short kind labels, and for `Remembered` entries the
+  memory kind instead ("close friends", "rivals", "lost a job",
+  "promoted", "evicted"), since `World::Chronicle` keeps only those;
+  bank emissions read by sign ("money created" / "money destroyed").
+- `Credits()` is a local copy, as `InspectorOrganization.cpp` and
+  `InspectorGang.cpp` already do. `context_budget.py` and the two
+  MODULES.md tables gained the new files; ctest 155/155, statistics
+  module 18.1k of 25k, new file 2.9k. No sim code touched, so no
+  headless comparison applies (as in C3a); the tab is for the user to
+  see in the game.
 
 ### - [ ] C3c. The robot page's History section (inspector module)
 
