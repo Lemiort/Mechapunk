@@ -35,7 +35,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | ui | 15k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | inspector | 21k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
-| gangs | 23k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp`, `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
+| gangs | 20k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
+| gang-lists | 4k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
 | chronicle | 8k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 
 ## What lives where
@@ -132,6 +133,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Prop models, rain, renderer | rendering | `Props.cpp` |
 | The inspector window and its clickable names | inspector | `Inspector.cpp`, `Links.cpp` |
 | Which rows an organization page shows, sorted | organization-lists | `app/OrganizationLists.cpp` |
+| Which rows a gang page shows, sorted | gang-lists | `app/GangLists.cpp` |
 | Panels, input, camera; frames from the simulation thread | ui | `main.cpp`, `SimulationHost.cpp` |
 
 A task touching two modules (a new robot field shown in the inspector, say)

@@ -70,8 +70,8 @@ MODULES = {
                   "app/Links.cpp", "app/InspectorInternal.hpp",
                   "app/InspectorOrganization.cpp", "app/InspectorGang.cpp"],
     "gangs": [I + "Gangs.hpp", "sim/src/Gangs.cpp", "tests/GangRosterTests.cpp",
-              "tests/GangCrimeTests.cpp", "app/GangLists.hpp", "app/GangLists.cpp",
-              "tests/GangListsTests.cpp"],
+              "tests/GangCrimeTests.cpp"],
+    "gang-lists": ["app/GangLists.hpp", "app/GangLists.cpp", "tests/GangListsTests.cpp"],
     "chronicle": [I + "Chronicle.hpp", "sim/src/Chronicle.cpp", "tests/ChronicleTests.cpp",
                   I + "World.hpp"],
 }

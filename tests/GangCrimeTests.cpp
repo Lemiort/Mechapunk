@@ -674,3 +674,83 @@ TEST(Gangs, RivalFightsCutWearAndCondition) {
     EXPECT_EQ(fighting.conditionLoss - idle.conditionLoss, 200 * fighting.fights);
     EXPECT_EQ(fighting.wearGain - idle.wearGain, 40 * fighting.fights);
 }
+
+// B4 asked for two ways an officer takes a robber, and the code had one: the
+// pair roll decides a robbery in the same ten minutes the watched room is
+// built, so the officer had to be standing there at that exact moment, which
+// over 40 days at 10000 robots came out at 4 arrests to 1473 robberies. The
+// other way is the one this test pins: an officer on patrol arrests the members
+// it meets in its room who robbed in the last hour. The stage runs in two
+// halves - the night half with no officer in the room, so the robberies can
+// happen at all, then the officer arrives after 04:00, where `ConsiderCrime`
+// does not act at all and an arrest can only come from the hour it walked into.
+TEST(Gangs, OfficerCatchesRobbersOfTheHourBefore) {
+    Stage stage = MakeStage(7, 300, 100, /*wantOfficer=*/true);
+    ASSERT_TRUE(stage.room.IsValid());
+    ASSERT_GE(stage.crowd.size(), 2U);
+    ASSERT_TRUE(stage.officer.has_value());
+    const sim::EntityId gang = stage.state.gangs[0].id;
+    for (std::size_t seat = 0; seat < stage.crowd.size(); seat += 2) {
+        stage.state.robots[stage.crowd[seat]].gang = gang;
+    }
+    const std::set<std::uint64_t> members = IdsOf(stage.state, stage.crowd);
+    const sim::EntityId officerId = stage.state.robots[*stage.officer].id;
+
+    // 03:00 to 04:00 is the night half; everything after 04:00 is day.
+    stage.state.tick = sim::StartOfDay(stage.state.tick) +
+                       3 * sim::kMinutesPerHour;
+    // The officer waits at its own station until the second half: standing in
+    // the room from the start would turn every attempt there into an arrest.
+    sim::Robot& watchman = stage.state.robots[*stage.officer];
+    watchman.location = watchman.workspace;
+    watchman.patrol = sim::EntityId{};
+
+    auto started = sim::World::FromState(std::move(stage.state));
+    ASSERT_TRUE(started.has_value()) << started.error();
+    sim::World world = std::move(*started);
+    world.RunFor(60);
+    sim::WorldState mid = world.State();
+    ASSERT_GT(mid.today.robberies, 0U);
+    ASSERT_EQ(mid.today.arrests, 0U);
+
+    // The officer arrives on patrol in the room the crowd is standing in, and
+    // the robbers' memories keep their old rooms - their apartments - so a
+    // rule that asked whether the crime happened in this room would arrest
+    // nobody: the officer cannot see where a crime was, only who stands in
+    // the room with it now.
+    for (sim::Robot& robot : mid.robots) {
+        if (robot.id == officerId) {
+            robot.activity = sim::RobotActivity::Working;
+            robot.location = stage.room;
+            robot.patrol = stage.room;
+            robot.nextActionAt = mid.tick + 100000;
+            continue;
+        }
+        for (sim::Memory& memory : robot.memories) {
+            if (memory.kind == sim::MemoryKind::RobbedSomeone) memory.room = robot.apartment;
+        }
+    }
+    auto resumed = sim::World::FromState(std::move(mid));
+    ASSERT_TRUE(resumed.has_value()) << resumed.error();
+    sim::World patrolled = std::move(*resumed);
+    std::vector<sim::SimEvent> log;
+    Watch(log, patrolled);
+    patrolled.RunFor(30);
+
+    const sim::WorldState& after = patrolled.State();
+    EXPECT_TRUE(sim::ValidateWorldState(after));
+    EXPECT_TRUE(sim::ValidateEconomy(after).has_value());
+    EXPECT_GT(after.today.arrests, 0U);
+    // Nobody could rob in the second half: the room is watched, so an attempt
+    // there becomes an arrest, and the crowd's members are its only members.
+    EXPECT_EQ(after.today.robberies, mid.today.robberies);
+    // The arrests are about the members who robbed in that room, and they
+    // happen in the second half: `mid.today.arrests` was 0.
+    std::size_t arrests = 0;
+    for (const sim::SimEvent& event : log) {
+        if (event.kind == sim::EventKind::Arrested) ++arrests;
+    }
+    EXPECT_EQ(arrests, after.today.arrests);
+    EXPECT_GT(CountOf(log, sim::EventKind::Arrested, members), 0U);
+}
+

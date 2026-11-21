@@ -61,6 +61,20 @@ const Organization& FindGovernment(const std::vector<Organization>& organization
     return organizations[0];
 }
 
+// Whether this robot remembers `kind` happening within the last hour: the
+// window B4 gave the officer (it catches a robbery of the hour, no further
+// back). Memories are oldest first, so the scan starts at the newest and stops
+// as soon as a memory is older than the hour.
+bool RememberedInLastHour(const Robot& robot, MemoryKind kind, Tick now) {
+    const Tick cutoff = now > kMinutesPerHour ? now - kMinutesPerHour : 0;
+    for (auto memory = robot.memories.rbegin(); memory != robot.memories.rend();
+         ++memory) {
+        if (memory->tick < cutoff) return false;
+        if (memory->kind == kind) return true;
+    }
+    return false;
+}
+
 }  // namespace
 
 // An officer is a robot whose job room is a police station. The three places
@@ -382,6 +396,50 @@ void World::ReviewGangs() {
     }
 }
 
+// The whole of an arrest, so both paths that end in one cannot drift apart.
+// No credit is taken: the fine (B4: credits plus savings, at most 100) is paid
+// to City Hall through PayBill, which is why the money still adds up.
+void World::Arrest(Robot& robber) {
+    const std::int64_t fine =
+        std::min(robber.credits + robber.savings, static_cast<std::int64_t>(100));
+    PayBill(robber, FindGovernment(state_.economy.organizations).id, fine);
+    ++state_.today.arrests;
+    ++robber.arrests;
+    Emit({.tick = state_.tick,
+          .kind = EventKind::Arrested,
+          .robot = robber.id,
+          .room = robber.location});
+    Remember(robber, MemoryKind::Arrested, {}, robber.location);
+}
+
+// B4 asked for two ways an officer takes a robber and the code had one: the
+// pair roll decides a robbery in the same ten minutes the watched room is
+// built, so the officer has to stand there at that exact moment, and over 40
+// days at 10000 robots that came out at 4 arrests to 1473 robberies - an
+// officer visits one venue for a quarter of an hour once a shift hour, while
+// the city has hundreds of venues, so a crime's room is watched about one
+// hour in fifty. The other way B4 gave is the officer on patrol meeting a
+// member who robbed in the last hour: the crime may have been in another room
+// and its room may never be watched, but the criminal is standing there with
+// the officer, so an arrest needs no luck about where the robbery was.
+// `Socialize` calls this for every room it found watched: a member standing
+// in it that remembers robbing in that hour is arrested, once an hour (the
+// arrest's own memory is the guard), in id order and with no random draw, so
+// the same room always gives the same arrests (rule 1).
+void World::PatrolArrests(const std::vector<std::size_t>& present) {
+    for (std::size_t index : present) {
+        Robot& robot = state_.robots[index];
+        // Officers are never members (ReviewGangs forbids it), so a member
+        // standing in a room an officer stands in is a rival of that officer.
+        if (!robot.gang.IsValid()) continue;
+        if (!RememberedInLastHour(robot, MemoryKind::RobbedSomeone, state_.tick)) {
+            continue;
+        }
+        if (RememberedInLastHour(robot, MemoryKind::Arrested, state_.tick)) continue;
+        Arrest(robot);
+    }
+}
+
 void World::ConsiderCrime(Robot& first, Robot& second,
     const std::set<std::uint64_t>& officerRooms) {
     const Gang* gangA = FindGangOf(state_.gangs, first);
@@ -485,19 +543,7 @@ void World::ConsiderCrime(Robot& first, Robot& second,
         // B5: the would-be robber is arrested instead. No credit moves; the
         // fine goes to City Hall through PayBill, and the robber's rap sheet
         // grows, which is what makes it leave its gang later.
-        std::int64_t fine = std::min(robber->credits + robber->savings, static_cast<std::int64_t>(100));
-
-        PayBill(*robber, FindGovernment(state_.economy.organizations).id, fine);
-
-        ++state_.today.arrests;
-        ++robber->arrests;
-
-        Emit({.tick = state_.tick,
-              .kind = EventKind::Arrested,
-              .robot = robber->id,
-              .room = robber->location});
-
-        Remember(*robber, MemoryKind::Arrested, {}, robber->location);
+        Arrest(*robber);
     } else {
         // No officer: the robbery proceeds.
         std::int64_t loot = std::min(victim->credits, 20 + victim->credits / 4);

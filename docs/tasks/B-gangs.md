@@ -18,8 +18,11 @@ members can rob other robots who are not in their gang." Unions come later
 - `docs/IMPLEMENTATION_GUIDE.md` sections 1 to 5 (rule 3 for the save change).
 - `docs/MODULES.md`. Gangs get their **own module** `gangs`:
   `sim/include/mechapunk/sim/Gangs.hpp`, `sim/src/Gangs.cpp`,
-  `tests/GangTests.cpp`, plus `World.hpp`. Do not grow `Social.cpp` or
-  `Behaviour.cpp` beyond one-line hooks.
+  `tests/GangRosterTests.cpp` and `tests/GangCrimeTests.cpp` (the old
+  `tests/GangTests.cpp` was split in B12b), plus `World.hpp`. The gang
+  page's list functions are a module of their own, `gang-lists`
+  (`app/GangLists.*`, `tests/GangListsTests.cpp`). Do not grow `Social.cpp`
+  or `Behaviour.cpp` beyond one-line hooks.
 - Officers exist (task A of the old plan, done): a robot whose job room is
   a `RoomKind::PoliceStation` is an officer; on shift it is `Working`,
   at the station or at the venue in `Robot::patrol`.
@@ -606,14 +609,86 @@ their own "simulated in N s" and "Saved <path>" summary lines: nothing about
 where robots were, what they earned or what they did differed. Saves made
 before this keep the turfs they had.
 
-## Done when
+### - [x] B13. The officer's second arrest rule (gangs module)
+
+The first "Done when" item could not be met as written, so it was measured
+first, at `7c03785` (head, task C done), seed 1 / 10000 robots / 40 days:
+1473 robberies (107183 credits), **4 arrests**, 24 fights, 813 members by
+day 40. So the note "arrests still come out at 0 and fights at 0" was wrong
+on both counts (B12c's turf tie-break moved which venues officers reach),
+but an arrest in one robbery out of 370 is still invisible in the game, which
+is what that item is about. One rule was missing: B4 asked for two ways an
+officer takes a robber - the room is watched when the pair rolls, *and* the
+officer arriving where a member robbed in the last hour - and `ConsiderCrime`
+had only the first.
+
+Open: `sim/src/Gangs.cpp`, `sim/include/mechapunk/sim/World.hpp` (the gang
+section), `sim/src/Social.cpp` (only the `Socialize` room loop),
+`tests/GangCrimeTests.cpp`, `scripts/context_budget.py`, `docs/MODULES.md`.
+
+Done as:
+
+- `World::PatrolArrests(present)` in `Gangs.cpp`, called from `Socialize` once
+  per watched room with the robots standing in it: a member standing where an
+  officer on shift stands, that remembers robbing in the last hour, is arrested.
+  It takes no random number and walks the room in id order (rule 1), so a
+  room gives the same arrests on every machine.
+- The robbery's **room is not matched**, only the hour: an officer visits one
+  venue for 15 minutes once a shift hour out of the city's ~484 venues, so
+  matching the room (the first thing tried here) left 7 arrests in 40 days
+  against 1557 robberies. The officer cannot see where a crime was, only who
+  stands in the room with it now.
+- `World::Arrest(robot)` now holds the whole arrest - the fine to City Hall
+  through `PayBill`, `arrests += 1`, the event and the memory - and both
+  officer paths call it, replacing the block that had been inline in
+  `ConsiderCrime` (one notion written twice was B12b's lesson). The arrest's
+  own memory, fresh in that hour, is what keeps one crime from being arrested
+  twice.
+- No save change: no field, meaning or layout was added; the rule writes
+  existing memories (`RobbedSomeone`, `Arrested`), the existing `Arrested`
+  event and the existing `DayCounters.arrests`.
+- Test `Gangs.OfficerCatchesRobbersOfTheHourBefore`: the stage runs in two
+  halves, the night half with no officer in the room (30 to 40 robberies
+  happen) and the officer arriving after 04:00, where `ConsiderCrime` does not
+  act at all, so an arrest can only come from the hour it walked into. The
+  robbers' memories are moved to their apartments on the way, so a rule that
+  matched the room would arrest nobody. Bite-checked twice: with the hook
+  out, and with the room matched again, the test reports 0 arrests.
+- `ContextBudget` failed after the new code (gangs 25453 of 25000), so the
+  gang list files (`app/GangLists.hpp/.cpp`, `tests/GangListsTests.cpp`)
+  became their own `gang-lists` module, as B9c did for the organization lists:
+  gangs 20584, gang-lists 4990.
+
+Numbers, same command before and after: robberies 1473 to 1538, arrests 4 to
+**9**, fights 24 to 19, members 813 to 758 (an arrested robot leaves its gang
+at 3 arrests, so arrests also thin the gangs). Economy unchanged in kind on
+day 40: money 5188000 to 5169909, `created` 2625 to 2069 a day, wages still
+110%, robot debt 324927 in 1182 robots to 318367 in 1200, banks 252733 to
+235305, broke 1008 to 1053, gini 497 to 500, treasury 285302 to 280112 - a
+robber fined 100 has less to lend, so the central bank creates less. Money
+adds up: `ValidateEconomy` passes in the test after the arrests, and a 12 day
+save at 10000 robots loads back clean.
+
+Still short of seen: 9 arrests in 40 days is one in 170 robberies, because
+the police are the limit - about 9 officers at 10000 robots, one venue each
+shift hour - and rival members barely meet, which is why 40 days gives 19 to
+24 fights. Both need `World::Patrol` (`sim/src/Behaviour.cpp`), a different
+module: recorded below as step B14, not done here.
 
 ## Done when
 
-- [ ] Gangs exist in new and old cities, members join and leave, rob, get
+- [x] Gangs exist in new and old cities, members join and leave, rob, get
   arrested and fight; money adds up over 40 days at 10000 robots. Old cities
-  now found gangs (B12c) and the money adds up; arrests still come out at 0
-  and fights at 0 over those 40 days at seed 1 - see the roadmap gap.
+  found gangs (B12c) and the money adds up. Measured at head before B13:
+  1473 robberies, 4 arrests, 24 fights - the old note here claiming arrests
+  and fights "come out at 0" was stale, see B13.
+- [ ] Arrests and gang fights are seen in a running city (step B14, world
+  module): 9 arrests and ~20 fights in 40 days at 10000 robots is invisible
+  next to 1500 robberies. The limit is the police, not the rule: about 9
+  officers, each visiting one venue for 15 minutes per shift hour out of ~484
+  venues, so `World::Patrol` in `sim/src/Behaviour.cpp` has to send officers
+  where the crime is, and members of rival gangs have to meet more often
+  than one pair in a hundred (see the roadmap gap).
 - [x] Save version 18 with migration, fixture and tests.
 - [ ] Crime tab, gang page, gang colours in the city. Steps B10a-B11d fixed
   the tab's link ids, made its links work and moved the member, relation and

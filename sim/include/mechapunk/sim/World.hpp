@@ -401,6 +401,18 @@ private:
     // population for each pair (the check B7 asked for).
     void ConsiderCrime(Robot& first, Robot& second,
                        const std::set<std::uint64_t>& officerRooms);
+    // One arrest: the fine to City Hall, the rap sheet, the day's count. Both
+    // ways an officer takes someone go through this, so an arrest is one thing
+    // written once.
+    void Arrest(Robot& robber);
+    // B4's second officer rule: an officer on patrol meeting a member that
+    // robbed in the last hour arrests it, wherever the robbery happened - the
+    // robbery's own room is watched only about one hour in fifty, so matching
+    // on the room left arrests at 4 in 40 days. `Socialize` calls this once
+    // per watched room with the robots standing in it; it walks them in id
+    // order and takes no random number, so the same room always gives the same
+    // arrests (rule 1: the same state grows the same future everywhere).
+    void PatrolArrests(const std::vector<std::size_t>& present);
     // The economy, in Founding.cpp, Money.cpp, Units.cpp, Property.cpp,
     // Settlement.cpp and EconomyStatistics.cpp (see docs/MODULES.md).
     void FoundEconomy(std::uint64_t seed);

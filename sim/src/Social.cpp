@@ -299,6 +299,13 @@ void World::Socialize() {
             Talk(robot, state_.robots[present[slot]]);
             ConsiderCrime(robot, state_.robots[present[slot]], officerRooms);
         }
+        // The officer's other half (B4): a member standing in a room an officer
+        // stands in, that robbed in the last hour, is arrested (in Gangs.cpp).
+        // The room the robbery happened in is not required: officers see about
+        // one venue in fifty, so matching rooms left arrests almost unseen.
+        if (officerRooms.contains(room)) {
+            PatrolArrests(present);
+        }
     }
 }
 
