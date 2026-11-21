@@ -1,7 +1,7 @@
 # Task C: chronicle (saved city history)
 
-Status: C1 done, save version 19 shipped; C2, C3, C4 open. Save change was C1.
-Do after A (links) and B (gang events).
+Status: C1, C2 done, save version 19 shipped; C3, C4 open. Save change was
+C1. Do after A (links) and B (gang events).
 
 ## What and why
 
@@ -66,7 +66,7 @@ generated it before founding worked), so no fixture shows a v18 save that
 already has gangs; `Gangs.OldSaveGrowsGangsAtMidnight` covers that case from
 the v17 fixture instead, and old fixtures must not be regenerated.
 
-### - [ ] C2. Recording (chronicle module)
+### - [x] C2. Recording (chronicle module)
 
 Open: `Chronicle.cpp`, `ChronicleTests.cpp`, `World.cpp` (only `Emit`).
 
@@ -78,6 +78,30 @@ Open: `Chronicle.cpp`, `ChronicleTests.cpp`, `World.cpp` (only `Emit`).
 - Text comes from `World::Describe`: build a `SimEvent` from an entry.
 - Tests: a 30-day city has entries of several kinds, in order, at most
   5000, and they survive a save. Commit.
+
+Done as (chronicle module, one commit): `World::Emit` is no longer `const`
+and calls the new private `World::Chronicle` (implemented in `sim/src/Chronicle.cpp`)
+for every event; `Chronicle` drops the entry unless its kind is notable,
+copies the seven fields (`tick, kind, robot, otherRobot, room, credits,
+memory`) into a `ChronicleEntry`, appends and erases from the front past
+`kChronicleCap`. Notable: Scrapped, Arrived, BoughtProperty, UnitOpened,
+UnitClosed, the five gang kinds, `MoneySupplyChanged` with `credits > 10000`,
+and `Remembered` carrying `BecameCloseFriends`, `BecameRivals`, `LostJob`,
+`Promoted` or `Evicted`. The "money over 10000" is credits *created*
+(the emission event keeps its sign); destroyed money is not kept.
+No entry-to-SimEvent helper yet: the entry mirrors `SimEvent`'s fields so
+`World::Describe` can rebuild the text when C3 shows it.
+Tests in `tests/ChronicleTests.cpp`: seed 5 / 1000 robots / 30 days gives
+9 distinct kinds (threshold 4, margin checked by hand), ticks sorted, at
+most `kChronicleCap`, no `Departed`/`ArrivedHome`/`WeatherChanged` entries,
+and a serialize→deserialize→`FromState` round-trip that compares every
+field of every entry. `sim/CMakeLists.txt`, `tests/CMakeLists.txt` and
+the `chronicle` module in `scripts/context_budget.py` gained the new
+files. Nothing else in the sim reads the chronicle, so behaviour cannot
+move: the seed 7 / 2000 robots / 6 days `--all` log is byte-identical to
+before the change (last two lines aside), and the two saves differ only
+inside the `"chronicle"` block (`[]` becoming its entries) - no save
+version bump, the field shipped in C1.
 
 ### - [ ] C3. Showing it (statistics and inspector modules)
 

@@ -36,7 +36,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | inspector | 21k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
 | gangs | 23k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp`, `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
-| chronicle | 6k | `Chronicle.hpp`, `World.hpp` |
+| chronicle | 8k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 
 ## What lives where
 
@@ -61,6 +61,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Careers.hpp/.cpp` | Wages, promotions, firing, `ReviewJobs`, `ReviewHomes` (eviction, moving up, friends moving in together), `JobShift`, `JobKey`, `OpeningsFor` |
 | `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |
 | `Chronicle.hpp` | The saved story (`ChronicleEntry`, `kChronicleCap`) |
+| `Chronicle.cpp` | `World::Chronicle`: which events `Emit` keeps in the chronicle |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
 | `Founding.cpp` | `FoundEconomy` (organizations, owners, starting money), `IndexEconomy` |

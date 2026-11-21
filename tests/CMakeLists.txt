@@ -5,6 +5,7 @@ add_executable(sim_tests
     GangRosterTests.cpp
     GangCrimeTests.cpp
     CareersTests.cpp
+    ChronicleTests.cpp
     CityTests.cpp
     EconomyTests.cpp
     HousingTests.cpp

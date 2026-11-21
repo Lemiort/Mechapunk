@@ -376,7 +376,12 @@ private:
     // staff on the shift it would work.
     [[nodiscard]] std::vector<EntityId> OpeningsFor(
         EntityId robot, const std::unordered_map<std::uint64_t, std::uint32_t>& staff) const;
-    void Emit(const SimEvent& event) const;
+    // The event log and the saved story. Neither is const: the chronicle
+    // lives in `state_`, so emitting an event can change saved state.
+    void Emit(const SimEvent& event);
+    // Keeps the event in `state_.chronicle` when it is notable (Chronicle.cpp
+    // lists which kinds); `Emit` calls it for every event.
+    void Chronicle(const SimEvent& event);
     // Gangs, in Gangs.cpp.
     void FoundGangs(Pcg32& random);
     void ReviewGangs();

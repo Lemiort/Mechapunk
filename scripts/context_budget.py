@@ -70,7 +70,8 @@ MODULES = {
     "gangs": [I + "Gangs.hpp", "sim/src/Gangs.cpp", "tests/GangRosterTests.cpp",
               "tests/GangCrimeTests.cpp", "app/GangLists.hpp", "app/GangLists.cpp",
               "tests/GangListsTests.cpp"],
-    "chronicle": [I + "Chronicle.hpp", I + "World.hpp"],
+    "chronicle": [I + "Chronicle.hpp", "sim/src/Chronicle.cpp", "tests/ChronicleTests.cpp",
+                  I + "World.hpp"],
 }
 SOURCE_DIRS = ["sim", "app", "tests", "tools"]
 

@@ -191,10 +191,11 @@ void World::UpdateNeeds() {
     }
 }
 
-void World::Emit(const SimEvent& event) const {
+void World::Emit(const SimEvent& event) {
     if (sink_) {
         sink_(event);
     }
+    Chronicle(event);
 }
 
 }  // namespace mechapunk::sim

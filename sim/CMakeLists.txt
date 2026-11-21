@@ -2,6 +2,7 @@
 # it runs in tools and tests without a window.
 add_library(mechapunk_sim STATIC
     src/Careers.cpp
+    src/Chronicle.cpp
     src/Economy.cpp
     src/EconomyStatistics.cpp
     src/Founding.cpp
