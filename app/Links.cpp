@@ -204,6 +204,19 @@ std::optional<InspectorRequest> RobotLink(const std::string& name,
         .jumpToRobot = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)};
 }
 
+// A gang's colour as a square with an id that survives being drawn twice:
+// the same way a link's id does, by counting this window's earlier squares
+// for that gang. Windows that need the colour on their own (the Crime tab's
+// colour column, next to a hex code and no name) call this instead of
+// ImGui::ColorButton, because a ColorButton("##swatch") inside a PushID of
+// the gang id clashes with the square `GangLink` draws for the same gang
+// in the same frame, and ImGui then treats the two squares as one widget.
+void GangSwatch(std::string_view what, const ImVec4& colour, ImVec2 size) {
+    ImGui::PushID(RepeatOf(std::format("swatch {}", what)));
+    ImGui::ColorButton("##swatch", colour, ImGuiColorEditFlags_NoTooltip, size);
+    ImGui::PopID();
+}
+
 // A gang's name with a colour swatch; clicking it shows the gang page.
 std::optional<InspectorRequest> GangLink(const WorldFrame& frame,
                                          sim::EntityId gang,
@@ -228,16 +241,13 @@ std::optional<InspectorRequest> GangLink(const WorldFrame& frame,
         return std::nullopt;
     }
 
-    // Draw a small colour swatch, then the name as a link. The PushID keeps
-    // the swatch's id out of the one the name gets.
-    const ImVec4 col = GangColour(found->color);
-    ImGui::PushID(static_cast<int>(gang.value));
-    const ImVec2 swatch{16.0F, 16.0F};
-    ImGui::ColorButton("##swatch", col, ImGuiColorEditFlags_NoTooltip, swatch);
+    // A colour square, then the name as a link. Both ids count how many times
+    // this frame already drew that gang, so a gang shown twice (its own row
+    // and another gang's relations) gets two squares and two links instead of
+    // one id twice. The label ends in "##gang<id>", like every other link.
+    GangSwatch(std::format("gang##{}", gang.value), GangColour(found->color));
     ImGui::SameLine();
-    const bool clicked = Link(std::format("{}{}", prefix, found->name));
-    ImGui::PopID();
-    if (clicked) {
+    if (Link(std::format("{}{}##gang{}", prefix, found->name, gang.value))) {
         return InspectorRequest{.selection = {.gang = gang}};
     }
     return std::nullopt;

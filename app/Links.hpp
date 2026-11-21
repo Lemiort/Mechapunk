@@ -22,7 +22,10 @@ namespace mechapunk {
 //
 // Labels end in "##<kind><id>", so equal names never share an ImGui id, and
 // a link drawn twice in one frame (the same room twice on a page) gets a
-// separate id for each repeat, so it never conflicts with itself.
+// separate id for each repeat, so it never conflicts with itself. A colour
+// square in front of a name gets the same kind of repeat-safe id: see
+// `GangSwatch`, which every window that draws a gang's colour should use
+// instead of calling `ImGui::ColorButton` itself.
 
 // A room's name with its building, so text reads as a place.
 std::string RoomLabel(const CityView& city, sim::EntityId room);
@@ -68,9 +71,19 @@ std::optional<InspectorRequest> RobotLink(
     const std::string& name, const Selection& target,
     ImGuiSelectableFlags flags = 0);
 
-// A gang's name: a click shows it in the inspector.
+// A gang's name with its colour square in front of it: a click shows the
+// gang page.
 std::optional<InspectorRequest> GangLink(const WorldFrame& frame,
                                          sim::EntityId gang,
                                          std::string_view prefix);
+
+// A gang's colour as a small square, for a page that draws the colour next
+// to something other than the gang's name (the Crime tab's colour column).
+// The square's id counts how many times this window drew that gang this
+// frame, so a gang that appears twice (its own row, and another gang's
+// relations) never gets one id twice. `what` names the gang the square
+// stands for, as in a link label: "gang##<id>".
+void GangSwatch(std::string_view what, const ImVec4& colour,
+                ImVec2 size = ImVec2{16.0F, 16.0F});
 
 }  // namespace mechapunk

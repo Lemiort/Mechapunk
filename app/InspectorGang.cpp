@@ -109,11 +109,11 @@ std::optional<InspectorRequest> DrawGangPage(
         return result;
     }
 
-    // Title: a swatch in the gang's colour, its hex, its name.
-    ImGui::PushID(static_cast<int>(gang->id.value));
-    ImGui::ColorButton("##swatch", GangColour(gang->color),
-                       ImGuiColorEditFlags_NoTooltip, ImVec2{24.0F, 16.0F});
-    ImGui::PopID();
+    // Title: a swatch in the gang's colour, its hex, its name. The swatch
+    // goes through GangSwatch so its id counts repeats, as every other
+    // gang's colour square in the game does.
+    GangSwatch(std::format("gang##{}", gang->id.value), GangColour(gang->color),
+               ImVec2{24.0F, 16.0F});
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Text, GangColour(gang->color));
     ImGui::TextUnformatted(RgbColor(gang->color).c_str());
