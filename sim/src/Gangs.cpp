@@ -3,6 +3,7 @@
 #include "mechapunk/sim/Gangs.hpp"
 #include <algorithm>
 #include <cstdint>
+#include <set>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -390,7 +391,8 @@ void World::ReviewGangs() {
     }
 }
 
-void World::ConsiderCrime(Robot& first, Robot& second) {
+void World::ConsiderCrime(Robot& first, Robot& second,
+    const std::set<std::uint64_t>& officerRooms) {
     const Gang* gangA = FindGangOf(state_.gangs, first);
     const Gang* gangB = FindGangOf(state_.gangs, second);
 
@@ -419,6 +421,11 @@ void World::ConsiderCrime(Robot& first, Robot& second) {
 
                 first.wear += 20;
                 second.wear += 20;
+                // B4 said a fight also costs condition. B7 thought Robot has
+                // no condition field: it lives in Robot.needs.condition, on
+                // the 0..1000 needs scale, so a fight cuts it by 100.
+                first.needs.condition = std::max(0, first.needs.condition - 100);
+                second.needs.condition = std::max(0, second.needs.condition - 100);
             }
         }
     }
@@ -474,19 +481,10 @@ void World::ConsiderCrime(Robot& first, Robot& second) {
     // Try the robbery roll (3%).
     std::uint32_t roll = state_.random.UniformInt(1, 100);
 
-    auto hasOfficerInRoom = [&]() {
-        for (const Robot& r : state_.robots) {
-            if (r.location != first.location) continue;
-            auto workRef = rooms_.Find(r.workspace);
-            if (workRef && workRef->room->kind == RoomKind::PoliceStation &&
-                (r.activity == RobotActivity::Working || r.patrol.value)) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    bool officerPresent = hasOfficerInRoom();
+    // Would an officer on shift standing in this room stop this robbery?
+    // `officerRooms` is built once per Socialize call (B7's speed fix), so
+    // the lookup is a set contains instead of a walk over the population.
+    const bool officerPresent = officerRooms.contains(first.location.value);
 
     if (!officerPresent) {
         // No officer: robbery proceeds.

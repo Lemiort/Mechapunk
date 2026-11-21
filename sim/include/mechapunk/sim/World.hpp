@@ -4,6 +4,7 @@
 #include <expected>
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -377,8 +378,12 @@ private:
     void FoundGangs(Pcg32& random);
     void ReviewGangs();
     void HandleOfficerAffinity(Robot& first, Robot& second);
-    // Crime and gang interactions, in Gangs.cpp.
-    void ConsiderCrime(Robot& first, Robot& second);
+    // Crime and gang interactions, in Gangs.cpp. `officerRooms` holds the
+    // ids of rooms that hold an officer on shift; `Socialize` builds it once
+    // per call so every pair can ask, instead of walking the whole
+    // population for each pair (the check B7 asked for).
+    void ConsiderCrime(Robot& first, Robot& second,
+                       const std::set<std::uint64_t>& officerRooms);
     // The economy, in Founding.cpp, Money.cpp, Units.cpp, Property.cpp,
     // Settlement.cpp and EconomyStatistics.cpp (see docs/MODULES.md).
     void FoundEconomy(std::uint64_t seed);

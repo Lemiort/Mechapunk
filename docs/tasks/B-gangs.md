@@ -1,7 +1,7 @@
 # Task B: gangs
 
-Status: B1-B6 done; review fixes B7-B8 done (with leftovers, see B9e);
-gang details B9 split into B9a-B9e on 2026-11-20 (B9a-B9d done, rest open).
+Status: B1-B6 done; review fixes B7-B8 done; gang details B9 split into
+B9a-B9e on 2026-11-20, all of B9a-B9e done (notes under B9e).
 Save change done (v18). Do task A first: the inspector uses its links.
 
 ## What the user asked for
@@ -342,7 +342,7 @@ Open: `app/Statistics.cpp` (`DrawCrime`).
   since B9a changed `text` to the bare act).
 - Members column: `MembersOf(frame, gang.id).size()`.
 
-### - [ ] B9e. B7 leftovers, found during B9 (gangs module)
+### - [x] B9e. B7 leftovers, found during B9 (gangs module)
 
 Open: `sim/src/Gangs.cpp`, `sim/src/Social.cpp` (only the `Socialize`
 loop), `tests/GangTests.cpp`. Each fix comes with a test.
@@ -360,6 +360,36 @@ loop), `tests/GangTests.cpp`. Each fix comes with a test.
   credits and money adds up; no robbery while an officer on shift is in
   the room — the 3% pair becomes an arrest instead; friendly gangs
   never rob each other. Population level (guide §5).
+
+Done as (2026-11-21):
+
+- One fixture in `tests/GangTests.cpp`: `MakeStage` puts a crowd of robots
+  Visiting in an empty bar at 21:00, clears every other robot's gang and
+  (when asked) adds an officer standing in that room on a patrol leg. Every
+  robot in it, gangless idlers included, stays put and the day's counters
+  can only be about the crowd, so each test asks the event log
+  (`Watch`/`Between`) about the robots it scripted rather than trusting
+  the day's totals - a gangless idler that wanders into the room can legally
+  be robbed by the crowd. `SameGangNoRobbery` therefore gangs the whole
+  crowd with one gang and asserts no `Robbed`/`Fought` between crowd robots;
+  it runs now instead of skipping, and removing the same-gang return in
+  `ConsiderCrime` makes it fail (23 robberies).
+- `Socialize` builds `officerRooms` (rooms holding an officer on shift) once
+  per call and `ConsiderCrime` looks a room up in it. Proven behaviour
+  identical: the same headless scenario (seed 7, 2000 robots, 6 days, `--all`
+  with a save) gave a byte-identical log and save before and after.
+- B7 was half wrong: `Robot` has no `condition`, but `Robot.needs.condition`
+  (0..1000, capped at kMaxWear minus wear) is there, so a fight cuts it by
+  100 as B4 said. No save version bump: no state field, meaning or layout
+  changed, only what a fight does.
+- The fight cost is measured against a control run of the same crowd with
+  nobody ganged, since idle needs drift swamps a single 100; within one day
+  nothing else moves wear or condition, so the difference is exact: 40 wear
+  and 200 condition per fight. The robbery test compares the two robots'
+  credits around one logged robbery and calls `ValidateEconomy`.
+- Finding: `--seed 1 --robots 10000 --days 40` reports robberies and the
+  odd arrest but 0 gang fights over all 40 days, so the fight rule is
+  effectively never seen in a real city. Added to the roadmap's gaps.
 
 ## Done when
 

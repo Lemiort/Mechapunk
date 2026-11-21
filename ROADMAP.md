@@ -215,3 +215,8 @@ game:
   Statistics window (T) shows it all.
 - From above, the upper deck of a station hides the lower level's trains.
 - Robots inside closed buildings aren't drawn (nobody can see them).
+- Gang fights are never seen: a 40 day run at 10000 robots reports robberies
+  and the odd arrest but 0 fights, because members of rival gangs almost
+  never talk to each other. The rule works when the robots share a room
+  (`Gangs.RivalFightsCutWearAndCondition` scripts that crowd). The rules work in tests (`Gangs.RivalFightsCut
+  WearAndCondition`), not in the city.

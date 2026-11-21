@@ -14,6 +14,7 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -230,6 +231,24 @@ std::string MemoryText(MemoryKind kind, std::string_view other,
 }
 
 void World::Socialize() {
+    // Rooms that hold an officer on shift right now: an officer is on shift
+    // when its job room is a police station and it is working or on a patrol
+    // leg. Built once per call so ConsiderCrime can look a room up instead
+    // of walking every robot for every pair.
+    std::set<std::uint64_t> officerRooms;
+    for (const Robot& robot : state_.robots) {
+        if (robot.activity != RobotActivity::Working && !robot.patrol.IsValid()) {
+            continue;
+        }
+        if (!robot.workspace.value) {
+            continue;
+        }
+        const auto station = rooms_.Find(robot.workspace);
+        if (station && station->room->kind == RoomKind::PoliceStation) {
+            officerRooms.insert(robot.location.value);
+        }
+    }
+
     // Robots sharing a room, in id order within each room and rooms in id
     // order, so random draws happen in a fixed order.
     std::map<std::uint64_t, std::vector<std::size_t>> rooms;
@@ -284,7 +303,7 @@ void World::Socialize() {
             busy[self] = true;
             busy[slot] = true;
             Talk(robot, state_.robots[present[slot]]);
-            ConsiderCrime(robot, state_.robots[present[slot]]);
+            ConsiderCrime(robot, state_.robots[present[slot]], officerRooms);
         }
     }
 }
