@@ -422,8 +422,34 @@ void DrawCentralBank(const WorldFrame& frame, const std::vector<sim::DailyStats>
     }
 }
 
+// What a robot is doing at this minute, in a few words.
+const char* DoingNow(const RobotFrame& robot) {
+    switch (robot.activity) {
+        case sim::RobotActivity::Resting:
+            return "at home";
+        case sim::RobotActivity::Working:
+            return "working";
+        case sim::RobotActivity::Visiting:
+            return "at a venue";
+        case sim::RobotActivity::Walking:
+            return "walking";
+    }
+    return "idle";
+}
+
+// Draws the Crime tab. Links in it report what the player clicked through
+// `request`, as the Central bank tab does: a link only returns on the frame
+// it is clicked, so a drawing function that drops that value has links the
+// player can hover and never use.
 void DrawCrime(const std::vector<sim::DailyStats>& history, const WorldFrame& frame,
-               const CityView& city) {
+               const CityView& city, std::optional<InspectorRequest>* request) {
+    // One click per frame is all a player can ask for; the last link clicked
+    // wins, as it does on the gang page.
+    const auto follow = [&](const std::optional<InspectorRequest>& link) {
+        if (link) {
+            *request = *link;
+        }
+    };
     if (history.empty()) {
         ImGui::TextDisabled("Statistics start at the end of the first day.");
         return;
@@ -452,63 +478,73 @@ void DrawCrime(const std::vector<sim::DailyStats>& history, const WorldFrame& fr
     } else {
         constexpr ImGuiTableFlags kFlags =
             ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV;
+
+        // Both tables below read the gangs once per frame through the tested
+        // GangLists functions (guide §9.4): `members` is every gang's members
+        // sorted by id, `robberiesToday` how many of this night's crimes its
+        // members remember as robberies, and `crimesToday` the same count per
+        // member, of any kind. Rows of GangCrimes come newest first, so the
+        // walk stops at the first crime before this midnight. `frame.gangs`
+        // is sorted by id, so a row keeps its place between frames.
+        const auto today = sim::StartOfDay(frame.tick);
+        std::vector<std::vector<const RobotFrame*>> members;
+        std::vector<std::uint32_t> robberiesToday;
+        std::map<std::uint64_t, std::uint32_t> crimesToday;
+        for (const sim::Gang& gang : *frame.gangs) {
+            members.push_back(MembersOf(frame, gang.id));
+            std::uint32_t robberies = 0;
+            for (const GangCrime& crime : GangCrimes(frame, gang.id)) {
+                if (crime.tick < today) {
+                    break;
+                }
+                ++crimesToday[crime.member.value];
+                if (crime.kind == CrimeKind::Robbery) {
+                    ++robberies;
+                }
+            }
+            robberiesToday.push_back(robberies);
+        }
+
         if (ImGui::BeginTable("gangs", 5, kFlags, ImVec2{0.0F, 350.0F})) {
             for (const char* column : {"Gang", "Colour", "Members", "Robberies", "Turf / Relations"}) {
                 ImGui::TableSetupColumn(column, ImGuiTableColumnFlags_WidthStretch, 0.8F);
             }
             ImGui::TableHeadersRow();
 
-            // Rows come from the tested GangLists functions (guide §9.4);
-            // the drawing only draws what they return. Rows of
-            // GangCrimes come newest first, so the walk over today's
-            // crimes can stop at the first older one.
-            const auto today = sim::StartOfDay(frame.tick);
-
-            for (std::uint64_t i = 0; i < frame.gangs->size(); ++i) {
-                const sim::Gang& gang = (*frame.gangs)[static_cast<std::size_t>(i)];
+            for (std::size_t index = 0; index < frame.gangs->size(); ++index) {
+                const sim::Gang& gang = (*frame.gangs)[index];
                 ImGui::TableNextRow();
-                // Gang name as a clickable link.
+                // Gang name and colour as a link: opens the gang's page.
                 ImGui::TableSetColumnIndex(0);
-                GangLink(frame, gang.id, "");
+                follow(GangLink(frame, gang.id, ""));
 
-                // Colour swatch and hex string.
+                // Colour again as a square with its hex code. GangSwatch
+                // counts how often this frame drew this gang's square, so the
+                // one here and the one in front of the name stay two widgets.
                 ImGui::TableSetColumnIndex(1);
-                ImGui::PushID(static_cast<int>(gang.id.value));
                 const ImVec4 gangColour{static_cast<float>((gang.color >> 16) & 0xFF) / 255.0F,
                                         static_cast<float>((gang.color >> 8) & 0xFF) / 255.0F,
                                         static_cast<float>(gang.color & 0xFF) / 255.0F,
                                         1.0F};
-                ImGui::ColorButton("##swatch", gangColour,
-                                   ImGuiColorEditFlags_NoTooltip, ImVec2{24.0F, 16.0F});
-                ImGui::PopID();
+                GangSwatch(std::format("gang##{}", gang.id.value), gangColour,
+                           ImVec2{24.0F, 16.0F});
                 ImGui::SameLine();
                 std::string colourStr = std::format("#{:06X}", gang.color);
                 ImGui::TextUnformatted(colourStr.c_str());
 
                 ImGui::TableSetColumnIndex(2);
-                ImGui::TextUnformatted(
-                    std::to_string(MembersOf(frame, gang.id).size()).c_str());
+                ImGui::TextUnformatted(std::to_string(members[index].size()).c_str());
 
                 // Robberies by this gang's members since midnight; counted
                 // by kind, as the text-prefix count went dead when B9a made
-                // `text` the bare act. Rows are newest first, so the walk
-                // stops at the first older night.
+                // `text` the bare act.
                 ImGui::TableSetColumnIndex(3);
-                std::int64_t robberiesToday = 0;
-                for (const GangCrime& crime : GangCrimes(frame, gang.id)) {
-                    if (crime.tick < today) {
-                        break;
-                    }
-                    if (crime.kind == CrimeKind::Robbery) {
-                        ++robberiesToday;
-                    }
-                }
-                ImGui::TextUnformatted(std::to_string(robberiesToday).c_str());
+                ImGui::TextUnformatted(std::to_string(robberiesToday[index]).c_str());
 
                 // Turf and relations.
                 ImGui::TableSetColumnIndex(4);
                 if (gang.turf.value != 0) {
-                    BuildingLink(city, gang.turf, "");
+                    follow(BuildingLink(city, gang.turf, ""));
                 } else {
                     ImGui::TextDisabled("no turf");
                 }
@@ -527,7 +563,55 @@ void DrawCrime(const std::vector<sim::DailyStats>& history, const WorldFrame& fr
                             break;
                     }
                     ImGui::SameLine();
-                    GangLink(frame, rel.gang, "");
+                    follow(GangLink(frame, rel.gang, ""));
+                }
+            }
+            ImGui::EndTable();
+        }
+
+        // Every member of every gang, in blocks under the gang's name. A
+        // member's name is a link: one click shows that robot in the inspector,
+        // a double-click also moves the camera to it. Rows come from MembersOf,
+        // which sorts by id, in the order of `frame.gangs`, so a robot keeps
+        // its place while its gang stands; a gang nobody is in now needs no
+        // block, since the table above already shows its zero.
+        ImGui::SeparatorText("Members");
+        // The other long tables of this window are resizable and 260 px high,
+        // and this one is longer than any of them: with a hundred robots a
+        // night in gangs, the player drags its separator to see more.
+        if (ImGui::BeginTable("members", 4, kFlags | ImGuiTableFlags_Resizable,
+                              ImVec2{0.0F, 260.0F})) {
+            for (const char* column :
+                {"Member", "Doing now", "Where", "Crimes this night"}) {
+                ImGui::TableSetupColumn(column, ImGuiTableColumnFlags_WidthStretch, 1.2F);
+            }
+            for (std::size_t index = 0; index < members.size(); ++index) {
+                if (members[index].empty()) {
+                    continue;
+                }
+                // The gang's name heads its block; the name link and its
+                // square get repeat-safe ids, so drawing it again in this
+                // frame does not steal the id of the row above.
+                ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+                ImGui::TableSetColumnIndex(0);
+                follow(GangLink(frame, (*frame.gangs)[index].id, ""));
+                for (const RobotFrame* member : members[index]) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    follow(RobotLink(SimulationHost::AccountName(frame, member->id),
+                                     ShowRobot(frame, city, member->id)));
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(DoingNow(*member));
+                    ImGui::TableSetColumnIndex(2);
+                    if (!member->location.IsValid()) {
+                        ImGui::TextDisabled("no room");
+                    } else {
+                        follow(RoomLink(city, member->location, ""));
+                    }
+                    ImGui::TableSetColumnIndex(3);
+                    const auto counted = crimesToday.find(member->id.value);
+                    ImGui::TextUnformatted(std::to_string(
+                        counted == crimesToday.end() ? 0U : counted->second).c_str());
                 }
             }
             ImGui::EndTable();
@@ -576,7 +660,7 @@ std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const World
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Crime")) {
-                DrawCrime(history, frame, city);
+                DrawCrime(history, frame, city, &request);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

@@ -1,7 +1,8 @@
 # Task B: gangs
 
 Status: B1-B6 done; review fixes B7-B8 done; gang details B9 split into
-B9a-B9e on 2026-11-20, all of B9a-B9e done (notes under B9e).
+B9a-B9e on 2026-11-20, all of B9a-B9e done (notes under B9e); the Crime tab
+bugs the user found on 2026-11-21 are steps B10a-B10b, both done.
 Save change done (v18). Do task A first: the inspector uses its links.
 
 ## What the user asked for
@@ -391,10 +392,54 @@ Done as (2026-11-21):
   odd arrest but 0 gang fights over all 40 days, so the fight rule is
   effectively never seen in a real city. Added to the roadmap's gaps.
 
+### - [x] B10a. Bug the user found in the game: gang squares share ImGui ids
+
+Asked for on 2026-11-21 (inspector module: `app/Links.cpp`, `app/Links.hpp`,
+`app/InspectorGang.cpp`). A gang's colour square was drawn as
+`ColorButton("##swatch")` inside `PushID(gang id)`, so every square of one
+gang had one id. One frame shows the same gang more than once - its own row
+and another gang's relation in the Crime tab's gang table, and the tab drew
+its own square next to the one `GangLink` drew for the same row - so two
+squares fought over one id and ImGui treated them as one widget: hovering
+or clicking one moved the other.
+
+Done as (commit 271d40f): `Links.cpp` gained a public `GangSwatch(what,
+colour, size)` whose id comes from the same per-frame repeat count the private
+`Link()` already uses for labels, so each repeat of a gang in a frame gets
+its own square; `GangLink` uses it and its name label now ends in `##gang<id>`,
+which `Links.hpp` documents and the gang link was the one link that broke;
+`InspectorGang.cpp` draws its title square through `GangSwatch` too, so no
+window calls `ColorButton` with a shared label any more (guide §9.2).
+
+### - [x] B10b. Crime tab: links that work, and a list of every gang's members
+
+Asked for on 2026-11-21 (statistics module: `app/Statistics.cpp`, `DrawCrime`).
+`DrawCrime` threw away the value every link function returns, so a click in
+that tab did nothing while the other tabs pipe it out.
+
+Done as (this step): `DrawCrime` takes `std::optional<InspectorRequest>*`
+like `DrawCentralBank` and a local `follow` pipes the gang, turf, relation
+and member links into it (the last click of the frame wins, as on the gang
+page). The tab gained a **Members** table under the gang table: each gang
+heads a header row of its own and under it one row per member - the member's
+name clickable (one click shows it in the inspector, a double-click moves the
+camera), what it is doing, the room it stands in, and how many crimes it
+remembers of this night. Rows come only from the tested `MembersOf` and
+`GangCrimes` (guide §9.4): the gangs are read once a frame into
+`members`, `robberiesToday` and `crimesToday`, which the gang table's two
+count columns now also read instead of walking the memories again. The table
+is resizable and 260 px high, as the other long statistics tables are.
+
+Nothing to test here: the app's link drawing is in no test target, so both
+steps are for the user to see in the game. `ctest` 147/147 pass,
+`ContextBudget` fine (statistics 16.3k, inspector 21.9k of 25k).
+
 ## Done when
 
 - [ ] Gangs exist in new and old cities, members join and leave, rob, get
   arrested and fight; money adds up over 40 days at 10000 robots.
 - [x] Save version 18 with migration, fixture and tests.
-- [ ] Crime tab, gang page, gang colours in the city.
+- [ ] Crime tab, gang page, gang colours in the city. Steps B10a-B10b fixed
+  the tab's link ids and made its links work and added the member list;
+  whether it looks right is still for the user to see in the game.
 - [ ] The guide's task table marks B done.
