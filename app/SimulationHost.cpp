@@ -240,6 +240,22 @@ void SimulationHost::Publish() {
         gangs_ = std::make_shared<const std::vector<sim::Gang>>(world_.State().gangs);
     }
     frame.gangs = gangs_;
+    // The chronicle grows by one entry per notable event and drops the oldest
+    // past kChronicleCap, so its size or newest tick changes exactly when an
+    // entry was added; copying it only then keeps minutes without an event
+    // from recopying a list of up to 5000 entries.
+    {
+        const sim::WorldState& state = world_.State();
+        const sim::Tick newest = state.chronicle.empty() ? sim::Tick{} : state.chronicle.back().tick;
+        if (chronicle_ == nullptr || chronicleSize_ != state.chronicle.size() ||
+            chronicleLastTick_ != newest) {
+            chronicle_ =
+                std::make_shared<const std::vector<sim::ChronicleEntry>>(state.chronicle);
+            chronicleSize_ = state.chronicle.size();
+            chronicleLastTick_ = newest;
+        }
+    }
+    frame.chronicle = chronicle_;
     frame.economy = economy_;
     if (cityFrame_ == nullptr || cityVersion_ != world_.CityVersion()) {
         cityFrame_ = std::make_shared<const sim::City>(world_.State().city);

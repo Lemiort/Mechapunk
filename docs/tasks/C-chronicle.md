@@ -1,7 +1,8 @@
 # Task C: chronicle (saved city history)
 
-Status: C1, C2 done, save version 19 shipped; C3, C4 open. Save change was
-C1. Do after A (links) and B (gang events).
+Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
+C3a-C3c, C3a done, C3b, C3c and C4 open. Save change was C1. Do after A
+(links) and B (gang events).
 
 ## What and why
 
@@ -103,12 +104,45 @@ before the change (last two lines aside), and the two saves differ only
 inside the `"chronicle"` block (`[]` becoming its entries) - no save
 version bump, the field shipped in C1.
 
-### - [ ] C3. Showing it (statistics and inspector modules)
+### C3. Showing it (statistics and inspector modules) — split on 2026-11-21
 
-- `EconomyFrame` (or a new shared pointer in `WorldFrame`) carries the
-  chronicle, copied only when it changed.
-- Statistics: a "Chronicle" tab, newest first, clipped; every robot, room,
-  building and organization in an entry is a link (task A helpers).
+The step names two modules, but its first bullet lives in a third: the
+frames are `app/SimulationHost.*`, the `ui` module. MODULES.md ("a task
+touching two modules ... is done in steps, one module at a time") and the
+B9 precedent cut it into steps of one module each; the original bullets
+live on inside C3a-C3c.
+
+### - [x] C3a. The chronicle in the frames (ui module)
+
+Open: `app/SimulationHost.hpp`, `app/SimulationHost.cpp`.
+
+- `WorldFrame` gains `chronicle`: a `shared_ptr<const std::vector<sim::
+  ChronicleEntry>>`, not a field of `EconomyFrame`: the chronicle is the
+  city's story, not money, and it changes with events, not every ten
+  minutes. Copied from the world's list only when it changed.
+
+Done as: `Publish` keeps `chronicle_` plus the pair `(size, newest tick)`
+the copy was made from; a notable event appends an entry and the oldest
+leave only past `kChronicleCap`, so that pair changes exactly when the
+list does and minutes without an event share one copy instead of recopying
+up to 5000 entries. No new source files, so `scripts/context_budget.py`
+is unchanged; no sim code touched, so no headless comparison applies. As
+in B8a no test runs `SimulationHost` (`layout_tests` build `WorldFrame`
+by hand), so this step is checked by the build and by C3b and C3c.
+
+### - [ ] C3b. The Chronicle tab (statistics module)
+
+Open: `app/Statistics.hpp`, `app/Statistics.cpp` (tab dispatch and one
+new Draw function).
+
+- Statistics: a "Chronicle" tab reading `WorldFrame::chronicle`, newest
+  first, clipped; every robot, room, building and organization in an
+  entry is a link (task A helpers).
+
+### - [ ] C3c. The robot page's History section (inspector module)
+
+Open: `app/Inspector.cpp` (robot page only).
+
 - Robot page: a "History" section with that robot's entries. Commit.
 
 ### - [ ] C4. Chronicle details (inspector, statistics)

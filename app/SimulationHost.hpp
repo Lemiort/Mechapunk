@@ -15,6 +15,7 @@
 #include "SimulationThread.hpp"
 #include "SnapshotBuffer.hpp"
 #include "mechapunk/sim/City.hpp"
+#include "mechapunk/sim/Chronicle.hpp"
 #include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -117,6 +118,10 @@ struct WorldFrame {
     std::shared_ptr<const sim::City> city;
     // Gangs, published alongside economy data every ten minutes.
     std::shared_ptr<const std::vector<sim::Gang>> gangs;
+    // The city's saved story, oldest first (see sim::ChronicleEntry). Frames
+    // share one copy until a notable event adds an entry; Publish recopies
+    // only when the list changed.
+    std::shared_ptr<const std::vector<sim::ChronicleEntry>> chronicle;
 };
 
 // Runs a World on a SimulationThread. The world belongs to the worker while
@@ -192,6 +197,12 @@ private:
     std::shared_ptr<const EconomyFrame> economy_;
     std::shared_ptr<const std::vector<sim::DailyStats>> history_;
     std::shared_ptr<const std::vector<sim::Gang>> gangs_;
+    std::shared_ptr<const std::vector<sim::ChronicleEntry>> chronicle_;
+    // Size and newest tick of the chronicle chronicle_ was copied from: an
+    // entry is appended only by a notable event, and the oldest leaves only
+    // past kChronicleCap, so that pair changes exactly when the list does.
+    std::size_t chronicleSize_{};
+    sim::Tick chronicleLastTick_{};
     std::shared_ptr<const std::unordered_map<std::uint64_t, sim::EntityId>> owners_;
     sim::Tick economyDay_{};
     std::shared_ptr<const sim::City> cityFrame_;
