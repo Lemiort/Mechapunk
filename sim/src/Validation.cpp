@@ -276,6 +276,19 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
             }
         }
     }
+    // The chronicle: oldest first, never longer than the game keeps. Entries
+    // are not checked against the robots and rooms they name: an entry about
+    // a scrapped robot outlives that robot on purpose.
+    if (state.chronicle.size() > kChronicleCap) {
+        return fail(std::format("The chronicle holds {} entries, more than {}",
+                                state.chronicle.size(), kChronicleCap));
+    }
+    for (std::size_t i = 1; i < state.chronicle.size(); ++i) {
+        if (state.chronicle[i].tick < state.chronicle[i - 1].tick) {
+            return fail(std::format("The chronicle's entry {} is older than {}",
+                                    i, i - 1));
+        }
+    }
     return ValidateSocial(state);
 }
 

@@ -397,4 +397,15 @@ std::expected<void, std::string> V17ToV18(SaveDocument& world) try {
         std::format("the version 17 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V18ToV19(SaveDocument& world) try {
+    // The chronicle: a list of notable events. A version 18 world has none,
+    // and its story begins when the current game runs it; entries are added
+    // by the recording step, not by this migration.
+    world["chronicle"] = SaveDocument::array_t{};
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 18 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

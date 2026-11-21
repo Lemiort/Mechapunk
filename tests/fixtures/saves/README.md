@@ -23,6 +23,7 @@ every fixture, so old saves keep working as the format evolves.
 | `v16-city.json` | 16     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v16-city.json` (game 0.16.0) |
 | `v17-city.json` | 17     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v17-city.json` (game 0.17.0) |
 | `v18-city.json` | 18     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v18-city.json` (game 0.18.0) |
+| `v19-city.json` | 19     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v19-city.json` (game 0.19.0) |
 
 All other fixtures stop at the same moment as the older ones: Day 20 Sat 16:50.
 `v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
@@ -64,6 +65,12 @@ supporting robots out of work and owning the metro.
 moved and savers earning interest.
 `v17-city.json` stops at the same moment with police stations and metro
 depots, whose staff have no patrols yet.
+`v18-city.json` stops at the same moment in a city that has no gangs yet:
+its gang list is empty and no robot names one, which is how the game's
+first midnight comes to founding them (see `Gangs.OldSaveGrowsGangsAtMidnight`).
+`v19-city.json` stops at the same moment in a city that does have gangs, and
+carries a chronicle - empty, as nothing writes to that list until the
+recording step.
 `Version1FixtureMigratesAndRuns` loads the v1
 fixture through the migration, checks every robot kept its home and
 workplace, and runs two days of evenings; `Version2FixtureMigratesAndRuns`

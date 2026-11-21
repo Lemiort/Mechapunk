@@ -115,6 +115,21 @@ struct glz::meta<mechapunk::sim::EmissionReason> {
                   BankRescue, "repaid", Repaid, "interest", Interest);
 };
 
+template <>
+struct glz::meta<mechapunk::sim::EventKind> {
+    using enum mechapunk::sim::EventKind;
+    static constexpr auto value = enumerate(
+        "departed", Departed, "clockedIn", ClockedIn, "shiftEnded", ShiftEnded,
+        "arrivedAtVenue", ArrivedAtVenue, "arrivedHome", ArrivedHome, "rentPaid",
+        RentPaid, "rentMissed", RentMissed, "talked", Talked, "remembered",
+        Remembered, "scrapped", Scrapped, "arrived", Arrived, "weatherChanged",
+        WeatherChanged, "borrowed", Borrowed, "boughtProperty", BoughtProperty,
+        "soldProperty", SoldProperty, "inherited", Inherited, "moneySupplyChanged",
+        MoneySupplyChanged, "unitOpened", UnitOpened, "unitClosed", UnitClosed,
+        "robbed", Robbed, "arrested", Arrested, "fought", Fought, "joinedGang",
+        JoinedGang, "leftGang", LeftGang);
+};
+
 namespace mechapunk::sim {
 
 namespace {
@@ -175,6 +190,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 17,
               .summary = "gangs and crime statistics",
               .apply = &migrations::V17ToV18},
+    Migration{.fromVersion = 18,
+              .summary = "the chronicle",
+              .apply = &migrations::V18ToV19},
 };
 }  // namespace
 

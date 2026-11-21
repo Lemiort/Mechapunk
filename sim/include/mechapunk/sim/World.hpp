@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "mechapunk/sim/Careers.hpp"
+#include "mechapunk/sim/Chronicle.hpp"
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/Ids.hpp"
@@ -145,6 +146,8 @@ struct WorldState {
     DayCounters today;
     // One entry per day, oldest first, at most kHistoryDays.
     std::vector<DailyStats> history;
+    // The city's story: notable events, oldest first, at most kChronicleCap.
+    std::vector<ChronicleEntry> chronicle;
 };
 
 struct WorldParams {

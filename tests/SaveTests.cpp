@@ -44,6 +44,20 @@ std::string EditSave(const std::string& json, Edit edit) {
     return glz::write_json(document).value_or("");
 }
 
+// Appends one chronicle entry to a save document: all seven keys the format
+// has for an entry, everything but the tick left empty.
+void PushChronicleEntry(sim::SaveDocument& chronicle, std::uint64_t tick) {
+    sim::SaveDocument entry = sim::SaveDocument::object_t{};
+    entry["tick"] = tick;
+    entry["kind"] = "scrapped";
+    entry["robot"] = std::uint64_t{0};
+    entry["otherRobot"] = std::uint64_t{0};
+    entry["room"] = std::uint64_t{0};
+    entry["credits"] = std::int64_t{0};
+    entry["memory"] = "arrivedInCity";
+    chronicle.get_array().push_back(std::move(entry));
+}
+
 const std::filesystem::path kFixtureDirectory{MECHAPUNK_FIXTURE_DIR};
 }  // namespace
 
@@ -177,7 +191,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v18-city.json";
+        kFixtureDirectory / "saves" / "v19-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -252,6 +266,10 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     for (const sim::Robot& robot : state->robots) {
         EXPECT_FALSE(robot.patrol.IsValid()) << robot.name;
     }
+    // Saved with a chronicle, empty: what counts as notable is recorded while
+    // the game runs, which the recording step adds. The round trip above is
+    // what proves the save carries the key at all.
+    EXPECT_TRUE(state->chronicle.empty());
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -705,5 +723,57 @@ TEST(Save, Version17FixtureMigratesAndRuns) {
     // The save had no gangs and grew some at its first midnight, from its own
     // seed; Gangs.OldSaveGrowsGangsAtMidnight checks what they look like.
     EXPECT_FALSE(world->State().gangs.empty());
+}
+
+// A version 18 save predates the chronicle: the only thing its migration adds
+// is an empty one, and the city keeps running. The fixture is checked for
+// the absence of the key, so what loads is the migration's work, not a
+// fixture that quietly grew the field.
+TEST(Save, Version18FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v18-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+    EXPECT_EQ(fixture.find("\"chronicle\""), std::string::npos);
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_TRUE(state->chronicle.empty());
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// The chronicle is kept in order and in check: an entry older than the one
+// before it is refused, as is a save holding more than the game keeps.
+TEST(Save, RejectsChroniclesOutOfOrderOrOverfull) {
+    const sim::World world = sim::World::Generate({.seed = 3, .robots = 10});
+    const std::string json = Serialize(world.State());
+
+    const auto backwards = sim::DeserializeWorld(
+        EditSave(json, [](sim::SaveDocument& document) {
+            auto& chronicle = document["world"]["chronicle"];
+            PushChronicleEntry(chronicle, 500);
+            PushChronicleEntry(chronicle, 400);
+        }));
+    ASSERT_TRUE(backwards.has_value()) << backwards.error();
+    auto reordered = sim::World::FromState(std::move(*backwards));
+    ASSERT_FALSE(reordered);
+    EXPECT_NE(reordered.error().find("chronicle"), std::string::npos)
+        << reordered.error();
+
+    const auto overfull = sim::DeserializeWorld(
+        EditSave(json, [](sim::SaveDocument& document) {
+            auto& chronicle = document["world"]["chronicle"];
+            for (std::size_t i = 0; i <= sim::kChronicleCap; ++i) {
+                PushChronicleEntry(chronicle, static_cast<std::uint64_t>(i));
+            }
+        }));
+    ASSERT_TRUE(overfull.has_value()) << overfull.error();
+    auto rejected = sim::World::FromState(std::move(*overfull));
+    ASSERT_FALSE(rejected);
+    EXPECT_NE(rejected.error().find("chronicle"), std::string::npos)
+        << rejected.error();
 }
 

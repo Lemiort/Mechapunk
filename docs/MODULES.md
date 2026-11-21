@@ -35,7 +35,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | ui | 15k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | inspector | 21k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
-| gangs | 22k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp`, `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
+| gangs | 23k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp`, `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
+| chronicle | 6k | `Chronicle.hpp`, `World.hpp` |
 
 ## What lives where
 
@@ -48,7 +49,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 
 | File | What lives there |
 | --- | --- |
-| `World.hpp` | `Robot`, `WorldState`, `EventKind`/`SimEvent`, gangs (`Gang`, `Stance`), the `World` class (every member, grouped by the file implementing it) |
+| `World.hpp` | `Robot`, `WorldState`, `EventKind`/`SimEvent`, gangs (`Gang`, `Stance`), the chronicle (`ChronicleEntry`, declared in `Chronicle.hpp`), the `World` class (every member, grouped by the file implementing it) |
 | `World.cpp` | Construction, `FromState`, `Step` (the midnight order), `RunFor`, `UpdateNeeds`, `IsGuestTrip`, `WalkOf` |
 | `Behaviour.cpp` | A robot's day: `Act`, `Arrive`, `Decide`, `StartWalk`, commutes, `PlanAtHome`, officers' `Patrol` |
 | `Generation.cpp` | `World::Generate`, `AssignDorm`, `AssignJob`, robot names |
@@ -59,6 +60,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Venues.hpp/.cpp` | `VenueRules` per venue kind (hours, price, effects, capacity), `StaffRules` (also police and crew rooms), `FindStaffRules`, `StaffPerShift`, `JobsAt`, `ShiftSlot` |
 | `Careers.hpp/.cpp` | Wages, promotions, firing, `ReviewJobs`, `ReviewHomes` (eviction, moving up, friends moving in together), `JobShift`, `JobKey`, `OpeningsFor` |
 | `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |
+| `Chronicle.hpp` | The saved story (`ChronicleEntry`, `kChronicleCap`) |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
 | `Founding.cpp` | `FoundEconomy` (organizations, owners, starting money), `IndexEconomy` |

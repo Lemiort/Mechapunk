@@ -79,4 +79,9 @@ namespace mechapunk::sim::migrations {
 // gang and zero arrests, counters are all zero.
 [[nodiscard]] std::expected<void, std::string> V17ToV18(SaveDocument& world);
 
+// Version 18 to 19: the world gets a chronicle of notable events, empty at
+// first: it fills up as the game runs, so an old save simply starts its
+// story from the moment it is loaded.
+[[nodiscard]] std::expected<void, std::string> V18ToV19(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations
