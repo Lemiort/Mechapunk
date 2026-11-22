@@ -4,8 +4,10 @@ Status: B1-B6 done; review fixes B7-B8 done; gang details B9 split into
 B9a-B9e on 2026-11-20, all done; the Crime tab bugs the user found on
 2026-11-21 are steps B10a-B10b, and the gang's own inspector view is B11a-B11d,
 all done. Reviewing the whole task as one commit found three rules B7 had
-claimed and not implemented: steps B12a-B12c, all done. Save change done
-(v18). Do task A first: the inspector uses its links.
+claimed and not implemented: steps B12a-B12c, all done; B13 (the officer's
+second arrest rule) done. B14 split on 2026-11-22 into B14a (done) and
+B14b (open). Save change done (v18). Do task A first: the inspector uses its
+links.
 
 ## What the user asked for
 
@@ -675,6 +677,61 @@ shift hour - and rival members barely meet, which is why 40 days gives 19 to
 24 fights. Both need `World::Patrol` (`sim/src/Behaviour.cpp`), a different
 module: recorded below as step B14, not done here.
 
+### B14. Arrests and gang fights seen in a running city — split on 2026-11-22
+
+The item wants two fixes and they live in different modules, so B14 is
+two steps of one module each (guide, section 1 item 5): the officer going
+where the crime is (world module, `World::Patrol`), and rival members
+meeting at all (gangs module, a gang choice made through a one-line hook
+in `Decide`; task B keeps Behaviour.cpp to hooks).
+
+### - [x] B14a. Officers patrol venues the city just robbed (world module)
+
+Open: `sim/src/Behaviour.cpp` (`World::Patrol`, the patrol constants),
+`tests/WorldTests.cpp`; for reading only `Gangs.cpp` and `Chronicle.cpp`,
+to see what a robbery records and where.
+
+Done as: task B made robberies notable and task C keeps every `Robbed`
+event in `state_.chronicle` with its tick and room, so `Patrol` can walk
+the chronicle back from the newest entry over `kCrimeLookbackMinutes`
+(60) and find the venues the city robbed in the last hour. When one of
+the hour's reachable candidates is among them, the officer picks at
+random among **those** instead of among all of the city's ~484 venues:
+still one draw from `state_.random`, both lists sorted, the scan follows
+the chronicle's own order (rule 1). The robbers of a fresh crime still
+stand in its room, which is exactly where `PatrolArrests` (B13) arrests a
+member that robbed in that hour, so arrests now follow the crime's
+geography instead of the officer's luck. No saved state changed: the
+chronicle already existed (v19), nothing new is written.
+
+Test `World.OfficersPatrolWhereTheCityWasRobbed` (population level, guide
+§5): seed 1, 4000 robots, 20 days, summing `counted.arrests` over
+`history`; the run gives 1 arrest without the rule and 38 with it
+(measured both ways), the bound of 10 bites from both sides.
+
+Numbers, seed 1 / 10000 robots / 40 days, before to after: robberies
+1538 to 1464, **arrests 9 to 337** (one in four robberies now), fights
+19 to 24, members 758 to 764. Economy the same in kind: money 5169909
+to 5165746, `created` 2069 to 1105 a day (a fined robber has less to
+lend, as in B13), wages 110% to 108%, robot debt 318367 in 1200 to
+335195 in 1186, banks 235305 to 225786, broke 1053 to 1071, gini 500
+to 499. Money adds up: `ValidateEconomy` passes in every test.
+
+### - [ ] B14b. Rival gang members meet (gangs module)
+
+`sim/src/Gangs.cpp` (a `World` member taking the robot and its outing
+decision, e.g. `GangOuting`), one-line hook in `Decide` in
+`sim/src/Behaviour.cpp`, gangs module. Fights are still 24 in 40 days
+because members of rival gangs share a room barely at all: gangs pick
+venues as if they were not in a gang, out of ~484, so the 1% fight roll
+in `ConsiderCrime` has almost nothing to act on. A gang member must
+sometimes choose its outing among venues tied to its gang — near its
+turf, or near a rival's turf, which is what rivals do to each other —
+so rival members meet "more often than one pair in a hundred" (the
+Done-when item) and `fights` rises from ~20 in 40 days at 10000 robots,
+with the usual economy watch (guide §5) and the population tests
+(guide §5: no skipping, leave margin).
+
 ## Done when
 
 - [x] Gangs exist in new and old cities, members join and leave, rob, get
@@ -682,13 +739,14 @@ module: recorded below as step B14, not done here.
   found gangs (B12c) and the money adds up. Measured at head before B13:
   1473 robberies, 4 arrests, 24 fights - the old note here claiming arrests
   and fights "come out at 0" was stale, see B13.
-- [ ] Arrests and gang fights are seen in a running city (step B14, world
-  module): 9 arrests and ~20 fights in 40 days at 10000 robots is invisible
-  next to 1500 robberies. The limit is the police, not the rule: about 9
-  officers, each visiting one venue for 15 minutes per shift hour out of ~484
-  venues, so `World::Patrol` in `sim/src/Behaviour.cpp` has to send officers
-  where the crime is, and members of rival gangs have to meet more often
-  than one pair in a hundred (see the roadmap gap).
+- [ ] Arrests and gang fights are seen in a running city (step B14, split
+  into B14a world module, done, and B14b gangs module): 9 arrests and ~20
+  fights in 40 days at 10000 robots is invisible next to 1500 robberies.
+  The limit is the police, not the rule: about 9 officers, each visiting
+  one venue for 15 minutes per shift hour out of ~484 venues. B14a made
+  `World::Patrol` in `sim/src/Behaviour.cpp` send officers where the crime
+  is; members of rival gangs still have to meet more often than one pair
+  in a hundred (B14b, see the roadmap gap).
 - [x] Save version 18 with migration, fixture and tests.
 - [ ] Crime tab, gang page, gang colours in the city. Steps B10a-B11d fixed
   the tab's link ids, made its links work and moved the member, relation and

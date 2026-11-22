@@ -517,3 +517,24 @@ TEST(World, OfficersPatrolVenuesAndReturnToTheirStations) {
     EXPECT_GE(lookingRound, 10 * started);
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }
+
+TEST(World, OfficersPatrolWhereTheCityWasRobbed) {
+    // Population level, nobody scripted: an officer's venue pick follows
+    // the chronicle's recent robberies (B14), which is what makes the hour
+    // rule of `PatrolArrests` (B13) fire where the criminals are standing.
+    // This exact run (seed 1, 4000 robots, 20 days) gives 1 arrest without
+    // the rule and 38 with it (measured both ways); the bound of 10 bites
+    // from both sides with room. Before the rule an arrest needed an officer
+    // to visit the crime's venue by luck out of ~484 (9 in 40 days at
+    // 10000 robots, B13's number).
+    sim::World world = sim::World::Generate({.seed = 1, .robots = 4000});
+    for (sim::Tick minute = 0; minute < 20 * sim::kMinutesPerDay; ++minute) {
+        world.Step();
+    }
+    int arrests = 0;
+    for (const sim::DailyStats& day : world.State().history) {
+        arrests += static_cast<int>(day.counted.arrests);
+    }
+    EXPECT_GE(arrests, 10);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}

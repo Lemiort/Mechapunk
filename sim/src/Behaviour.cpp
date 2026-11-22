@@ -66,6 +66,14 @@ constexpr Tick kPatrolReachMinutes = 10;
 
 constexpr Tick kPatrolStayMinutes = 15;
 
+// B14: how far back the chronicle is searched for robberies when an officer
+// picks the venue to patrol. A uniform pick out of the city's ~484 venues
+// left B13's arrest rule invisible at 9 arrests in 40 days, because an
+// officer almost never stood where the robbers were standing; robbers of a
+// fresh crime still are at its venue, so the officer goes to a venue the
+// city robbed within this many minutes instead, when one is within reach.
+constexpr Tick kCrimeLookbackMinutes = 60;
+
 // Weights of the evening decision. Going home is judged by an hour of rest.
 constexpr std::int32_t kHomePeriods = 6;
 
@@ -182,9 +190,34 @@ void World::Patrol(Robot& robot, Tick shiftEnd) {
         }
         // Sorted, so the pick below is deterministic.
         std::ranges::sort(candidates);
-        if (!candidates.empty()) {
-            robot.patrol = candidates[state_.random.UniformInt(
-                0, static_cast<std::uint32_t>(candidates.size() - 1))];
+        // The chronicle keeps every `Robbed` event oldest first (task B
+        // made the crimes notable, task C keeps them), so walking it back
+        // from the newest entry stops at the first robbery older than the
+        // lookback. The officer then goes to a venue on that list when one
+        // is in reach: its robbers still stand in its room, which is where
+        // `PatrolArrests` (B13) arrests a member that robbed in that hour.
+        // Without this the arrest rule needs an officer to visit the crime
+        // venue by luck out of ~484 venues, which gave 9 arrests in 40 days.
+        std::vector<EntityId> crimeRooms;
+        for (auto it = state_.chronicle.rbegin();
+             it != state_.chronicle.rend() &&
+             it->tick + kCrimeLookbackMinutes >= state_.tick;
+             ++it) {
+            if (it->kind == EventKind::Robbed && it->room.IsValid()) {
+                crimeRooms.push_back(it->room);
+            }
+        }
+        std::ranges::sort(crimeRooms);
+        crimeRooms.erase(std::unique(crimeRooms.begin(), crimeRooms.end()),
+                         crimeRooms.end());
+        std::vector<EntityId> crimeVenues;
+        std::ranges::set_intersection(candidates, crimeRooms,
+                                      std::back_inserter(crimeVenues));
+        const std::vector<EntityId>& pick =
+            crimeVenues.empty() ? candidates : crimeVenues;
+        if (!pick.empty()) {
+            robot.patrol = pick[state_.random.UniformInt(
+                0, static_cast<std::uint32_t>(pick.size() - 1))];
             StartWalk(robot, robot.patrol);
             return;
         }
