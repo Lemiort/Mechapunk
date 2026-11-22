@@ -732,6 +732,65 @@ Done-when item) and `fights` rises from ~20 in 40 days at 10000 robots,
 with the usual economy watch (guide §5) and the population tests
 (guide §5: no skipping, leave margin).
 
+### Arrests name the arresting officer — requested 2026-11-22 (B15a-B15d)
+
+The user asked: an arrest must say **who** did it. The chronicle line
+should read "officer X arrested robber Y", the officer's card should
+gain "arrested Y" and the robber's card "arrested by X". Today nothing
+can say that: `World::Arrest` takes only the robber, because neither
+officer path ever works out *which* officer - `officerRooms` is a set of
+room ids (B7's speed fix) and `PatrolArrests` gets the room's robots
+without its officer - and `Social.hpp`'s comment for `Arrested`
+promises an `otherRobot` ("victim (if an officer)") that no code ever
+fills. One new memory kind (the officer's side) is a saved-state change:
+save version 20, so the work starts in the saves module.
+
+### - [x] B15a. Save version 20: the officer's side of an arrest (saves module)
+
+Open: `Social.hpp` (only `MemoryKind`), `Save.hpp`, `Save.cpp`,
+`Migrations.hpp`, end of `Migrations.cpp`, `tests/SaveTests.cpp`,
+`tests/fixtures/saves/README.md`, the guide's state line.
+
+- New `MemoryKind::ArrestedSomeone` (the officer remembers taking someone;
+  robot: the arrested robber); `Arrested`'s stale comment becomes true in
+  the next step: its `otherRobot` is the arresting officer.
+- `V19ToV20` adds nothing: every key a version 19 save has is still there,
+  and the new kind cannot occur in an older file; the bump records the
+  format's new meaning and stops a v20 save loading into an older game.
+- Fixture `v20-city.json` (`--seed 33 --robots 100 --minutes 28370`), a
+  README row and sentence; `CurrentVersionFixtureLoadsAndRoundTrips` at
+  the v20 fixture (the first one whose chronicle is not empty, since the
+  recording step exists now) and `Version19FixtureMigratesAndRuns`.
+
+### - [ ] B15b. The arrest names its officer (gangs module)
+
+Open: `sim/src/Gangs.cpp` (`Arrest`, `ConsiderCrime`, `PatrolArrests`),
+`World.hpp` (the gang section), `sim/src/Social.cpp` (only the `Socialize`
+loop that builds `officerRooms`), `tests/GangCrimeTests.cpp`.
+
+`Socialize` builds a map room → the smallest-id officer on shift in it
+(id order, rule 1); `ConsiderCrime` and `PatrolArrests` look the officer
+up there and pass it to `Arrest(robber, officer)`, which sets the event's
+`robot` to the officer and `otherRobot` to the robber (so the chronicle
+shows who and whom), remembers `Arrested` on the robber with the officer,
+and `ArrestedSomeone` on the officer with the robber. No new random
+draws. Tests: both memories, both directions, on the stage fixture.
+
+### - [ ] B15c. The personal card lines (social module)
+
+Open: `sim/src/Social.cpp` (only `MemoryText`), `tests/SocialTests.cpp`.
+`Arrested`: "arrested by <officer>", falling back to the old "arrested
+for robbing" when the other robot is unknown (memories from v19 saves);
+`ArrestedSomeone`: "arrested <robber>". The robot page already links
+`memory.robot`, so the names become links by themselves.
+
+### - [ ] B15d. The chronicle and log line (validation module)
+
+Open: `sim/src/Describe.cpp` (only the `Arrested` case), and
+`tests/WorldTests.cpp` if a description is pinned there:
+"{officer} arrested {robber} for robbing at {venue}" - the `who` column
+is the officer, `otherRobot` the robber.
+
 ## Done when
 
 - [x] Gangs exist in new and old cities, members join and leave, rob, get

@@ -4,8 +4,9 @@ How to continue the game without earlier conversations. Written for models
 with a small context (about 57k tokens): everything is split so one step of
 one task needs only this guide, one task file and one module.
 
-State as of 2026-11-19: save version 17, game version 0.17.0, 111 tests
-passing (`sim_tests`, `layout_tests` and `ContextBudget`).
+State as of 2026-11-22: save version 20, game version 0.20.0, all tests
+passing (`sim_tests`, `layout_tests` and `ContextBudget`; ctest counts them
+individually).
 
 ## 1. How to work with a small context
 

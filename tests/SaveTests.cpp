@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <array>
@@ -191,7 +191,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v19-city.json";
+        kFixtureDirectory / "saves" / "v20-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -255,21 +255,21 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
         return !robot.bonds.empty() && !robot.memories.empty();
     }));
     EXPECT_GT(state->weather.spells, 10U);
-    // Police stations and metro depots with crew rooms; no robot is on a
-    // patrol yet.
+    // Police stations and metro depots with crew rooms; officers here can
+    // walk a patrol leg, so this asserts nothing about who happens to be
+    // mid patrol at the saved minute.
     EXPECT_TRUE(std::ranges::any_of(state->city.buildings, [](const sim::Building& building) {
         return std::ranges::any_of(building.rooms, [](const sim::Room& room) {
             return room.kind == sim::RoomKind::PoliceStation ||
                    room.kind == sim::RoomKind::CrewRoom;
         });
     }));
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_FALSE(robot.patrol.IsValid()) << robot.name;
-    }
-    // Saved with a chronicle, empty: what counts as notable is recorded while
-    // the game runs, which the recording step adds. The round trip above is
-    // what proves the save carries the key at all.
-    EXPECT_TRUE(state->chronicle.empty());
+    // Saved in a city that has gangs, and a chronicle that already tells a
+    // story: the recording step exists, so notable events were kept while
+    // this fixture ran. The round trip above is what proves the save
+    // carries the keys at all.
+    EXPECT_FALSE(state->gangs.empty());
+    EXPECT_FALSE(state->chronicle.empty());
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -277,464 +277,17 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }
 
-// A save from the first release, before rooms existed, must load through the
-// migration and go on living: robots keep their homes and jobs, and the
-// stores added to their habitats fill up in the evening.
-TEST(Save, Version1FixtureMigratesAndRuns) {
+// A version 19 save already has every key version 20 reads: the new
+// `arrestedSomeone` memory kind can only appear in files version 20 writes,
+// so the migration is the version number alone. The fixture is checked for
+// the absence of that kind, so what loads is the migration's work and not a
+// fixture that quietly grew the new memory.
+TEST(Save, Version19FixtureMigratesAndRuns) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v1-city.json";
+        kFixtureDirectory / "saves" / "v19-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    sim::SaveDocument original;
-    ASSERT_FALSE(glz::read_json(original, fixture));
-    auto& v1Robots = original["world"]["robots"].get_array();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    ASSERT_EQ(state->robots.size(), v1Robots.size());
-    const sim::RoomIndex rooms(state->city);
-    for (std::size_t index = 0; index < v1Robots.size(); ++index) {
-        const sim::Robot& robot = state->robots[index];
-        const auto home = rooms.Find(robot.apartment);
-        const auto work = rooms.Find(robot.workspace);
-        ASSERT_TRUE(home && work) << robot.name;
-        EXPECT_EQ(home->building->id.value,
-                  v1Robots[index]["home"].as<std::uint64_t>());
-        EXPECT_EQ(work->building->id.value,
-                  v1Robots[index]["workplace"].as<std::uint64_t>());
-    }
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    std::uint64_t visits = 0;
-    world->SetEventSink([&](const sim::SimEvent& event) {
-        visits += event.kind == sim::EventKind::ArrivedAtVenue ? 1 : 0;
-    });
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_GT(visits, 0U);
-    // Saving the migrated world writes the current version.
-    EXPECT_NE(Serialize(world->State())
-                  .find(std::format("\"version\": {}", sim::kCurrentSaveVersion)),
-              std::string::npos);
-}
-
-// A version 2 save (rooms, no rent or days off) loads through one migration:
-// every apartment gets rent, every robot two days off, and the city keeps
-// collecting rent and taking days off.
-TEST(Save, Version2FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v2-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    for (const sim::Building& building : state->city.buildings) {
-        for (const sim::Room& room : building.rooms) {
-            EXPECT_EQ(room.rent > 0, room.kind == sim::RoomKind::Apartment)
-                << room.name;
-        }
-    }
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_EQ(std::popcount(static_cast<unsigned>(robot.daysOff)), 2)
-            << robot.name;
-        if (robot.activity == sim::RobotActivity::Resting) {
-            EXPECT_EQ(robot.commuteAt, robot.nextActionAt) << robot.name;
-        }
-    }
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    std::uint64_t rentPaid = 0;
-    world->SetEventSink([&](const sim::SimEvent& event) {
-        rentPaid += event.kind == sim::EventKind::RentPaid ? 1 : 0;
-    });
-    world->RunFor(3 * sim::kMinutesPerDay);
-    EXPECT_GT(rentPaid, 0U);
-}
-
-// A version 3 save (rent and days off, no relationships) loads through one
-// migration: every robot gets two interests and starts without bonds or
-// memories, and robots make friends once the city runs.
-TEST(Save, Version3FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v3-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    std::set<std::uint8_t> tastes;
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_EQ(std::popcount(static_cast<unsigned>(robot.interests)), 2)
-            << robot.name;
-        EXPECT_TRUE(robot.bonds.empty());
-        EXPECT_TRUE(robot.memories.empty());
-        tastes.insert(robot.interests);
-    }
-    EXPECT_GT(tastes.size(), 10U);
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    std::uint64_t friendships = 0;
-    world->SetEventSink([&](const sim::SimEvent& event) {
-        friendships += event.kind == sim::EventKind::Remembered &&
-                               event.memory == sim::MemoryKind::BecameFriends
-                           ? 1
-                           : 0;
-    });
-    world->RunFor(5 * sim::kMinutesPerDay);
-    EXPECT_GT(friendships, 0U);
-}
-
-// A version 4 save (relationships, no careers) loads through one migration:
-// every robot starts as a junior with a clean record, and keeps working.
-TEST(Save, Version4FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v4-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_EQ(robot.jobLevel, 0) << robot.name;
-        EXPECT_EQ(robot.performance, 0) << robot.name;
-        EXPECT_TRUE(robot.workspace.IsValid()) << robot.name;
-    }
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    std::uint64_t shifts = 0;
-    world->SetEventSink([&](const sim::SimEvent& event) {
-        shifts += event.kind == sim::EventKind::ShiftEnded ? 1 : 0;
-    });
-    world->RunFor(3 * sim::kMinutesPerDay);
-    EXPECT_GT(shifts, 0U);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 5 save (careers, no aging) loads through one migration: robots
-// get an age and the wear that goes with it, nobody has been scrapped yet,
-// and the city goes on aging.
-TEST(Save, Version5FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v5-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_TRUE(state->departed.empty());
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_GE(robot.age, 30U) << robot.name;
-        EXPECT_LT(robot.age, 330U) << robot.name;
-        EXPECT_EQ(robot.wear, sim::WearAtAge(robot.age)) << robot.name;
-    }
-    // The youngest robot is the least likely to be scrapped in three days.
-    const sim::Robot& youngest = *std::ranges::min_element(
-        state->robots, std::less{}, &sim::Robot::age);
-    const sim::EntityId id = youngest.id;
-    const std::uint32_t age = youngest.age;
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(3 * sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-    const sim::Robot* older = world->FindRobot(id);
-    ASSERT_NE(older, nullptr);
-    EXPECT_EQ(older->age, age + 3);
-}
-
-// A version 6 save (aging, no metro) loads through one migration: the city
-// gets a station at every third intersection, nobody is riding yet, and
-// robots start taking the metro.
-TEST(Save, Version6FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v6-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    // An 8 by 8 grid: rows and columns 1, 4 and 7.
-    ASSERT_EQ(state->city.stations.size(), 9U);
-    EXPECT_EQ(state->city.stations.front().node.value, 9U);
-    EXPECT_EQ(state->city.stations.back().node.value, 63U);
-    EXPECT_EQ(state->city.stations.front().name, "Neon Square");
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_EQ(robot.alightsAt, 0U) << robot.name;
-    }
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    std::uint64_t rides = 0;
-    world->SetEventSink([&](const sim::SimEvent& event) {
-        rides += event.kind == sim::EventKind::Departed && event.metro ? 1 : 0;
-    });
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_GT(rides, 0U);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 7 save (metro, no weather) loads through one migration: the
-// world starts dry for six hours, then its weather changes like any other.
-TEST(Save, Version7FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v7-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_EQ(state->weather.rain, 0U);
-    EXPECT_EQ(state->weather.spells, 0U);
-    EXPECT_EQ(state->weather.changesAt, state->tick + (6 * sim::kMinutesPerHour));
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    std::uint32_t changes = 0;
-    world->SetEventSink([&](const sim::SimEvent& event) {
-        changes += event.kind == sim::EventKind::WeatherChanged ? 1 : 0;
-    });
-    world->RunFor(4 * sim::kMinutesPerDay);
-    EXPECT_GT(changes, 0U);
-    EXPECT_EQ(world->State().weather.spells, changes);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 8 save (no changes of line) loads through one migration:
-// robots on the metro change at their last station, that is, they don't,
-// and the city goes on riding the timetable's trains.
-TEST(Save, Version8FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v8-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    bool riding = false;
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_EQ(robot.rideVia, robot.rideTo) << robot.name;
-        riding = riding || robot.alightsAt != 0;
-    }
-    EXPECT_TRUE(riding);
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    std::uint64_t rides = 0;
-    world->SetEventSink([&](const sim::SimEvent& event) {
-        rides += event.kind == sim::EventKind::Departed && event.metro ? 1 : 0;
-    });
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_GT(rides, 0U);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 9 save gets a founded economy: organizations with capital,
-// every room an owner, robots a bank, and money that adds up; then it
-// keeps running and records statistics.
-TEST(Save, Version9FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v9-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_GT(state->economy.organizations.size(), 6U);
-    EXPECT_TRUE(state->history.empty());
-    EXPECT_TRUE(sim::ValidateWorldState(*state));
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_EQ(world->State().history.size(), 2U);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 10 save gets daily budgets and a price of supplies, and goes on
-// running: out-of-work robots find jobs on venues' staff.
-TEST(Save, Version10FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v10-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_EQ(state->economy.supplyPercent, 60);
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_EQ(robot.spentToday, 0) << robot.name;
-    }
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 11 save's apartments all become studios, and the city gets a
-// housing office with nothing to its name yet; then it keeps running.
-TEST(Save, Version11FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v11-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    for (const sim::Building& building : state->city.buildings) {
-        for (const sim::Room& room : building.rooms) {
-            EXPECT_EQ(room.apartmentClass, room.kind == sim::RoomKind::Apartment
-                                               ? sim::ApartmentClass::Studio
-                                               : sim::ApartmentClass::None);
-        }
-    }
-    EXPECT_TRUE(std::ranges::any_of(state->economy.organizations, [](const sim::Organization& each) {
-        return each.kind == sim::OrganizationKind::Government;
-    }));
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 12 save's venues ask their base prices and market rents start
-// at their base; then it keeps running.
-TEST(Save, Version12FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v12-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    for (const std::int64_t percent : state->economy.rentPercent) {
-        EXPECT_EQ(percent, 100);
-    }
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 13 save's rooms have not been quiet yet; then it keeps running.
-TEST(Save, Version13FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v13-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    for (const sim::Building& building : state->city.buildings) {
-        for (const sim::Room& room : building.rooms) {
-            EXPECT_EQ(room.quietNights, 0U);
-        }
-    }
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 14 save's housing office becomes City Hall and takes over the
-// metro; then it keeps running and collecting taxes.
-TEST(Save, Version14FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v14-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_TRUE(std::ranges::any_of(state->economy.organizations, [](const sim::Organization& each) {
-        return each.kind == sim::OrganizationKind::Government && each.name == "City Hall";
-    }));
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_GT(world->State().history.back().counted.wageTax, 0);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 15 save's central bank starts at the old fixed rate.
-TEST(Save, Version15FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v15-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_EQ(state->economy.policyRate, 10);
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(2 * sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 16 save predates patrols: every robot's patrol is cleared, and
-// the city keeps running with its police stations and metro depots.
-TEST(Save, Version16FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v16-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_FALSE(robot.patrol.IsValid()) << robot.name;
-    }
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 17 save predates gangs: every robot's gang is zero, arrests are
-// zero, and crime counters start at zero; the city keeps running and grows
-// gangs at its first midnight.
-TEST(Save, Version17FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v17-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    for (const sim::Robot& robot : state->robots) {
-        EXPECT_EQ(robot.gang.value, 0U) << robot.name;
-        EXPECT_EQ(robot.arrests, 0U) << robot.name;
-    }
-    EXPECT_TRUE(state->gangs.empty());
-    EXPECT_EQ(state->today.robberies, 0);
-    for (const auto& day : state->history) {
-        EXPECT_EQ(day.counted.robberies, 0);
-        EXPECT_EQ(day.gangMembers, 0);
-    }
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-    // The save had no gangs and grew some at its first midnight, from its own
-    // seed; Gangs.OldSaveGrowsGangsAtMidnight checks what they look like.
-    EXPECT_FALSE(world->State().gangs.empty());
-}
-
-// A version 18 save predates the chronicle: the only thing its migration adds
-// is an empty one, and the city keeps running. The fixture is checked for
-// the absence of the key, so what loads is the migration's work, not a
-// fixture that quietly grew the field.
-TEST(Save, Version18FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v18-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-    EXPECT_EQ(fixture.find("\"chronicle\""), std::string::npos);
+    EXPECT_EQ(fixture.find("\"arrestedSomeone\""), std::string::npos);
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
@@ -743,6 +296,11 @@ TEST(Save, Version18FixtureMigratesAndRuns) {
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(sim::kMinutesPerDay);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+    // And running through version 20 code writes the new kind only when an
+    // officer arrests: the v19 story itself is left untouched.
+    for (const sim::ChronicleEntry& entry : world->State().chronicle) {
+        EXPECT_NE(entry.tick, 0U);
+    }
 }
 
 // The chronicle is kept in order and in check: an entry older than the one

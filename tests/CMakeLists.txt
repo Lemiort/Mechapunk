@@ -13,6 +13,7 @@ add_executable(sim_tests
     MetroTests.cpp
     RandomTests.cpp
     SaveTests.cpp
+    SaveFixtureTests.cpp
     SocialTests.cpp
     TransitTests.cpp
     WeatherTests.cpp

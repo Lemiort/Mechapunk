@@ -90,7 +90,8 @@ struct glz::meta<mechapunk::sim::MemoryKind> {
         BoughtProperty, "soldHome", SoldHome, "tookLoan", TookLoan,
         "inherited", Inherited, "movedInTogether", MovedInTogether,
         "joinedGang", JoinedGang, "leftGang", LeftGang, "wasRobbed",
-        WasRobbed, "robbedSomeone", RobbedSomeone, "arrested", Arrested);
+        WasRobbed, "robbedSomeone", RobbedSomeone, "arrested", Arrested,
+        "arrestedSomeone", ArrestedSomeone);
 };
 template <>
 struct glz::meta<mechapunk::sim::OrganizationKind> {
@@ -193,6 +194,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 18,
               .summary = "the chronicle",
               .apply = &migrations::V18ToV19},
+    Migration{.fromVersion = 19,
+              .summary = "arrests name the arresting officer",
+              .apply = &migrations::V19ToV20},
 };
 }  // namespace
 

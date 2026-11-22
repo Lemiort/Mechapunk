@@ -81,7 +81,8 @@ enum class MemoryKind : std::uint8_t {
     LeftGang,       // room: its home.
     WasRobbed,      // room: where; credits: what was taken; otherRobot: robber.
     RobbedSomeone,  // credits: what it took; otherRobot: victim; room: where.
-    Arrested,       // room: the venue; otherRobot: victim (if an officer).
+    Arrested,       // room: the venue; otherRobot: the arresting officer.
+    ArrestedSomeone,  // The officer's side of an arrest; robot: the robber.
 };
 
 struct Memory {

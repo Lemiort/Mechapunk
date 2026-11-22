@@ -408,4 +408,18 @@ std::expected<void, std::string> V18ToV19(SaveDocument& world) try {
         std::format("the version 18 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V19ToV20(SaveDocument& world) try {
+    // Nothing to add. Version 20 only makes arrests name the officer who
+    // took the criminal: memories already carry the other robot, so no key
+    // is new, and the memory kind `arrestedSomeone`, which only this
+    // version writes, can never be missing from a version 19 file. The
+    // bump still matters: it records the format's new meaning and makes a
+    // version 20 save refuse to load into an older game.
+    static_cast<void>(world);
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 19 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

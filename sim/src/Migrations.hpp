@@ -84,4 +84,10 @@ namespace mechapunk::sim::migrations {
 // story from the moment it is loaded.
 [[nodiscard]] std::expected<void, std::string> V18ToV19(SaveDocument& world);
 
+// Version 19 to 20: an arrest names the arresting officer. The JSON needs
+// no new key: memories already name the other robot, and the new memory
+// kind `arrestedSomeone` cannot appear in a version 19 file, so the
+// migration only carries the version forward.
+[[nodiscard]] std::expected<void, std::string> V19ToV20(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations
