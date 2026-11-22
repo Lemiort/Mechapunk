@@ -869,17 +869,25 @@ carries three rows: an arrest with an officer, a was-robbed row, and an
 arrest of a version 19 memory with no officer (perpetrator empty, member
 still the victim). ctest: 159/159 pass.
 
-### - [ ] B15g. The gang page shows that officer (inspector module)
+### - [x] B15g. The gang page shows that officer (inspector module)
 
 Open: `app/InspectorGang.cpp` (`Counterpart`, and the comment above it),
 no sim change. "Who" in the gang page's crime table is
-`Counterpart(crime)`; for `Arrest` it returns none today, so the column reads
+`Counterpart(crime)`; for `Arrest` it returned none, so the column read
 "nobody" beside "arrested" even though B15f made the row name the officer.
 Return `crime.perpetrator` for an arrest - an old save's empty officer still
 prints "nobody". The inspector has no render test of this table
 (guide, section 9.4: the list functions are what is tested, the drawing is
 what the user checks), so the bite is that the officer's name becomes a
 link; whether it reads well is for the user to see in the game.
+
+Done as: as written - one case added, comment corrected. The row's officer
+goes through the same `RobotLink` the other kinds use, so it opens that
+officer's page; with `perpetrator` empty (a version 19 arrest) the column
+keeps its "nobody" rather than linking the member to itself. No test of
+the drawing exists, so this step is checked by the compile and by the user
+looking at a gang page; `GangLists.GangCrimesFieldsAndOrder` (B15f) is
+what pins the data behind it. ctest: 159/159 pass.
 
 ## Done when
 

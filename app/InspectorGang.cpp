@@ -71,12 +71,16 @@ const char* Doing(const RobotFrame& robot) {
 }
 
 // The other robot in a crime row, if any: who the member did it to, or who
-// did it to the member; an arrest named no robot in the memories.
+// did it to the member. Since B15 an arrest names the officer that made it,
+// so the row links that officer; a memory of a version 19 save recorded no
+// officer (B15e's migration clears the field) and that row still reads
+// "nobody" instead of linking the member to itself.
 sim::EntityId Counterpart(const GangCrime& crime) {
     switch (crime.kind) {
         case CrimeKind::Robbery:   return crime.victim;
         case CrimeKind::WasRobbed: return crime.perpetrator;
-        default:                 return sim::EntityId{};
+        case CrimeKind::Arrest:    return crime.perpetrator;
+        default:                   return sim::EntityId{};
     }
 }
 
