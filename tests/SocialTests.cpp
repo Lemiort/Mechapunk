@@ -67,6 +67,20 @@ TEST(Social, DescribesInterestsAndMemories) {
               "fell behind on rent");
 }
 
+TEST(Social, ArrestMemoryLinesNameTheOfficer) {
+    // B15c: both sides of an arrest on the personal cards; memories from
+    // version 19 saves never filled the other robot, so they keep the old,
+    // vaguer line.
+    EXPECT_EQ(sim::MemoryText(sim::MemoryKind::Arrested, "RB-07 Vex"),
+              "arrested by RB-07 Vex");
+    EXPECT_EQ(sim::MemoryText(sim::MemoryKind::Arrested, ""),
+              "arrested for robbing");
+    EXPECT_EQ(sim::MemoryText(sim::MemoryKind::ArrestedSomeone, "HK-632 Pike"),
+              "arrested HK-632 Pike");
+    EXPECT_EQ(sim::MemoryText(sim::MemoryKind::ArrestedSomeone, ""),
+              "arrested someone");
+}
+
 TEST(Social, RobotsAreBornWithTwoInterestsAndNoBonds) {
     const sim::World world = sim::World::Generate({.seed = 4, .robots = 80});
     std::set<std::uint8_t> kinds;

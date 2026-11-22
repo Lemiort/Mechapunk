@@ -809,13 +809,20 @@ is regenerated (allowed: only older fixtures are frozen). Test: an
 `arrested` chronicle entry edited into the v19 fixture's JSON loads
 swapped.
 
-### - [ ] B15c. The personal card lines (social module)
+### - [x] B15c. The personal card lines (social module)
 
 Open: `sim/src/Social.cpp` (only `MemoryText`), `tests/SocialTests.cpp`.
 `Arrested`: "arrested by <officer>", falling back to the old "arrested
 for robbing" when the other robot is unknown (memories from v19 saves);
 `ArrestedSomeone`: "arrested <robber>". The robot page already links
 `memory.robot`, so the names become links by themselves.
+
+Done as: as written, both lines append the venue as "at <room>" through
+`MemoryText`'s `at()` helper. Test `Social.ArrestMemoryLinesNameTheOfficer`
+pins the four spellings; without the new `ArrestedSomeone` case the text
+falls back to "remembered something" and the test fails. The inspector's
+robot page already links `memory.robot` (`DrawMemories`), so officer and
+robber names on both cards click through without any app change.
 
 ### - [ ] B15d. The chronicle and log line (validation module)
 

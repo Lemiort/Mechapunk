@@ -225,7 +225,17 @@ std::string MemoryText(MemoryKind kind, std::string_view other,
             return place.empty() ? std::string{"robbed someone"}
                                  : std::format("robbed someone at {}", place);
         case MemoryKind::Arrested:
-            return std::format("arrested for robbing");
+            // B15: the robber's card names the officer that took it; memories
+            // from version 19 saves never filled the other robot, so those
+            // keep the old, vaguer line.
+            return at(other.empty() ? std::string{"arrested for robbing"}
+                                    : std::format("arrested by {}", other),
+                      "at");
+        case MemoryKind::ArrestedSomeone:
+            // The officer's card: it was the officer that made the arrest.
+            return at(other.empty() ? std::string{"arrested someone"}
+                                    : std::format("arrested {}", other),
+                      "at");
     }
     return "remembered something";
 }
