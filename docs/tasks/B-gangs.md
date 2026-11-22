@@ -796,7 +796,7 @@ with its own copy of the stage in an anonymous namespace; new
 `gang-officer` module in `scripts/context_budget.py` and `docs/MODULE
 S.md` (gangs 16818, gang-officer 8233). ctest: 158/158 pass.
 
-### - [ ] B15e. Old arrests in old saves read the new way (saves module)
+### - [x] B15e. Old arrests in old saves read the new way (saves module)
 
 Open: `Migrations.cpp` (only `V19ToV20`), `SaveTests.cpp`, the fixture
 directory, `README.md`. `V19ToV20` was written as a no-op in B15a, but
@@ -808,6 +808,18 @@ The migration must swap them (`robot` → unknown, `robber` →
 is regenerated (allowed: only older fixtures are frozen). Test: an
 `arrested` chronicle entry edited into the v19 fixture's JSON loads
 swapped.
+
+Done as: `V19ToV20` walks `world.chronicle` and, for entries of kind
+`arrested`, moves `robot` into `otherRobot` and clears `robot`: the
+migration may not invent an officer the old game never recorded, and
+`Describe` (B15d) reads the cleared form as "An officer arrested X".
+The v20 fixture was regenerated and is **byte-identical** (seed 33 at
+100 robots never arrests, and the new kind and swapped fields only
+appear in runs that do), so it stays as B15a committed it.
+`Version19FixtureMigratesAndRuns` grew the bite: an `arrested` entry
+(robber 424242, no officer) edited into the fixture's JSON with `EditSave`
+loads with `robot` empty and `otherRobot` 424242; without the swap the
+assertion fails. Older fixtures untouched, as always. ctest: 159/159.
 
 ### - [x] B15c. The personal card lines (social module)
 

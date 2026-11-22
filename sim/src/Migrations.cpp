@@ -409,13 +409,22 @@ std::expected<void, std::string> V18ToV19(SaveDocument& world) try {
 }
 
 std::expected<void, std::string> V19ToV20(SaveDocument& world) try {
-    // Nothing to add. Version 20 only makes arrests name the officer who
-    // took the criminal: memories already carry the other robot, so no key
-    // is new, and the memory kind `arrestedSomeone`, which only this
-    // version writes, can never be missing from a version 19 file. The
-    // bump still matters: it records the format's new meaning and makes a
-    // version 20 save refuse to load into an older game.
-    static_cast<void>(world);
+    // Version 20 makes arrests name the officer that made them (task B,
+    // step B15b), and turns around what an `arrested` chronicle entry
+    // stores: version 19 wrote the criminal into `robot` and knew no
+    // officer, because neither arrest path worked out which officer it
+    // was. The criminal moves to `otherRobot` and `robot` becomes none,
+    // which the game reads as "an officer arrested him": the migration
+    // must not invent an officer the old game never recorded. No other
+    // key changes, and the memory kind `arrestedSomeone`, which only
+    // version 20 writes, can never be missing from a version 19 file.
+    for (SaveDocument& entry : world["chronicle"].get_array()) {
+        if (entry["kind"].is_string() &&
+            entry["kind"].get_string() == "arrested") {
+            entry["otherRobot"] = entry["robot"];
+            entry["robot"] = std::uint64_t{0};
+        }
+    }
     return {};
 } catch (const std::exception& error) {
     return std::unexpected(

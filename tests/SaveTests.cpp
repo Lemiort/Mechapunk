@@ -301,6 +301,30 @@ TEST(Save, Version19FixtureMigratesAndRuns) {
     for (const sim::ChronicleEntry& entry : world->State().chronicle) {
         EXPECT_NE(entry.tick, 0U);
     }
+
+    // A story that saw an arrest: version 19 wrote the criminal into
+    // `robot` and knew no officer, so the migration turns the entry
+    // around - criminal in `otherRobot`, `robot` none - instead of inventing
+    // an officer. The entry is edited into the fixture's JSON, so what
+    // loads is the migration's work.
+    const auto edited = EditSave(fixture, [](sim::SaveDocument& document) {
+        sim::SaveDocument entry = sim::SaveDocument::object_t{};
+        entry["tick"] = std::uint64_t{1000};
+        entry["kind"] = "arrested";
+        entry["robot"] = std::uint64_t{424242};
+        entry["otherRobot"] = std::uint64_t{0};
+        entry["room"] = std::uint64_t{0};
+        entry["credits"] = std::int64_t{0};
+        entry["memory"] = "becameFriends";
+        document["world"]["chronicle"].get_array().push_back(std::move(entry));
+    });
+    auto story = sim::DeserializeWorld(edited);
+    ASSERT_TRUE(story.has_value()) << story.error();
+    ASSERT_FALSE(story->chronicle.empty());
+    const sim::ChronicleEntry& last = story->chronicle.back();
+    EXPECT_EQ(last.kind, sim::EventKind::Arrested);
+    EXPECT_FALSE(last.robot.IsValid());
+    EXPECT_EQ(last.otherRobot.value, 424242U);
 }
 
 // The chronicle is kept in order and in check: an entry older than the one
