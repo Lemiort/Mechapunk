@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -395,24 +396,30 @@ private:
     // officer rule B4 asked for went dead because it also asked whether the
     // officer belonged to a gang, which ReviewGangs forbids.
     [[nodiscard]] bool OfficerOnShift(const Robot& robot) const;
-    // Crime and gang interactions, in Gangs.cpp. `officerRooms` holds the
-    // ids of rooms that hold an officer on shift; `Socialize` builds it once
-    // per call so every pair can ask, instead of walking the whole
-    // population for each pair (the check B7 asked for).
+    // Crime and gang interactions, in Gangs.cpp. `officerInRoom` maps a room
+    // that holds an officer on shift to that officer's place in `state_.robots`
+    // (the smaller id when several officers share a room); `Socialize` builds
+    // it once per call so every pair can ask, instead of walking the whole
+    // population for each pair (the check B7 asked for), and an arrest can
+    // name the officer that made it (B15).
     void ConsiderCrime(Robot& first, Robot& second,
-                       const std::set<std::uint64_t>& officerRooms);
-    // One arrest: the fine to City Hall, the rap sheet, the day's count. Both
-    // ways an officer takes someone go through this, so an arrest is one thing
+                       const std::map<std::uint64_t, std::size_t>& officerInRoom);
+    // One arrest: the fine to City Hall, the rap sheet, the day's count, and
+    // both memories of who took whom: `Arrested` on the robber naming the
+    // officer, `ArrestedSomeone` on the officer naming the robber. Both ways
+    // an officer takes someone go through this, so an arrest is one thing
     // written once.
-    void Arrest(Robot& robber);
+    void Arrest(Robot& robber, Robot& officer);
     // B4's second officer rule: an officer on patrol meeting a member that
     // robbed in the last hour arrests it, wherever the robbery happened - the
     // robbery's own room is watched only about one hour in fifty, so matching
     // on the room left arrests at 4 in 40 days. `Socialize` calls this once
-    // per watched room with the robots standing in it; it walks them in id
-    // order and takes no random number, so the same room always gives the same
-    // arrests (rule 1: the same state grows the same future everywhere).
-    void PatrolArrests(const std::vector<std::size_t>& present);
+    // per watched room with the robots standing in it and the room's officer;
+    // it walks them in id order and takes no random number, so the same room
+    // always gives the same arrests by the same officer (rule 1: the same
+    // state grows the same future everywhere).
+    void PatrolArrests(const std::vector<std::size_t>& present,
+                       std::size_t officerIndex);
     // The economy, in Founding.cpp, Money.cpp, Units.cpp, Property.cpp,
     // Settlement.cpp and EconomyStatistics.cpp (see docs/MODULES.md).
     void FoundEconomy(std::uint64_t seed);

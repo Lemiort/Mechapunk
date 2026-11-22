@@ -757,12 +757,14 @@ Open: `Social.hpp` (only `MemoryKind`), `Save.hpp`, `Save.cpp`,
 - `V19ToV20` adds nothing: every key a version 19 save has is still there,
   and the new kind cannot occur in an older file; the bump records the
   format's new meaning and stops a v20 save loading into an older game.
+  (B15b changes what an `arrested` chronicle entry's `robot` names; that
+  fix-up lives in step B15e, written when B15b made it necessary.)
 - Fixture `v20-city.json` (`--seed 33 --robots 100 --minutes 28370`), a
   README row and sentence; `CurrentVersionFixtureLoadsAndRoundTrips` at
   the v20 fixture (the first one whose chronicle is not empty, since the
   recording step exists now) and `Version19FixtureMigratesAndRuns`.
 
-### - [ ] B15b. The arrest names its officer (gangs module)
+### - [x] B15b. The arrest names its officer (gangs module)
 
 Open: `sim/src/Gangs.cpp` (`Arrest`, `ConsiderCrime`, `PatrolArrests`),
 `World.hpp` (the gang section), `sim/src/Social.cpp` (only the `Socialize`
@@ -775,6 +777,37 @@ up there and pass it to `Arrest(robber, officer)`, which sets the event's
 shows who and whom), remembers `Arrested` on the robber with the officer,
 and `ArrestedSomeone` on the officer with the robber. No new random
 draws. Tests: both memories, both directions, on the stage fixture.
+
+Done as: as written; `officerInRoom` replaces the set, `PatrolArrests`
+takes the room's officer index. The tests pin the naming: every
+`Arrested` event of the second half of `OfficerCatchesRobbersOfTheHour
+Before` has `robot` = the stage officer and a valid `otherRobot`, and
+the officer ends with `ArrestedSomeone` memories;
+`OfficerTurnsTheRobberyIntoAnArrest` checks the robber-side memory
+names the officer and the officer has the other kind. `CountOf`'s
+either-seat OR still matches, and the arrest's own-memory guard
+(once an hour) still holds on the robber side. The flip means
+`Arrested` chronicle entries in version 19 saves read backwards and
+the v20 fixture of B15a was written by the old code - recorded as
+step B15e (saves module), not done here. `tests/GangCrimeTests.cpp`
+went over the 10k per-file limit with the new assertions, so the
+officer-bond/rival/hour tests moved to `tests/GangOfficerTests.cpp`
+with its own copy of the stage in an anonymous namespace; new
+`gang-officer` module in `scripts/context_budget.py` and `docs/MODULE
+S.md` (gangs 16818, gang-officer 8233). ctest: 158/158 pass.
+
+### - [ ] B15e. Old arrests in old saves read the new way (saves module)
+
+Open: `Migrations.cpp` (only `V19ToV20`), `SaveTests.cpp`, the fixture
+directory, `README.md`. `V19ToV20` was written as a no-op in B15a, but
+B15b changed what `robot` means in an `arrested` chronicle entry: version
+19 files hold entries with the **robber** in `robot` and no `otherRobot`.
+The migration must swap them (`robot` → unknown, `robber` →
+`otherRobot`) so old entries print "An officer arrested X" and new ones
+"X arrested Y", and the v20 fixture - written by the pre-B15b binary -
+is regenerated (allowed: only older fixtures are frozen). Test: an
+`arrested` chronicle entry edited into the v19 fixture's JSON loads
+swapped.
 
 ### - [ ] B15c. The personal card lines (social module)
 

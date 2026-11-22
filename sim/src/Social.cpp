@@ -235,11 +235,19 @@ void World::Socialize() {
     // -OnShift: the same definition HandleOfficerAffinity uses, so a watched
     // room and the officer in it cannot be decided two different ways. Built
     // once per call so ConsiderCrime can look a room up instead of walking
-    // every robot for every pair (B7's speed item).
-    std::set<std::uint64_t> officerRooms;
-    for (const Robot& robot : state_.robots) {
-        if (OfficerOnShift(robot)) {
-            officerRooms.insert(robot.location.value);
+    // every robot for every pair (B7's speed item); the value is the room's
+    // officer, the smaller id when two stand in it, so an arrest can name
+    // one and names the same one on every machine (rule 1).
+    std::map<std::uint64_t, std::size_t> officerInRoom;
+    for (std::size_t index = 0; index < state_.robots.size(); ++index) {
+        const Robot& robot = state_.robots[index];
+        if (!OfficerOnShift(robot)) {
+            continue;
+        }
+        const auto [found, inserted] =
+            officerInRoom.try_emplace(robot.location.value, index);
+        if (!inserted && state_.robots[found->second].id.value > robot.id.value) {
+            found->second = index;
         }
     }
 
@@ -297,14 +305,16 @@ void World::Socialize() {
             busy[self] = true;
             busy[slot] = true;
             Talk(robot, state_.robots[present[slot]]);
-            ConsiderCrime(robot, state_.robots[present[slot]], officerRooms);
+            ConsiderCrime(robot, state_.robots[present[slot]], officerInRoom);
         }
         // The officer's other half (B4): a member standing in a room an officer
-        // stands in, that robbed in the last hour, is arrested (in Gangs.cpp).
-        // The room the robbery happened in is not required: officers see about
-        // one venue in fifty, so matching rooms left arrests almost unseen.
-        if (officerRooms.contains(room)) {
-            PatrolArrests(present);
+        // stands in, that robbed in the last hour, is arrested by that officer
+        // (in Gangs.cpp). The room the robbery happened in is not required:
+        // officers see about one venue in fifty, so matching rooms left arrests
+        // almost unseen.
+        const auto watched = officerInRoom.find(room);
+        if (watched != officerInRoom.end()) {
+            PatrolArrests(present, watched->second);
         }
     }
 }

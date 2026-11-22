@@ -4,6 +4,7 @@ include(GoogleTest)
 add_executable(sim_tests
     GangRosterTests.cpp
     GangCrimeTests.cpp
+    GangOfficerTests.cpp
     CareersTests.cpp
     ChronicleTests.cpp
     CityTests.cpp

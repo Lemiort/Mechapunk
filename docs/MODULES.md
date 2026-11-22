@@ -35,7 +35,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | ui | 15k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | inspector | 21k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
-| gangs | 20k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
+| gangs | 17k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
+| gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
 | gang-lists | 4k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
 | chronicle | 8k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 

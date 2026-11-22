@@ -398,8 +398,12 @@ void World::ReviewGangs() {
 
 // The whole of an arrest, so both paths that end in one cannot drift apart.
 // No credit is taken: the fine (B4: credits plus savings, at most 100) is paid
-// to City Hall through PayBill, which is why the money still adds up.
-void World::Arrest(Robot& robber) {
+// to City Hall through PayBill, which is why the money still adds up. The
+// arrest names its officer (B15): the event puts the officer in `robot` and
+// the robber in `otherRobot`, so the chronicle says who did it and whom;
+// both sides remember - the robber `Arrested` naming the officer, the officer
+// `ArrestedSomeone` naming the robber - which is what the personal cards show.
+void World::Arrest(Robot& robber, Robot& officer) {
     const std::int64_t fine =
         std::min(robber.credits + robber.savings, static_cast<std::int64_t>(100));
     PayBill(robber, FindGovernment(state_.economy.organizations).id, fine);
@@ -407,9 +411,11 @@ void World::Arrest(Robot& robber) {
     ++robber.arrests;
     Emit({.tick = state_.tick,
           .kind = EventKind::Arrested,
-          .robot = robber.id,
-          .room = robber.location});
-    Remember(robber, MemoryKind::Arrested, {}, robber.location);
+          .robot = officer.id,
+          .room = robber.location,
+          .otherRobot = robber.id});
+    Remember(robber, MemoryKind::Arrested, officer.id, robber.location);
+    Remember(officer, MemoryKind::ArrestedSomeone, robber.id, robber.location);
 }
 
 // B4 asked for two ways an officer takes a robber and the code had one: the
@@ -426,7 +432,8 @@ void World::Arrest(Robot& robber) {
 // in it that remembers robbing in that hour is arrested, once an hour (the
 // arrest's own memory is the guard), in id order and with no random draw, so
 // the same room always gives the same arrests (rule 1).
-void World::PatrolArrests(const std::vector<std::size_t>& present) {
+void World::PatrolArrests(const std::vector<std::size_t>& present,
+                         std::size_t officerIndex) {
     for (std::size_t index : present) {
         Robot& robot = state_.robots[index];
         // Officers are never members (ReviewGangs forbids it), so a member
@@ -436,12 +443,12 @@ void World::PatrolArrests(const std::vector<std::size_t>& present) {
             continue;
         }
         if (RememberedInLastHour(robot, MemoryKind::Arrested, state_.tick)) continue;
-        Arrest(robot);
+        Arrest(robot, state_.robots[officerIndex]);
     }
 }
 
 void World::ConsiderCrime(Robot& first, Robot& second,
-    const std::set<std::uint64_t>& officerRooms) {
+    const std::map<std::uint64_t, std::size_t>& officerInRoom) {
     const Gang* gangA = FindGangOf(state_.gangs, first);
     const Gang* gangB = FindGangOf(state_.gangs, second);
 
@@ -529,21 +536,24 @@ void World::ConsiderCrime(Robot& first, Robot& second,
 
     // The pair roll (B4): only 3 percent of the pairs where a member could
     // take something try it. One roll per pair decides both what follows:
-    // an officer on shift standing in this room (officerRooms is built once
+    // an officer on shift standing in this room (officerInRoom is built once
     // per Socialize call, B7's speed fix) turns the attempt into an arrest
-    // instead of a robbery. Drawing the roll once is the whole point - the
-    // first version tested it only on the arrest path, so every eligible
-    // pair robbed and an officer held crime down rather than changing it.
+    // by that officer instead of a robbery. Drawing the roll once is the
+    // whole point: the first version tested it only on the arrest path, so
+    // every eligible pair robbed and an officer held crime down rather than
+    // changing it.
     const std::uint32_t roll = state_.random.UniformInt(1, 100);
     if (roll > kRobberyPercent) {
         return;
     }
 
-    if (officerRooms.contains(first.location.value)) {
-        // B5: the would-be robber is arrested instead. No credit moves; the
-        // fine goes to City Hall through PayBill, and the robber's rap sheet
-        // grows, which is what makes it leave its gang later.
-        Arrest(*robber);
+    if (auto watched = officerInRoom.find(first.location.value);
+        watched != officerInRoom.end()) {
+        // B5: the would-be robber is arrested by the room's officer instead.
+        // No credit moves; the fine goes to City Hall through PayBill, and
+        // the robber's rap sheet grows, which is what makes it leave its
+        // gang later.
+        Arrest(*robber, state_.robots[watched->second]);
     } else {
         // No officer: the robbery proceeds.
         std::int64_t loot = std::min(victim->credits, 20 + victim->credits / 4);
