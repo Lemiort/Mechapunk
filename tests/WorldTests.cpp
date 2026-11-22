@@ -453,6 +453,20 @@ TEST(World, DescribesEventsWithRoomsAndBuildings) {
         << lines.front();
     EXPECT_NE(lines.front().find(", Dormitory "), std::string::npos)
         << lines.front();
+    // B15: an arrest names its officer in front and the criminal after;
+    // a migrated version 19 entry names no officer and stays vague.
+    const std::string named = world.Describe({.tick = 0,
+                                              .kind = sim::EventKind::Arrested,
+                                              .robot = sim::EntityId{999998},
+                                              .otherRobot = sim::EntityId{999999},
+                                              .room = sim::EntityId{999997}});
+    EXPECT_NE(named.find(" arrested "), std::string::npos) << named;
+    EXPECT_EQ(named.find("An officer arrested"), std::string::npos) << named;
+    const std::string vague = world.Describe({.tick = 0,
+                                              .kind = sim::EventKind::Arrested,
+                                              .otherRobot = sim::EntityId{999999},
+                                              .room = sim::EntityId{999997}});
+    EXPECT_NE(vague.find("An officer arrested"), std::string::npos) << vague;
 }
 
 TEST(World, OfficersPatrolVenuesAndReturnToTheirStations) {

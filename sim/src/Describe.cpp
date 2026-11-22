@@ -131,7 +131,17 @@ std::string World::Describe(const SimEvent& event) const {
                                NameOf(event.otherRobot), event.credits,
                                DescribeRoom(event.room));
         case EventKind::Arrested:
-            return std::format("{}  An officer arrested {} for robbing", when, who);
+            // B15: an arrest names its officer: `robot` is the officer,
+            // `otherRobot` the criminal. An entry migrated from a version
+            // 19 save (step B15e swaps it over) knows no officer, so that
+            // one keeps the old indefinite line rather than naming nobody.
+            return event.robot.IsValid()
+                       ? std::format("{}  {} arrested {} for robbing at {}",
+                                     when, who, NameOf(event.otherRobot),
+                                     DescribeRoom(event.room))
+                       : std::format("{}  An officer arrested {} for robbing at {}",
+                                     when, NameOf(event.otherRobot),
+                                     DescribeRoom(event.room));
         case EventKind::Fought:
             return std::format("{}  Members of rival gangs fought at {}", when,
                                DescribeRoom(event.room));

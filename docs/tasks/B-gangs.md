@@ -824,12 +824,20 @@ falls back to "remembered something" and the test fails. The inspector's
 robot page already links `memory.robot` (`DrawMemories`), so officer and
 robber names on both cards click through without any app change.
 
-### - [ ] B15d. The chronicle and log line (validation module)
+### - [x] B15d. The chronicle and log line (validation module)
 
 Open: `sim/src/Describe.cpp` (only the `Arrested` case), and
 `tests/WorldTests.cpp` if a description is pinned there:
 "{officer} arrested {robber} for robbing at {venue}" - the `who` column
 is the officer, `otherRobot` the robber.
+
+Done as: the new convention reads "{officer} arrested {robber} for robbing
+at {venue}"; an entry whose `robot` names nobody - what B15e's migration
+leaves for version 19 stories - keeps the old "An officer arrested
+{robber} for robbing at {venue}". `World.DescribesEventsWithRoomsAndBuildings`
+pins both spellings with synthetic events (no fixture of an old version
+is touched). The chronicle tab and the `--all` log print through
+`Describe`, so both show the who and the whom for free.
 
 ## Done when
 
