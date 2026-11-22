@@ -58,8 +58,13 @@ std::vector<GangCrime> GangCrimes(const WorldFrame& frame, sim::EntityId gang) {
                     break;
                 case sim::MemoryKind::Arrested:
                     crime.kind = CrimeKind::Arrest;
-                    crime.perpetrator = member.id;
-                    crime.victim = sim::EntityId{};
+                    // B15: an arrest now remembers the officer that made it,
+                    // so the row says who did it and who was done to; a
+                    // memory from a version 19 save recorded no officer
+                    // (the game never knew which one it was), and that row
+                    // keeps an empty perpetrator.
+                    crime.perpetrator = memory.robot;
+                    crime.victim = member.id;
                     crime.text = "arrested";
                     break;
                 default:

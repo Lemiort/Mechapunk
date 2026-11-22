@@ -132,29 +132,40 @@ TEST(GangListsTests, GangCrimesCollectsOnlyMembers) {
 }
 
 // Was-robbed rows put the robber in `perpetrator` and the member in `victim`;
-// arrest rows have no victim; rows come newest first.
+// an arrest row names the arresting officer and has the member as its victim,
+// and comes newest first.
 TEST(GangListsTests, GangCrimesFieldsAndOrder) {
     std::vector<std::vector<sim::Memory>> memories = {
         {MakeMemory(sim::Tick{90}, sim::MemoryKind::WasRobbed,
             sim::EntityId{44}, sim::EntityId{700}),
             MakeMemory(sim::Tick{95}, sim::MemoryKind::Arrested,
-                sim::EntityId{}, sim::EntityId{701})},
+                sim::EntityId{45}, sim::EntityId{701}),
+            // B15e's migration leaves an arrest memory of a version 19 save
+            // with no officer, and that row names nobody rather than making
+            // one up.
+            MakeMemory(sim::Tick{88}, sim::MemoryKind::Arrested,
+                sim::EntityId{}, sim::EntityId{702})},
     };
     WorldFrame frame = MakeFrame(
         {{sim::EntityId{1}, sim::EntityId{10}}}, memories);
 
     std::vector<GangCrime> crimes = GangCrimes(frame, sim::EntityId{10});
 
-    ASSERT_EQ(crimes.size(), 2U);
+    ASSERT_EQ(crimes.size(), 3U);
     EXPECT_EQ(crimes[0].kind, CrimeKind::Arrest);
     EXPECT_EQ(crimes[0].text, "arrested");
-    EXPECT_FALSE(crimes[0].victim.IsValid());
+    EXPECT_EQ(crimes[0].perpetrator, sim::EntityId{45});
+    EXPECT_EQ(crimes[0].victim, sim::EntityId{1});
     EXPECT_EQ(crimes[0].location, sim::EntityId{701});
     EXPECT_EQ(crimes[1].kind, CrimeKind::WasRobbed);
     EXPECT_EQ(crimes[1].text, "was robbed");
     EXPECT_EQ(crimes[1].perpetrator, sim::EntityId{44});
     EXPECT_EQ(crimes[1].victim, sim::EntityId{1});
     EXPECT_EQ(crimes[1].location, sim::EntityId{700});
+    EXPECT_EQ(crimes[2].kind, CrimeKind::Arrest);
+    EXPECT_FALSE(crimes[2].perpetrator.IsValid());
+    EXPECT_EQ(crimes[2].victim, sim::EntityId{1});
+    EXPECT_EQ(crimes[2].location, sim::EntityId{702});
 }
 
 // Rows of the same minute fall back to member id, whatever order the

@@ -28,8 +28,10 @@ struct GangCrime {
     sim::Tick tick{};         // When it happened; the page prints FormatTime(tick).
     CrimeKind kind{};
     sim::EntityId member;     // The gang member whose memory this is.
-    sim::EntityId perpetrator;// Who did it: the member (robbery), the robber (was robbed).
-    sim::EntityId victim;     // Who it was done to; none for an arrest.
+    sim::EntityId perpetrator;// Who did it: the member (robbery), the robber (was
+                              //  robbed), the officer (arrest; empty for a memory
+                              //  of a version 19 save, which recorded none).
+    sim::EntityId victim;     // Who it was done to; the member (arrest).
     sim::EntityId location;   // Room where it happened, if the memory has one.
 };
 

@@ -851,6 +851,36 @@ pins both spellings with synthetic events (no fixture of an old version
 is touched). The chronicle tab and the `--all` log print through
 `Describe`, so both show the who and the whom for free.
 
+### - [x] B15f. The gang page's crime row names the officer (gang-lists module)
+
+Open: `app/GangLists.hpp`, `app/GangLists.cpp` (the `Arrested` case),
+`tests/GangListsTests.cpp`. B15b put the officer in the `Arrested` memory's
+other robot, so the arrest row that had to say "no robot" can name the one
+that took the member.
+
+Done as: the row's `perpetrator` becomes `memory.robot` (the officer; empty
+for a memory of a version 19 save, which B15e's migration leaves without one
+- the row does not invent an officer) and `victim` becomes the member, which
+is who the arrest was done to. The header's comments for both fields say so.
+Nothing else reads the two fields: the Crime tab's Robberies column filters
+on `kind == Robbery`, and the gang page prints the counterpart through
+`Counterpart`, which is step B15g. `GangLists.GangCrimesFieldsAndOrder` now
+carries three rows: an arrest with an officer, a was-robbed row, and an
+arrest of a version 19 memory with no officer (perpetrator empty, member
+still the victim). ctest: 159/159 pass.
+
+### - [ ] B15g. The gang page shows that officer (inspector module)
+
+Open: `app/InspectorGang.cpp` (`Counterpart`, and the comment above it),
+no sim change. "Who" in the gang page's crime table is
+`Counterpart(crime)`; for `Arrest` it returns none today, so the column reads
+"nobody" beside "arrested" even though B15f made the row name the officer.
+Return `crime.perpetrator` for an arrest - an old save's empty officer still
+prints "nobody". The inspector has no render test of this table
+(guide, section 9.4: the list functions are what is tested, the drawing is
+what the user checks), so the bite is that the officer's name becomes a
+link; whether it reads well is for the user to see in the game.
+
 ## Done when
 
 - [x] Gangs exist in new and old cities, members join and leave, rob, get
