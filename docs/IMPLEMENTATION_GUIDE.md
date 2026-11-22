@@ -53,10 +53,18 @@ python scripts/context_budget.py                                                
   anything: run `--seed 7 --robots 2000 --days 6 --all --save X.json`
   before and after and compare both files byte for byte, ignoring the last
   two lines of the log (timing and save path).
-- The game: `build/build/Release/mechapunk.exe --save FILE` continues a
-  save; `--new --save FILE` starts a city; `--seed`, `--robots`,
-  `--follow ROBOT_ID`. Keys: 1-5 speed, Space pause, T statistics, F follow,
-  Q/E floors, F12 screenshot.
+- The game: `mechapunk.exe --save FILE` continues a save; `--new --save FILE`
+  starts a city; `--seed`, `--robots`, `--follow ROBOT_ID`. Keys: 1-5 speed,
+  Space pause, T statistics, F follow, Q/E floors, F12 screenshot.
+  **Start it with the working directory `build/build/Release`**: it opens
+  `fonts/Roboto-Medium.ttf` and the engine's `shaders/`, `models/` and
+  `textures/` by a path relative to the working directory (CMake copies them
+  next to the exe), and writes `shader-cache/`, `mechapunk-ui.ini` and the save
+  there; from the repo root it finds no font and no shaders, and `--save FILE`
+  names a file in the working directory. `tools/drive-game.ps1` starts it that
+  way, with `-WorkingDirectory build/build/Release`. The headless runner needs
+  no assets, so the `mechapunk-sim.exe` commands above do run from the repo
+  root.
 - **Do not drive or screenshot the game window unless the user says the
   machine is free.** `tools/drive-game.ps1` activates the window and clicks
   can land in other applications; a screen capture may show the user's
