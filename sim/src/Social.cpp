@@ -54,7 +54,25 @@ constexpr std::int32_t kStayRivals = -10;
 // acquaintance, if that one is barely known.
 constexpr std::size_t kMaxBonds = 12;
 constexpr std::int32_t kForgettable = 10;
-constexpr std::size_t kMaxMemories = 12;
+// What a robot remembers, in two shares that cannot push each other out:
+// twelve memories of ordinary life, and twelve memories of crime - its rap
+// sheet, what it did to the city and what the city did to it. One share of
+// twelve held everything, so the crime lines faded within days: a member
+// fined for robbing a week earlier still carries "Arrests: 1" (the counter
+// is durable) and had no arrest in its memories, the card the user read on
+// 2026-11-22 as "robber has no memory of arrest".
+constexpr std::size_t kMaxOrdinaryMemories = 12;
+constexpr std::size_t kMaxCrimeMemories = 12;
+// The whole store, which is what validation and a save file allow.
+constexpr std::size_t kMaxMemories = kMaxOrdinaryMemories + kMaxCrimeMemories;
+
+// The rap sheet kinds: a robbery the robot did or suffered, an arrest it
+// made or took. `Remember` evicts within a share, and validation counts the
+// same two shares, so this is the one list both sides agree on.
+[[nodiscard]] constexpr bool IsCrimeMemory(MemoryKind kind) {
+    return kind == MemoryKind::RobbedSomeone || kind == MemoryKind::WasRobbed ||
+           kind == MemoryKind::Arrested || kind == MemoryKind::ArrestedSomeone;
+}
 // Bonds fade by kFadePerDay each night once the two have not talked for
 // kFadeAfter.
 constexpr Tick kFadeAfter = 2 * kMinutesPerDay;
@@ -440,8 +458,27 @@ void World::Remember(Robot& robot, MemoryKind kind, EntityId other,
     }
     robot.memories.push_back(
         {.tick = state_.tick, .kind = kind, .robot = other, .room = room});
-    if (robot.memories.size() > kMaxMemories) {
-        robot.memories.erase(robot.memories.begin());
+    // Make way within the share the new memory belongs to: the oldest entry
+    // of that share goes, and it is the first entry of the share because the
+    // store is kept in tick order. Friendships cannot push out a rap sheet,
+    // and a busy rap sheet cannot push out the friendships, so neither a
+    // criminal's card nor an officer's card loses its crimes (rule 1: the
+    // order is the store's own, not a container's).
+    // Make way within the share the new memory belongs to: the oldest entry
+    // of that share goes, and it is the first entry of the share because the
+    // store is kept in tick order. Friendships cannot push out a rap sheet,
+    // and a busy rap sheet cannot push out the friendships, so neither a
+    // criminal's card nor an officer's card loses its crimes (rule 1: the
+    // order is the store's own, not a container's).
+    const bool crime = IsCrimeMemory(kind);
+    const std::size_t share =
+        crime ? kMaxCrimeMemories : kMaxOrdinaryMemories;
+    const auto inShare = [crime](const Memory& memory) {
+        return IsCrimeMemory(memory.kind) == crime;
+    };
+    if (static_cast<std::size_t>(std::ranges::count_if(robot.memories, inShare)) >
+        share) {
+        robot.memories.erase(std::ranges::find_if(robot.memories, inShare));
     }
     Emit({.tick = state_.tick,
           .kind = EventKind::Remembered,
@@ -551,6 +588,7 @@ std::expected<void, std::string> ValidateSocial(const WorldState& state) {
             }
             previous = bond.robot;
         }
+        std::size_t crimes = 0;
         for (const Memory& memory : robot.memories) {
             if (memory.tick > state.tick ||
                 (memory.robot.IsValid() && !remembered(memory.robot)) ||
@@ -559,6 +597,17 @@ std::expected<void, std::string> ValidateSocial(const WorldState& state) {
                     "Robot '{}' has a memory of a missing robot or room",
                     robot.name));
             }
+            crimes += IsCrimeMemory(memory.kind) ? 1 : 0;
+        }
+        // The two shares, not only the whole store: the card prints an
+        // arrest count that never fades, so a store that lost its crime
+        // share silently would contradict it (B16).
+        if (crimes > kMaxCrimeMemories || robot.memories.size() - crimes >
+            kMaxOrdinaryMemories) {
+            return std::unexpected(std::format(
+                "Robot '{}' has more memories of crime or of ordinary life "
+                "than it can keep",
+                robot.name));
         }
     }
     return {};

@@ -127,6 +127,48 @@ TEST(Social, FriendshipsAndRivalriesFormOverWeeks) {
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }
 
+// A robot keeps its rap sheet: the memory store holds twelve memories of
+// ordinary life and twelve memories of crime, so a card that prints
+// "Arrests: 2" also lists the arrests. Twelve slots for everything made the
+// crime lines fade within days, which the user read as "robber has no memory
+// of arrest" on 2026-11-22. Population test (guide 5: nothing scripted):
+// the arrest counter is durable, so a robot whose whole rap sheet fits in
+// the store must still show its arrest. At 4000 robots for 40 days 66 robots
+// are arrested, 11 of them had lost the memory under the old rule and none
+// under this one, so the bound bites from both sides.
+TEST(Social, KeepsItsRapSheetAsLongAsItFits) {
+    sim::World world = sim::World::Generate({.seed = 1, .robots = 4000});
+    world.RunFor(40 * sim::kMinutesPerDay);
+
+    std::uint32_t arrestedRobots = 0;
+    std::uint32_t forgotten = 0;
+    for (const sim::Robot& robot : world.State().robots) {
+        EXPECT_LE(robot.memories.size(), 24U);
+        std::uint32_t crimes = 0;
+        bool remembersArrest = false;
+        for (const sim::Memory& memory : robot.memories) {
+            if (memory.kind == sim::MemoryKind::RobbedSomeone ||
+                memory.kind == sim::MemoryKind::WasRobbed ||
+                memory.kind == sim::MemoryKind::Arrested ||
+                memory.kind == sim::MemoryKind::ArrestedSomeone) {
+                ++crimes;
+            }
+            remembersArrest = remembersArrest ||
+                              memory.kind == sim::MemoryKind::Arrested;
+        }
+        if (robot.arrests == 0) {
+            continue;
+        }
+        ++arrestedRobots;
+        // Twelve is the crime share `Remember` keeps in `Social.cpp`; a robot
+        // with more crimes than that has simply forgotten its oldest one.
+        if (crimes <= 12 && !remembersArrest) ++forgotten;
+    }
+    EXPECT_GT(arrestedRobots, 0U) << "somebody gets arrested in 40 days";
+    EXPECT_EQ(forgotten, 0U) << "an arrested robot names its arrest";
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
 // Robots who share interests like each other more than robots who share
 // none.
 TEST(Social, SharedInterestsMakeFriends) {

@@ -889,6 +889,51 @@ the drawing exists, so this step is checked by the compile and by the user
 looking at a gang page; `GangLists.GangCrimesFieldsAndOrder` (B15f) is
 what pins the data behind it. ctest: 159/159 pass.
 
+### Arrest memory has to outlive the card — requested 2026-11-22 (B16)
+
+The user: "robber has no memory of arrest - there should be". The robot page
+prints `Arrests: N` (`Inspector.cpp`, from `Robot::arrests`, a counter that
+never fades) above its memory list, and the list kept only the **twelve
+newest memories of everything**: a bond that grew close, a promotion, a move
+or the next visit erased the arrest. Measured at seed 1: 4000 robots for 40
+days arrests 66 robots, 11 of which no longer list their arrest; 10000 robots
+for 40 days arrests 226, 30 have forgotten. An officer, which makes dozens of
+arrests a month, loses nearly all of its `ArrestedSomeone` lines the same way,
+so the "arrested <robber>" card B15 built is invisible where it matters most.
+Not a save format change: no field, no enum value, no new key - only which
+memories a robot keeps changes, and a version 19 or 20 file stays readable.
+
+### - [x] B16. Two memory shares: ordinary life and the rap sheet (social module)
+
+Open: `sim/src/Social.cpp` (`kMaxMemories`, `World::Remember`, the robot part
+of `ValidateWorldState`), `tests/SocialTests.cpp`. A robot keeps twelve
+memories of ordinary life **and** twelve of crime - robbery done or suffered,
+arrest made or taken - and the two shares cannot push each other out: within
+a share the oldest entry makes way for the newest, so the store stays in tick
+order (rule 1) and `Robot::arrests` never contradicts the list under it.
+Validation counts the same two shares, not only the whole store (rule 5).
+No sim behaviour change is expected: every rule that reads memories bounds them
+by tick (`RememberedInLastHour`) or uses the counter, so measure the headless
+city anyway (guide 5) and the population test `Social.KeepsItsRapSheetAsLongAs
+ItFits` must hold with margin and bite from both sides.
+
+Done as: `kMaxOrdinaryMemories` and `kMaxCrimeMemories` (12 each) and
+`kMaxMemories` as their sum for validation; one list of the rap sheet kinds,
+`IsCrimeMemory`, that `Remember` and validation share, so the two sides cannot
+disagree about what a crime is. `Remember` counts the share the new memory
+belongs to and erases that share's oldest entry - the first one, because the
+store is kept in tick order; no container order decides (rule 1). The robot
+part of `ValidateWorldState` now counts crimes while walking the memories and
+rejects a store over either share. Test (population, nothing scripted): seed
+1, 4000 robots, 40 days, every robot with `arrests > 0` whose crime count fits
+the share must hold an `Arrested` memory - measured 11 of 66 failing under the
+old rule, 0 under the new one, and `arrestedRobots > 0` keeps it from going
+vacuous. Headless seed 1 / 10000 robots / 40 days is unchanged in every figure
+the city prints (money 5165746, created 1105, wages 108%, robot debt 335195 in
+1186, banks 225786, broke 1071, gini 499) and 30 of the 226 arrested robots
+now carry their arrest memory again. `docs/MODULES.md`: social 21k to 25k.
+ctest: 160/160 pass (the new test runs 37 s).
+
 ## Done when
 
 - [x] Gangs exist in new and old cities, members join and leave, rob, get
