@@ -355,6 +355,10 @@ void World::Decide(Robot& robot) {
     const std::int64_t budget = BudgetOf(robot);
     const auto here = rooms_.Find(robot.location);
     const RoomKind hereKind = here ? here->room->kind : RoomKind::Apartment;
+    // Where this outing may go at all: on a gang outing, the venues round one
+    // gang's turf (`GangOuting`, in Gangs.cpp); empty means the whole city,
+    // as it always was.
+    const std::vector<EntityId> gangOuting = GangOuting(robot);
     for (const RoomKind kind : VenueKinds()) {
         const VenueRules& rules = *FindVenueRules(kind);
         // Within what it can pay, and what it means to spend today. A worn
@@ -363,6 +367,12 @@ void World::Decide(Robot& robot) {
                                  robot.needs.condition < kRepairUrgentCondition;
         for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
             const Room& room = *venue.room;
+            // A gang outing only goes to the neighbourhood it was drawn to.
+            if (!gangOuting.empty() &&
+                !std::binary_search(gangOuting.cbegin(), gangOuting.cend(),
+                                    room.id)) {
+                continue;
+            }
             const std::int64_t price = PriceAt(room);
             if (needsRepair ? robot.credits + robot.savings - price < reserve
                             : (robot.credits - price < reserve ||

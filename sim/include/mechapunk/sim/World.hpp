@@ -386,6 +386,11 @@ private:
     // Gangs, in Gangs.cpp.
     void FoundGangs(Pcg32& random);
     void ReviewGangs();
+    // On a gang outing: the venues within a walk of one turf, its gang's own
+    // or a rival gang's, picked by lot. Empty means an ordinary outing over
+    // the whole city; `Decide` only weighs these venues otherwise (B14b: rival
+    // members have to meet to fight).
+    [[nodiscard]] std::vector<EntityId> GangOuting(const Robot& robot);
     void HandleOfficerAffinity(Robot& first, Robot& second);
     // One definition of "this robot is an officer": its job room is a police
     // station. ReviewGangs keeps such robots out of any gang.

@@ -6,8 +6,8 @@ B9a-B9e on 2026-11-20, all done; the Crime tab bugs the user found on
 all done. Reviewing the whole task as one commit found three rules B7 had
 claimed and not implemented: steps B12a-B12c, all done; B13 (the officer's
 second arrest rule) done. B14 split on 2026-11-22 into B14a (done) and
-B14b (open). Save change done (v18). Do task A first: the inspector uses its
-links.
+B14b (done on 2026-11-23). Save change done (v18). Do task A first: the
+inspector uses its links.
 
 ## What the user asked for
 
@@ -717,7 +717,7 @@ lend, as in B13), wages 110% to 108%, robot debt 318367 in 1200 to
 335195 in 1186, banks 235305 to 225786, broke 1053 to 1071, gini 500
 to 499. Money adds up: `ValidateEconomy` passes in every test.
 
-### - [ ] B14b. Rival gang members meet (gangs module)
+### - [x] B14b. Rival gang members meet (gangs module)
 
 `sim/src/Gangs.cpp` (a `World` member taking the robot and its outing
 decision, e.g. `GangOuting`), one-line hook in `Decide` in
@@ -731,6 +731,48 @@ so rival members meet "more often than one pair in a hundred" (the
 Done-when item) and `fights` rises from ~20 in 40 days at 10000 robots,
 with the usual economy watch (guide §5) and the population tests
 (guide §5: no skipping, leave margin).
+
+Done as: `World::GangOuting(robot)` in `Gangs.cpp` answers, for one outing,
+which venues it may go to at all: the rooms within `kTurfReachMeters`
+(40 m: the turf's own street corner, where up to four buildings stand and
+where its ground floor venues are) of one turf - the robot's gang's own,
+or, drawn by lot, the turf of a gang it rivals fights. `Decide` keeps
+every rule it always had for the choice inside that list, so the robot
+still has to afford the visit and the way home, the venue must be open
+when it arrives, not be where it works and have room for it; an empty
+answer is an ordinary outing over the whole city. Two draws from
+`state_.random` per outing (`Decide` runs in robot id order, rule 1),
+the answer sorted by room id and never following a container's order,
+and the street distances are `RoutePlanner`'s, cached per origin node,
+so a city computes a turf's distances once.
+
+Two things the step's wording left out and the work had to settle:
+the hook is two pieces, not one line (the list in `Decide`, and a
+`continue` in the venue loop), and it is a restriction rather than a
+score bonus. A bonus was tried first and did nothing: a tied venue's
++250 of the score loses to the need-relief of whatever venue a robot
+really wants and to a shorter walk, so members kept choosing near home,
+and rivals visiting each other's blocks only swap places, so they
+still never shared a room (measured: 24 to 28 fights at the widest
+reach, 50 with a narrower one and a bigger percent). Half the outings
+of a member now spend themselves in one neighbourhood, often an
+enemy's, whose own members are already standing in it.
+
+Numbers, seed 1 / 10000 robots / 40 days, before to after: robberies
+1464 to 1241 (106752 to 89613 cr stolen), arrests 337 to 332, **fights
+24 to 73**, members 764 to 724. Economy the same in kind: money 5165746
+to 5187372, `created` 1105 to 1089 a day, wages 108% to 108%, robot
+debt 335195 in 1186 to 338141 in 1196, banks 225786 to 250967, broke
+1071 to 1067, gini 499 to 505. Money adds up: `ValidateEconomy` passes
+in every test; ctest 161/161 pass, `ContextBudget` fine (gangs 18.7k,
+world 24.3k, social 24.9k of 25k).
+
+Test `Gangs.RivalMembersMeetAtGangOutings` (population level, nobody
+scripted, guide §5): seed 1, 6000 robots, 40 days, summing `counted.fights`
+over `history`; the run gives 9 fights without the rule and 32 with it
+(measured both ways), so the bound of 20 bites from both sides, and the
+robberies of the same run (914 without, 857 with) stay under 1200, so
+the members mixing has not turned the city crime-heavy.
 
 ### Arrests name the arresting officer — requested 2026-11-22 (B15a-B15d)
 
@@ -941,14 +983,16 @@ ctest: 160/160 pass (the new test runs 37 s).
   found gangs (B12c) and the money adds up. Measured at head before B13:
   1473 robberies, 4 arrests, 24 fights - the old note here claiming arrests
   and fights "come out at 0" was stale, see B13.
-- [ ] Arrests and gang fights are seen in a running city (step B14, split
+- [x] Arrests and gang fights are seen in a running city (step B14, split
   into B14a world module, done, and B14b gangs module): 9 arrests and ~20
   fights in 40 days at 10000 robots is invisible next to 1500 robberies.
   The limit is the police, not the rule: about 9 officers, each visiting
   one venue for 15 minutes per shift hour out of ~484 venues. B14a made
   `World::Patrol` in `sim/src/Behaviour.cpp` send officers where the crime
   is; members of rival gangs still have to meet more often than one pair
-  in a hundred (B14b, see the roadmap gap).
+  in a hundred (B14b, see the roadmap gap). Measured at B14b's head, seed
+  1 / 10000 robots / 40 days: 1241 robberies, 332 arrests, 73 gang fights,
+  724 in gangs - the fights of the 40 days are now two a day.
 - [x] Save version 18 with migration, fixture and tests.
 - [ ] Crime tab, gang page, gang colours in the city. Steps B10a-B11d fixed
   the tab's link ids, made its links work and moved the member, relation and

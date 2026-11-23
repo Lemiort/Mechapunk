@@ -461,3 +461,34 @@ TEST(Gangs, OfficerTurnsTheRobberyIntoAnArrest) {
     }
     EXPECT_GT(arrested, 0U);
 }
+
+// B14b: the whole crime chapter needs two rival members standing in one room,
+// and they almost never were: a member chose its outing out of the city's ~484
+// venues as if it were not in a gang, so a member of the gang it fights was
+// one face in four hundred it might stand beside, and the 1% fight roll had
+// nothing to act on. An outing now spends half its time in one gang's
+// neighbourhood - the robot's own gang's turf, or the turf of a gang it rivals,
+// one of them chosen by lot - which is what rivals do to each other and what
+// puts the two of them in the same rooms.
+//
+// Population level, nobody scripted (guide §5). This exact run (seed 1, 6000
+// robots, 40 days) gives 9 fights without the rule and 32 with it, measured
+// both ways, so the bound of 20 bites from both sides. Robberies stay where
+// they were (914 before, 857 after): the members mix more, the city does not
+// turn crime-heavy.
+TEST(Gangs, RivalMembersMeetAtGangOutings) {
+    sim::World world = sim::World::Generate({.seed = 1, .robots = 6000});
+    for (sim::Tick minute = 0; minute < 40 * sim::kMinutesPerDay; ++minute) {
+        world.Step();
+    }
+    int fights = 0;
+    int robberies = 0;
+    for (const sim::DailyStats& day : world.State().history) {
+        fights += static_cast<int>(day.counted.fights);
+        robberies += static_cast<int>(day.counted.robberies);
+    }
+    EXPECT_GE(fights, 20);
+    EXPECT_LT(robberies, 1200);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+    EXPECT_TRUE(sim::ValidateEconomy(world.State()).has_value());
+}

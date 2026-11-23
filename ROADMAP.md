@@ -215,12 +215,17 @@ game:
   Statistics window (T) shows it all.
 - From above, the upper deck of a station hides the lower level's trains.
 - Robots inside closed buildings aren't drawn (nobody can see them).
-- Gang crime is almost never seen in a running city: a 40 day run at 10000
-  robots (seed 1) reports 1538 robberies, 9 arrests and 19 gang fights in all.
-  Both rules work when the robots are scripted into one room
+- Gang crime used to be almost never seen in a running city: before task B's
+  step B14 a 40 day run at 10000 robots (seed 1) reported 1538 robberies, 9
+  arrests and 19 gang fights in all. Both rules work when the robots are
+  scripted into one room
   (`Gangs.RivalFightsCutWearAndCondition`,
-  `Gangs.OfficerCatchesRobbersOfTheHourBefore`); what is rare is the meeting.
-  Members of rival gangs barely ever talk to each other, and the police are
-  few: about 9 officers at 10000 robots, each visiting one venue for 15
-  minutes per shift hour out of ~484 venues. Task B's step B14 is about
-  sending officers where the crime is.
+  `Gangs.OfficerCatchesRobbersOfTheHourBefore`); what was rare was the
+  meeting. B14a sends officers to the venues the city robbed in the last
+  hour (337 arrests by day 40 of that run), and B14b spends half a gang
+  member's outings in one neighbourhood, its own gang's turf or, by lot,
+  a rival's (73 gang fights in the same 40 days, next to 1241 robberies).
+  A rival meeting is still rare next to the tens of thousands of talks a
+  day, and the police
+  are few: about 9 officers at 10000 robots, each visiting one venue for
+  15 minutes per shift hour out of ~484 venues.
