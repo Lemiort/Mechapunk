@@ -1,8 +1,10 @@
 # Task C: chronicle (saved city history)
 
 Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
-C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a, C4b
-and C4c done, C4d open. Save change was C1. Do after A (links) and B (gang events).
+C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a to C4d
+done, C4e open (it is a save change and waits for the user to say whether the
+organization page needs the account an emission carried). Save change was C1.
+Do after A (links) and B (gang events).
 
 ## What and why
 
@@ -385,7 +387,7 @@ proof applies; the move is only the budget script's membership.
   applies (as in C3a, C3b, C3c and C4a, C4b): `mechapunk-sim.exe` was not even
   relinked. The two sections are for the user to check in the game.
 
-### - [ ] C4d. Organization page and the robot page's rows (inspector module)
+### - [x] C4d. Organization page and the robot page's rows (inspector module)
 
 Open: `app/InspectorOrganization.cpp`, `app/InspectorHistory.cpp`.
 
@@ -393,6 +395,52 @@ Open: `app/InspectorOrganization.cpp`, `app/InspectorHistory.cpp`.
 - The robot page's History section reads `EntriesAboutRobot` instead of scanning
   `WorldFrame::chronicle` itself, so its rows match the other pages' - this is
   where C3c's local `WhatName` and `Credits` copies belong to one place.
+
+Done as (chronicle-pages module, one commit): the section is `DrawOrganizationHistory`
+in `app/InspectorChronicle.cpp`, next to the room's and the building's sections,
+declared in `app/InspectorInternal.hpp` the way they are, and called at the end of
+`DrawOrganization` with `&result`, so a click in it moves the inspector as the rest
+of the page does. The step's "Open" list names `InspectorOrganization.cpp` for that
+call site only: the drawing belongs with the other history sections, in the module
+C4c made for them, and `Inspector.cpp` had no room for it anyway.
+
+- The rows are `EntriesAboutOrganization(frame, organization.id)`, already tested
+  in C4a (`ChronicleLists.OrganizationHistoryIsItsRoomsAndWorkers`), drawn by the
+  file's `DrawEntries` with `showRoom` true: an organization owns rooms in many
+  buildings, so the room changes from row to row and is a link ("a room that is
+  gone" for a unit closed since, "-" for an event with no place). Table id
+  "organization history", frozen header, `kVisibleRows` (12) rows high,
+  `ImGuiListClipper`, so `kChronicleCap` rows are safe.
+- A line under the section title says what it covers, because that rule is not
+  visible from the rows: a robot's eviction or promotion is on the page through
+  the employer that owns its workspace.
+- The robot page now calls `EntriesAboutRobot`, which is the scan it did by hand
+  plus an `IsValid` guard, so its rows cannot drift from the other pages'.
+- The copies went to one place: `kListFlags`, `kVisibleRows`, `ListSize`, `Credits`
+  and `WhatName` moved out of `InspectorHistory.cpp` and `InspectorChronicle.cpp`
+  into a new private header `app/ChroniclePagesInternal.hpp`, the way
+  `StatisticsInternal.hpp` is the statistics module's header. `Counterpart` stayed
+  in `InspectorHistory.cpp` and `DrawEntries` in `InspectorChronicle.cpp`: each has
+  one user (the layout's rule). The statistics tab's copies stayed where C4b left
+  them: that file is the `statistics` module, a second module.
+- What the step's text left open, and what was chosen:
+  - The organization page's own `Credits` ("{} cr", ungrouped) did not move: the
+    step asks for one place for the chronicle's copies, and the page's books are
+    not chronicle rows.
+  - Money an emission gave to the organization itself is still not a row of its
+    own: a `ChronicleEntry` saves no account (C4a's note), so the section reaches
+    money through its rooms and its workers. That is C4e, a save change, and it
+    waits for the user to say whether the page needs it.
+- No new tests: the rows come from `EntriesAboutOrganization` and
+  `EntriesAboutRobot`, both tested in C4a, and the drawing needs the window (as in
+  C4c). `scripts/context_budget.py` gained the header in `chronicle-pages`:
+  `inspector` 23018 → 23237 of 25000 (the call site and the declaration),
+  `chronicle-pages` 8596 → 8376 (the header's 1059, the two files down 946 and
+  489). `docs/MODULES.md` gained the header's row and says the organization page
+  has a history section. ctest 169/169 including ContextBudget. No sim code
+  touched, so no headless comparison applies (as in C3a, C3b, C3c, C4a, C4b and
+  C4c): `mechapunk-sim.exe` was not even relinked. The section is for the user to
+  check in the game.
 
 ### - [ ] C4e. Money an organization was given (saves module, only if wanted)
 
@@ -406,6 +454,7 @@ grows the third rule. Ask the user whether the organization page needs it.
 
 ## Done when
 
-- [ ] The chronicle is saved, migrated, tested, and shown with links.
-- [ ] Robots, rooms, buildings and organizations show their own history.
-- [ ] The guide's task table marks C done.
+- [x] The chronicle is saved, migrated, tested, and shown with links. (C1 to C4d)
+- [x] Robots, rooms, buildings and organizations show their own history. (C3c, C4c, C4d)
+- [ ] The guide's task table marks C done. (C4e open: ask the user whether the
+  organization page needs the account an emission carried, a save change to v21)

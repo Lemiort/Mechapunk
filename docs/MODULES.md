@@ -35,7 +35,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | ui | 15k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | inspector | 23k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
-| chronicle-pages | 8k | `InspectorHistory.cpp`, `InspectorChronicle.cpp`, `InspectorInternal.hpp`, `Links.hpp`, `ChronicleLists.hpp`, `Inspector.hpp` |
+| chronicle-pages | 8k | `InspectorHistory.cpp`, `InspectorChronicle.cpp`, `ChroniclePagesInternal.hpp`, `InspectorInternal.hpp`, `Links.hpp`, `ChronicleLists.hpp`, `Inspector.hpp` |
 | gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
 | gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
 | gang-lists | 4k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
@@ -104,8 +104,9 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Props` | Box models of every prop and the robot figure. |
 | `Inspector` | Inspector window for the selected building, room or robot. |
 | `Links.hpp/.cpp` | Clickable names in the inspector: `RoomLabel`, `ShowRoom`, `RoomLink`, `ShowRobot`, `RobotLink`. |
-| `InspectorHistory.cpp` | The robot page's "History" section: its chronicle entries, newest first, each robot and room a link. |
-| `InspectorChronicle.cpp` | The room page's and the building page's "What happened here" sections: the chronicle entries of that room, or of any room of that building, newest first, each robot and (on the building page) each room a link. |
+| `InspectorHistory.cpp` | The robot page's "History" section: the entries `EntriesAboutRobot` returns, newest first, each robot and room a link. |
+| `InspectorChronicle.cpp` | The room page's and the building page's "What happened here" sections and the organization page's "History" section: the chronicle entries of that room, of any room of that building, or about that organization, newest first, each robot and (except on the room page) each room a link. |
+| `ChroniclePagesInternal.hpp` | The helpers the two history files share: the scrolling table's flags and height, an entry's credits and what its kind reads as, so one entry reads alike on every page. |
 | `ChronicleLists` | Which chronicle entries a history list shows: about a robot, room, building or organization, newest first, plus the Chronicle tab's filters (kind group, day range, name). |
 | `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank, Crime and Chronicle tabs, plots from `DailyStats`; the Chronicle tab and its filter controls (group buttons, day range, name box, held in `StatisticsView`) are drawn in `StatisticsChronicle.cpp`. |
 | `main.cpp` | Window, input, camera, panels, applying frames. |
@@ -141,7 +142,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Which rows an organization page shows, sorted | organization-lists | `app/OrganizationLists.cpp` |
 | Which rows a gang page shows, sorted | gang-lists | `app/GangLists.cpp` |
 | Which rows a history list shows, filtered | chronicle-lists | `app/ChronicleLists.cpp` |
-| A robot's, room's or building's history section in the inspector | chronicle-pages | `app/InspectorHistory.cpp`, `app/InspectorChronicle.cpp` |
+| A robot's, room's, building's or organization's history section in the inspector | chronicle-pages | `app/InspectorHistory.cpp`, `app/InspectorChronicle.cpp` |
 | Panels, input, camera; frames from the simulation thread | ui | `main.cpp`, `SimulationHost.cpp` |
 
 A task touching two modules (a new robot field shown in the inspector, say)

@@ -115,4 +115,13 @@ void DrawBuildingChronicle(const WorldFrame& frame, const CityView& city,
                            sim::EntityId building,
                            std::optional<InspectorRequest>* request);
 
+// The "History" section of the organization page, in InspectorChronicle.cpp:
+// the chronicle entries in a room this organization owns or naming one of the
+// robots that work for it today, newest first, each row also linking the room
+// it happened in. Takes the page's request by pointer, as the other history
+// sections do.
+void DrawOrganizationHistory(const WorldFrame& frame, const CityView& city,
+                             sim::EntityId organization,
+                             std::optional<InspectorRequest>* request);
+
 }  // namespace mechapunk

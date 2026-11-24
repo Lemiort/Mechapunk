@@ -296,6 +296,10 @@ std::optional<InspectorRequest> DrawOrganization(const Selection& selection,
         ImGui::SeparatorText("Savings");
         ImGui::Text("%u robots save %s here", savers, Credits(saved).c_str());
     }
+
+    // What happened in a room it owns or to a robot that works for it; the
+    // rows are `EntriesAboutOrganization`, the same list the tests check.
+    DrawOrganizationHistory(frame, city, organization.id, &result);
     return result;
 }
 
