@@ -1,7 +1,7 @@
 # Task C: chronicle (saved city history)
 
 Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
-C3a-C3c, C3a and C3b done, C3c and C4 open. Save change was C1. Do after A
+C3a-C3c, C3a, C3b and C3c done, C4 open. Save change was C1. Do after A
 (links) and B (gang events).
 
 ## What and why
@@ -173,11 +173,48 @@ itself did not change: the tab dispatch in `DrawStatistics` gained a
   headless comparison applies (as in C3a); the tab is for the user to
   see in the game.
 
-### - [ ] C3c. The robot page's History section (inspector module)
+### - [x] C3c. The robot page's History section (inspector module)
 
 Open: `app/Inspector.cpp` (robot page only).
 
 - Robot page: a "History" section with that robot's entries. Commit.
+
+Done as (inspector module, one commit): the section's drawing is a new
+`app/InspectorHistory.cpp`, declared as `DrawRobotHistory` in
+`app/InspectorInternal.hpp` the way `DrawGangPage` is, because `Inspector.cpp`
+was already 9.4k of the 10k per-file budget and could not take the section in
+place; the call site in `DrawRobot` is four lines. It goes between "Memories"
+and "Recent" - before the event log, whose child window takes all the space
+left below it - and takes `&result`, so a click in the section moves the
+inspector as the rest of the page does.
+
+- The rows: the entries of `WorldFrame::chronicle` whose `robot` or `otherRobot`
+  is this robot, collected newest first by reading the saved list backwards,
+  drawn in a frozen-header table `kVisibleRows` (12) rows high with
+  `ImGuiListClipper`, so a robot with `kChronicleCap` entries is safe. Columns:
+  When (`sim::FormatTime`), What, About whom, Room, Credits. No Building or
+  Owner column as the Chronicle tab has: the room's label already carries the
+  building's name, and the page is 430 px wide.
+- Links: the other robot through `AccountLink(frame, city, ...)`, so a scrapped
+  one reads as its remembered name in plain text and an organization as its
+  page link; the room through `RoomLink`, or "a room that is gone" when the
+  unit closed since. `Counterpart` picks the robot an entry names besides this
+  one; no second robot gives an invalid id, which `AccountLink` draws as
+  "nobody".
+- `WhatName` and `Credits` are local copies of the Chronicle tab's, so one
+  entry reads alike in both places; sharing them would put an inspector header
+  in the statistics module's context, which the split forbids. C4's
+  `ChronicleLists` is where such sharing belongs.
+- No sim code touched, so no headless comparison applies (as in C3a and C3b):
+  `mechapunk-sim.exe` was not even relinked. ctest 161/161 including
+  ContextBudget; the new file is 2.4k, `Inspector.cpp` 9.5k, the inspector
+  module 24.9k of 25k.
+
+Warning for C4: the inspector module now stands at 24917 of 25000 tokens, 83
+short of its budget. C4 edits `Inspector.cpp`, `InspectorOrganization.cpp` and
+the Chronicle tab, so it must first make room - `ChronicleLists.*` gets its
+own module (as `organization-lists` and `gang-lists` are) and a page file
+moves out of `inspector` - before any History section is added.
 
 ### - [ ] C4. Chronicle details (inspector, statistics)
 

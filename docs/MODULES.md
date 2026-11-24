@@ -34,7 +34,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
 | ui | 15k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
-| inspector | 21k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
+| inspector | 24k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp`, `InspectorHistory.cpp` |
 | gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
 | gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
 | gang-lists | 4k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
@@ -102,6 +102,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Props` | Box models of every prop and the robot figure. |
 | `Inspector` | Inspector window for the selected building, room or robot. |
 | `Links.hpp/.cpp` | Clickable names in the inspector: `RoomLabel`, `ShowRoom`, `RoomLink`, `ShowRobot`, `RobotLink`. |
+| `InspectorHistory.cpp` | The robot page's "History" section: its chronicle entries, newest first, each robot and room a link. |
 | `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank, Crime and Chronicle tabs, plots from `DailyStats`; the Chronicle tab is drawn in `StatisticsChronicle.cpp`. |
 | `main.cpp` | Window, input, camera, panels, applying frames. |
 

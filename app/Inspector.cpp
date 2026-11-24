@@ -463,6 +463,11 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
         follow(DrawMemories(*social, frame, city));
     }
 
+    // The robot's saved story, newest first: the chronicle outlives the event
+    // log below, so what shaped a robot years ago is still readable. Drawn in
+    // InspectorHistory.cpp, as this file is near its token budget.
+    DrawRobotHistory(robot, frame, city, &result);
+
     ImGui::SeparatorText("Recent");
     const float recentHeight =
         std::max(ImGui::GetContentRegionAvail().y, kMinRecentHeight);

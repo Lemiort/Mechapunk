@@ -45,6 +45,7 @@ add_executable(mechapunk
     app/GameRenderer.cpp
     app/Inspector.cpp
     app/InspectorGang.cpp
+    app/InspectorHistory.cpp
     app/InspectorOrganization.cpp
     app/Links.cpp
     app/StatisticsChronicle.cpp

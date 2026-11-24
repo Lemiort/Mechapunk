@@ -92,4 +92,12 @@ inline std::string SectorLabel(sim::Sector sector) {
 [[nodiscard]] std::optional<InspectorRequest> DrawGangPage(
     const Selection& selection, const WorldFrame& frame, const CityView& city);
 
+// The "History" section of the robot page, in InspectorHistory.cpp: the
+// chronicle entries naming this robot, newest first, every entity in one a
+// link. Takes the page's request by pointer, as the Chronicle tab does, so a
+// click in the section can move the inspector.
+void DrawRobotHistory(const RobotFrame& robot, const WorldFrame& frame,
+                      const CityView& city,
+                      std::optional<InspectorRequest>* request);
+
 }  // namespace mechapunk
