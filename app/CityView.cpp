@@ -100,16 +100,15 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     AddStations();
 
     // Simulated buildings take the corners next to their entrance first.
+    // Which corners are left free is saved state (`City::lots`), so the
+    // placement below only needs to know how far along a node's buildings it
+    // has come; the parks are drawn from the plots themselves.
     std::map<std::uint32_t, std::uint32_t> usedSlots;
-    std::vector<std::array<bool, 4>> occupied(city_.nodes.size());
     for (const sim::Building& building : city_.buildings) {
         const std::uint32_t slot = usedSlots[building.entrance.value]++;
         const vec2 quadrant = kQuadrants.at(slot % kQuadrants.size());
         // A fifth building at one corner moves to the far side of the block.
         const float ring = slot < kQuadrants.size() ? 1.0F : 3.0F;
-        if (slot < kQuadrants.size()) {
-            occupied[building.entrance.value].at(slot) = true;
-        }
         const vec3 centerOnGround =
             NodePosition(building.entrance) +
             vec3{quadrant.x * kQuadrantOffset.x * ring, 0.0F,
@@ -185,21 +184,21 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
         AddFacade(shape.center, kBuildingWidth, kBuildingDepth, shape.floors);
     }
 
-    // Corners without a building are small parks.
+    // Corners without a building are small parks. The city saves exactly
+    // those corners as its free plots, sorted by node and then corner, which
+    // is the order the corners of `nodes` were walked in before, so the same
+    // parks get the same decoration draws.
     sim::Pcg32 random = sim::Pcg32::FromSeed(seed, kDecorationStream);
-    for (const sim::CityNode& node : city_.nodes) {
-        const vec3 corner = NodePosition(node.id);
-        for (std::size_t slot = 0; slot < kQuadrants.size(); ++slot) {
-            const vec2 quadrant = kQuadrants.at(slot);
-            const vec3 position =
-                corner + vec3{quadrant.x * kQuadrantOffset.x, 0.0F,
-                              quadrant.y * kQuadrantOffset.y};
-            const bool insideCity =
-                position.x > minimum.x && position.z > minimum.z &&
-                position.x < maximum.x && position.z < maximum.z;
-            if (insideCity && !occupied[node.id.value].at(slot)) {
-                AddPark(position, random);
-            }
+    for (const sim::CityLot& lot : city_.lots) {
+        const vec2 quadrant = kQuadrants.at(lot.corner);
+        const vec3 position =
+            NodePosition(lot.node) +
+            vec3{quadrant.x * kQuadrantOffset.x, 0.0F, quadrant.y * kQuadrantOffset.y};
+        // A corner outside the grid's bounding box gets no park.
+        const bool insideCity = position.x > minimum.x && position.z > minimum.z &&
+                                position.x < maximum.x && position.z < maximum.z;
+        if (insideCity) {
+            AddPark(position, random);
         }
     }
     BuildStaticBatches();
