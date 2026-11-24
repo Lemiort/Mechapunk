@@ -575,6 +575,8 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
         }
         ImGui::EndTable();
     }
+    // What happened in this room, newest first, drawn in InspectorChronicle.cpp.
+    DrawRoomChronicle(frame, city, selection.room, &result);
     return result;
 }
 
@@ -690,6 +692,9 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
         }
         ImGui::EndTable();
     }
+    // What happened in this building's rooms, newest first, drawn in
+    // InspectorChronicle.cpp: every room of the building, not only this floor's.
+    DrawBuildingChronicle(frame, city, selection.building, &result);
     return result;
 }
 

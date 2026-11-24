@@ -1,8 +1,8 @@
 # Task C: chronicle (saved city history)
 
 Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
-C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a and
-C4b done, C4c open. Save change was C1. Do after A (links) and B (gang events).
+C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a, C4b
+and C4c done, C4d open. Save change was C1. Do after A (links) and B (gang events).
 
 ## What and why
 
@@ -214,7 +214,9 @@ Warning for C4: the inspector module now stands at 24917 of 25000 tokens, 83
 short of its budget. C4 edits `Inspector.cpp`, `InspectorOrganization.cpp` and
 the Chronicle tab, so it must first make room - `ChronicleLists.*` gets its
 own module (as `organization-lists` and `gang-lists` are) and a page file
-moves out of `inspector` - before any History section is added.
+moves out of `inspector` - before any History section is added. C4c did this:
+`InspectorHistory.cpp` and the new `InspectorChronicle.cpp` are the `chronicle-pages`
+module, and `inspector` is back to 23018 of 25000.
 
 ### C4. Chronicle details (inspector, statistics) — split on 2026-11-24
 
@@ -328,7 +330,7 @@ including ContextBudget. No sim code touched, so no headless comparison applies
 (as in C3a, C3b and C3c): `mechapunk-sim.exe` was not even relinked. The tab
 is for the user to check in the game.
 
-### - [ ] C4c. Room and building pages (inspector module)
+### - [x] C4c. Room and building pages (inspector module)
 
 Open: `app/Inspector.cpp` (room and building pages), `app/InspectorInternal.hpp`,
 a new `app/InspectorChronicle.cpp`.
@@ -340,6 +342,48 @@ a new `app/InspectorChronicle.cpp`.
 - "What happened here" on the room page and the building page: `EntriesAboutRoom`
   and `EntriesAboutBuilding`, a clipped table `kVisibleRows` (12) rows high,
   every robot and room in a row a link, a scrapped robot its remembered name.
+
+Done as (chronicle-pages module, one commit): the room was made first - `scripts/context_budget.py`
+moved `InspectorHistory.cpp` out of `inspector` into a new `chronicle-pages` module
+that holds it and the new `app/InspectorChronicle.cpp` plus the headers they lean on
+(`InspectorInternal.hpp`, `Links.hpp`, `ChronicleLists.hpp`, `Inspector.hpp`), and
+`python scripts/context_budget.py` was run before the page was written: `inspector`
+24917 → 23018 of 25000, `chronicle-pages` 8596. No source file moved, so no split
+proof applies; the move is only the budget script's membership.
+
+- The sections are `DrawRoomChronicle` and `DrawBuildingChronicle` in the new
+  `app/InspectorChronicle.cpp`, declared in `app/InspectorInternal.hpp` the way
+  `DrawRobotHistory` is, and called at the end of `DrawRoom` and `DrawBuilding`
+  with `&result`, so a click in a section moves the inspector as the rest of the
+  page does. `CMakeLists.txt` gained the file in the `mechapunk` executable.
+- Both sections draw through one file-local `DrawEntries`, in the Chronicle tab's
+  column order: When (`sim::FormatTime`), What, Who, Whom, [Room], Credits, a
+  frozen header, `kVisibleRows` (12) rows high and `ImGuiListClipper`, so a list
+  of any length up to `kChronicleCap` is safe. Table ids "room history" and
+  "building history".
+- What the step's text left open, and what was chosen:
+  - The room page has no Room column: `EntriesAboutRoom` returns only entries
+    whose room is the one already open, so a link to it would reselect the page.
+    The step's "every robot and room in a row a link" is met on the building
+    page, where the room changes from row to row: `RoomLink`, "a room that is
+    gone" for a unit closed since, "-" for room id 0 (an event with no place).
+  - Both robots an entry names are links through `AccountLink(frame, city, ...)`,
+    so a live robot or organization is clickable, a scrapped one reads as its
+    remembered name in plain text and no second robot as "nobody".
+  - The building page's section covers the whole building, not the floor the
+    slider is on, which is what `EntriesAboutBuilding` answers.
+  - `kListFlags`, `kVisibleRows`, `ListSize`, `Credits` and `WhatName` are local
+    copies, as `InspectorGang.cpp`, `InspectorOrganization.cpp` and
+    `InspectorHistory.cpp` each already have; unifying `WhatName` and `Credits`
+    is C4d's.
+- No new tests: the rows come from `EntriesAboutRoom` and `EntriesAboutBuilding`,
+  already tested in C4a (`ChronicleLists.RoomHistoryNamesItsRoom`,
+  `ChronicleLists.BuildingHistoryCoversItsRooms`); the drawing itself needs the
+  window. `docs/MODULES.md` gained the `chronicle-pages` row, the
+  `InspectorChronicle.cpp` row and a "which module for which task" row. ctest
+  169/169 including ContextBudget. No sim code touched, so no headless comparison
+  applies (as in C3a, C3b, C3c and C4a, C4b): `mechapunk-sim.exe` was not even
+  relinked. The two sections are for the user to check in the game.
 
 ### - [ ] C4d. Organization page and the robot page's rows (inspector module)
 

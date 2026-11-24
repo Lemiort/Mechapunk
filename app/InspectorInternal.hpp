@@ -100,4 +100,19 @@ void DrawRobotHistory(const RobotFrame& robot, const WorldFrame& frame,
                       const CityView& city,
                       std::optional<InspectorRequest>* request);
 
+// The "What happened here" section of the room page, in InspectorChronicle.cpp:
+// the chronicle entries whose room is `room`, newest first, each robot in one
+// a link (a scrapped one its remembered name). Takes the page's request by
+// pointer, as the robot page's History section does.
+void DrawRoomChronicle(const WorldFrame& frame, const CityView& city,
+                       sim::EntityId room,
+                       std::optional<InspectorRequest>* request);
+
+// The "What happened here" section of the building page, in InspectorChronicle.cpp:
+// the chronicle entries in any of `building`'s rooms, newest first, each row
+// also linking the room it happened in.
+void DrawBuildingChronicle(const WorldFrame& frame, const CityView& city,
+                           sim::EntityId building,
+                           std::optional<InspectorRequest>* request);
+
 }  // namespace mechapunk
