@@ -431,4 +431,22 @@ std::expected<void, std::string> V19ToV20(SaveDocument& world) try {
         std::format("the version 19 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V20ToV21(SaveDocument& world) try {
+    // Version 21 gives every chronicle entry the account its event moved
+    // money for: the account a `MoneySupplyChanged` event created money
+    // in or destroyed it from, and the owner of a unit that opened or
+    // closed. A version 20 entry recorded no account anywhere a migration
+    // could read it back - the emission log is capped and matching an
+    // entry to it by tick would invent facts the old game never wrote -
+    // so every entry gains none, and the story's money names its account
+    // only from the minute the current game runs the save.
+    for (SaveDocument& entry : world["chronicle"].get_array()) {
+        entry["account"] = std::uint64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 20 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

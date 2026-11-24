@@ -197,6 +197,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 19,
               .summary = "arrests name the arresting officer",
               .apply = &migrations::V19ToV20},
+    Migration{.fromVersion = 20,
+              .summary = "chronicle entries name the account their money moved for",
+              .apply = &migrations::V20ToV21},
 };
 }  // namespace
 

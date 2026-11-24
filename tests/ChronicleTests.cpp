@@ -95,5 +95,7 @@ TEST(Chronicle, SurvivesSave) {
         EXPECT_EQ(before[i].room.value, after[i].room.value) << "entry " << i;
         EXPECT_EQ(before[i].credits, after[i].credits) << "entry " << i;
         EXPECT_EQ(before[i].memory, after[i].memory) << "entry " << i;
+        EXPECT_EQ(before[i].account.value, after[i].account.value)
+            << "entry " << i;
     }
 }

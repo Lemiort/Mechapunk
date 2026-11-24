@@ -92,4 +92,11 @@ namespace mechapunk::sim::migrations {
 // `arrestedSomeone` cannot appear in a version 19 file at all.
 [[nodiscard]] std::expected<void, std::string> V19ToV20(SaveDocument& world);
 
+// Version 20 to 21: a chronicle entry names the account its event's money
+// moved for - the account an emission created money in or destroyed it
+// from, the owner of a unit that opened or closed. A version 20 entry
+// stored no account and the migration must not invent one the old game
+// never recorded, so every entry of an old save gains none.
+[[nodiscard]] std::expected<void, std::string> V20ToV21(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

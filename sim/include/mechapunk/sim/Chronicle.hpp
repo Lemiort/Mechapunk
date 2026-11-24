@@ -23,7 +23,11 @@ inline constexpr std::size_t kChronicleCap = 5000;
 // robots and rooms an entry names may be gone by the time it is read (a
 // scrapped robot is still remembered), and `World::Describe` reads an entry
 // the way it reads a `SimEvent`. `memory` is the memory the event left, if
-// any, the same kind a robot's own memories use.
+// any, the same kind a robot's own memories use. `account` is whose account
+// the event's money moved into or out of: the central bank or a saver for
+// an emission, the owner for a unit that opened or closed; none for events
+// that carry no account. It is what lets an organization's history page
+// show the money it was given.
 struct ChronicleEntry {
     Tick tick{};
     EventKind kind{};
@@ -32,6 +36,7 @@ struct ChronicleEntry {
     EntityId room;
     std::int64_t credits{};
     MemoryKind memory{};
+    EntityId account;
 };
 
 }  // namespace mechapunk::sim

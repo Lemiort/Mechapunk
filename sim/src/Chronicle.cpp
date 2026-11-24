@@ -68,6 +68,7 @@ void World::Chronicle(const SimEvent& event) {
         .room = event.room,
         .credits = event.credits,
         .memory = event.memory,
+        .account = event.account,
     });
     if (state_.chronicle.size() > kChronicleCap) {
         state_.chronicle.erase(state_.chronicle.begin());

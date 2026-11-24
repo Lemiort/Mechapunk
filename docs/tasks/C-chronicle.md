@@ -2,8 +2,9 @@
 
 Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
 C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a to C4d
-done, C4e open (it is a save change and waits for the user to say whether the
-organization page needs the account an emission carried). Save change was C1.
+done, C4e split on 2026-11-24 into C4e1 and C4e2 (the user answered: the
+organization page does need the account an emission carried); C4e1 done,
+C4e2 open. Save change was C1, and C4e1 raised it to 21.
 Do after A (links) and B (gang events).
 
 ## What and why
@@ -442,19 +443,75 @@ C4c made for them, and `Inspector.cpp` had no room for it anyway.
   C4c): `mechapunk-sim.exe` was not even relinked. The section is for the user to
   check in the game.
 
-### - [ ] C4e. Money an organization was given (saves module, only if wanted)
+### C4e. Money an organization was given (saves, chronicle-lists) — split on 2026-11-24
 
-C4's bullet "money it was given" needs the account a `MoneySupplyChanged`
-event carries, which `ChronicleEntry` does not save (C4a's note). Doing it is a
-save change by rule 3: v21, `V20ToV21` adding `account` to every
-`world.chronicle[i]`, a new fixture, `CurrentVersionFixtureLoadsAndRoundTrips`
-pointing at it and `Version20FixtureMigratesAndRuns`, then `EntriesAboutOrganization`
-grows the third rule. Ask the user whether the organization page needs it.
+The step names the saves module, but its last bullet lives in another module:
+the field, migration, fixture and tests are `saves` (with two lines of
+recording in `chronicle`), and `EntriesAboutOrganization` growing the third
+rule is `chronicle-lists`. Cut into C4e1 and C4e2, one module and one commit
+each. The user answered the question the step could not ask: yes, the
+organization page needs the account an emission carried.
+
+### - [x] C4e1. The account an entry's money moved for (saves module + chronicle recording)
+
+Open: `Chronicle.hpp`, `sim/src/Chronicle.cpp` (the copy in `World::Chronicle`),
+`Save.hpp`, `Migrations.hpp`, the end of `Migrations.cpp`, `Save.cpp` (the
+list), `tests/SaveTests.cpp`, `tests/ChronicleTests.cpp` (the round trip).
+
+Done as (one commit): `ChronicleEntry` gains `EntityId account` - whose
+account the event's money moved into or out of - and `World::Chronicle`
+copies `SimEvent::account` into it. The events the chronicle keeps that
+carry one: `MoneySupplyChanged` (the account `ChangeMoney` funded,
+Money.cpp) and `UnitOpened`/`UnitClosed` (the room's owner, Units.cpp);
+the rest read as none. Save version 21, game 0.21.0.
+
+- `V20ToV21` adds `"account": 0` to every `world.chronicle[i]`: a version
+  20 entry recorded the account nowhere the entry kept it (the emission
+  log is capped, and matching an entry to it by tick would invent facts
+  the old game never wrote), so every entry of an old save gains none,
+  and the story's money names its account only from the minute the
+  current game runs the save. Declared in `Migrations.hpp`, registered
+  in `kMigrations`.
+- Fixture `tests/fixtures/saves/v21-city.json` from the guide's command
+  (seed 33, 100 robots, 28370 minutes) at game 0.21.0, plus its row and
+  a sentence in that folder's README.
+- `CurrentVersionFixtureLoadsAndRoundTrips` points at it and checks the
+  new data: some chronicle entry has a valid account (the fixture ran
+  with the recording, and units open and close in every such city).
+  `Version20FixtureMigratesAndRuns` loads v20: it walks the fixture's
+  parsed chronicle and asserts no entry has the `"account"` key - a
+  text search would hit the emissions log, which has always named its
+  account - then asserts every migrated entry's account is none, and
+  the city runs a day.
+- `PushChronicleEntry` writes the eighth key; the hand-written entry in
+  `Version19FixtureMigratesAndRuns` stays at seven keys on purpose,
+  because what loads it is the migration chain that adds the eighth.
+  `Chronicle.SurvivesSave` compares the new field too.
+- No validation change: an entry's ids are not checked against the
+  entities they name (C1's note), and `account` is such an id.
+
+The bump changed no behaviour: the seed 1, 10000 robots, 40 days `--quiet`
+log matched byte for byte except its own `Simulated ... in N s` line, and
+the seed 7, 2000 robots, 6 days save differs only in the version and
+game version lines and the new `"account"` key on every chronicle entry.
+ctest: all tests pass including ContextBudget; no new source files, so
+`scripts/context_budget.py` is unchanged.
+
+### - [ ] C4e2. `EntriesAboutOrganization` grows the third rule (chronicle-lists module)
+
+Open: `app/ChronicleLists.cpp`, `tests/ChronicleListsTests.cpp`.
+
+- `EntriesAboutOrganization` answers a third rule: entries whose `account`
+  is the organization - an emission that funded it, money created or
+  destroyed for it - newest first, through the one `Matching` helper.
+- Tests: an organization the chronicle names as an account has rows
+  (the fixture city or the hand-written chronicle); a robot's own
+  savings emission does not join an organization's list.
 
 
 ## Done when
 
 - [x] The chronicle is saved, migrated, tested, and shown with links. (C1 to C4d)
 - [x] Robots, rooms, buildings and organizations show their own history. (C3c, C4c, C4d)
-- [ ] The guide's task table marks C done. (C4e open: ask the user whether the
-  organization page needs the account an emission carried, a save change to v21)
+- [ ] The guide's task table marks C done. (C4e2 open: `EntriesAboutOrganization`
+  grows its third rule, the account C4e1 now saves)

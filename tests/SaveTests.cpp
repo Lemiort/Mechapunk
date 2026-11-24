@@ -44,7 +44,7 @@ std::string EditSave(const std::string& json, Edit edit) {
     return glz::write_json(document).value_or("");
 }
 
-// Appends one chronicle entry to a save document: all seven keys the format
+// Appends one chronicle entry to a save document: all eight keys the format
 // has for an entry, everything but the tick left empty.
 void PushChronicleEntry(sim::SaveDocument& chronicle, std::uint64_t tick) {
     sim::SaveDocument entry = sim::SaveDocument::object_t{};
@@ -55,6 +55,7 @@ void PushChronicleEntry(sim::SaveDocument& chronicle, std::uint64_t tick) {
     entry["room"] = std::uint64_t{0};
     entry["credits"] = std::int64_t{0};
     entry["memory"] = "arrivedInCity";
+    entry["account"] = std::uint64_t{0};
     chronicle.get_array().push_back(std::move(entry));
 }
 
@@ -191,7 +192,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v20-city.json";
+        kFixtureDirectory / "saves" / "v21-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -270,6 +271,14 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     // carries the keys at all.
     EXPECT_FALSE(state->gangs.empty());
     EXPECT_FALSE(state->chronicle.empty());
+    // And from version 21 the story names accounts: an entry for an
+    // emission or for a unit opening or closing carries the account its
+    // money moved for, so the fixture's chronicle has at least one entry
+    // with a valid account.
+    EXPECT_TRUE(std::ranges::any_of(state->chronicle,
+                                    [](const sim::ChronicleEntry& entry) {
+                                        return entry.account.IsValid();
+                                    }));
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -325,6 +334,43 @@ TEST(Save, Version19FixtureMigratesAndRuns) {
     EXPECT_EQ(last.kind, sim::EventKind::Arrested);
     EXPECT_FALSE(last.robot.IsValid());
     EXPECT_EQ(last.otherRobot.value, 424242U);
+}
+
+// A version 20 save has a chronicle whose entries name no account: the
+// migration adds the key as none, because the old game recorded the money's
+// account nowhere the entry kept it, and the migration must not invent one.
+// The fixture is checked entry by entry for the absence of the key - a
+// text search would hit the emissions log, which has always named its
+// account - so what loads is the migration's work and not a fixture that
+// quietly grew the field.
+TEST(Save, Version20FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v20-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    sim::SaveDocument document;
+    ASSERT_FALSE(glz::read_json(document, fixture));
+    const sim::SaveDocument& chronicle = document["world"]["chronicle"];
+    ASSERT_TRUE(chronicle.is_array());
+    ASSERT_FALSE(chronicle.get_array().empty());
+    for (const sim::SaveDocument& entry : chronicle.get_array()) {
+        EXPECT_FALSE(entry.contains("account"));
+    }
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    // The story migrates rather than being replaced: the fixture's
+    // chronicle already tells one, and none of its entries can know an
+    // account.
+    EXPECT_FALSE(state->chronicle.empty());
+    for (const sim::ChronicleEntry& entry : state->chronicle) {
+        EXPECT_FALSE(entry.account.IsValid());
+    }
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }
 
 // The chronicle is kept in order and in check: an entry older than the one
