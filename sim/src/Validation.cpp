@@ -96,6 +96,32 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
         }
     }
 
+    // Free plots: out of `kCornersPerNode` corners per node, those no
+    // building of that node stands on. Construction raises a building on a
+    // plot, so a plot a building already occupies would put two buildings
+    // on one corner; the list names each free corner once, sorted by node
+    // and then corner.
+    std::vector<std::uint32_t> taken(nodeCount, 0);
+    for (const Building& building : city.buildings) {
+        ++taken.at(building.entrance.value);
+    }
+    std::uint64_t previousPlotKey = 0;
+    bool firstPlot = true;
+    for (const CityLot& lot : city.lots) {
+        const std::uint64_t key =
+            (static_cast<std::uint64_t>(lot.node.value) * kCornersPerNode) +
+            lot.corner;
+        if (lot.node.value >= nodeCount || lot.corner >= kCornersPerNode ||
+            lot.corner < taken.at(static_cast<std::size_t>(lot.node.value)) ||
+            (!firstPlot && key <= previousPlotKey)) {
+            return fail(std::format("Free plot corner {} of node {} is not a "
+                                    "free corner of its node, or is out of order",
+                                    lot.corner, lot.node.value));
+        }
+        previousPlotKey = key;
+        firstPlot = false;
+    }
+
     std::unordered_set<std::uint32_t> stationNodes;
     for (const Station& station : city.stations) {
         if (station.node.value >= nodeCount ||

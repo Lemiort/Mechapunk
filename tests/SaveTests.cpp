@@ -192,7 +192,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v21-city.json";
+        kFixtureDirectory / "saves" / "v22-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -279,6 +279,20 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
                                     [](const sim::ChronicleEntry& entry) {
                                         return entry.account.IsValid();
                                     }));
+    // And from version 22 the city saves its free plots: the corners of its
+    // intersections no building stands on, so the fixture has plots and
+    // none of them is a corner a building already occupies.
+    EXPECT_FALSE(state->city.lots.empty());
+    {
+        std::vector<std::uint32_t> taken(state->city.nodes.size(), 0);
+        for (const sim::Building& building : state->city.buildings) {
+            ++taken.at(building.entrance.value);
+        }
+        for (const sim::CityLot& lot : state->city.lots) {
+            EXPECT_LT(lot.corner, sim::kCornersPerNode);
+            EXPECT_GE(lot.corner, taken.at(lot.node.value));
+        }
+    }
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -375,6 +389,39 @@ TEST(Save, Version20FixtureMigratesAndRuns) {
 
 // The chronicle is kept in order and in check: an entry older than the one
 // before it is refused, as is a save holding more than the game keeps.
+// A version 21 save knows nothing about free plots: the migration computes
+// them from the save's own grid - four corners per node, minus the corners
+// its buildings stand on - so what loads is the migration's work and not a
+// fixture that quietly grew the field.
+TEST(Save, Version21FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v21-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    sim::SaveDocument document;
+    ASSERT_FALSE(glz::read_json(document, fixture));
+    ASSERT_TRUE(document["world"]["city"].is_object());
+    EXPECT_FALSE(document["world"]["city"].contains("lots"));
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    std::vector<std::uint32_t> taken(state->city.nodes.size(), 0);
+    for (const sim::Building& building : state->city.buildings) {
+        ++taken.at(building.entrance.value);
+    }
+    // The plots are the fixture's own free corners, not an empty list.
+    EXPECT_FALSE(state->city.lots.empty());
+    for (const sim::CityLot& lot : state->city.lots) {
+        EXPECT_LT(lot.corner, sim::kCornersPerNode);
+        EXPECT_GE(lot.corner, taken.at(lot.node.value));
+    }
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
 TEST(Save, RejectsChroniclesOutOfOrderOrOverfull) {
     const sim::World world = sim::World::Generate({.seed = 3, .robots = 10});
     const std::string json = Serialize(world.State());

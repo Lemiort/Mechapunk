@@ -15,7 +15,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | Module | Tokens | Files |
 |---|---:|---|
 | world | 24k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
-| generation | 22k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
+| generation | 24k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
 | validation | 11k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 22k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 22k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Units.cpp`, `Property.cpp`, `HousingTests.cpp` |
@@ -23,8 +23,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | careers | 18k | `World.hpp`, `Careers.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 25k | `World.hpp`, `Social.hpp`, `Social.cpp`, `LifeCycle.cpp`, `SocialTests.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 24k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
-| saves-frozen | 5k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp` |
+| saves | 22k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
+| saves-frozen | 9k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 11k | `World.hpp`, `main.cpp` |
 | view-core | 18k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
@@ -60,7 +60,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Residents.cpp` | `RentOf`, `ResidentsOf`, `CountResidents`, `CollectRent` |
 | `Describe.cpp` | `Describe`, `DescribeRoom`: event and room text |
 | `Validation.cpp` | `ValidateWorldState` |
-| `City.hpp/.cpp` | Streets, stations, buildings, rooms, `RoomKind`, `ApartmentClass`, `GenerateCity`, `RoomIndex`, `RoutePlanner` |
+| `City.hpp/.cpp` | Streets, stations, buildings, rooms, `RoomKind`, `ApartmentClass`, free plots (`CityLot`, `City::lots`), `GenerateCity`, `RoomIndex`, `RoutePlanner` |
 | `Venues.hpp/.cpp` | `VenueRules` per venue kind (hours, price, effects, capacity), `StaffRules` (also police and crew rooms), `FindStaffRules`, `StaffPerShift`, `JobsAt`, `ShiftSlot` |
 | `Careers.hpp/.cpp` | Wages, promotions, firing, `ReviewJobs`, `ReviewHomes` (eviction, moving up, friends moving in together), `JobShift`, `JobKey`, `OpeningsFor` |
 | `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |

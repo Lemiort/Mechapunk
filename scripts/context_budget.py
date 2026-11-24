@@ -48,7 +48,7 @@ MODULES = {
               "sim/src/MigrationsInternal.hpp", "sim/src/Migrations.cpp", "tests/SaveTests.cpp",
               "tests/SaveFixtureTests.cpp"],
     "saves-frozen": ["sim/src/Migrations.hpp", "sim/src/MigrationsInternal.hpp",
-                     "sim/src/MigrationsEarly.cpp"],
+                     "sim/src/MigrationsEarly.cpp", "tests/SaveFixtureTestsEarly.cpp"],
     "basics": [I + "GameTime.hpp", I + "Ids.hpp", I + "Random.hpp", I + "Weather.hpp",
                "sim/src/GameTime.cpp", "sim/src/Random.cpp", "sim/src/Weather.cpp",
                "tests/RandomTests.cpp", "tests/WeatherTests.cpp"],

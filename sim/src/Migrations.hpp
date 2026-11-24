@@ -99,4 +99,11 @@ namespace mechapunk::sim::migrations {
 // never recorded, so every entry of an old save gains none.
 [[nodiscard]] std::expected<void, std::string> V20ToV21(SaveDocument& world);
 
+// Version 21 to 22: the city saves its free building plots - out of four
+// corners per intersection, those no building of that intersection stands
+// on. A version 21 city names its nodes and every building's entrance, so
+// the migration computes the plots from them exactly as the view counts a
+// node's corners, instead of leaving the land construction builds on empty.
+[[nodiscard]] std::expected<void, std::string> V21ToV22(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

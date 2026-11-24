@@ -26,6 +26,7 @@ every fixture, so old saves keep working as the format evolves.
 | `v19-city.json` | 19     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v19-city.json` (game 0.19.0) |
 | `v20-city.json` | 20     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v20-city.json` (game 0.20.0) |
 | `v21-city.json` | 21     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v21-city.json` (game 0.21.0) |
+| `v22-city.json` | 22     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v22-city.json` (game 0.22.0) |
 
 All other fixtures stop at the same moment as the older ones: Day 20 Sat 16:50.
 `v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
@@ -78,7 +79,10 @@ from this version an arrest names the officer that made it (see
 `Gangs.OldSaveGrowsGangsAtMidnight` and step B15). `v21-city.json` stops at
 the same moment in the same kind of city: from this version a chronicle
 entry names the account its event's money moved for, and its story has
-such entries (see step C4e1).
+such entries (see step C4e1). `v22-city.json` stops at the same moment in
+the same kind of city: from this version the city saves its free building
+plots - out of four corners per intersection, those no building stands on
+- and its grid has them (see step D1a).
 `Version1FixtureMigratesAndRuns` loads the v1
 fixture through the migration, checks every robot kept its home and
 workplace, and runs two days of evenings; `Version2FixtureMigratesAndRuns`

@@ -190,6 +190,33 @@ TEST(City, NoIntersectionHasMoreThanFourBuildings) {
     }
 }
 
+// A free plot is a corner of an intersection no building stands on: the
+// view draws a park there, and construction raises a building on it, so
+// the saved list must hold exactly the corners that are free - a node's
+// slots after its buildings - sorted by node and then corner.
+TEST(City, LotsAreTheFreeCornersOfTheGrid) {
+    for (const std::uint64_t seed : {1U, 7U, 33U}) {
+        for (const std::uint32_t residents : {100U, 1000U, 10000U}) {
+            const sim::City city = Generate(seed, residents);
+            std::vector<std::uint32_t> taken(city.nodes.size(), 0);
+            for (const sim::Building& building : city.buildings) {
+                ++taken.at(building.entrance.value);
+            }
+            std::vector<sim::CityLot> expected;
+            for (std::size_t node = 0; node < taken.size(); ++node) {
+                for (std::uint32_t corner = taken.at(node);
+                     corner < sim::kCornersPerNode; ++corner) {
+                    expected.push_back({.node = sim::NodeId{static_cast<std::uint32_t>(node)},
+                                        .corner = corner});
+                }
+            }
+            EXPECT_EQ(city.lots, expected)
+                << "seed=" << seed << " residents=" << residents;
+            EXPECT_FALSE(city.lots.empty());
+        }
+    }
+}
+
 TEST(RoutePlanner, PathLengthMatchesDistance) {
     sim::Pcg32 random = sim::Pcg32::FromSeed(4);
     sim::EntityIdAllocator ids;

@@ -200,6 +200,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 20,
               .summary = "chronicle entries name the account their money moved for",
               .apply = &migrations::V20ToV21},
+    Migration{.fromVersion = 21,
+              .summary = "the city's free building plots",
+              .apply = &migrations::V21ToV22},
 };
 }  // namespace
 

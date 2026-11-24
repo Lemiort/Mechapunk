@@ -1,7 +1,8 @@
 # Task D: construction
 
-Status: open. Save change. The biggest remaining task: take it slowly, one
-step per module.
+Status: open. D1 split on 2026-11-24 into D1a and D1b; D1a is done and
+raised the save version to 22. Save change. The biggest remaining task: take
+it slowly, one step per module.
 
 ## What and why
 
@@ -17,15 +18,90 @@ own module: `Construction.hpp`, `sim/src/Construction.cpp`,
 
 ## Steps
 
-### - [ ] D1. Land as simulation state (generation + saves)
+### D1. Land as simulation state — split on 2026-11-24
 
-Free corners are parks today; only the view knows them
-(`rg -n "AddPark" app`). Make them state: `City::lots` (node and corner
-index, sorted). `GenerateCity` fills them; the migration fills them from
-the grid exactly as the view computes free corners (four corners per node,
-minus taken ones; `NoIntersectionHasMoreThanFourBuildings` in
-`CityTests.cpp` shows how corners are counted). The view draws parks from
-`lots`. Save change, fixture, tests. Check the city looks the same.
+The step names two modules and its last bullet lives in a third: the field,
+the filling and the save change are `generation` and `saves`, "the view draws
+parks from `lots`" is `view-core`. Cut into steps of one module and one commit
+each, the original bullets living on inside D1a and D1b.
+
+### - [x] D1a. Free plots as saved state (generation + saves)
+
+Open: `City.hpp`, `City.cpp` (the end of `GenerateCity`), `CityTests.cpp`,
+`Save.hpp`, `Save.cpp` (the migration list), `Migrations.hpp`, the end of
+`Migrations.cpp`, `SaveTests.cpp`, plus `Validation.cpp` (rule 5, as C1 did
+for the chronicle).
+
+Done as (one commit): `City.hpp` gains `kCornersPerNode` (4), `CityLot
+{NodeId node; std::uint32_t corner;}` and `City::lots`, sorted by node and
+then corner. A lot is a corner slot no building of that node stands on: the
+view numbers an intersection's four corners and puts a node's buildings on
+its first slots in id order (`CityView.cpp`'s `usedSlots`, and buildings are
+saved sorted by id), so the free plots of a node are the slots after the
+buildings at it - which is what `NoIntersectionHasMoreThanFourBuildings`
+keeps to four.
+
+- `GenerateCity` fills them at the end, counting its own `city.buildings`
+  by entrance rather than reusing `buildingsAt`, which also holds the depot
+  reservations; the list is built by node then corner, so it is sorted.
+- `V21ToV22` (declared in `Migrations.hpp`, registered in `kMigrations`)
+  computes the same list from the save's own `city.nodes` and every
+  `city.buildings[i].entrance`, and writes `"lots"` into `world.city`: a
+  version 21 save names its grid and its buildings, so the land is derived
+  from facts it did store, not invented. Save version 22, game 0.22.0.
+- Fixture `tests/fixtures/saves/v22-city.json` from the guide's command (seed
+  33, 100 robots, 28370 minutes) at game 0.22.0, plus its row and a sentence
+  in that folder's README.
+- Validation (`ValidateWorldState`, before the station checks): every lot
+  names a node of the city, a corner below `kCornersPerNode`, a slot at or
+  after that node's building count, and the list is strictly increasing by
+  node then corner. What is *not* checked: that every free corner is listed.
+  A save may know fewer plots than it has, and D2 only ever consumes them.
+- Tests: `City.LotsAreTheFreeCornersOfTheGrid` (seeds 1, 7, 33 at 100, 1000
+  and 10000 residents) compares the whole list against the free corners
+  recomputed from the buildings; `CurrentVersionFixtureLoadsAndRoundTrips`
+  points at v22 and checks the fixture has plots and that none sits on a
+  taken corner; `Version21FixtureMigratesAndRuns` parses the v21 fixture's
+  JSON and asserts `world.city` has no `"lots"` key - so what loads is the
+  migration's work - then that every migrated lot is a free corner of its
+  node, and runs the city a day.
+
+First make room, as C4c did: `saves` stood at 23905 of 25000, and this step's
+migration and tests need about 1250 tokens, so `tests/SaveFixtureTests.cpp`
+was split by era. The frozen versions 1 to 8 moved to a new
+`tests/SaveFixtureTestsEarly.cpp` in the `saves-frozen` module (the way
+`MigrationsEarly.cpp` holds the frozen migrations), added to
+`tests/CMakeLists.txt` and to `scripts/context_budget.py`. Code moved only:
+the same tests run, and ctest went 172 to 174 because of this step's two new
+tests. `saves` is now 22675, `saves-frozen` 8535.
+
+The bump changed no behaviour: the seed 1, 10000 robots, 40 days `--quiet`
+log matched byte for byte except its own `Simulated ... in N s` line, and
+the seed 7, 2000 robots, 6 days save differs only in the version and game
+version lines and the new `"lots"` block - compared as parsed JSON with
+`lots` removed the two saves are equal, and the block holds exactly the
+free corners of that city.
+
+Warning for the steps after this: `generation` is now 24353 of 25000, 647
+short of its budget, and `saves` 2325 short. A step that adds to `CityTests.cpp`
+or to the saves module must make room first. Note for D2: generation fills
+corners up to four per node, so a big city has little free land - the seed 7,
+2000 robots city has 31 plots - and construction will find it scarce.
+
+### - [ ] D1b. The view draws parks from the plots (view-core)
+
+Open: `app/CityView.cpp` (the park loop at the end of the constructor, and
+the `occupied` array that only it reads - `usedSlots` stays, the building
+placement needs it).
+
+- Replace the loop that walks every node's four corners with one over
+  `city_.lots`: the position comes from the lot's node and corner through
+  `kQuadrants`, and the `insideCity` test stays, because a corner outside
+  the grid's bounding box gets no park.
+- Check the city looks the same: the same parks in the same places, which
+  the user sees in the game; `mechapunk-sim.exe` never builds the view, so
+  the headless log and save cannot move and must still match D1a's byte for
+  byte.
 
 ### - [ ] D2. Projects (construction module)
 

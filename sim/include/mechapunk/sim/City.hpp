@@ -121,12 +121,33 @@ struct Building {
     std::vector<Room> rooms;
 };
 
+// An intersection has room for four buildings, one on each corner; the
+// view numbers those corners 0 to 3, and generation never puts a fifth
+// building at a node.
+inline constexpr std::uint32_t kCornersPerNode = 4;
+
+// A free building plot: a corner of a street intersection with no building
+// on it. `corner` is the slot the view numbers an intersection's four
+// corners, and the buildings at a node take the first slots in id order,
+// so a plot is a slot no building of that node has. The view draws a park
+// there; construction raises a building on it.
+struct CityLot {
+    NodeId node;
+    std::uint32_t corner{};
+
+    bool operator==(const CityLot&) const = default;
+};
+
 // Saved city layout. Buildings are kept sorted by id.
 struct City {
     std::vector<CityNode> nodes;
     std::vector<CityEdge> edges;
     std::vector<Building> buildings;
     std::vector<Station> stations;
+    // Every free plot, sorted by node and then corner: the corners of
+    // each node that no building stands on, out of `kCornersPerNode`
+    // corners per node.
+    std::vector<CityLot> lots;
 
     [[nodiscard]] const Building* FindBuilding(EntityId id) const noexcept;
 };

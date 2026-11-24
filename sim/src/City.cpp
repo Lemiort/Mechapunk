@@ -570,6 +570,24 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
              .capacity = std::max<std::uint32_t>(2, line.trains)});
         city.buildings.push_back(std::move(depot));
     }
+
+    // Every corner of an intersection that no building stands on is a free
+    // plot: the view draws a park there and construction raises a building
+    // on it. The view puts a node's buildings on its first corners in id
+    // order, which is the order `buildings` are kept in, so the free plots
+    // are the slots after the buildings at that node, listed by node and
+    // then corner.
+    std::vector<std::uint32_t> taken(city.nodes.size(), 0);
+    for (const Building& building : city.buildings) {
+        ++taken.at(building.entrance.value);
+    }
+    for (std::size_t node = 0; node < taken.size(); ++node) {
+        for (std::uint32_t corner = taken.at(node); corner < kCornersPerNode;
+             ++corner) {
+            city.lots.push_back({.node = NodeId{static_cast<std::uint32_t>(node)},
+                                 .corner = corner});
+        }
+    }
     return city;
 }
 

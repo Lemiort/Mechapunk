@@ -449,4 +449,39 @@ std::expected<void, std::string> V20ToV21(SaveDocument& world) try {
         std::format("the version 20 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V21ToV22(SaveDocument& world) try {
+    // Version 22 saves the city's free building plots: out of four corners
+    // per intersection, those no building of that intersection stands on.
+    // A version 21 city names its nodes and every building's entrance, so
+    // the plots are computed from them here instead of leaving the land
+    // construction builds on empty. The view puts a node's buildings on its
+    // first corners and buildings are saved sorted by id, so the free
+    // corners of a node are the slots after the buildings at it.
+    constexpr std::uint32_t kCorners = 4;
+    const std::size_t nodeCount = world["city"]["nodes"].get_array().size();
+    std::vector<std::uint32_t> taken(nodeCount, 0);
+    for (SaveDocument& building : world["city"]["buildings"].get_array()) {
+        if (building["entrance"].is_number()) {
+            const std::uint64_t node = building["entrance"].get<std::uint64_t>();
+            if (node < nodeCount) {
+                ++taken.at(static_cast<std::size_t>(node));
+            }
+        }
+    }
+    Array lots;
+    for (std::size_t node = 0; node < nodeCount; ++node) {
+        for (std::uint32_t corner = taken.at(node); corner < kCorners; ++corner) {
+            SaveDocument lot = SaveDocument::object_t{};
+            lot["node"] = std::uint64_t{node};
+            lot["corner"] = std::uint64_t{corner};
+            lots.push_back(std::move(lot));
+        }
+    }
+    world["city"]["lots"] = std::move(lots);
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 21 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations
