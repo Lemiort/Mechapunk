@@ -38,6 +38,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
 | gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
 | gang-lists | 4k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
+| chronicle-lists | 7k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
 | chronicle | 8k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 
 ## What lives where
@@ -103,6 +104,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Inspector` | Inspector window for the selected building, room or robot. |
 | `Links.hpp/.cpp` | Clickable names in the inspector: `RoomLabel`, `ShowRoom`, `RoomLink`, `ShowRobot`, `RobotLink`. |
 | `InspectorHistory.cpp` | The robot page's "History" section: its chronicle entries, newest first, each robot and room a link. |
+| `ChronicleLists` | Which chronicle entries a history list shows: about a robot, room, building or organization, newest first, plus the Chronicle tab's filters (kind group, day range, name). |
 | `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank, Crime and Chronicle tabs, plots from `DailyStats`; the Chronicle tab is drawn in `StatisticsChronicle.cpp`. |
 | `main.cpp` | Window, input, camera, panels, applying frames. |
 
@@ -136,6 +138,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | The inspector window and its clickable names | inspector | `Inspector.cpp`, `Links.cpp` |
 | Which rows an organization page shows, sorted | organization-lists | `app/OrganizationLists.cpp` |
 | Which rows a gang page shows, sorted | gang-lists | `app/GangLists.cpp` |
+| Which rows a history list shows, filtered | chronicle-lists | `app/ChronicleLists.cpp` |
 | Panels, input, camera; frames from the simulation thread | ui | `main.cpp`, `SimulationHost.cpp` |
 
 A task touching two modules (a new robot field shown in the inspector, say)

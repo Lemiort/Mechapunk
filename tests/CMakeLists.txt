@@ -27,7 +27,13 @@ target_compile_definitions(sim_tests PRIVATE
 gtest_discover_tests(sim_tests)
 
 # The game's floor plans, without a window or renderer.
-add_executable(layout_tests GangListsTests.cpp LayoutTests.cpp OrganizationListsTests.cpp)
+add_executable(
+    layout_tests
+    ChronicleListsTests.cpp
+    GangListsTests.cpp
+    LayoutTests.cpp
+    OrganizationListsTests.cpp
+)
 target_link_libraries(layout_tests PRIVATE mechapunk_layout GTest::gtest_main)
 gtest_discover_tests(layout_tests)
 

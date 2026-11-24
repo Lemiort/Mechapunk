@@ -75,6 +75,8 @@ MODULES = {
               "tests/GangCrimeTests.cpp"],
     "gang-officer": [I + "Gangs.hpp", "tests/GangOfficerTests.cpp"],
     "gang-lists": ["app/GangLists.hpp", "app/GangLists.cpp", "tests/GangListsTests.cpp"],
+    "chronicle-lists": ["app/ChronicleLists.hpp", "app/ChronicleLists.cpp",
+                        "tests/ChronicleListsTests.cpp"],
     "chronicle": [I + "Chronicle.hpp", "sim/src/Chronicle.cpp", "tests/ChronicleTests.cpp",
                   I + "World.hpp"],
 }

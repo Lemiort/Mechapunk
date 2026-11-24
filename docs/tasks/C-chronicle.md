@@ -1,8 +1,8 @@
 # Task C: chronicle (saved city history)
 
 Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
-C3a-C3c, C3a, C3b and C3c done, C4 open. Save change was C1. Do after A
-(links) and B (gang events).
+C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a done,
+C4b open. Save change was C1. Do after A (links) and B (gang events).
 
 ## What and why
 
@@ -216,27 +216,105 @@ the Chronicle tab, so it must first make room - `ChronicleLists.*` gets its
 own module (as `organization-lists` and `gang-lists` are) and a page file
 moves out of `inspector` - before any History section is added.
 
-### - [ ] C4. Chronicle details (inspector, statistics)
+### C4. Chronicle details (inspector, statistics) — split on 2026-11-24
 
-Follow the guide's section 9 (detail pages). Open: a new
-`app/ChronicleLists.hpp/.cpp` and `tests/ChronicleListsTests.cpp`,
-`app/Statistics.cpp` (the Chronicle tab), `app/Inspector.cpp` (robot,
-room and building pages), `app/InspectorOrganization.cpp`.
+The step names two modules and its first bullet lives in a third: `ChronicleLists.*`
+and its tests want their own module (as `organization-lists` and `gang-lists` have),
+the tab is `statistics`, the pages are `inspector`. Cut into steps of one module and
+one commit each, the original bullets living on inside C4a to C4d; C4e is the part
+of the step the text could not ask for (see C4a's note).
+
+### - [x] C4a. The chronicle lists (chronicle-lists module)
+
+Open: a new `app/ChronicleLists.hpp/.cpp` and `tests/ChronicleListsTests.cpp`.
 
 - `ChronicleLists` (plain, tested): entries about a robot, a room, a
   building (any of its rooms) and an organization (rooms it owns, robots it
-  employs, money it was given), newest first; and a filter by kind and by
-  day range.
-- **Chronicle tab**: filter buttons by kind (people, work, homes, venues,
-  crime, money) and a day range; a search box for a robot's name; each
-  entry's time, its text, and every robot, room, building and organization
-  in it as links, clipped.
-- **History sections**: the robot page ("History"), the room and building
-  pages ("What happened here") and the organization page ("History"), each
-  a clipped list of its entries with links.
-- An entry about a robot that was scrapped shows its name as plain text
-  (`AccountLink` already does this).
+  employs), newest first; and a filter by kind and by day range.
 - Tests for every list function; add the new files to the budget script.
+
+Done as (chronicle-lists module, one commit): four list functions
+`EntriesAboutRobot`, `EntriesAboutRoom`, `EntriesAboutBuilding`,
+`EntriesAboutOrganization`, plus `ChronicleGroup` (the six buttons), `GroupOf`,
+`ChronicleFilter` and `FilterChronicle`. Every one returns `const
+sim::ChronicleEntry*` pointers into `WorldFrame::chronicle` (the frame keeps them
+alive, as `OrganizationLists.cpp` does with loans) and shares one file-local
+`Matching` helper that walks the saved list backwards, so every list is newest
+first, complete and stable. A building's room ids and an organization's rooms
+and workers go into `unordered_set`s used for membership only, never iterated,
+so the guide's determinism rule holds; the organization's workers come from
+`WorkersOf` in `OrganizationLists.hpp`, the same rule its worker list uses.
+The day range is inclusive with a bound of 0 meaning "no bound"
+(`sim::DayNumber`), and the name filter lowercases both sides and looks the
+robot up in `frame.directory`, so a search finds a scrapped robot's entries.
+
+What the step's text left open, and what was chosen:
+
+- Which kind answers to which button. Gang joining and leaving reads as
+  **crime**, the way the Crime tab already tells it; a `Remembered` entry is
+  judged by its memory, since `World::Chronicle` keeps only five: friends and
+  rivalries **people**, a lost job and a promotion **work**, an eviction
+  **homes**. A kind no button names gets `std::nullopt`, so a button on hides
+  it - `Departed`, `ArrivedHome`, `WeatherChanged` and the dropped memories.
+- **"money it was given" cannot be answered from a saved entry**: `ChronicleEntry`
+  keeps no account, and `World::Chronicle` (sim/src/Chronicle.cpp) drops
+  `SimEvent::account`, which is where `MoneySupplyChanged` puts it
+  (sim/src/Money.cpp:131). An organization's page therefore reaches money only
+  through its rooms and its workers; the account is C4e, a save change.
+- The tests never skip: the five population tests share one generated city
+  (seed 5, 1000 robots, 30 days - the city tests/ChronicleTests.cpp uses), pick
+  the id the chronicle names most often and assert it has at least two rows;
+  the group and filter tests write their chronicle by hand, so their kinds,
+  days and names cannot move with the random stream.
+
+`CMakeLists.txt` gained the file in `mechapunk_layout`, `tests/CMakeLists.txt`
+in `layout_tests`, `scripts/context_budget.py` the `chronicle-lists` module
+(7560 tokens: 959 + 2054 + 4547) and `docs/MODULES.md` its three tables. ctest
+169/169 including ContextBudget. No sim code touched, so no headless comparison
+applies (as in C3a, C3b and C3c): `mechapunk-sim.exe` was not even relinked.
+
+### - [ ] C4b. The Chronicle tab's filters (statistics module)
+
+Open: `app/StatisticsChronicle.cpp`, `app/Statistics.cpp` (the tab's controls).
+
+- Filter buttons for the six `ChronicleGroup`s, a day range and a search box
+  for a robot's name, all fed into `ChronicleFilter` and drawn from
+  `FilterChronicle`'s rows instead of reading the vector backwards by hand.
+- Keep the frozen header and `ImGuiListClipper`: a filtered list of any length,
+  up to `kChronicleCap`, must be safe. The tab's own `WhatName` and `Credits`
+  stay where they are.
+
+### - [ ] C4c. Room and building pages (inspector module)
+
+Open: `app/Inspector.cpp` (room and building pages), `app/InspectorInternal.hpp`,
+a new `app/InspectorChronicle.cpp`.
+
+- First make room, as the warning above says: move `InspectorHistory.cpp` out
+  of `inspector` into a new `chronicle-pages` module in `scripts/context_budget.py`
+  (with the new page file) and re-run `python scripts/context_budget.py` before
+  writing any page.
+- "What happened here" on the room page and the building page: `EntriesAboutRoom`
+  and `EntriesAboutBuilding`, a clipped table `kVisibleRows` (12) rows high,
+  every robot and room in a row a link, a scrapped robot its remembered name.
+
+### - [ ] C4d. Organization page and the robot page's rows (inspector module)
+
+Open: `app/InspectorOrganization.cpp`, `app/InspectorHistory.cpp`.
+
+- The organization page's "History" section: `EntriesAboutOrganization`.
+- The robot page's History section reads `EntriesAboutRobot` instead of scanning
+  `WorldFrame::chronicle` itself, so its rows match the other pages' - this is
+  where C3c's local `WhatName` and `Credits` copies belong to one place.
+
+### - [ ] C4e. Money an organization was given (saves module, only if wanted)
+
+C4's bullet "money it was given" needs the account a `MoneySupplyChanged`
+event carries, which `ChronicleEntry` does not save (C4a's note). Doing it is a
+save change by rule 3: v21, `V20ToV21` adding `account` to every
+`world.chronicle[i]`, a new fixture, `CurrentVersionFixtureLoadsAndRoundTrips`
+pointing at it and `Version20FixtureMigratesAndRuns`, then `EntriesAboutOrganization`
+grows the third rule. Ask the user whether the organization page needs it.
+
 
 ## Done when
 
