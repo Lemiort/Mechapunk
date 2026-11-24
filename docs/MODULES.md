@@ -105,7 +105,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Links.hpp/.cpp` | Clickable names in the inspector: `RoomLabel`, `ShowRoom`, `RoomLink`, `ShowRobot`, `RobotLink`. |
 | `InspectorHistory.cpp` | The robot page's "History" section: its chronicle entries, newest first, each robot and room a link. |
 | `ChronicleLists` | Which chronicle entries a history list shows: about a robot, room, building or organization, newest first, plus the Chronicle tab's filters (kind group, day range, name). |
-| `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank, Crime and Chronicle tabs, plots from `DailyStats`; the Chronicle tab is drawn in `StatisticsChronicle.cpp`. |
+| `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank, Crime and Chronicle tabs, plots from `DailyStats`; the Chronicle tab and its filter controls (group buttons, day range, name box, held in `StatisticsView`) are drawn in `StatisticsChronicle.cpp`. |
 | `main.cpp` | Window, input, camera, panels, applying frames. |
 
 

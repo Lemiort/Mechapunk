@@ -3,11 +3,14 @@
 // so the player can follow the story into the game.
 
 #include "StatisticsInternal.hpp"
+#include "ChronicleLists.hpp"
 #include "Links.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -75,15 +78,33 @@ std::string_view WhatName(const sim::ChronicleEntry& entry) {
     }
 }
 
+// The six group buttons the tab offers, in the order `ChronicleGroup` declares
+// its values. The label is what the player reads; the group is what goes into
+// `ChronicleFilter::group`, so no cast of an index into the enum is needed.
+struct GroupButton {
+    const char* label;
+    ChronicleGroup group;
+};
+
+constexpr std::array<GroupButton, 6> kGroups{{
+    {.label = "People", .group = ChronicleGroup::People},
+    {.label = "Work", .group = ChronicleGroup::Work},
+    {.label = "Homes", .group = ChronicleGroup::Homes},
+    {.label = "Venues", .group = ChronicleGroup::Venues},
+    {.label = "Crime", .group = ChronicleGroup::Crime},
+    {.label = "Money", .group = ChronicleGroup::Money},
+}};
+
 }  // namespace
 
 // Draws the Chronicle tab: one table of the city's saved story, newest entry
-// first (the list is saved oldest first, so row `row` reads entry `row` back
-// from the end). The rooms and robots an entry names may be gone by now -
-// the chronicle keeps a closed unit or a scrapped robot on purpose - so
-// those cells fall back to plain text. Links are piped into `request` as
-// the Crime tab does: one click a frame, the last link clicked wins.
-void DrawChronicle(const WorldFrame& frame, const CityView& city,
+// first, and the controls that decide which entries the table holds. The
+// rooms and robots an entry names may be gone by now - the chronicle keeps a
+// closed unit or a scrapped robot on purpose - so those cells fall back to
+// plain text. Links are piped into `request` as the Crime tab does: one click
+// a frame, the last link clicked wins.
+void DrawChronicle(StatisticsView& view, const WorldFrame& frame,
+                   const CityView& city,
                    std::optional<InspectorRequest>* request) {
     const auto follow = [&](const std::optional<InspectorRequest>& link) {
         if (link) {
@@ -91,11 +112,67 @@ void DrawChronicle(const WorldFrame& frame, const CityView& city,
         }
     };
     ImGui::SeparatorText("Chronicle, newest first");
+
+    // The tab's controls, held in `view` so a filter outlives the frame it
+    // was set in. A radio group picks one of the six `ChronicleGroup`s, or
+    // "All" for no group at all; the day boxes give an inclusive range of
+    // day numbers, 0 meaning no bound; the search box holds a robot's name,
+    // matched case-insensitively against the frame's directory, so a search
+    // finds the entries of a robot that has since been scrapped.
+    ImGui::RadioButton("All", &view.chronicleGroup, 0);
+    for (std::size_t index = 0; index < std::size(kGroups); ++index) {
+        ImGui::SameLine();
+        ImGui::RadioButton(kGroups[index].label, &view.chronicleGroup,
+                           static_cast<int>(index) + 1);
+    }
+    ImGui::SetNextItemWidth(110.0F);
+    ImGui::InputInt("From day", &view.chronicleFromDay);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(110.0F);
+    ImGui::InputInt("To day", &view.chronicleToDay);
+    ImGui::SetNextItemWidth(220.0F);
+    // The search box writes into the view's buffer: the Dear ImGui the Conan
+    // recipe provides (1.92.8) has no `misc/cpp/imgui_stdlib.h`, so there is
+    // no std::string overload of InputText to call.
+    ImGui::InputText("Robot name", view.chronicleName.data(),
+                     static_cast<int>(view.chronicleName.size()));
+
+    // What the controls say, in the one structure the tested list code reads.
+    ChronicleFilter filter;
+    // The radio group only ever holds one of its own indices, but a value
+    // outside the table would read past it, so the guard costs nothing.
+    if (view.chronicleGroup > 0 &&
+        static_cast<std::size_t>(view.chronicleGroup) <= std::size(kGroups)) {
+        filter.group =
+            kGroups[static_cast<std::size_t>(view.chronicleGroup) - 1].group;
+    }
+    // A bound typed as 0, or negative, means "no bound", as ChronicleFilter
+    // documents its day numbers.
+    if (view.chronicleFromDay > 0) {
+        filter.fromDay = static_cast<std::uint64_t>(view.chronicleFromDay);
+    }
+    if (view.chronicleToDay > 0) {
+        filter.toDay = static_cast<std::uint64_t>(view.chronicleToDay);
+    }
+    filter.text = view.chronicleName.data();
+
     if (frame.chronicle == nullptr || frame.chronicle->empty()) {
         ImGui::TextDisabled("Nothing recorded yet: notable events gather here.");
         return;
     }
-    const std::vector<sim::ChronicleEntry>& entries = *frame.chronicle;
+    // The rows come from `FilterChronicle`, newest first, so the tab shows
+    // what the tested list code keeps rather than a second copy of its rules.
+    const std::vector<const sim::ChronicleEntry*> rows = FilterChronicle(frame, filter);
+    ImGui::TextUnformatted(
+        std::format("{} of {} entries match this filter.", rows.size(),
+                    frame.chronicle->size())
+            .c_str());
+    if (rows.empty()) {
+        ImGui::TextDisabled(
+            "Nothing matches: widen the day range, clear the name or pick "
+            "another button.");
+        return;
+    }
     if (ImGui::BeginTable("chronicle", 8, kListFlags, ImVec2{0.0F, 450.0F})) {
         ImGui::TableSetupScrollFreeze(0, 1);
         // The room label holds the building's name too, so it gets the widest
@@ -109,15 +186,15 @@ void DrawChronicle(const WorldFrame& frame, const CityView& city,
         ImGui::TableSetupColumn("Owner", ImGuiTableColumnFlags_WidthStretch, 1.3F);
         ImGui::TableSetupColumn("Credits", ImGuiTableColumnFlags_WidthStretch, 1.0F);
         ImGui::TableHeadersRow();
-        // Up to kChronicleCap entries: only the ones on screen are drawn.
+        // A filtered list of any length, up to kChronicleCap: only the rows
+        // on screen are drawn.
         ImGuiListClipper clipper;
-        clipper.Begin(static_cast<int>(entries.size()));
+        clipper.Begin(static_cast<int>(rows.size()));
         while (clipper.Step()) {
             for (int row = clipper.DisplayStart; row < clipper.DisplayEnd;
                  ++row) {
                 const sim::ChronicleEntry& entry =
-                    entries[entries.size() - 1 -
-                            static_cast<std::size_t>(row)];
+                    *rows[static_cast<std::size_t>(row)];
                 // The entry's room, if it names one that still exists: id 0
                 // (an event with no place) and a closed unit are both not in
                 // the city's room index.

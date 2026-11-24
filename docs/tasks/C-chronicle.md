@@ -1,8 +1,8 @@
 # Task C: chronicle (saved city history)
 
 Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
-C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a done,
-C4b open. Save change was C1. Do after A (links) and B (gang events).
+C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a and
+C4b done, C4c open. Save change was C1. Do after A (links) and B (gang events).
 
 ## What and why
 
@@ -273,7 +273,7 @@ in `layout_tests`, `scripts/context_budget.py` the `chronicle-lists` module
 169/169 including ContextBudget. No sim code touched, so no headless comparison
 applies (as in C3a, C3b and C3c): `mechapunk-sim.exe` was not even relinked.
 
-### - [ ] C4b. The Chronicle tab's filters (statistics module)
+### - [x] C4b. The Chronicle tab's filters (statistics module)
 
 Open: `app/StatisticsChronicle.cpp`, `app/Statistics.cpp` (the tab's controls).
 
@@ -283,6 +283,50 @@ Open: `app/StatisticsChronicle.cpp`, `app/Statistics.cpp` (the tab's controls).
 - Keep the frozen header and `ImGuiListClipper`: a filtered list of any length,
   up to `kChronicleCap`, must be safe. The tab's own `WhatName` and `Credits`
   stay where they are.
+
+Done as (statistics module, one commit): the controls are drawn at the top of
+`DrawChronicle` and their state lives in `StatisticsView` (`app/Statistics.hpp`),
+which is what the statistics window keeps between frames; a function-local
+`static` would have hidden that state from the next reader. `DrawChronicle`
+therefore gained a `StatisticsView&` first parameter, re-declared in
+`app/StatisticsInternal.hpp` (which now includes `Statistics.hpp`), and the
+tab dispatch in `Statistics.cpp` passes `view`.
+
+What the step's text left open, and what was chosen:
+
+- One group, not six checkboxes: `ChronicleFilter::group` is a single
+  `std::optional<ChronicleGroup>`, so the buttons are one radio group with an
+  "All" first option (`ImGui::RadioButton(label, &view.chronicleGroup, n)`,
+  0 = every group). The label→group pairs sit in a file-local `kGroups` table
+  in the order `ChronicleGroup` declares its values, so no index is cast into
+  the enum, and a value outside the table reads as "all" rather than past its
+  end.
+- The day range is two `ImGui::InputInt` boxes ("From day", "To day"); a bound
+  typed as 0 or negative means "no bound", which is what `ChronicleFilter`
+  documents for its day numbers.
+- The search box is `ImGui::InputText` writing into a `std::array<char, 64>`
+  in `StatisticsView`: the Dear ImGui the Conan recipe provides (1.92.8) ships
+  no `misc/cpp/imgui_stdlib.h`, so there is no `std::string` overload to call,
+  and `IM_COUNTOF` wants a C array, so the length is
+  `static_cast<int>(view.chronicleName.size())`; `filter.text` copies the
+  buffer.
+- A line above the table says how many entries match out of how many are
+  saved, and an empty result says what to widen, so a filter that hides
+  everything is not mistaken for a chronicle that has nothing in it. The
+  controls are drawn before the "Nothing recorded yet" return, so they are
+  usable from the first day.
+- The table itself changed only in where its rows come from: `FilterChronicle`'s
+  pointers (`*rows[row]`, newest first) instead of `entries[size - 1 - row]`.
+  The frozen header, the eight columns and `ImGuiListClipper` stay, so a
+  filtered list of any length up to `kChronicleCap` is safe; `WhatName` and
+  `Credits` did not move.
+
+No new source files, so `scripts/context_budget.py` is unchanged (the statistics
+module grew from 18.1k to 19.3k of 25k); `docs/MODULES.md`'s `Statistics` row
+now says the tab's controls live in `StatisticsChronicle.cpp`. ctest 169/169
+including ContextBudget. No sim code touched, so no headless comparison applies
+(as in C3a, C3b and C3c): `mechapunk-sim.exe` was not even relinked. The tab
+is for the user to check in the game.
 
 ### - [ ] C4c. Room and building pages (inspector module)
 

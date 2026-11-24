@@ -593,7 +593,7 @@ std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const World
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Chronicle")) {
-                DrawChronicle(frame, city, &request);
+                DrawChronicle(view, frame, city, &request);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

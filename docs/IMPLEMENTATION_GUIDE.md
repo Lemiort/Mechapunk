@@ -230,7 +230,7 @@ Do them in this order; each file lists its steps and which are done.
 | --- | --- | --- | --- |
 | A. Organizations in the inspector; every name a link (done; user to check in game) | `docs/tasks/A-organizations-and-links.md` | inspector, statistics | no |
 | B. Gangs (B1-B11d done, all steps) | `docs/tasks/B-gangs.md` | gangs, inspector, statistics | done (v18) |
-| C. Chronicle (C1 to C4a done) | `docs/tasks/C-chronicle.md` | chronicle-lists, statistics, inspector | yes (v19) |
+| C. Chronicle (C1 to C4b done) | `docs/tasks/C-chronicle.md` | chronicle-lists, statistics, inspector | yes (v19) |
 | D. Construction | `docs/tasks/D-construction.md` | saves, generation, property, view-core | yes |
 | E. Simulation level of detail | `docs/tasks/E-level-of-detail.md` | world | maybe |
 | F. See-through windows | `docs/tasks/F-windows.md` | view-core, view-interiors | no |
