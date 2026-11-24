@@ -36,8 +36,10 @@ std::vector<const sim::ChronicleEntry*> EntriesAboutRoom(
 std::vector<const sim::ChronicleEntry*> EntriesAboutBuilding(
     const WorldFrame& frame, sim::EntityId building);
 
-// Entries about `organization`: in a room it owns, or naming a robot that
-// works for it today, newest first.
+// Entries about `organization`, by three rules: in a room it owns, naming a
+// robot that works for it today, or whose `account` is the organization - an
+// emission that funded it, money created or destroyed for it, which names no
+// room and no robot at all. Newest first.
 std::vector<const sim::ChronicleEntry*> EntriesAboutOrganization(
     const WorldFrame& frame, sim::EntityId organization);
 

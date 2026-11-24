@@ -98,12 +98,12 @@ std::vector<const sim::ChronicleEntry*> EntriesAboutBuilding(
 
 std::vector<const sim::ChronicleEntry*> EntriesAboutOrganization(
     const WorldFrame& frame, sim::EntityId organization) {
-    if (!organization.IsValid() || frame.economy == nullptr) {
+    if (!organization.IsValid()) {
         return {};
     }
     // Rooms it owns, straight from the frame's owner map.
     std::unordered_set<std::uint64_t> owned_rooms;
-    if (frame.economy->owners != nullptr) {
+    if (frame.economy != nullptr && frame.economy->owners != nullptr) {
         for (const auto& [room_id, owner] : *frame.economy->owners) {
             if (owner == organization) {
                 owned_rooms.insert(room_id);
@@ -116,11 +116,13 @@ std::vector<const sim::ChronicleEntry*> EntriesAboutOrganization(
     for (const auto* robot : WorkersOf(frame, organization)) {
         workers.insert(robot->id.value);
     }
-    if (owned_rooms.empty() && workers.empty()) {
-        return {};
-    }
+    // The third rule needs neither set: an emission that funded the organization
+    // names no room and no robot, only its account, so an organization with
+    // neither a room nor a worker still has a money row to show. Ids come from
+    // one counter per world, so a robot's own savings emission cannot answer
+    // this rule by accident.
     return Matching(frame, [&](const sim::ChronicleEntry& entry) {
-        return owned_rooms.contains(entry.room.value) ||
+        return entry.account == organization || owned_rooms.contains(entry.room.value) ||
                workers.contains(entry.robot.value) || workers.contains(entry.otherRobot.value);
     });
 }

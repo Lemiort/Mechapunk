@@ -58,13 +58,14 @@ const sim::World& City() {
 }
 
 // A frame over that city, with just what the list functions read: robots
-// and their workspaces, the economy's owner map, the city, the directory and
-// a copy of the world's chronicle.
+// and their workspaces, the economy's organizations and owner map, the city,
+// the directory and a copy of the world's chronicle.
 std::shared_ptr<WorldFrame> MakeFrame(const sim::World& world) {
     auto frame = std::make_shared<WorldFrame>();
     const auto& state = world.State();
 
     auto economy = std::make_shared<EconomyFrame>();
+    economy->organizations = state.economy.organizations;
     auto owners = std::make_shared<std::unordered_map<std::uint64_t, sim::EntityId>>();
     for (const auto& building : state.city.buildings) {
         for (const auto& room : building.rooms) {
@@ -208,9 +209,9 @@ TEST(ChronicleLists, BuildingHistoryCoversItsRooms) {
     EXPECT_EQ(EntriesAboutRoom(*frame, sim::EntityId{busiest_room}).size(), busiest_count);
 }
 
-// Entries about an organization: its rooms and the robots it employs now,
-// and nothing else.
-TEST(ChronicleLists, OrganizationHistoryIsItsRoomsAndWorkers) {
+// Entries about an organization: its rooms, the robots it employs now and the
+// money moved for its own account, and nothing else.
+TEST(ChronicleLists, OrganizationHistoryIsItsRoomsWorkersAndAccount) {
     const auto frame = MakeFrame(City());
 
     // The organization owning the most rooms the chronicle names.
@@ -230,7 +231,8 @@ TEST(ChronicleLists, OrganizationHistoryIsItsRoomsAndWorkers) {
     ExpectNewestFirst(entries);
     EXPECT_GE(entries.size(), best_count) << "its own rooms are missing from its page";
 
-    // Every row is about a room it owns or a robot it employs now.
+    // Every row is about a room it owns, a robot it employs now, or money
+    // moved for its own account.
     std::unordered_set<std::uint64_t> workers;
     for (const auto* robot : WorkersOf(*frame, organization)) {
         workers.insert(robot->id.value);
@@ -241,8 +243,97 @@ TEST(ChronicleLists, OrganizationHistoryIsItsRoomsAndWorkers) {
             owner != frame->economy->owners->end() && owner->second == organization;
         const bool employs = workers.contains(entry->robot.value) ||
                              workers.contains(entry->otherRobot.value);
-        EXPECT_TRUE(owns_room || employs) << "an entry about neither its room nor its worker";
+        const bool funded = entry->account == organization;
+        EXPECT_TRUE(owns_room || employs || funded)
+            << "an entry about neither its room, its worker nor its account";
     }
+}
+
+// The third rule on its own: an emission that funded an organization names no
+// room and no robot, so it reaches a page only through the entry's account.
+TEST(ChronicleLists, OrganizationHistoryFindsItsOwnEmissions) {
+    const auto frame = MakeFrame(City());
+
+    // Which ids are organizations at all: an entry's account can also be a
+    // robot's savings account, and those are nobody's history page.
+    std::unordered_set<std::uint64_t> organization_ids;
+    for (const auto& organization : frame->economy->organizations) {
+        organization_ids.insert(organization.id.value);
+    }
+    std::map<std::uint64_t, std::size_t> per_account;
+    for (const auto& entry : *frame->chronicle) {
+        if (organization_ids.contains(entry.account.value)) ++per_account[entry.account.value];
+    }
+    const auto [best_id, best_count] = MostFrequent(per_account);
+    ASSERT_GE(best_count, 2U) << "the chronicle names no organization as an account";
+    const auto organization = sim::EntityId{best_id};
+
+    const auto entries = EntriesAboutOrganization(*frame, organization);
+    ExpectNewestFirst(entries);
+    std::size_t funded = 0;
+    for (const auto* entry : entries) {
+        if (entry->account == organization) ++funded;
+    }
+    EXPECT_EQ(funded, best_count) << "the money it was given is missing from its page";
+}
+
+// The third rule exactly, written by hand so the kinds and accounts cannot
+// move with the random stream: an emission that funded the organization is a
+// row of its own, a unit whose owner was the organization is a row even after
+// the room changed hands, and an emission for a robot's savings account or
+// for another organization is not.
+TEST(ChronicleLists, OrganizationHistoryIsItsAccountEmissions) {
+    constexpr sim::Tick kDay = sim::kMinutesPerDay;
+    const auto employer = sim::EntityId{400};
+    const auto saver = sim::EntityId{401};
+    const auto other = sim::EntityId{402};
+    const std::vector<sim::ChronicleEntry> entries = {
+        // Money created for the organization: no room, no robot, only its
+        // account, so only the third rule can find it.
+        {.tick = kDay,
+         .kind = sim::EventKind::MoneySupplyChanged,
+         .credits = 50000,
+         .account = employer},
+        // Money destroyed for it, later.
+        {.tick = 2 * kDay,
+         .kind = sim::EventKind::MoneySupplyChanged,
+         .credits = -1200,
+         .account = employer},
+        // A unit that closed while the organization owned it; the room is
+        // nobody's rule's here, the account still names the organization.
+        {.tick = 3 * kDay,
+         .kind = sim::EventKind::UnitClosed,
+         .room = sim::EntityId{90},
+         .account = employer},
+        // A robot's own savings emission, and an emission for another
+        // organization: neither belongs on the first organization's page.
+        {.tick = 4 * kDay,
+         .kind = sim::EventKind::MoneySupplyChanged,
+         .credits = 30000,
+         .account = saver},
+        {.tick = 5 * kDay,
+         .kind = sim::EventKind::MoneySupplyChanged,
+         .credits = 40000,
+         .account = other},
+    };
+    // A frame with no economy at all: the account rule reads the entry alone.
+    const auto frame = MakeHandFrame(entries, {});
+
+    const auto rows = EntriesAboutOrganization(*frame, employer);
+    ExpectNewestFirst(rows);
+    ASSERT_EQ(rows.size(), 3U) << "the account rule found no row of its own";
+    EXPECT_EQ(rows.front()->tick, 3 * kDay);
+    EXPECT_EQ(rows.back()->tick, kDay);
+    for (const auto* row : rows) {
+        EXPECT_EQ(row->account, employer);
+    }
+    // A robot's own savings emission joins no organization's page: ids come
+    // from one counter per world, so a robot's id is never an organization's
+    // id, and the rule matches the entry's account alone. The other
+    // organization gets its own emission and not the robot's.
+    const auto other_rows = EntriesAboutOrganization(*frame, other);
+    ASSERT_EQ(other_rows.size(), 1U);
+    EXPECT_EQ(other_rows.front()->tick, 5 * kDay);
 }
 
 // Nothing to draw, and no crash: an id that exists nowhere, an id that is

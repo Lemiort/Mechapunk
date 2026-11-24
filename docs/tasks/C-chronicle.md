@@ -3,8 +3,8 @@
 Status: C1, C2 done, save version 19 shipped; C3 split on 2026-11-21 into
 C3a-C3c, C3a, C3b and C3c done; C4 split on 2026-11-24 into C4a-C4e, C4a to C4d
 done, C4e split on 2026-11-24 into C4e1 and C4e2 (the user answered: the
-organization page does need the account an emission carried); C4e1 done,
-C4e2 open. Save change was C1, and C4e1 raised it to 21.
+organization page does need the account an emission carried); C4e1 and C4e2
+done, so task C is complete. Save change was C1, and C4e1 raised it to 21.
 Do after A (links) and B (gang events).
 
 ## What and why
@@ -497,7 +497,7 @@ game version lines and the new `"account"` key on every chronicle entry.
 ctest: all tests pass including ContextBudget; no new source files, so
 `scripts/context_budget.py` is unchanged.
 
-### - [ ] C4e2. `EntriesAboutOrganization` grows the third rule (chronicle-lists module)
+### - [x] C4e2. `EntriesAboutOrganization` grows the third rule (chronicle-lists module)
 
 Open: `app/ChronicleLists.cpp`, `tests/ChronicleListsTests.cpp`.
 
@@ -508,10 +508,61 @@ Open: `app/ChronicleLists.cpp`, `tests/ChronicleListsTests.cpp`.
   (the fixture city or the hand-written chronicle); a robot's own
   savings emission does not join an organization's list.
 
+Done as (chronicle-lists module, one commit): the predicate gained
+`entry.account == organization` as its first rule, so an emission that
+names no room and no robot is a row of its own, and the one `Matching`
+walk keeps all three rules newest first and stable.
+
+What the step's text left open, and what was chosen:
+
+- The `frame.economy == nullptr` guard and the "no rooms and no workers"
+  early return went with it: the account rule reads the entry alone, so
+  keeping them would have made the rule untestable without an economy and
+  left a firm whose units all closed - no room, no worker - reading as
+  having no history at all. `WorkersOf` already answers an empty list for
+  a frame with no economy, so the other two rules simply find nothing.
+- Both tests the step asks for, and neither can skip.
+  `ChronicleLists.OrganizationHistoryIsItsAccountEmissions` writes five
+  entries by hand (money created for the organization, money destroyed
+  for it, a unit that closed while it owned the room, an emission for a
+  robot's savings account, one for another organization) and asserts the
+  page has exactly those three rows, newest first, every one naming its
+  account; the other organization gets only its own row, so the robot's
+  savings emission joins no organization's list - ids come from one
+  counter per world, so a robot's id is never an organization's id. The
+  frame has no economy at all, which is what proves the guard went.
+  `ChronicleLists.OrganizationHistoryFindsItsOwnEmissions` runs the rule
+  on the generated city: the organization the chronicle names as an
+  account most often has exactly that many rows of it.
+- `OrganizationHistoryIsItsRoomsAndWorkers` became
+  `OrganizationHistoryIsItsRoomsWorkersAndAccount`: its last loop asserted
+  every row is a room it owns or a worker "and nothing else", which the
+  third rule now breaks legitimately, so its account is the third reason
+  a row may be there.
+- `MakeFrame` copies `state.economy.organizations` into the frame: the
+  population test needs to tell an organization's account from a robot's
+  savings account, and the owner map holds both.
+
+The step's "Open" list missed one file: `app/InspectorChronicle.cpp`'s
+organization section states in a caption what its rows cover, and C4e1
+left its comment saying "an entry saves no account, so money an emission
+gave to this organization itself is not a row of its own (task C, step
+C4e)". The comment and the caption now name the third rule, so the page
+does not promise something it no longer draws; no logic in that file
+changed, and it stays in the `chronicle-pages` module.
+
+`scripts/context_budget.py` is unchanged (no new file): chronicle-lists
+8927 of 25000, chronicle-pages 8456 (the caption and the comment).
+`docs/MODULES.md`'s chronicle-lists size went 7k to 9k. ctest 172/172
+including ContextBudget. No sim code touched, so no headless comparison
+applies (as in C3a to C4e1): `mechapunk-sim.exe` was not even relinked.
+The organization page's money rows are for the user to check in the game.
+
 
 ## Done when
 
 - [x] The chronicle is saved, migrated, tested, and shown with links. (C1 to C4d)
 - [x] Robots, rooms, buildings and organizations show their own history. (C3c, C4c, C4d)
-- [ ] The guide's task table marks C done. (C4e2 open: `EntriesAboutOrganization`
-  grows its third rule, the account C4e1 now saves)
+- [x] The guide's task table marks C done. (C4e2 done: `EntriesAboutOrganization`
+  answers its third rule, the account C4e1 saves; the organization page shows
+  the money it was given)

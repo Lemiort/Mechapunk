@@ -1,9 +1,10 @@
 // The chronicle's history sections in the inspector: the "What happened here"
 // section of the room page and of the building page, and the "History" section
 // of the organization page: the chronicle entries that happened in this room,
-// in any room of this building, or in a room this organization owns or to one
-// of its workers, newest first, so the player can read a place's or a firm's
-// story long after the event log has scrolled away.
+// in any room of this building, or in a room this organization owns, to one
+// of its workers, or money moved for its account, newest first, so the player
+// can read a place's or a firm's story long after the event log has scrolled
+// away.
 
 #include "ChroniclePagesInternal.hpp"
 #include "InspectorInternal.hpp"
@@ -134,18 +135,20 @@ void DrawBuildingChronicle(const WorldFrame& frame, const CityView& city,
 }
 
 // Draws the organization page's "History" section: the chronicle entries in a
-// room this organization owns or naming a robot that works for it today, from
-// `EntriesAboutOrganization`, newest first, each row naming the room the event
-// happened in. An entry saves no account, so money an emission gave to this
-// organization itself is not a row of its own (task C, step C4e): the section
-// reaches money through the organization's rooms and its workers.
+// room this organization owns, naming a robot that works for it today, or whose
+// account is this organization - an emission that funded it, money created or
+// destroyed for it - from `EntriesAboutOrganization`, newest first, each row
+// naming the room the event happened in. An emission names no room and no
+// robot, so its row reads "-" there and the account rule is what puts it on
+// the page (task C, step C4e2).
 void DrawOrganizationHistory(const WorldFrame& frame, const CityView& city,
                              sim::EntityId organization,
                              std::optional<InspectorRequest>* request) {
     const auto rows = EntriesAboutOrganization(frame, organization);
     ImGui::SeparatorText("History");
     ImGui::TextDisabled(
-        "What happened in a room it owns, or to a robot that works for it.");
+        "What happened in a room it owns, to a robot that works for it, or money "
+        "moved for its account.");
     if (rows.empty()) {
         ImGui::TextDisabled("Nothing recorded about this organization yet.");
         return;
