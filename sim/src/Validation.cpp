@@ -315,6 +315,47 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                                     i, i - 1));
         }
     }
+    // Projects: the buildings going up, sorted by building id. Unlike the
+    // chronicle's ids, a project's building and owner must exist: the
+    // building stands on its lot from the night the project starts, and
+    // its owner pays the supplies the site costs every night; and no
+    // project can have finished more floors than its building has.
+    {
+        EntityId previousProject;
+        for (const Project& project : state.projects) {
+            if (!project.building.IsValid() ||
+                (previousProject.IsValid() && project.building <= previousProject)) {
+                return fail(std::format("Project on building {} is invalid, "
+                                        "repeated or out of order",
+                                        project.building.value));
+            }
+            previousProject = project.building;
+            const auto building = std::ranges::find_if(
+                city.buildings, [&](const Building& each) {
+                    return each.id == project.building;
+                });
+            if (building == city.buildings.end()) {
+                return fail(std::format("Project names building {}, which the "
+                                        "city does not have",
+                                        project.building.value));
+            }
+            if (!std::ranges::any_of(state.economy.organizations,
+                                     [&](const Organization& each) {
+                                         return each.id == project.owner;
+                                     })) {
+                return fail(std::format("Project on building {} has no "
+                                        "organization to pay for it",
+                                        project.building.value));
+            }
+            if (project.floorsDone > building->floors) {
+                return fail(std::format("Project on building {} has {} floors "
+                                        "done of its {} floors",
+                                        project.building.value,
+                                        project.floorsDone,
+                                        building->floors));
+            }
+        }
+    }
     return ValidateSocial(state);
 }
 

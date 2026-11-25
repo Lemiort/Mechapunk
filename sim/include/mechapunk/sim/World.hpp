@@ -13,6 +13,7 @@
 
 #include "mechapunk/sim/Careers.hpp"
 #include "mechapunk/sim/Chronicle.hpp"
+#include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/Ids.hpp"
@@ -149,6 +150,8 @@ struct WorldState {
     std::vector<DailyStats> history;
     // The city's story: notable events, oldest first, at most kChronicleCap.
     std::vector<ChronicleEntry> chronicle;
+    // Buildings under construction, sorted by building id.
+    std::vector<Project> projects;
 };
 
 struct WorldParams {

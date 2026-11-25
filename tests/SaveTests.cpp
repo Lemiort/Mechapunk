@@ -59,6 +59,18 @@ void PushChronicleEntry(sim::SaveDocument& chronicle, std::uint64_t tick) {
     chronicle.get_array().push_back(std::move(entry));
 }
 
+// Appends one project to a save document: all four keys the format has
+// for a project, one day left and `floorsDone` floors finished.
+void PushProject(sim::SaveDocument& projects, std::uint64_t building,
+                 std::uint64_t owner, std::uint64_t floorsDone = 1) {
+    sim::SaveDocument project = sim::SaveDocument::object_t{};
+    project["building"] = building;
+    project["owner"] = owner;
+    project["daysLeft"] = std::uint64_t{1};
+    project["floorsDone"] = floorsDone;
+    projects.get_array().push_back(std::move(project));
+}
+
 const std::filesystem::path kFixtureDirectory{MECHAPUNK_FIXTURE_DIR};
 }  // namespace
 
@@ -192,7 +204,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v22-city.json";
+        kFixtureDirectory / "saves" / "v23-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -293,6 +305,11 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
             EXPECT_GE(lot.corner, taken.at(lot.node.value));
         }
     }
+    // And from version 23 the world saves its projects: buildings under
+    // construction. Nothing starts one until the nightly review does (step
+    // D2b), so this fixture's list is empty; the round trip above is what
+    // proves the save carries the key at all.
+    EXPECT_TRUE(state->projects.empty());
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -420,6 +437,92 @@ TEST(Save, Version21FixtureMigratesAndRuns) {
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(sim::kMinutesPerDay);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A version 22 save knows nothing about buildings under construction: the
+// migration opens the empty list, and the current game starts its first
+// project when homes or jobs run short (step D2b), so what loads is the
+// migration's work and not a fixture that quietly grew the field.
+TEST(Save, Version22FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v22-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+
+    sim::SaveDocument document;
+    ASSERT_FALSE(glz::read_json(document, fixture));
+    EXPECT_FALSE(document["world"].contains("projects"));
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_TRUE(state->projects.empty());
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A project names a building of the city and an organization that pays
+// for it, its floorsDone cannot pass the building's floors, and the list
+// is sorted by building id: a save that breaks one of these is refused
+// by FromState, as the chronicle's checks are.
+TEST(Save, RejectsProjectsOutOfOrderOrBroken) {
+    const sim::World world = sim::World::Generate({.seed = 3, .robots = 10});
+    const std::string json = Serialize(world.State());
+    const std::vector<sim::Building> buildings = world.State().city.buildings;
+    const std::vector<sim::Organization> organizations =
+        world.State().economy.organizations;
+    ASSERT_GE(buildings.size(), 2U);
+    ASSERT_FALSE(organizations.empty());
+    const std::uint64_t owner = organizations.front().id.value;
+    const std::uint64_t later = buildings.back().id.value;
+    const std::uint64_t earlier = buildings[buildings.size() - 2].id.value;
+
+    // Two real buildings, named in decreasing order.
+    const auto outOfOrder = sim::DeserializeWorld(
+        EditSave(json, [=](sim::SaveDocument& document) {
+            PushProject(document["world"]["projects"], later, owner);
+            PushProject(document["world"]["projects"], earlier, owner);
+        }));
+    ASSERT_TRUE(outOfOrder.has_value()) << outOfOrder.error();
+    auto reordered = sim::World::FromState(std::move(*outOfOrder));
+    ASSERT_FALSE(reordered);
+    EXPECT_NE(reordered.error().find("out of order"), std::string::npos)
+        << reordered.error();
+
+    // A building the city does not have.
+    const auto missing = sim::DeserializeWorld(
+        EditSave(json, [=](sim::SaveDocument& document) {
+            PushProject(document["world"]["projects"], later + 1000000U, owner);
+        }));
+    ASSERT_TRUE(missing.has_value()) << missing.error();
+    auto unknown = sim::World::FromState(std::move(*missing));
+    ASSERT_FALSE(unknown);
+    EXPECT_NE(unknown.error().find("does not have"), std::string::npos)
+        << unknown.error();
+
+    // A building of the city, but no organization to pay for it.
+    const auto unowned = sim::DeserializeWorld(
+        EditSave(json, [=](sim::SaveDocument& document) {
+            PushProject(document["world"]["projects"], later, 1000000U);
+        }));
+    ASSERT_TRUE(unowned.has_value()) << unowned.error();
+    auto orphan = sim::World::FromState(std::move(*unowned));
+    ASSERT_FALSE(orphan);
+    EXPECT_NE(orphan.error().find("no organization"), std::string::npos)
+        << orphan.error();
+
+    // More floors done than the building has.
+    const auto overbuilt = sim::DeserializeWorld(
+        EditSave(json, [=](sim::SaveDocument& document) {
+            PushProject(document["world"]["projects"], later, owner,
+                        buildings.back().floors + 1);
+        }));
+    ASSERT_TRUE(overbuilt.has_value()) << overbuilt.error();
+    auto impossible = sim::World::FromState(std::move(*overbuilt));
+    ASSERT_FALSE(impossible);
+    EXPECT_NE(impossible.error().find("floors done"), std::string::npos)
+        << impossible.error();
 }
 
 TEST(Save, RejectsChroniclesOutOfOrderOrOverfull) {

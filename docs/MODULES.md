@@ -16,31 +16,32 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 |---|---:|---|
 | world | 24k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
 | generation | 24k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
-| validation | 11k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
-| money | 22k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
-| property | 22k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Units.cpp`, `Property.cpp`, `HousingTests.cpp` |
-| statistics | 18k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp` |
-| careers | 18k | `World.hpp`, `Careers.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
-| social | 25k | `World.hpp`, `Social.hpp`, `Social.cpp`, `LifeCycle.cpp`, `SocialTests.cpp`, `LifeCycleTests.cpp` |
+| validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
+| money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
+| property | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Units.cpp`, `Property.cpp`, `HousingTests.cpp` |
+| statistics | 19k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp` |
+| careers | 19k | `World.hpp`, `Careers.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
+| social | 24k | `World.hpp`, `Social.hpp`, `Social.cpp`, `LifeCycle.cpp`, `SocialTests.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 22k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
-| saves-frozen | 9k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
+| saves | 24k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
+| saves-frozen | 8k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
-| runner | 11k | `World.hpp`, `main.cpp` |
+| runner | 12k | `World.hpp`, `main.cpp` |
 | view-core | 18k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
 | view-robots | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
 | view-interiors | 11k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
-| ui | 15k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
+| ui | 16k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | inspector | 23k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
 | chronicle-pages | 8k | `InspectorHistory.cpp`, `InspectorChronicle.cpp`, `ChroniclePagesInternal.hpp`, `InspectorInternal.hpp`, `Links.hpp`, `ChronicleLists.hpp`, `Inspector.hpp` |
 | gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
 | gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
-| gang-lists | 4k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
-| chronicle-lists | 9k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
-| chronicle | 8k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
+| gang-lists | 5k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
+| chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
+| chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
+| construction | 7k | `Construction.hpp`, `World.hpp` |
 
 ## What lives where
 
@@ -66,6 +67,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |
 | `Chronicle.hpp` | The saved story (`ChronicleEntry`, `kChronicleCap`) |
 | `Chronicle.cpp` | `World::Chronicle`: which events `Emit` keeps in the chronicle |
+| `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done) |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
 | `Founding.cpp` | `FoundEconomy` (organizations, owners, starting money), `IndexEconomy` |
@@ -143,6 +145,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Which rows a gang page shows, sorted | gang-lists | `app/GangLists.cpp` |
 | Which rows a history list shows, filtered | chronicle-lists | `app/ChronicleLists.cpp` |
 | A robot's, room's, building's or organization's history section in the inspector | chronicle-pages | `app/InspectorHistory.cpp`, `app/InspectorChronicle.cpp` |
+| A building going up: its project, its lot, its owner | construction | `Construction.hpp` (`Project`) |
 | Panels, input, camera; frames from the simulation thread | ui | `main.cpp`, `SimulationHost.cpp` |
 
 A task touching two modules (a new robot field shown in the inspector, say)

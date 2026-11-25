@@ -106,4 +106,11 @@ namespace mechapunk::sim::migrations {
 // node's corners, instead of leaving the land construction builds on empty.
 [[nodiscard]] std::expected<void, std::string> V21ToV22(SaveDocument& world);
 
+// Version 22 to 23: the world gets its list of buildings under construction,
+// empty at first: a version 22 game never raised a building, and projects
+// are started by the nightly review (task D, step D2b), not by this
+// migration, so an old save simply starts building as soon as the current
+// game runs it and homes or jobs run short.
+[[nodiscard]] std::expected<void, std::string> V22ToV23(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

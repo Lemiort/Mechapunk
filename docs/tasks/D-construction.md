@@ -2,8 +2,9 @@
 
 Status: open. D1 split on 2026-11-24 into D1a and D1b; D1a is done and
 raised the save version to 22, and D1b is done (the view draws parks from
-the saved plots, no save change). Save change. The biggest remaining task: take
-it slowly, one step per module.
+the saved plots, no save change). D2 split on 2026-11-25 into D2a to D2c;
+D2a is done and raised the save version to 23. Save change. The biggest
+remaining task: take it slowly, one step per module.
 
 ## What and why
 
@@ -129,16 +130,104 @@ the headless log and save cannot move; the seed 7 / 2000 robots / 6 days
 `--all --save` run was made anyway to have a save to compare the plots
 against. The parks are for the user to see in the game.
 
-### - [ ] D2. Projects (construction module)
+### D2. Projects (construction module) — split on 2026-11-25
 
-`struct Project { EntityId building; EntityId owner; std::uint32_t daysLeft{};
-std::uint32_t floorsDone{}; };` in `WorldState` (second save change of this
-task, or fold into D1). Nightly `ReviewConstruction` after `ReviewUnits`:
-home vacancy under 5% for 7 nights → the Habitat Trust starts a habitat on
-the lot nearest the centre; jobs per robot under 1.05 → an industry
-corporation starts a workplace. The building exists from the start with
-`floors` growing; its rooms cannot be rented or staffed until done. Costs
-are supplies paid every night (`PaySupplies`).
+The step names one module, but its bullets live in four: the field, the
+migration, the fixture and the tests are `construction` and `saves` (with
+`Validation.cpp`, rule 5, as C1 and D1a did); the nightly `ReviewConstruction`
+and its call site in the midnight order are `construction` with a few lines
+of `World.cpp` (as C2 opened `World.cpp` for `Emit`); "cannot be rented
+or staffed until done" is `careers` (`ReviewJobs` and `ReviewHomes` both
+live in Careers.cpp) and possibly `property` (`ReviewUnits` counts quiet
+nights and reopens units); the supplies cost is a call to the existing
+`PaySupplies` in Money.cpp, no money change. Cut into D2a to D2c, one
+module and one commit each, the original bullets living on inside them.
+
+### - [x] D2a. Projects as saved state (construction + saves)
+
+Open: a new `Construction.hpp`, `World.hpp` (WorldState), `Save.hpp`,
+`Save.cpp` (the list), `Migrations.hpp`, the end of `Migrations.cpp`,
+`Validation.cpp`, `SaveTests.cpp`, plus the fixture and its README row.
+
+Done as (one commit): `Construction.hpp` declares `Project` exactly as
+the step's text has it - `building`, `owner`, `daysLeft`, `floorsDone` -
+and `WorldState` gains `std::vector<Project> projects`, sorted by
+building id (rule 1: the same world reviews the same projects
+everywhere). The step's "or fold into D1" is moot: D1 shipped v22, so
+this is the task's second save change, version 23, game 0.23.0.
+
+- `V22ToV23` (declared in `Migrations.hpp`, registered in `kMigrations`)
+  writes `"projects": []` into `world`: a version 22 game never raised a
+  building, so the migration opens the list and starts nothing; the
+  story of construction begins when the current game runs the save.
+- Fixture `tests/fixtures/saves/v23-city.json` from the guide's command
+  (seed 33, 100 robots, 28370 minutes) at game 0.23.0, plus its row and
+  a sentence in that folder's README.
+- Validation (`ValidateWorldState`, after the chronicle): unlike the
+  chronicle's ids, a project's building and owner must exist - the
+  building stands on its lot from the night the project starts and its
+  owner pays the supplies the site costs every night - `floorsDone`
+  cannot pass the building's floors, and the list is sorted by building
+  id. What is *not* checked: that the building's rooms are empty or that
+  its lot was free; a save may hold a project an older game left half
+  built, and only the review (D2b) starts new ones.
+- Tests: `CurrentVersionFixtureLoadsAndRoundTrips` points at v23 and
+  checks the fixture's list is empty - nothing starts a project until
+  D2b, and the round trip is what proves the save carries the key;
+  `Version22FixtureMigratesAndRuns` parses the v22 fixture's JSON and
+  asserts `world` has no `"projects"` key - so what loads is the
+  migration's work - then that the migrated list is empty, and runs
+  the city a day; `RejectsProjectsOutOfOrderOrBroken` writes projects
+  by hand through a new `PushProject` helper: two real buildings in
+  decreasing order, a building the city does not have, an owner that
+  is none, and more floors done than the building has. All four bite.
+- No `Construction.cpp` or `ConstructionTests.cpp` yet: as with C1's
+  `Chronicle.hpp`, the data ships before the code that fills it. The
+  `construction` module in `scripts/context_budget.py` holds
+  `Construction.hpp` and `World.hpp` (7433); `docs/MODULES.md` gained
+  the module row, the `Construction.hpp` row and a "which module for
+  which task" row.
+
+Warning for the steps after this: `saves` stands at 24440 of 25000, 560
+short, and `world` at 24350, 650 short. A step that adds to `SaveTests.cpp`
+or `WorldTests.cpp` must make room first.
+
+The bump changed no behaviour: the seed 1, 10000 robots, 40 days `--quiet`
+log matched byte for byte except its own `Simulated ... in N s` line, and
+the seed 7, 2000 robots, 6 days save differs only in the version and
+game version lines and the new `"projects": []` block - compared as parsed
+JSON with `projects` removed the two saves are equal, and the `--all`
+log is identical to its last two lines. ctest: 176/176 including
+ContextBudget.
+
+### - [ ] D2b. `ReviewConstruction` (construction module, `World.cpp` call site)
+
+Nightly `ReviewConstruction` after `ReviewUnits` in the midnight order
+(the call site is a few lines in `World.cpp`, as C2's `Emit` call was):
+home vacancy under 5% for 7 nights - `DailyStats::vacantApartments` over
+the city's apartments, the streak read from the saved `history`, no new
+field - starts a habitat on the free lot nearest the centre, owned by
+the housing trust (the step's "Habitat Trust"); jobs per robot under
+1.05 - `employed` over `population` in the saved history - starts a
+workplace owned by an industry corporation. The project consumes its
+lot, raises the building that exists from the start with `floors`
+growing as `floorsDone` counts the finished ones, counts `daysLeft`
+down at midnight, and pays the supplies the site costs every night
+through the existing `PaySupplies` (Money.cpp). When `daysLeft` reaches
+0 the project ends and the building is ordinary. Tests in a new
+`ConstructionTests.cpp`; add the new files to the budget script.
+
+Warning: until D2c lands, a site's rooms can attract staff and tenants,
+so do not trust a 40-day headless run of this step for hiring or homes
+counts; the "money adds up over 40 days at 10000 robots" watch belongs
+after D2c.
+
+### - [ ] D2c. A site's rooms cannot be rented or staffed until done (careers)
+
+`OpeningsFor` and `ReviewJobs` skip rooms of a building under construction
+(Careers.cpp); so do `ReviewHomes` and `AddNewcomer`'s choice of apartment.
+If `ReviewUnits` (Units.cpp, property) counts a site's quiet nights or
+reopens its rooms, split a D2d for that file.
 
 ### - [ ] D3. Builders (careers module)
 

@@ -484,4 +484,16 @@ std::expected<void, std::string> V21ToV22(SaveDocument& world) try {
         std::format("the version 21 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V22ToV23(SaveDocument& world) try {
+    // Version 23 saves the projects: the buildings going up. A version 22
+    // game never raised one, and its story of construction begins when the
+    // current game runs the save: the nightly review starts projects,
+    // this migration only opens the list.
+    world["projects"] = SaveDocument::array_t{};
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 22 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations
