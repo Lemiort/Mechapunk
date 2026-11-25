@@ -3,6 +3,7 @@
 // when homes or jobs have run short for a week (task D, step D2b).
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -39,12 +40,23 @@ constexpr std::uint32_t kWorkplaceFloors = 4;
 // are what every other sector buys from it.
 constexpr std::int64_t kSiteSuppliesNight = 200;
 
-// The share of the city's apartments that may stand empty before homes are
-// short; the same tight share market rents follow (Units.cpp).
-constexpr std::int64_t kTightVacancyPercent = 5;
+// The share of the market's homes that may stand empty before homes are short.
+// The market's homes are the ones `SetPrices` (Units.cpp) counts class by class
+// when it moves market rents: every apartment but a government dorm room, that
+// is the homes a robot can afford and move into. A quarter of them standing
+// empty is room enough to live in; under that for a week the city is running
+// out of homes. Measured: a young city leaves 75 to 85 per cent of them empty
+// around its twelfth night (most robots still live in a dorm bed) and fills
+// them by its thirtieth, so this bites when the market really runs out.
+constexpr std::int64_t kMarketVacancyPercent = 25;
 
-// Jobs per robot, in thousandths, under which jobs are short.
-constexpr std::int64_t kJobsPerRobotMille = 1050;
+// The share of the population out of work above which jobs are short: the
+// same share at which `ReviewUnits` (Units.cpp) reopens an empty unit as a
+// workspace. Below it the city has work for everyone it needs; above it for a
+// week it needs more, and a workplace is raised when no empty unit is left.
+// Measured: a young city has 0 to 3 per cent of its robots out of work, so
+// this bites only in a city whose jobs really have gone.
+constexpr std::int64_t kUnemploymentPercent = 5;
 
 // Workplaces on a finished floor of a new workplace, and the places in one.
 constexpr std::uint32_t kWorkspacesPerFloor = 2;
@@ -216,20 +228,40 @@ void World::ReviewConstruction() {
         }
     };
 
-    // The shortage that decides what to raise, read off the saved history
-    // and tonight's statistics: the last `kStreakNights` days each. The
-    // apartments a day was counted over is not saved, so every day of the
-    // streak is measured against the homes the city has now.
-    const std::int64_t apartments = static_cast<std::int64_t>(
-        rooms_.RoomsOfKind(RoomKind::Apartment).size());
-    const auto homesShort = [this, apartments]() {
-        if (state_.history.size() < kStreakNights || apartments == 0) {
+    // The shortage that decides what to raise, read off the saved history: the
+    // last `kStreakNights` days each. The homes a past day was counted over are
+    // not saved, so every day of the streak is measured against the homes the
+    // city has now - which is what `SetPrices` does with the market tonight.
+    // The market's homes, counted as `SetPrices` (Units.cpp) counts them: the
+    // four classes from `ApartmentClass::Studio` up, a government dorm bed
+    // being off the market, and `DailyStats::residentsByClass` from the same
+    // classes being who lives in them. A home two robots share therefore reads
+    // as one vacancy fewer than it is; the share is set with room for that.
+    std::array<std::int64_t, 4> marketHomes{};
+    for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
+        const std::size_t kind = static_cast<std::size_t>(apartment.room->apartmentClass);
+        if (kind < 2) {
+            // `None` and `Dorm`: not homes the market sells.
+            continue;
+        }
+        ++marketHomes.at(kind - 2);
+    }
+    const std::int64_t market = marketHomes[0] + marketHomes[1] + marketHomes[2] + marketHomes[3];
+    const auto homesShort = [this, market]() {
+        if (state_.history.size() < kStreakNights || market == 0) {
             return false;
         }
         const std::size_t first = state_.history.size() - kStreakNights;
         for (std::size_t day = first; day != state_.history.size(); ++day) {
             const DailyStats& stats = state_.history[day];
-            if (stats.vacantApartments * 100 >= kTightVacancyPercent * apartments) {
+            // Robots living in the market's homes: `residentsByClass` starts at
+            // the dorm beds, so the market is the entries after it.
+            std::int64_t lived = 0;
+            for (std::size_t index = 1; index != stats.residentsByClass.size(); ++index) {
+                lived += stats.residentsByClass.at(index);
+            }
+            const std::int64_t vacant = market > lived ? market - lived : 0;
+            if (vacant * 100 >= kMarketVacancyPercent * market) {
                 return false;
             }
         }
@@ -242,7 +274,10 @@ void World::ReviewConstruction() {
         const std::size_t first = state_.history.size() - kStreakNights;
         for (std::size_t day = first; day != state_.history.size(); ++day) {
             const DailyStats& stats = state_.history[day];
-            if (stats.employed * 1000 >= kJobsPerRobotMille * stats.population) {
+            // `DailyStats::unemployed` counts the robots with no workplace, as
+            // `ReviewUnits` counts them when it decides whether to reopen a
+            // unit; `population` is the robots that night.
+            if (stats.unemployed * 100 <= kUnemploymentPercent * stats.population) {
                 return false;
             }
         }

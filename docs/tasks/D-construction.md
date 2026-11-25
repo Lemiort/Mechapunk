@@ -4,8 +4,10 @@ Status: open. D1 split on 2026-11-24 into D1a and D1b; D1a is done and
 raised the save version to 22, and D1b is done (the view draws parks from
 the saved plots, no save change). D2 split on 2026-11-25 into D2a to D2c;
 D2a is done and raised the save version to 23, and D2b is done (no save
-change: `projects` and `lots` shipped in v23 and v22). Save change. The
-biggest remaining task: take it slowly, one step per module.
+change: `projects` and `lots` shipped in v23 and v22). D2b2 was added between
+D2b and D2c on 2026-11-25 and is done, also with no save change: it retunes
+the two triggers D2b wrote, which as shipped could never fire as intended.
+Save change. The biggest remaining task: take it slowly, one step per module.
 
 ## What and why
 
@@ -296,6 +298,87 @@ gained it.
 Warning for the steps after this: `world` is now 24449 of 25000 and
 `generation` 24436; a step that adds to `World.cpp`, `WorldTests.cpp` or
 `CityTests.cpp` must make room first.
+
+### - [x] D2b2. The two triggers retuned (construction module)
+
+Added on 2026-11-25, before D2c, because the rules D2b shipped cannot do what
+they say: `employed` counts robots that have a workspace, so "jobs per robot
+under 1.05" is never false and the city raised a workplace at every midnight
+while it had a free plot; and vacancy over all apartments sits at 34 to 38 per
+cent, so "under 5% for 7 nights" never fires. This is the question D2b's own
+text left open ("ask the user whether the jobs share should be a real one, and
+whether vacancy should be read over the market homes alone, as `SetPrices` does
+per class"), answered.
+
+Open: `Construction.cpp`, `ConstructionTests.cpp`, plus the lines of `Units.cpp`
+that hold `SetPrices` and `ReviewUnits` - the market homes, and the unemployment
+share the property module already uses - and `DailyStats` in `Economy.hpp`.
+
+Done as (construction module, one commit): the two lambdas in
+`World::ReviewConstruction` measure different things; nothing else moved.
+
+- Jobs: over 5 per cent of the population out of work for 7 nights raises a
+  workplace. Read as `DailyStats::unemployed` over `DailyStats::population`,
+  both already saved, and 5 per cent is the share at which `ReviewUnits`
+  (Units.cpp) reopens an empty unit as a workspace (`kHighUnemploymentPercent`):
+  the city reuses an empty unit first and builds only when that has not kept up
+  for a week. The old `employed`-over-`population` comparison is gone.
+- Homes: vacancy over the market's homes under a quarter for 7 nights raises a
+  habitat. The market's homes are the ones `SetPrices` counts class by class -
+  `ApartmentClass` from `Studio` up, a government dorm bed being off the market,
+  the homes robots can afford and move into - and the robots who lived in them
+  each night come from `DailyStats::residentsByClass`, the entries after the
+  dorm beds. The homes a past day was counted over are not saved, so every
+  night of the streak is measured against the homes the city has now, as D2b
+  already did. A home two robots share reads as one vacancy fewer than it is,
+  which is why the share leaves room.
+- Unchanged from D2b: the midnight call site after `SettleEconomy`, the lot
+  consumption, the supplies through `PaySupplies`, the floors and `daysLeft`,
+  and no new random draw, so the saved stream is untouched.
+- No save change: `population`, `employed`, `unemployed` and `residentsByClass`
+  are fields `DailyStats` has had long before v23, so no new key, no migration,
+  no fixture, and `Validation` needs nothing new.
+- What the new rules see, measured night by night on the seed 5 / 1000 robots
+  city over 30 nights: the market's homes start 100 per cent empty and fill as
+  robots move up out of the dorm beds - 77 per cent at night 9, 44 at 15, 24 at
+  21, 7 at 29 - so under a quarter from night 21, and the first habitat goes up
+  at night 27: 3 buildings raised in 30 nights, all habitats. Unemployment stays
+  at 0 to 3 per cent there, so no workplace: the jobs rule bites only where
+  jobs really went.
+- The jobs rule was shown firing on a hand-made city (`JobsTakenState` in the
+  tests): every workspace nobody is in or on its way to is removed and its
+  workers laid off as `CloseUnit` (Units.cpp) does it - no workplace, junior,
+  no performance, `commuteAt = kNoCommute` - which leaves 76.9 per cent of the
+  robots out of work and raises a workplace at the seventh midnight. Clearing
+  `commuteAt` is what makes it hold: a robot whose job was taken but whose
+  departure is still planned walks to room 0 and `PlanTrip` throws
+  "Trip between unknown rooms"; and leaving the rooms standing as empty units
+  does not work either, since `ReviewUnits` reopens them at that same 5 per
+  cent and the robots are hired back.
+- Tests: 9 in `tests/ConstructionTests.cpp`, 4 new, none can skip. `HomesShortRaisesAHabitat`
+  (the 30-night city: the site's kind, an owner of sector Housing, 6 nights left,
+  the ground floor empty, and all 7 nights it read under the share);
+  `HomesNotShortLeavesNoHabitat` (the same city 15 nights in: 44 per cent of the
+  market empty, nothing raised); `JobsShortRaisesAWorkplace` (the jobs-taken
+  city: the site's kind, a corporation of industry as owner, workspaces of that
+  owner a floor up, and no habitat); `JobsNotShortLeavesNoWorkplace` (30 nights
+  of a young city raise no workplace). The three D2b tests that had used a
+  hand-made city whose empty homes were removed now use the real city, and
+  `HomesTakenState` is gone: the market fills up on its own.
+- Budget: `construction` went 15429 to 18653 of 25000, so no module was split;
+  `world` (24452) and `generation` (24436) are untouched, as no `World.cpp`,
+  `World.hpp` or `CityTests.cpp` line changed.
+- ctest: 185/185 including ContextBudget (181 before, +4 new). Simulation code
+  changed, so the headless check ran: seed 1, 10000 robots, 40 days `--quiet`
+  finished with the money adding up every day (`money` equal to `created`,
+  `destroyed 0`), `created` 839 on the last day, `wages at 110%`, 7 of 10000
+  out of work, 6003 vacant apartments, 22 empty units, `supplies` 919606. The
+  market fills up there too: comparing the save of that run against the save
+  of the same seed after 1 day, the city raised 9 buildings, all habitats
+  ("Hab Block"), took 9 of its 50 plots (50 to 41) and had 6 sites still going
+  up at the end - and no workplace, since the jobs rule never sees over 5 per
+  cent out of work. As D2b's warning says, hiring and homes counts are still
+  not to be trusted until D2c lands, and the money watch belongs after D2c.
 
 ### - [ ] D2c. A site's rooms cannot be rented or staffed until done (careers)
 
