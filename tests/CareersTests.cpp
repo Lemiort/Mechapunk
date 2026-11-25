@@ -7,8 +7,10 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "mechapunk/sim/Careers.hpp"
+#include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -79,6 +81,79 @@ bool Remembers(const sim::Robot& robot, sim::MemoryKind kind) {
 std::uint32_t RentOf(const sim::World& world, sim::EntityId apartment) {
     const auto room = world.Rooms().Find(apartment);
     return room ? room->room->rent : 0;
+}
+
+// True when `room` is one of the rooms of `building`; an invalid room id,
+// such as a robot with no job, answers false.
+bool InBuilding(const sim::WorldState& state, sim::EntityId building, sim::EntityId room) {
+    for (const sim::Building& each : state.city.buildings) {
+        if (each.id != building) {
+            continue;
+        }
+        return std::ranges::any_of(
+            each.rooms, [room](const sim::Room& held) { return held.id == room; });
+    }
+    return false;
+}
+
+// A workplace building that has workspaces, and the employer that owns them:
+// the ids a test needs, since a state moved into `Load` invalidates pointers
+// into it.
+std::pair<sim::EntityId, sim::EntityId> WorkplaceAndOwner(const sim::WorldState& state) {
+    for (const sim::Building& building : state.city.buildings) {
+        for (const sim::Room& room : building.rooms) {
+            if (room.kind == sim::RoomKind::Workspace) {
+                return {building.id, room.owner};
+            }
+        }
+    }
+    return {};
+}
+
+// A habitat building with a home nobody lives in, and that home.
+std::pair<sim::EntityId, sim::EntityId> HabitatAndVacantHome(const sim::WorldState& state) {
+    std::set<std::uint64_t> homes;
+    for (const sim::Robot& robot : state.robots) {
+        homes.insert(robot.apartment.value);
+    }
+    for (const sim::Building& building : state.city.buildings) {
+        if (building.kind != sim::BuildingKind::Habitat) {
+            continue;
+        }
+        for (const sim::Room& room : building.rooms) {
+            if (room.kind == sim::RoomKind::Apartment && !homes.contains(room.id.value)) {
+                return {building.id, room.id};
+            }
+        }
+    }
+    return {};
+}
+
+// Puts a building on a site: a project raises it for `nights` more nights,
+// owned by `owner`. The cities these tests write have no project yet - the
+// shortage that starts one is read off seven saved days - so the list stays
+// sorted by building id, as validation asks.
+void Raise(sim::WorldState& state, sim::EntityId building, sim::EntityId owner,
+           std::uint32_t nights) {
+    state.projects.push_back({
+        .building = building,
+        .owner = owner,
+        .daysLeft = nights,
+        .floorsDone = 1,
+    });
+}
+
+// Lays a robot off as `CloseUnit` (Units.cpp) does it: no workplace, junior,
+// no performance, no commute planned, and at home when it stood at work.
+void LayOff(sim::Robot& robot) {
+    robot.workspace = sim::EntityId{};
+    robot.jobLevel = 0;
+    robot.performance = 0;
+    robot.commuteAt = sim::kNoCommute;
+    if (robot.activity == sim::RobotActivity::Working) {
+        robot.activity = sim::RobotActivity::Resting;
+        robot.location = robot.apartment;
+    }
 }
 
 // A city a day and a half in, with robots at work.
@@ -336,5 +411,96 @@ TEST(Careers, CareersMoveOverMonths) {
     }
     EXPECT_GT(promotions, 30U);
     EXPECT_LT(outOfWork, 300U / 20);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
+// A building a project is raising takes no staff: none of its rooms is an
+// opening until the project is done, so the robots laid off from it find work
+// in the finished buildings instead.
+TEST(Careers, SitesTakeNoWorkers) {
+    sim::World start = sim::World::Generate({.seed = 7, .robots = 200});
+    sim::WorldState state = start.State();
+    const auto [site, employer] = WorkplaceAndOwner(state);
+    ASSERT_TRUE(site.IsValid());
+    ASSERT_TRUE(employer.IsValid());
+    // Everyone working in that building is laid off, so its rooms stand empty
+    // and would be openings if a site's rooms counted.
+    std::set<std::uint64_t> laidOff;
+    for (sim::Robot& robot : state.robots) {
+        if (!InBuilding(state, site, robot.workspace)) {
+            continue;
+        }
+        LayOff(robot);
+        laidOff.insert(robot.id.value);
+    }
+    ASSERT_FALSE(laidOff.empty());
+    Raise(state, site, employer, 30);  // Still going up all week.
+
+    sim::World world = Load(std::move(state));
+    for (int day = 0; day < 7; ++day) {
+        world.RunFor(sim::kMinutesPerDay);
+        EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+    }
+    const sim::WorldState& after = world.State();
+    EXPECT_FALSE(after.projects.empty()) << "the site is still going up";
+    std::uint32_t staffed = 0;
+    std::uint32_t rehired = 0;
+    for (const sim::Robot& robot : after.robots) {
+        staffed += InBuilding(after, site, robot.workspace) ? 1 : 0;
+        rehired += laidOff.contains(robot.id.value) && robot.workspace.IsValid() ? 1 : 0;
+    }
+    EXPECT_EQ(staffed, 0U) << "a site's rooms are not openings";
+    EXPECT_GT(rehired, 0U) << "the laid off robots did look for work";
+    EXPECT_TRUE(sim::ValidateWorldState(after));
+}
+
+// A home in a building still going up cannot be moved into: an evicted robot
+// takes the cheapest finished home even when the site's is cheaper still.
+TEST(Careers, EvicteesSkipSiteHomes) {
+    sim::World start = sim::World::Generate({.seed = 7, .robots = 200});
+    start.RunFor(sim::kMinutesPerDay + (23 * 60));  // Day 2, 23:00.
+    sim::WorldState state = start.State();
+    const auto [site, cheap] = HabitatAndVacantHome(state);
+    ASSERT_TRUE(site.IsValid());
+    ASSERT_TRUE(cheap.IsValid());
+    Raise(state, site, HousingTrust(state), 30);
+    // The site's home is the cheapest in the city: a rent of 1 is under a
+    // dorm's 8 (City.cpp), so an evicted robot would reach for it if a site's
+    // homes were rentable.
+    for (sim::Building& building : state.city.buildings) {
+        for (sim::Room& room : building.rooms) {
+            if (room.id == cheap) {
+                room.rent = 1;
+            }
+        }
+    }
+    // A tenant of the housing trust, deep in debt, and the only debtor:
+    // `CollectRent` has charged the others one night, under the five that
+    // evict.
+    const auto index = FindIndex(state, [](const sim::Robot& robot) {
+        return robot.activity == sim::RobotActivity::Resting;
+    });
+    ASSERT_TRUE(index);
+    sim::Robot& robot = state.robots[*index];
+    const sim::EntityId id = robot.id;
+    const sim::EntityId flat = robot.apartment;
+    for (sim::Robot& other : state.robots) {
+        if (other.id != id) {
+            other.rentOwed = 0;
+        }
+    }
+    SetOwner(state, flat, HousingTrust(state));
+    robot.workspace = {};
+    robot.commuteAt = sim::kNoCommute;
+    robot.savings = 0;
+    sim::SetCredits(state, robot, 0);
+    robot.rentOwed = 10 * static_cast<std::int64_t>(RentOf(start, flat));
+
+    sim::World world = Load(std::move(state));
+    world.RunFor(90);  // Past midnight and the walk to the new place.
+    const sim::Robot& after = *world.FindRobot(id);
+    EXPECT_NE(after.apartment, cheap) << "a site's homes are not rentable";
+    EXPECT_NE(after.apartment, flat);
+    EXPECT_TRUE(Remembers(after, sim::MemoryKind::Evicted));
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }

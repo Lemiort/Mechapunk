@@ -377,7 +377,8 @@ private:
     // Robots holding each job, by JobKey.
     [[nodiscard]] std::unordered_map<std::uint64_t, std::uint32_t> StaffCounts() const;
     // Jobs a robot could take now: workspaces with room, and venues short of
-    // staff on the shift it would work.
+    // staff on the shift it would work; none of a building a project is still
+    // raising, whose rooms open when the project is done (task D, step D2c).
     [[nodiscard]] std::vector<EntityId> OpeningsFor(
         EntityId robot, const std::unordered_map<std::uint64_t, std::uint32_t>& staff) const;
     // The event log and the saved story. Neither is const: the chronicle

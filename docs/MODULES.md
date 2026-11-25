@@ -20,7 +20,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Units.cpp`, `Property.cpp`, `HousingTests.cpp` |
 | statistics | 19k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp` |
-| careers | 19k | `World.hpp`, `Careers.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
+| careers | 22k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 11k | `World.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
@@ -42,7 +42,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | gang-lists | 5k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
 | chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
 | chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
-| construction | 15k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionTests.cpp` |
+| construction | 18k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionTests.cpp` |
 
 ## What lives where
 
@@ -68,7 +68,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |
 | `Chronicle.hpp` | The saved story (`ChronicleEntry`, `kChronicleCap`) |
 | `Chronicle.cpp` | `World::Chronicle`: which events `Emit` keeps in the chronicle |
-| `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done) |
+| `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done) and `IsUnderConstruction`, which hiring and moving home ask per room (task D, step D2c) |
 | `Construction.cpp` | `World::ReviewConstruction`: a site's supplies and its floors, and the shortage that starts a new one |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |

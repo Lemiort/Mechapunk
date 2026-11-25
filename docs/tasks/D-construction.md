@@ -6,7 +6,11 @@ the saved plots, no save change). D2 split on 2026-11-25 into D2a to D2c;
 D2a is done and raised the save version to 23, and D2b is done (no save
 change: `projects` and `lots` shipped in v23 and v22). D2b2 was added between
 D2b and D2c on 2026-11-25 and is done, also with no save change: it retunes
-the two triggers D2b wrote, which as shipped could never fire as intended.
+the two triggers D2b wrote, which as shipped could never fire as intended. D2c
+was split on 2026-11-25 into D2c and D2c2: its `AddNewcomer` half lives in
+`LifeCycle.cpp`, the `life-cycle` module. D2c is done, with no save change
+(`projects` shipped in v23) and no D2d: `ReviewUnits` only works on ground-floor
+rooms, and a site's ground floor is empty until D3.
 Save change. The biggest remaining task: take it slowly, one step per module.
 
 ## What and why
@@ -380,12 +384,110 @@ Done as (construction module, one commit): the two lambdas in
   cent out of work. As D2b's warning says, hiring and homes counts are still
   not to be trusted until D2c lands, and the money watch belongs after D2c.
 
-### - [ ] D2c. A site's rooms cannot be rented or staffed until done (careers)
+### - [x] D2c. A site's rooms cannot be rented or staffed until done (careers)
 
 `OpeningsFor` and `ReviewJobs` skip rooms of a building under construction
 (Careers.cpp); so do `ReviewHomes` and `AddNewcomer`'s choice of apartment.
 If `ReviewUnits` (Units.cpp, property) counts a site's quiet nights or
 reopens its rooms, split a D2d for that file.
+
+Split on 2026-11-25: the step names the careers module, but `AddNewcomer`
+lives in `LifeCycle.cpp`, which is the `life-cycle` module, so its half of the
+step became D2c2. No D2d is needed for `Units.cpp`: `ReviewUnits` skips every
+room with `room.floor != 0` (Units.cpp) and a site's ground floor holds nothing
+until step D3 (D2b's note), so it never counts a site's quiet nights nor reopens
+its rooms.
+
+Done as (careers module, one commit): `Construction.hpp` gained
+`IsUnderConstruction(projects, building)`, a lookup of the saved list by
+building id - `WorldState` keeps it sorted (D2a), so it is a binary search like
+`ReviewConstruction`'s own `buildingFor`. It is inline in that public header
+because two areas ask it (careers now, life-cycle in D2c2) and "public headers
+are the only way between areas" (docs/MODULES.md); `World.hpp` gained no member.
+
+- `OpeningsFor` skips a site's rooms in all three of its loops (workspaces,
+  venue kinds, police stations and crew rooms) through one file-local `onSite`
+  lambda. `ReviewJobs` needed no change of its own: it hires from
+  `OpeningsFor`, so a site's rooms are simply not openings - and that already
+  covers the job a newcomer takes, which `AddNewcomer` picks from `OpeningsFor`
+  too (LifeCycle.cpp); only its choice of *home* is left, in D2c2.
+- `ReviewHomes` skips them in its `pick` helper, which is one place for all
+  three of its choices: the cheapest home an evicted robot is put in, the
+  priciest affordable one a saver moves up to, and the shared flat two friends
+  move into together.
+- No save change: `projects` shipped in v23 (D2a) and `lots` in v22 (D1a), no
+  field, key, migration or fixture was added, and `Validation` needs nothing
+  new - D2a's project checks and D1a's plot checks already cover what this step
+  reads. No random draw is added either: the skip filters a candidate list
+  before the draw, so the saved stream is untouched; the outcome moves, which
+  is the point of the step.
+- Tests: 2 new in `tests/CareersTests.cpp`, neither can skip.
+  `SitesTakeNoWorkers` puts a workplace building of the seed 7 / 200 robots
+  city on a site by hand (`Raise`: a project whose owner is the employer of
+  that building's rooms, 30 nights left), lays off everyone working in it as
+  `CloseUnit` does, and runs 7 midnights: nobody works in the site, the project
+  is still going up, and the laid off robots did find other work (`rehired > 0`,
+  so the openings path really ran). With the skip taken out, 3 robots work
+  there (`CareersTests.cpp:452: Value of: staffed, Actual: 3, Expected: 0`).
+  `EvicteesSkipSiteHomes` puts a habitat building on a site and sets one of its
+  free homes to rent 1 - under a dorm's 8 (City.cpp), so it is the cheapest
+  home in the city - then evicts the only debtor at the next midnight (the
+  others' `rentOwed` is cleared, and `CollectRent` charges them one night, under
+  the five that evict): it moves, remembers the eviction, and not onto the site.
+  With the skip out it lands there (`CareersTests.cpp:502`).
+- Budget: `careers` 19974 to 22534 of 25000 (the two tests, and `Construction.hpp`
+  in the module); `construction` 18663 to 18951 (the helper); `world` 24452 to
+  24485 and `generation` 24436 to 24469 (the `OpeningsFor` comment in `World.hpp`),
+  both still under 25000. `scripts/context_budget.py` gained `Construction.hpp`
+  in `careers`; `docs/MODULES.md` the two sizes and the `Construction.hpp` row.
+- ctest: 187/187 including ContextBudget (185 before, +2 new).
+- Simulation code changed, so the headless check ran: seed 1, 10000 robots, 40
+  days `--quiet` finished in 315 s, and the money adds up on all 40 days
+  (`money` equal to `created in all`, `destroyed 0` every day). Day 40 reads
+  `created 696 today`, `wages at 108%`, 24 of 10000 out of work, 6003 vacant
+  apartments, 17 empty units, `supplies 913905`, gini 503, 1068 broke robots,
+  13 behind on rent - the same shape as D2b2's run (created 839, wages at 110%,
+  7 out of work, 6003 vacant, 22 empty units, supplies 919606), so the fix
+  moved the city's story without straining its money. The save of that run
+  (the same seed and days with `--save`) holds 41 of the city's 50 plots and 6
+  projects still going up, so 9 sites were raised in 40 days and none is a
+  workplace: the same land the run took before this step (D2b2's note), so the
+  homes trigger still fires as often now that a site's homes hold no tenants.
+  The two `--quiet` logs match line for line except their own timing and save
+  path lines, which also proves the header's wrapped line changed nothing.
+
+### - [ ] D2c2. A newcomer's home is a finished one (life-cycle module)
+
+Open: `sim/src/LifeCycle.cpp` (`AddNewcomer`'s scan of
+`rooms_.RoomsOfKind(RoomKind::Apartment)`), `tests/LifeCycleTests.cpp`.
+
+- Skip the apartments of a building a project is raising, asking
+  `IsUnderConstruction(state_.projects, apartment.building->id)`
+  (`Construction.hpp`, D2c), in both the free homes and the free dorms lists.
+- Test: a city with a site going up never moves a newcomer into it, and the
+  newcomer did get a home (the test cannot pass because the list was empty).
+- No save change, no new random draw. `life-cycle` stands at 11531 of 25000.
+
+### - [ ] D2c3. A home a robot buys is a finished one (property module)
+
+Open: `sim/src/Property.cpp` (`TradeProperty`'s choice of a home to buy, the
+"dearest it can put a fifth down on" loop), `tests/HousingTests.cpp`.
+
+The step's text did not ask for this: it names `ReviewHomes` and `AddNewcomer`
+as the other places a home is chosen, and `TradeProperty` is a third. A habitat
+site's homes belong to `project.owner`, which is the housing trust
+(`Construction.cpp`), and this loop buys a robot into a home owned by the trust,
+so a robot can buy its way into a half-built tower.
+
+- Skip the apartments of a building a project is raising, asking
+  `IsUnderConstruction(state_.projects, apartment.building->id)`
+  (`Construction.hpp`, D2c). The two other apartment loops of the file need
+  nothing: one sells homes nobody lives in, the other collects homes that
+  *are* lived in, and a site's homes are neither.
+- Test: a city with a site going up never buys a robot into it, and the city
+  did have sales that night (the test cannot pass because nothing was bought).
+- No save change, no new random draw. `property` stands at 23719 of 25000:
+  make room first if the test does not fit.
 
 ### - [ ] D3. Builders (careers module)
 

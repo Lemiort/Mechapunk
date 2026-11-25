@@ -14,6 +14,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace mechapunk::sim {
@@ -99,18 +100,24 @@ std::unordered_map<std::uint64_t, std::uint32_t> World::StaffCounts() const {
 std::vector<EntityId> World::OpeningsFor(
     EntityId robot, const std::unordered_map<std::uint64_t, std::uint32_t>& staff) const {
     std::vector<EntityId> openings;
+    // A building a project is still raising takes no staff: its floors are
+    // going up, so none of its rooms is an opening until the project is done
+    // (task D, step D2c).
+    const auto onSite = [this](const RoomRef& place) {
+        return IsUnderConstruction(state_.projects, place.building->id);
+    };
     const auto taken = [&](const Room& room) {
         const auto found = staff.find(JobKey(room, robot));
         return found != staff.end() ? found->second : 0U;
     };
     for (const RoomRef& workspace : rooms_.RoomsOfKind(RoomKind::Workspace)) {
-        if (taken(*workspace.room) < workspace.room->capacity) {
+        if (!onSite(workspace) && taken(*workspace.room) < workspace.room->capacity) {
             openings.push_back(workspace.room->id);
         }
     }
     for (const RoomKind kind : VenueKinds()) {
         for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
-            if (taken(*venue.room) < StaffPerShift(*venue.room)) {
+            if (!onSite(venue) && taken(*venue.room) < StaffPerShift(*venue.room)) {
                 openings.push_back(venue.room->id);
             }
         }
@@ -118,7 +125,7 @@ std::vector<EntityId> World::OpeningsFor(
     // Police stations and crew rooms: one slot per capacity, checked via JobKey.
     for (const RoomKind kind : std::array{RoomKind::PoliceStation, RoomKind::CrewRoom}) {
         for (const RoomRef& room : rooms_.RoomsOfKind(kind)) {
-            if (taken(*room.room) < StaffPerShift(*room.room)) {
+            if (!onSite(room) && taken(*room.room) < StaffPerShift(*room.room)) {
                 openings.push_back(room.room->id);
             }
         }
@@ -200,14 +207,18 @@ void World::ReviewHomes() {
         taken.insert(robot.apartment.value);
     }
     const std::vector<RoomRef>& apartments = rooms_.RoomsOfKind(RoomKind::Apartment);
-    // The free apartment that `better` prefers, if any.
+    // The free apartment that `better` prefers, if any. A home in a building a
+    // project is still raising is not free: its floors are going up, so no
+    // robot moves into it until the project is done (task D, step D2c).
     const auto pick = [&](const std::function<bool(const Room&, const Room&)>& better,
                           const std::function<bool(const Room&)>& allowed)
         -> std::optional<EntityId> {
         const Room* best = nullptr;
         for (const RoomRef& apartment : apartments) {
             const Room& room = *apartment.room;
-            if (taken.contains(room.id.value) || !allowed(room)) {
+            if (taken.contains(room.id.value) ||
+                IsUnderConstruction(state_.projects, apartment.building->id) ||
+                !allowed(room)) {
                 continue;
             }
             if (best == nullptr || better(room, *best)) {

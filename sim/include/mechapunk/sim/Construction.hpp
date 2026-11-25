@@ -1,6 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
+#include <functional>
+#include <vector>
 
 #include "mechapunk/sim/Ids.hpp"
 
@@ -21,5 +24,19 @@ struct Project {
     std::uint32_t daysLeft{};
     std::uint32_t floorsDone{};
 };
+
+// True when a project is raising this building. Its rooms cannot be rented or
+// staffed until the project is done: the floors above the ground one are still
+// going up, so hiring (`OpeningsFor`, Careers.cpp) and the homes a robot may
+// move into (`ReviewHomes`, Careers.cpp) skip them; a newcomer's choice of
+// apartment does the same in step D2c2 (LifeCycle.cpp). `WorldState` keeps the
+// projects sorted by building id, so the lookup is a binary search; callers ask
+// per room and never iterate the list.
+[[nodiscard]] inline bool IsUnderConstruction(const std::vector<Project>& projects,
+                                              EntityId building) noexcept {
+    const auto found =
+        std::ranges::lower_bound(projects, building, std::less{}, &Project::building);
+    return found != projects.end() && found->building == building;
+}
 
 }  // namespace mechapunk::sim
