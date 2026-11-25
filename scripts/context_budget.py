@@ -40,8 +40,9 @@ MODULES = {
                    "app/StatisticsChronicle.cpp"],
     "careers": [I + "World.hpp", I + "Careers.hpp", "sim/src/Careers.cpp", I + "Venues.hpp",
                 "sim/src/Venues.cpp", "tests/CareersTests.cpp"],
-    "social": [I + "World.hpp", I + "Social.hpp", "sim/src/Social.cpp", "sim/src/LifeCycle.cpp",
-               "tests/SocialTests.cpp", "tests/LifeCycleTests.cpp"],
+    "social": [I + "World.hpp", I + "Social.hpp", "sim/src/Social.cpp",
+               "tests/SocialTests.cpp"],
+    "life-cycle": [I + "World.hpp", "sim/src/LifeCycle.cpp", "tests/LifeCycleTests.cpp"],
     "metro": [I + "Metro.hpp", "sim/src/Metro.cpp", "sim/src/Transit.cpp",
               "tests/MetroTests.cpp", "tests/TransitTests.cpp"],
     "saves": [I + "Save.hpp", "sim/src/Save.cpp", "sim/src/Migrations.hpp",
@@ -81,7 +82,8 @@ MODULES = {
                         "tests/ChronicleListsTests.cpp"],
     "chronicle": [I + "Chronicle.hpp", "sim/src/Chronicle.cpp", "tests/ChronicleTests.cpp",
                   I + "World.hpp"],
-    "construction": [I + "Construction.hpp", I + "World.hpp"],
+    "construction": [I + "Construction.hpp", "sim/src/Construction.cpp",
+                     I + "World.hpp", "tests/ConstructionTests.cpp"],
 }
 SOURCE_DIRS = ["sim", "app", "tests", "tools"]
 

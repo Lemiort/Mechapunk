@@ -147,7 +147,8 @@ python scripts/context_budget.py                                                
 act in id order (`Act` in `Behaviour.cpp`), needs change every 10
 minutes, and at midnight (`MinuteOfDay == 0`):
 `CollectRent` → `AgeRobots` → `ReviewHomes` → `ReviewJobs` → `FadeBonds`
-→ `ForgetDeparted` → `TradeProperty` → `SettleEconomy`.
+→ `ForgetDeparted` → `TradeProperty` → `SettleEconomy` → `ReviewConstruction`
+(last, after the books roll over, so a site's supplies count into the new day).
 `SettleEconomy`: supply market → interest and repayments → supply price →
 employers' pay → `RunCityHall` → `SetPolicyRate` → dividends → deposits →
 `ReviewUnits` → `SetPrices` → `RecordStatistics` → books roll over.

@@ -1,0 +1,315 @@
+// Buildings going up: `World::ReviewConstruction` pays a site the supplies
+// it costs, raises one of its floors, and starts a new habitat or workplace
+// when homes or jobs have run short for a week (task D, step D2b).
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <format>
+#include <functional>
+#include <limits>
+#include <string>
+#include <string_view>
+#include <utility>
+
+#include "mechapunk/sim/City.hpp"
+#include "mechapunk/sim/Construction.hpp"
+#include "mechapunk/sim/Economy.hpp"
+#include "mechapunk/sim/World.hpp"
+
+namespace mechapunk::sim {
+namespace {
+
+// Nights of the same shortage before the city raises another building. One
+// tight night is weather; a week of it is the city running short of homes
+// or of jobs.
+constexpr std::size_t kStreakNights = 7;
+
+// Floors a new site raises above its ground floor, one of them a night, so
+// `daysLeft` is also the floors still to come. The ground floor stands from
+// the first night and holds nothing until step D3 puts the site office in
+// it; that keeps `ReviewUnits`, which only works on ground-floor units,
+// away from a site.
+constexpr std::uint32_t kHabitatFloors = 6;
+constexpr std::uint32_t kWorkplaceFloors = 4;
+
+// Credits a night the site asks for. `PaySupplies` (Money.cpp) moves the
+// owner's sector's share of them into the supply market: half for the
+// housing trust, and nothing for an industry corporation, whose supplies
+// are what every other sector buys from it.
+constexpr std::int64_t kSiteSuppliesNight = 200;
+
+// The share of the city's apartments that may stand empty before homes are
+// short; the same tight share market rents follow (Units.cpp).
+constexpr std::int64_t kTightVacancyPercent = 5;
+
+// Jobs per robot, in thousandths, under which jobs are short.
+constexpr std::int64_t kJobsPerRobotMille = 1050;
+
+// Workplaces on a finished floor of a new workplace, and the places in one.
+constexpr std::uint32_t kWorkspacesPerFloor = 2;
+constexpr std::uint32_t kWorkspacePlaces = 8;
+
+// Daily rent of a new habitat's lowest floor, a credit more a floor up,
+// as generation asks of its own habitats (City.cpp).
+constexpr std::uint32_t kBaseRent = 30;
+
+// The hours a new workplace's staff stand: an assembly line's shift, the
+// plainest of generation's, so a new job is not the easiest in the city.
+constexpr Shift kSiteShift{.startMinute = 7 * 60, .lengthMinutes = 480, .wage = 100};
+
+// The class of homes on a floor of a new habitat: studios low, flats in
+// the middle, two-bedroom flats near the top, the rule generation uses for
+// a habitat of the same finished height.
+[[nodiscard]] ApartmentClass HomeClassFor(std::uint32_t floor,
+                                          std::uint32_t floors) noexcept {
+    if (floor * 3 <= floors) {
+        return ApartmentClass::Studio;
+    }
+    if (floor * 3 <= floors * 2) {
+        return ApartmentClass::OneBedroom;
+    }
+    return ApartmentClass::TwoBedroom;
+}
+
+// Rent of a class over the floor's base rent, and the word its rooms are
+// named with: copies of generation's file-local helpers, so a home raised
+// now reads and costs like a home raised with the city.
+[[nodiscard]] std::uint32_t RentPercent(ApartmentClass kind) noexcept {
+    switch (kind) {
+        case ApartmentClass::OneBedroom: return 150;
+        case ApartmentClass::TwoBedroom: return 240;
+        default: return 100;
+    }
+}
+
+[[nodiscard]] std::string_view HomeLabel(ApartmentClass kind) noexcept {
+    switch (kind) {
+        case ApartmentClass::Studio: return "Studio";
+        case ApartmentClass::OneBedroom: return "Flat";
+        case ApartmentClass::TwoBedroom: return "Two-Bedroom Flat";
+        default: return "Apartment";
+    }
+}
+
+}  // namespace
+
+// Runs at midnight after `SettleEconomy`, so tonight's statistics are already
+// in `state_.history` and the supplies a site pays count into the new day's
+// books. No random number is taken: the same city raises the same buildings
+// on every machine (rule 1), and the saved random stream is left alone.
+void World::ReviewConstruction() {
+    // The city's buildings by id, the order `City::buildings` keeps.
+    const auto buildingFor = [this](EntityId id) -> Building* {
+        const auto found = std::ranges::lower_bound(state_.city.buildings, id, std::less{},
+                                                    &Building::id);
+        return found != state_.city.buildings.end() && found->id == id ? &*found
+                                                                       : nullptr;
+    };
+
+    // The free plot nearest the middle of the grid, as an index into
+    // `City::lots`, or `noPlot` when the city has none left: construction
+    // takes land from the middle out, and a node's lowest free corner is
+    // where the view puts the building that takes it (D1a: the buildings
+    // at a node hold its first slots in id order), so consuming that one
+    // lot keeps the saved plots true.
+    constexpr std::size_t noPlot = std::numeric_limits<std::size_t>::max();
+    const auto nearestLot = [this]() -> std::size_t {
+        if (state_.city.nodes.empty()) {
+            return noPlot;
+        }
+        std::int64_t centreX = 0;
+        std::int64_t centreZ = 0;
+        for (const CityNode& node : state_.city.nodes) {
+            centreX += node.x;
+            centreZ += node.z;
+        }
+        const std::int64_t count = static_cast<std::int64_t>(state_.city.nodes.size());
+        centreX /= count;
+        centreZ /= count;
+        std::size_t best = noPlot;
+        std::int64_t bestDistance = 0;
+        for (std::size_t index = 0; index != state_.city.lots.size(); ++index) {
+            // A node id is its position in `City::nodes` (Ids.hpp).
+            const CityNode& node = state_.city.nodes[state_.city.lots[index].node.value];
+            const std::int64_t dx = node.x - centreX;
+            const std::int64_t dz = node.z - centreZ;
+            const std::int64_t distance = (dx * dx) + (dz * dz);
+            if (best == noPlot || distance < bestDistance) {
+                best = index;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    };
+
+    // Starts a site: the building stands from the first night on the plot
+    // the project consumes, and `daysLeft` nights raise its floors.
+    const auto startSite = [this, &nearestLot](BuildingKind kind, EntityId owner,
+                                               std::uint32_t floors,
+                                               std::string_view prefix) {
+        const std::size_t plot = nearestLot();
+        if (plot == noPlot) {
+            return;
+        }
+        const CityLot lot = state_.city.lots[plot];
+        const EntityId id = state_.ids.Allocate();
+        Building building{
+            .id = id,
+            .name = std::format("{} {}", prefix, id.value),
+            .kind = kind,
+            .entrance = lot.node,
+            .floors = 1,
+            .shift = kind == BuildingKind::Workplace ? kSiteShift : Shift{},
+            .rooms = {},
+        };
+        // The new id is the highest there is, so both lists stay sorted.
+        state_.city.buildings.push_back(std::move(building));
+        state_.city.lots.erase(state_.city.lots.begin() +
+                               static_cast<std::ptrdiff_t>(plot));
+        state_.projects.push_back({
+            .building = id,
+            .owner = owner,
+            .daysLeft = floors,
+            // The ground floor is finished the night the site starts.
+            .floorsDone = 1,
+        });
+    };
+
+    // One floor of a site: the floor above those standing, of the class the
+    // height the site will reach asks for, holding homes or workspaces.
+    const auto raiseFloor = [this](Building& building, Project& project) {
+        const std::uint32_t floor = building.floors;
+        // The height the site will reach: the floors standing plus the
+        // nights it has left, one floor a night.
+        const std::uint32_t floors = building.floors + project.daysLeft;
+        building.floors += 1;
+        ++project.floorsDone;
+        if (building.kind == BuildingKind::Habitat) {
+            const ApartmentClass kind = HomeClassFor(floor, floors);
+            const std::uint32_t perFloor = ApartmentsPerFloor(kind);
+            for (std::uint32_t index = 0; index != perFloor; ++index) {
+                building.rooms.push_back({
+                    .id = state_.ids.Allocate(),
+                    .name = perFloor == 1 ? std::format("{} {}", HomeLabel(kind), floor)
+                          : std::format("{} {}-{:02}", HomeLabel(kind), floor, index + 1),
+                    .kind = RoomKind::Apartment,
+                    .floor = floor,
+                    .capacity = Sleeps(kind),
+                    .rent = (kBaseRent + floor) * RentPercent(kind) / 100,
+                    .owner = project.owner,
+                    .apartmentClass = kind,
+                });
+            }
+        } else {
+            for (std::uint32_t index = 0; index != kWorkspacesPerFloor; ++index) {
+                building.rooms.push_back({
+                    .id = state_.ids.Allocate(),
+                    .name = std::format("Work Floor {}",
+                                        ((floor - 1) * kWorkspacesPerFloor) + index + 1),
+                    .kind = RoomKind::Workspace,
+                    .floor = floor,
+                    .capacity = kWorkspacePlaces,
+                    .owner = project.owner,
+                });
+            }
+        }
+    };
+
+    // The shortage that decides what to raise, read off the saved history
+    // and tonight's statistics: the last `kStreakNights` days each. The
+    // apartments a day was counted over is not saved, so every day of the
+    // streak is measured against the homes the city has now.
+    const std::int64_t apartments = static_cast<std::int64_t>(
+        rooms_.RoomsOfKind(RoomKind::Apartment).size());
+    const auto homesShort = [this, apartments]() {
+        if (state_.history.size() < kStreakNights || apartments == 0) {
+            return false;
+        }
+        const std::size_t first = state_.history.size() - kStreakNights;
+        for (std::size_t day = first; day != state_.history.size(); ++day) {
+            const DailyStats& stats = state_.history[day];
+            if (stats.vacantApartments * 100 >= kTightVacancyPercent * apartments) {
+                return false;
+            }
+        }
+        return true;
+    };
+    const auto jobsShort = [this]() {
+        if (state_.history.size() < kStreakNights) {
+            return false;
+        }
+        const std::size_t first = state_.history.size() - kStreakNights;
+        for (std::size_t day = first; day != state_.history.size(); ++day) {
+            const DailyStats& stats = state_.history[day];
+            if (stats.employed * 1000 >= kJobsPerRobotMille * stats.population) {
+                return false;
+            }
+        }
+        return true;
+    };
+    // The corporation that owns a new workplace: the first of industry, the
+    // order `Economy::organizations` keeps.
+    const auto industryEmployer = [this]() -> EntityId {
+        for (const Organization& organization : state_.economy.organizations) {
+            if (organization.kind == OrganizationKind::Corporation &&
+                organization.sector == Sector::Industry) {
+                return organization.id;
+            }
+        }
+        return EntityId{};
+    };
+
+    const bool homesShortNow = homesShort();
+    const bool jobsShortNow = jobsShort();
+
+    // The sites going up: pay the supplies the site costs, raise a floor,
+    // and end the ones whose nights are used up.
+    bool cityChanged = false;
+    for (Project& project : state_.projects) {
+        Organization* owner = MutableOrganization(project.owner);
+        if (owner != nullptr) {
+            PaySupplies(*owner, kSiteSuppliesNight);
+        }
+        if (project.daysLeft == 0) {
+            // A save may hold a site an older game left finished: nothing
+            // is left to raise, and the review below drops it.
+            continue;
+        }
+        Building* building = buildingFor(project.building);
+        if (building == nullptr) {
+            // ValidateWorldState refuses a project without its building.
+            continue;
+        }
+        raiseFloor(*building, project);
+        --project.daysLeft;
+        cityChanged = true;
+    }
+    std::erase_if(state_.projects,
+                  [](const Project& project) { return project.daysLeft == 0; });
+
+    // Then the new sites. Homes first: the habitat takes the plot nearest
+    // the middle, and a workplace the next one, so the two never share a
+    // corner. The housing trust owns the homes nobody else owns; an
+    // industry corporation owns the jobs.
+    if (homesShortNow && housing_.IsValid()) {
+        startSite(BuildingKind::Habitat, housing_, kHabitatFloors, "Hab Block");
+        cityChanged = true;
+    }
+    if (jobsShortNow) {
+        const EntityId employer = industryEmployer();
+        if (employer.IsValid()) {
+            startSite(BuildingKind::Workplace, employer, kWorkplaceFloors, "Work Yard");
+            cityChanged = true;
+        }
+    }
+
+    if (cityChanged) {
+        // Rooms were added, and buildings: the index of rooms by kind and
+        // the views of the city must follow.
+        rooms_ = RoomIndex(state_.city);
+        ++cityVersion_;
+    }
+}
+
+}  // namespace mechapunk::sim

@@ -3,8 +3,9 @@
 Status: open. D1 split on 2026-11-24 into D1a and D1b; D1a is done and
 raised the save version to 22, and D1b is done (the view draws parks from
 the saved plots, no save change). D2 split on 2026-11-25 into D2a to D2c;
-D2a is done and raised the save version to 23. Save change. The biggest
-remaining task: take it slowly, one step per module.
+D2a is done and raised the save version to 23, and D2b is done (no save
+change: `projects` and `lots` shipped in v23 and v22). Save change. The
+biggest remaining task: take it slowly, one step per module.
 
 ## What and why
 
@@ -200,7 +201,7 @@ JSON with `projects` removed the two saves are equal, and the `--all`
 log is identical to its last two lines. ctest: 176/176 including
 ContextBudget.
 
-### - [ ] D2b. `ReviewConstruction` (construction module, `World.cpp` call site)
+### - [x] D2b. `ReviewConstruction` (construction module, `World.cpp` call site)
 
 Nightly `ReviewConstruction` after `ReviewUnits` in the midnight order
 (the call site is a few lines in `World.cpp`, as C2's `Emit` call was):
@@ -221,6 +222,80 @@ Warning: until D2c lands, a site's rooms can attract staff and tenants,
 so do not trust a 40-day headless run of this step for hiring or homes
 counts; the "money adds up over 40 days at 10000 robots" watch belongs
 after D2c.
+
+Done as (construction module, one commit): a new `sim/src/Construction.cpp`
+implements `World::ReviewConstruction`, declared in `World.hpp` next to
+`ReviewUnits` and called in `World.cpp` after `SettleEconomy()` - which is
+where the midnight order puts it after `ReviewUnits` (that call lives inside
+`SettleEconomy`, Settlement.cpp) and after the books roll over, so a site's
+supplies count into the new day's books. The guide's section 4 midnight line
+gained it.
+
+- Advance first, then start: every project pays `PaySupplies(owner, 200)`
+  (Money.cpp takes the owner's sector share of the site's cost: half for the
+  housing trust, and nothing for an industry corporation, whose supplies are
+  what the other sectors buy from it), raises one floor - `building.floors`
+  and `floorsDone` grow together and that floor's homes or workspaces appear
+  with it - and `daysLeft` counts down; a project whose nights are used up is
+  erased and its building is ordinary.
+- A new site starts at `floorsDone` 1 (the ground floor stands from the first
+  night) with `daysLeft` the floors to raise: 6 for a habitat, 4 for a
+  workplace. The building is created with `floors` 1 and no rooms at all: the
+  ground floor stays empty until step D3 puts the site office there, which
+  also keeps `ReviewUnits` - it only works on ground-floor units - away from a
+  site, so no D2d split was needed. Homes are studios low, flats in the middle,
+  two-bedroom flats near the top, at generation's rents; a workplace gets two
+  workspaces of 8 places a floor on an assembly line's shift.
+- The lot is consumed: the project takes a node's *lowest* free corner, which
+  is where the view puts the building (D1a: a node's buildings hold its first
+  slots in id order), and erasing that one lot keeps `Validation`'s rule
+  "a lot is a corner no building of that node stands on" true. `rooms_` is
+  rebuilt and `cityVersion_` bumped whenever the city changed.
+- What the step's text left open, and what was measured:
+  - "jobs per robot under 1.05 - `employed` over `population`" is always true:
+    `employed` counts robots with a workspace (EconomyStatistics.cpp), so it
+    cannot pass `population`. The city therefore raises a workplace at every
+    midnight while it has a free plot - the seed 5 / 1000 robots city over 12
+    days took 4 plots (31 to 27) and all four new buildings are workplaces -
+    so the brake is land, not money.
+  - "home vacancy under 5%" is rare in a young city: seed 5 / 1000 robots has
+    598 of about 1560 apartments empty (38%), and the seed 1 / 10000 robots
+    run 5130 of about 15000 (34%), so no habitat starts in 40 days there. The
+    habitat tests therefore run a hand-made city whose un-lived apartments are
+    removed (vacancy 0%), the guide's "set the exact state and run" pattern.
+    Before D2c, ask the user whether the jobs share should be a real one
+    (unemployment over some share, say) and whether vacancy should be read
+    over the market homes alone, as `SetPrices` does per class.
+- No new saved field, no random draw, no new event kind: `projects` and `lots`
+  shipped in v22 and v23, so no save version bump, and the saved random stream
+  is untouched. `Validation` needed no new check (D2a's project checks and
+  D1a's plot checks already cover what this step writes).
+- Tests in the new `tests/ConstructionTests.cpp` (5, none can skip): a site
+  grows one floor a night and ends when its nights are up; the owner pays the
+  supplies and the industry corporation pays none, with `ValidateEconomy`
+  after; a site takes the plot nearest the middle and the plots stay true
+  (`ValidateWorldState`); a 30-day city stays valid, savable and raises no
+  habitat; the same seed twice gives the same save, a different seed not.
+- First make room, as C4c and D1a did: `social` stood at 24983 of 25000 and
+  this step's `World.hpp` declaration put it over, so `LifeCycle.cpp` and
+  `tests/LifeCycleTests.cpp` moved out of `social` into a new `life-cycle`
+  module (aging, wear, scrapping, newcomers) in `scripts/context_budget.py`
+  and both MODULES.md tables. No code moved: `social` 20754, `life-cycle`
+  11498.
+- `scripts/context_budget.py` gained the two new files in `construction`
+  (15429 of 25000), `sim/CMakeLists.txt` and `tests/CMakeLists.txt` the two
+  files, `docs/MODULES.md` the `Construction.cpp` row and the task rows.
+- ctest: 181/181 including ContextBudget (176 before, +5 new). Simulation code
+  changed, so the headless check ran: seed 1, 10000 robots, 40 days `--quiet`
+  finished in 243 s, money adding up every day (`money` equal to `created`
+  with `destroyed 0`), `created` 7491 on the last day, `wages at 110%`, 18 of
+  10000 out of work, 5893 vacant apartments, 27 empty units, `supplies` 921217
+  and rising. As the warning above says, hiring and homes counts are not to
+  be trusted until D2c lands, and the money watch belongs after D2c.
+
+Warning for the steps after this: `world` is now 24449 of 25000 and
+`generation` 24436; a step that adds to `World.cpp`, `WorldTests.cpp` or
+`CityTests.cpp` must make room first.
 
 ### - [ ] D2c. A site's rooms cannot be rented or staffed until done (careers)
 

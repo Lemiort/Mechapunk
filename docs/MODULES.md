@@ -21,7 +21,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | property | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Units.cpp`, `Property.cpp`, `HousingTests.cpp` |
 | statistics | 19k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp` |
 | careers | 19k | `World.hpp`, `Careers.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
-| social | 24k | `World.hpp`, `Social.hpp`, `Social.cpp`, `LifeCycle.cpp`, `SocialTests.cpp`, `LifeCycleTests.cpp` |
+| social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
+| life-cycle | 11k | `World.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
 | saves | 24k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
 | saves-frozen | 8k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
@@ -41,7 +42,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | gang-lists | 5k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
 | chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
 | chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
-| construction | 7k | `Construction.hpp`, `World.hpp` |
+| construction | 15k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionTests.cpp` |
 
 ## What lives where
 
@@ -68,6 +69,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Chronicle.hpp` | The saved story (`ChronicleEntry`, `kChronicleCap`) |
 | `Chronicle.cpp` | `World::Chronicle`: which events `Emit` keeps in the chronicle |
 | `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done) |
+| `Construction.cpp` | `World::ReviewConstruction`: a site's supplies and its floors, and the shortage that starts a new one |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
 | `Founding.cpp` | `FoundEconomy` (organizations, owners, starting money), `IndexEconomy` |
@@ -131,7 +133,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Buying homes, mortgages, inheritance | property | `Property.cpp` |
 | A new daily statistic and its plot | statistics | `EconomyStatistics.cpp`, `app/Statistics.cpp` |
 | Jobs, shifts, hiring, firing, promotions, moving home | careers | `Careers.cpp`, `Venues.cpp` |
-| Friends, rivals, memories, aging, scrapping, newcomers | social | `Social.cpp`, `LifeCycle.cpp` |
+| Friends, rivals, memories, talks | social | `Social.cpp` |
+| Aging, wear, scrapping, newcomers moving in | life-cycle | `LifeCycle.cpp` |
 | Timetable, trains, trips, driver runs | metro | `Metro.cpp`, `Transit.cpp` |
 | Any change to saved state (new version, migration, fixture) | saves | `Save.cpp`, end of `Migrations.cpp` |
 | The headless runner's report | runner | `tools/sim_runner/main.cpp` |
@@ -145,7 +148,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Which rows a gang page shows, sorted | gang-lists | `app/GangLists.cpp` |
 | Which rows a history list shows, filtered | chronicle-lists | `app/ChronicleLists.cpp` |
 | A robot's, room's, building's or organization's history section in the inspector | chronicle-pages | `app/InspectorHistory.cpp`, `app/InspectorChronicle.cpp` |
-| A building going up: its project, its lot, its owner | construction | `Construction.hpp` (`Project`) |
+| A building going up: its project, its lot, its owner | construction | `Construction.hpp` (`Project`), `Construction.cpp` (`ReviewConstruction`) |
 | Panels, input, camera; frames from the simulation thread | ui | `main.cpp`, `SimulationHost.cpp` |
 
 A task touching two modules (a new robot field shown in the inspector, say)
