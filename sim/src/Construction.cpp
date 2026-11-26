@@ -1,6 +1,7 @@
 // Buildings going up: `World::ReviewConstruction` pays a site the supplies
-// it costs, raises one of its floors, and starts a new habitat or workplace
-// when homes or jobs have run short for a week (task D, step D2b).
+// it costs, raises one of its floors, ends a project whose nights are up -
+// its office becoming an empty unit again (step D3d) - and starts a new
+// habitat or workplace when homes or jobs have run short for a week.
 
 #include <algorithm>
 #include <array>
@@ -338,6 +339,38 @@ void World::ReviewConstruction() {
         raiseFloor(*building, project);
         --project.daysLeft;
         cityChanged = true;
+    }
+    // A site whose nights are used up: its office becomes an ordinary empty
+    // unit (step D3d), which `ReviewUnits` may then reopen as a venue or a
+    // workspace like any other. `CloseUnit` (Units.cpp) is the existing way
+    // to close one: it lays off the builders as a closing venue lays off its
+    // staff - workplace cleared, junior, no performance, no commute planned
+    // - renames the room "Empty Unit" and records the closing. A room may
+    // change kind only when nobody stands in it or is on the way to it, and
+    // the layoff is what keeps that true here: the review runs at midnight,
+    // when a site's 07:00-to-15:00 shift is over and no robot is walking to
+    // its office or standing in it, so a builder's only link to the office
+    // is the departure it still plans that morning, and clearing `commuteAt`
+    // cancels it. The projects list is walked in its saved order and the
+    // robots in id order, so the same city closes the same offices on every
+    // machine (rule 1).
+    for (const Project& project : state_.projects) {
+        if (project.daysLeft != 0) {
+            continue;
+        }
+        Building* building = buildingFor(project.building);
+        if (building == nullptr) {
+            // ValidateWorldState refuses a project without its building.
+            continue;
+        }
+        for (Room& room : building->rooms) {
+            if (room.kind != RoomKind::SiteOffice) {
+                continue;
+            }
+            CloseUnit(room);
+            cityChanged = true;
+            break;
+        }
     }
     std::erase_if(state_.projects,
                   [](const Project& project) { return project.daysLeft == 0; });

@@ -85,7 +85,8 @@ MODULES = {
     "chronicle": [I + "Chronicle.hpp", "sim/src/Chronicle.cpp", "tests/ChronicleTests.cpp",
                   I + "World.hpp"],
     "construction": [I + "Construction.hpp", "sim/src/Construction.cpp",
-                     I + "World.hpp", "tests/ConstructionTests.cpp"],
+                     I + "World.hpp", "tests/ConstructionTests.cpp",
+                     "tests/SiteOfficeTests.cpp"],
 }
 SOURCE_DIRS = ["sim", "app", "tests", "tools"]
 

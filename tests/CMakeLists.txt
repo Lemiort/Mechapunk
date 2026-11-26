@@ -8,6 +8,7 @@ add_executable(sim_tests
     CareersTests.cpp
     ChronicleTests.cpp
     ConstructionTests.cpp
+    SiteOfficeTests.cpp
     CityTests.cpp
     EconomyTests.cpp
     HousingTests.cpp

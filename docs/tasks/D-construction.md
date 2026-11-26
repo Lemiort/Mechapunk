@@ -21,7 +21,9 @@ one step per module. D3b is done on 2026-11-26 with no save change: a
 building going up gets its site office on the ground floor, the kind
 D3a shipped. D3c is done on 2026-11-26, also with no save change: that
 office has staff rules and is an opening, so a site going up gets
-builders.
+builders. D3d is done on 2026-11-26, also with no save change: when a site's
+nights are up its builders are laid off and its office closes into an empty
+unit, which `ReviewUnits` may then reopen.
 
 ## What and why
 
@@ -871,7 +873,7 @@ no room at all.
   projects, 0 `siteOffice` rooms and all 31 plots), so the step changes
   nothing where there is no site.
 
-### - [ ] D3d. A finished site's office becomes a vacant unit (construction)
+### - [x] D3d. A finished site's office becomes a vacant unit (construction)
 
 Open: `Construction.cpp` (the review's end-of-project step),
 `ConstructionTests.cpp`, plus the lines of `Units.cpp` that hold `CloseUnit`
@@ -885,6 +887,82 @@ Open: `Construction.cpp` (the review's end-of-project step),
   the layoff must clear a builder whose destination is the office.
 - Tests: a finished site has a vacant unit where its office was, no
   robot works there, `ValidateWorldState` and `ValidateEconomy` after.
+
+Done as (construction module, one commit): in `World::ReviewConstruction`,
+between the advance loop and the erase of finished projects, a new loop walks
+`state_.projects` in its saved order and, for every project whose `daysLeft`
+has reached 0 - the site that just raised its last floor, and a site a save
+left finished - asks its building for the one `SiteOffice` room and closes
+it with `CloseUnit` (Units.cpp). The step's "the layoff pattern to copy" was
+taken as calling that function instead of restating it: it lays off the
+builders exactly as the step asks (workspace cleared, junior, no performance,
+`commuteAt = kNoCommute`, a `LostJob` memory, home when it stood at work),
+renames the room "Empty Unit" with `pricePercent` 100 and no visits or quiet
+nights, bumps `cityVersion_` and records the closing (`UnitClosed`,
+`today.venuesClosed`) - and one implementation keeps a closing office and a
+closing venue honest with each other. `cityChanged` is set so `rooms_` is
+rebuilt and the views reload the changed kind; `ReviewUnits` then finds the
+room in its `VacantStore` branch and may reopen it as a workspace, a police
+station or the most wanted venue.
+
+- What the step's second bullet guards, and why it holds: a room may change
+  kind only when nobody stands in it or is on the way to it. The review runs
+  at midnight, when a site's 07:00-to-15:00 shift (D3c) is over: no robot
+  stands in a site's office or walks to it then - a commute arrives near
+  07:00 - so a builder's only link to the office at that moment is the
+  departure it still plans that morning, and `CloseUnit`'s
+  `commuteAt = kNoCommute` cancels exactly that trip. A robot literally
+  mid-walk to a room would break `Arrive` (Behaviour.cpp throws "Robot
+  arrived at a room it has no business in"), which is why the midnight
+  timing matters; the comment in `Construction.cpp` says so.
+- No save change: `SiteOffice` shipped in v24 (D3a), `projects` in v23 (D2a)
+  and `lots` in v22 (D1a): no field, key, migration or fixture, and
+  `Validation` needs nothing new - a room is checked by floor, capacity and
+  id, not by a kind table. No new random draw of the city's own: the saved
+  stream moves only where builders are laid off, because `CloseUnit` calls
+  `PlanAtHome`, which draws the resting robot's next outing - as any
+  closing venue already does.
+- First make room, as D2c3 did: the new test put `tests/ConstructionTests.cpp`
+  at 10034 tokens, over the 10k file limit, so the two tests that read the
+  office itself - D3b's `AStartedSiteHasASiteOffice` and the new one - moved
+  to a new `tests/SiteOfficeTests.cpp` (suite `SiteOffice`), which joins the
+  `construction` module: the module total is 23853 of 25000, so unlike
+  D2c3's split it needs no new module. `tests/CMakeLists.txt` and
+  `scripts/context_budget.py` gained the file; `docs/MODULES.md` the module
+  row (20k to 24k) and the `Construction.cpp` row.
+- Test `SiteOffice.FinishedSiteOfficeBecomesAVacantUnit`: the seed 7 / 200
+  robots city, a workplace building put on a site by hand (`Raise`, 20 nights
+  left) with its office written on by a new `AddOffice` helper as `startSite`
+  makes it, and every workspace worker laid off (`LayOff`) so the office is
+  one of the few openings - D3c's builders test setup, with the nights short
+  enough to end. Over 14 midnights the office fills its crew: `builders >= 3`
+  (D3c measured six; the bound leaves margin for the stream to move in a
+  later step), so the layoff below bites on real builders. The run continues
+  to the twentieth midnight, where the project is gone; then the office room
+  reads `VacantStore` named "Empty Unit", the building has no `SiteOffice`
+  room left, no robot works at the office, and `ValidateWorldState` and
+  `ValidateEconomy` pass. The helpers (`WorkplaceAndOwner`, `Raise`,
+  `AddOffice`, `LayOff`, `SiteOffice`, `RunUntilSiteOf`, `BuildingWithId`)
+  are local copies, as the split forbids reaching into another test file.
+- ctest: 194/194 including ContextBudget (193 before, +1 new test; D3b's
+  test moved, not added).
+- Simulation code changed, so the headless check ran: seed 1, 10000 robots,
+  40 days `--quiet` in 286 s, money equal to `created in all` with
+  `destroyed 0` on all 40 days (checked line by line). Day 40 reads
+  `created 700 today`, wages at 110%, 29 of 10000 out of work, 6004 vacant
+  apartments, 29 empty units, supplies 926911, gini 505, 1071 broke robots,
+  11 behind on rent - the shape D3c's note quotes (created 1775, wages at
+  110%, 28 out of work, 6004 vacant, 26 empty units, supplies 924882, gini
+  505, 1067 broke, 13 behind), with three more empty units: the same 9 sites
+  raised and 6 projects still going up, and the 3 offices whose projects had
+  already finished (D3c's note) are now ordinary empty units - the day-40
+  save holds 6 `siteOffice` rooms, one per going-up site, 30 `vacantStore`
+  rooms all named "Empty Unit" and 41 of the city's 50 plots (the log's
+  29 is counted by `RecordStatistics` before that midnight's review). And
+  the seed 7, 2000 robots, 6 days `--all --save` run is byte for byte the
+  same log, except its own timing line, and the same save as before this
+  step: that city raises no site (its save has 0 projects and all 31 plots),
+  so the step changes nothing where there is no site.
 
 ### - [ ] D4. Drawing new buildings (view-core)
 
