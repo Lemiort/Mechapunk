@@ -70,6 +70,8 @@ MODULES = {
     "ui": ["app/main.cpp", "app/SimulationHost.hpp", "app/SimulationHost.cpp"],
     "organization-lists": ["app/OrganizationLists.hpp", "app/OrganizationLists.cpp",
                            "tests/OrganizationListsTests.cpp"],
+    "project-lists": ["app/ProjectLists.hpp", "app/ProjectLists.cpp",
+                      "tests/ProjectListsTests.cpp"],
     "inspector": ["app/Inspector.hpp", "app/Inspector.cpp", "app/Links.hpp",
                   "app/Links.cpp", "app/InspectorInternal.hpp",
                   "app/InspectorOrganization.cpp", "app/InspectorGang.cpp"],

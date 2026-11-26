@@ -27,6 +27,7 @@ add_library(mechapunk_layout STATIC
     app/InteriorStores.cpp
     app/InteriorWorkplaces.cpp
     app/OrganizationLists.cpp
+    app/ProjectLists.cpp
     app/Props.cpp)
 target_include_directories(mechapunk_layout PUBLIC app)
 target_link_libraries(mechapunk_layout PUBLIC nee::nee mechapunk::sim)

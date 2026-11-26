@@ -27,7 +27,9 @@ unit, which `ReviewUnits` may then reopen. D4 is done on 2026-11-26, also
 with no save change: the view draws a building going up as a scaffold and
 takes it in when its project raises it. D5 split on 2026-11-26 into D5a to
 D5e - its bullets live in four modules, not the two it names - and D5a is
-done, also with no save change: the published frame carries the projects.
+done, also with no save change: the published frame carries the projects. D5b
+is done on 2026-11-26, also with no save change: the layout library has the
+lists a project's pages show.
 
 ## What and why
 
@@ -1071,7 +1073,7 @@ moved on - the same test the economy block uses for `history_` and `owners_`.
   `mechapunk-sim.exe` was not relinked and the headless log and save cannot
   move (as in D1b and D4).
 
-### - [ ] D5b. `ProjectLists`: the rows a project page shows (new project-lists module)
+### - [x] D5b. `ProjectLists`: the rows a project page shows (new project-lists module)
 
 Open: a new `app/ProjectLists.hpp/.cpp` (the `mechapunk_layout` library), a
 new `tests/ProjectListsTests.cpp`, `app/OrganizationLists.hpp/.cpp` and
@@ -1085,6 +1087,60 @@ new `tests/ProjectListsTests.cpp`, `app/OrganizationLists.hpp/.cpp` and
 - Tests for every list function; add the new files to a new `project-lists`
   module in the budget script, and the module and its rows to
   `docs/MODULES.md`.
+
+Done as (project-lists module, one commit): `app/ProjectLists.hpp` declares
+four plain functions over the published frame (step D5a's `WorldFrame::projects`)
+and the city's `RoomIndex`, and `app/ProjectLists.cpp` implements them:
+
+- `BuildersOf(frame, rooms, building)` - the robots whose job room is a
+  `SiteOffice` room of that building, by robot id. The step's chain (the
+  robot's `workspace` room, that room's building, the project on that
+  building) is read from the room instead: the office is the only room of a
+  site anyone works in (D2c keeps the other rooms from hiring, D3d closes
+  the office when the project ends), so the room's kind names both the
+  building and the fact it is going up, and no per-robot project lookup is
+  needed.
+- `ProjectsOf(frame, owner)` - the sites of one organization, in the saved
+  order (by building id), which is the order the page shows them in.
+- `ProjectOn(frame, building)` - the binary search `IsUnderConstruction`
+  (Construction.hpp) does, over the frame's list: the building page's
+  "Being built" line and a builder's project link ask this direction.
+- `LotOf(frame, project)` - the building, its entrance node and the corner
+  of that node it occupies. What the step's "the lot or building a project
+  is on" left open: the lot is gone from `City::lots` from the night the
+  project starts (D2b erases the one it takes), so the corner is derived
+  the way the view places buildings - a node's buildings take its first
+  slots in id order (D1a) - which is exactly the lot the project consumed.
+- What the step left open, and what was chosen: the functions take the
+  project's *building id*, not the project: the page holds a `Project` and
+  asks by `project.building`, and `ProjectOn` answers the other way for the
+  pages that start from a building or a robot. A frame before the first
+  project list (`projects` null), no city, an invalid id or a project on a
+  building the city does not have give empty lists and a null building,
+  never a crash.
+- Tests: 5 in the new `tests/ProjectListsTests.cpp` (suite `ProjectLists`),
+  none can skip. `BuildersAreListedUnderTheirSite`: three robots hand-set
+  to the office of a site raised by hand (`Raise` and `AddOffice`, as
+  `SiteOfficeTests.cpp` has them), listed by id; a finished building and
+  no id at all have none. `ProjectsOfOwnerInSavedOrder`: the trust's habitat
+  and an employer's workplace, each listed under its owner alone, an
+  unknown owner and none empty. `ProjectOnFindsTheSite`, and
+  `LotOfProjectNamesTheCorner` against the test's own count of the node's
+  buildings with a smaller id, a project on a building the city lacks
+  reading as nowhere. `NoProjectsYetGivesEmptyLists`. The frame is built
+  by hand from a generated seed 3 / 300 robots city, as
+  `OrganizationListsTests.cpp` shows, with the projects copied into it as
+  `Publish` does.
+- No save change, no simulation change: only `app/` and `tests/` files
+  moved, so `mechapunk-sim.exe` was not relinked and the headless log and
+  save cannot move (as in D1b, D4 and D5a). No random draw and no money
+  movement: the lists only read the frame.
+- Budget: the new `project-lists` module in `scripts/context_budget.py`
+  (5040 of 25000); `CMakeLists.txt` gained `app/ProjectLists.cpp` in
+  `mechapunk_layout` and `tests/CMakeLists.txt` the test file; `docs/MODULES.md`
+  the module row, the `ProjectLists` row and the task row. No existing
+  module grew, so the `inspector` warning above still stands for D5c.
+- ctest: 199/199 including ContextBudget (194 before, +5 new).
 
 ### - [ ] D5c. The project page (inspector module)
 

@@ -37,6 +37,7 @@ add_executable(
     GangListsTests.cpp
     LayoutTests.cpp
     OrganizationListsTests.cpp
+    ProjectListsTests.cpp
 )
 target_link_libraries(layout_tests PRIVATE mechapunk_layout GTest::gtest_main)
 gtest_discover_tests(layout_tests)
