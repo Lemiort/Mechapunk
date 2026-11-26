@@ -16,6 +16,7 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -190,11 +191,18 @@ void World::TradeProperty() {
         const std::int64_t means = robot.credits + robot.savings;
         const std::int64_t mortgage = kMortgageShifts * PayOf(robot);
         // The dearest it can put a fifth down on, keeping a month's bills.
+        // Homes of a building a project is raising are not candidates: a
+        // habitat site's homes belong to its owner, which is the housing
+        // trust, so this loop would otherwise buy a robot into a half-built
+        // tower (task D, step D2c3), as `ReviewHomes` and a newcomer's choice
+        // of home already skip them.
         const Room* best = nullptr;
         for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
             const Room& room = *apartment.room;
             if (room.owner != housing_ || taken.contains(room.id.value) ||
-                Sleeps(room.apartmentClass) != 1 || RentFor(room) <= RentFor(*home->room)) {
+                Sleeps(room.apartmentClass) != 1 ||
+                RentFor(room) <= RentFor(*home->room) ||
+                IsUnderConstruction(state_.projects, apartment.building->id)) {
                 continue;
             }
             const std::int64_t price = PriceOf(room);

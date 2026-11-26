@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <map>
-#include <optional>
 #include <utility>
 #include <set>
 #include <vector>
@@ -126,126 +125,157 @@ TEST(Housing, RentsFallWhileHomesStandEmpty) {
     EXPECT_EQ(history.back().averageRent[0], history.front().averageRent[0]);
 }
 
-// A venue that filled up three times over asks more the next day; one that
-// had fewer guests than places asks less.
-TEST(Housing, VenuePricesFollowDemand) {
-    sim::World start = sim::World::Generate({.seed = 6, .robots = 400});
-    start.RunFor(sim::kMinutesPerDay - 1);
-    sim::WorldState state = start.State();
-    sim::Room* busy = nullptr;
-    sim::Room* quiet = nullptr;
-    for (sim::Building& building : state.city.buildings) {
-        for (sim::Room& room : building.rooms) {
-            if (sim::IsVenue(room.kind)) {
-                (busy == nullptr ? busy : quiet) = &room;
-                if (quiet != nullptr) {
-                    break;
-                }
-            }
-        }
-        if (quiet != nullptr) {
-            break;
+namespace {
+// The housing trust: the organization of the housing sector. It owns every
+// home on the market, and it owns a habitat site (Construction.cpp), which is
+// why the property market can reach a half-built tower at all.
+sim::EntityId HousingTrust(const sim::WorldState& state) {
+    for (const sim::Organization& organization : state.economy.organizations) {
+        if (organization.sector == sim::Sector::Housing) {
+            return organization.id;
         }
     }
-    ASSERT_NE(quiet, nullptr);
-    busy->visits = busy->capacity * 4;
-    quiet->visits = 0;
-    const sim::EntityId busyId = busy->id;
-    const sim::EntityId quietId = quiet->id;
-    auto world = sim::World::FromState(std::move(state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(1);
-    EXPECT_GT(world->Rooms().Find(busyId)->room->pricePercent, 100U);
-    EXPECT_LT(world->Rooms().Find(quietId)->room->pricePercent, 100U);
-    EXPECT_EQ(world->Rooms().Find(busyId)->room->visits, 0U);
+    return {};
 }
 
-namespace {
-// A ground-floor venue nobody is in or on the way to, as an index into
-// state.city.buildings and its rooms.
-std::optional<std::pair<std::size_t, std::size_t>> EmptyVenue(const sim::WorldState& state) {
-    std::set<std::uint64_t> busy;
-    for (const sim::Robot& robot : state.robots) {
-        busy.insert(robot.location.value);
-        busy.insert(robot.destination.value);
+// A state written by hand loads as a world; the assertion is what keeps a
+// setup that does not validate from reading as a passing test.
+sim::World Load(sim::WorldState state) {
+    auto world = sim::World::FromState(std::move(state));
+    EXPECT_TRUE(world.has_value()) << world.error();
+    return std::move(*world);
+}
+
+// True when `room` is one of the rooms of `building`; an invalid room id
+// answers false.
+bool InBuilding(const sim::WorldState& state, sim::EntityId building, sim::EntityId room) {
+    for (const sim::Building& each : state.city.buildings) {
+        if (each.id != building) {
+            continue;
+        }
+        return std::ranges::any_of(
+            each.rooms, [room](const sim::Room& held) { return held.id == room; });
     }
-    for (std::size_t b = 0; b < state.city.buildings.size(); ++b) {
-        const auto& rooms = state.city.buildings[b].rooms;
-        for (std::size_t r = 0; r < rooms.size(); ++r) {
-            if (sim::IsVenue(rooms[r].kind) && !busy.contains(rooms[r].id.value)) {
-                return std::pair{b, r};
+    return false;
+}
+
+// A habitat building with a home nobody lives in, and that home.
+std::pair<sim::EntityId, sim::EntityId> HabitatAndVacantHome(const sim::WorldState& state) {
+    std::set<std::uint64_t> homes;
+    for (const sim::Robot& robot : state.robots) {
+        homes.insert(robot.apartment.value);
+    }
+    for (const sim::Building& building : state.city.buildings) {
+        if (building.kind != sim::BuildingKind::Habitat) {
+            continue;
+        }
+        for (const sim::Room& room : building.rooms) {
+            if (room.kind == sim::RoomKind::Apartment && !homes.contains(room.id.value)) {
+                return {building.id, room.id};
             }
         }
     }
-    return std::nullopt;
+    return {};
+}
+
+// Puts a building on a site: a project raises it for `nights` more nights,
+// owned by `owner`. The cities these tests write have no project yet - the
+// shortage that starts one is read off seven saved days - so the list stays
+// sorted by building id, as validation asks.
+void Raise(sim::WorldState& state, sim::EntityId building, sim::EntityId owner,
+           std::uint32_t nights) {
+    state.projects.push_back({
+        .building = building,
+        .owner = owner,
+        .daysLeft = nights,
+        .floorsDone = 1,
+    });
+}
+
+// The rent `RentFor` (Units.cpp) reads a home at: its daily rent under the
+// saved market percent of its class.
+std::int64_t RentPrice(const sim::WorldState& state, const sim::Room& room) {
+    const std::size_t kind = static_cast<std::size_t>(room.apartmentClass);
+    if (kind < 2) {
+        return static_cast<std::int64_t>(room.rent);
+    }
+    return std::max<std::int64_t>(1, static_cast<std::int64_t>(room.rent) *
+                                        state.economy.rentPercent.at(kind - 2) / 100);
 }
 }  // namespace
 
-// A venue that has stood quiet for ten nights, its prices cut, closes, and
-// its staff are laid off.
-TEST(Housing, QuietVenuesClose) {
-    sim::World start = sim::World::Generate({.seed = 6, .robots = 400});
-    start.RunFor(sim::kMinutesPerDay - 1);
+// A home a robot buys is a finished one: the mortgage market of `TradeProperty`
+// (Property.cpp) skips the apartments of a building a project is raising, the
+// way `ReviewHomes` (step D2c) and a newcomer's choice of home (D2c2) do.
+TEST(Housing, BuyersSkipSiteHomes) {
+    sim::World start = sim::World::Generate({.seed = 5, .robots = 1000});
+    start.RunFor(sim::kMinutesPerDay);
     sim::WorldState state = start.State();
-    const auto found = EmptyVenue(state);
-    ASSERT_TRUE(found.has_value());
-    sim::Room& venue = state.city.buildings[found->first].rooms[found->second];
-    venue.pricePercent = 50;
-    venue.quietNights = 9;
-    venue.visits = 0;
-    const sim::EntityId id = venue.id;
-    std::vector<sim::EntityId> staff;
-    for (const sim::Robot& robot : state.robots) {
-        if (robot.workspace == id) {
-            staff.push_back(robot.id);
+    const sim::EntityId trust = HousingTrust(state);
+    ASSERT_TRUE(trust.IsValid());
+    const auto [site, free] = HabitatAndVacantHome(state);
+    ASSERT_TRUE(site.IsValid()) << "the city has a habitat with a free home";
+    ASSERT_TRUE(free.IsValid()) << "that habitat has a home nobody lives in";
+    Raise(state, site, trust, 30);  // Still going up for every night below.
+    // The site's free homes one place there are become the dearest such homes
+    // in the city, a hair above the dearest finished one, so a robot that can
+    // afford one buys there: with the skip out, the market filling up over
+    // these nights means this building is bought into.
+    std::int64_t dearest = 0;
+    for (const sim::Building& building : state.city.buildings) {
+        if (building.id == site) {
+            continue;
         }
-    }
-    auto world = sim::World::FromState(std::move(state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(1);
-    EXPECT_EQ(world->Rooms().Find(id)->room->kind, sim::RoomKind::VacantStore);
-    EXPECT_GT(world->CityVersion(), 0U);
-    for (const sim::EntityId robot : staff) {
-        EXPECT_NE(world->FindRobot(robot)->workspace, id);
-    }
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// An empty unit opens again, as the kind of venue the city is short of;
-// while no police station exists yet and the population can support one
-// (stations * 2000 < population), City Hall takes the unit first.
-TEST(Housing, EmptyUnitsOpenAsVenuesInDemand) {
-    sim::World start = sim::World::Generate({.seed = 6, .robots = 400});
-    start.RunFor(sim::kMinutesPerDay - 1);
-    sim::WorldState state = start.State();
-    const auto found = EmptyVenue(state);
-    ASSERT_TRUE(found.has_value());
-    sim::Room& unit = state.city.buildings[found->first].rooms[found->second];
-    for (sim::Robot& robot : state.robots) {
-        if (robot.workspace == unit.id) {
-            robot.workspace = {};
-            robot.commuteAt = sim::kNoCommute;
-        }
-    }
-    unit.kind = sim::RoomKind::VacantStore;
-    // Bars are packed: their prices are high everywhere.
-    for (sim::Building& building : state.city.buildings) {
-        for (sim::Room& room : building.rooms) {
-            if (room.kind == sim::RoomKind::Bar) {
-                room.pricePercent = 150;
+        for (const sim::Room& room : building.rooms) {
+            if (room.kind == sim::RoomKind::Apartment &&
+                sim::Sleeps(room.apartmentClass) == 1 && room.owner == trust) {
+                dearest = std::max(dearest, RentPrice(state, room));
             }
         }
     }
-    const sim::EntityId id = unit.id;
-    auto world = sim::World::FromState(std::move(state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    for (int night = 0; night < 60 && world->Rooms().Find(id)->room->kind == sim::RoomKind::VacantStore;
-         ++night) {
-        world->RunFor(sim::kMinutesPerDay);
+    for (sim::Building& building : state.city.buildings) {
+        if (building.id != site) {
+            continue;
+        }
+        std::set<std::uint64_t> lived;
+        for (const sim::Robot& robot : state.robots) {
+            lived.insert(robot.apartment.value);
+        }
+        for (sim::Room& room : building.rooms) {
+            if (room.kind != sim::RoomKind::Apartment || sim::Sleeps(room.apartmentClass) != 1 ||
+                lived.contains(room.id.value)) {
+                continue;
+            }
+            const std::size_t kind = static_cast<std::size_t>(room.apartmentClass);
+            const std::int64_t percent = kind < 2 ? 1 : state.economy.rentPercent.at(kind - 2);
+            room.rent = static_cast<std::uint32_t>((dearest + 5) * 100 / percent + 1);
+        }
     }
-    const sim::RoomKind kind = world->Rooms().Find(id)->room->kind;
-    // At this city size (400 robots) the station rule fires before any venue
-    // opens, so a police station is an expected outcome as well.
-    EXPECT_TRUE(sim::IsVenue(kind) || kind == sim::RoomKind::PoliceStation);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+    // Robots with plenty saved, so the market really is bought into: the
+    // buy is a three per cent draw a night, and these nights must not run
+    // out of buyers. Gangs are disabled so robbery cannot drain the savings.
+    for (std::size_t index = 0; index < state.robots.size(); index += 10) {
+        sim::SetCredits(state, state.robots[index], 20000);
+    }
+    state.gangs.clear();
+    for (sim::Robot& robot : state.robots) {
+        robot.gang = sim::EntityId{0};
+    }
+    sim::World world = Load(std::move(state));
+    std::uint64_t sales = 0;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::BoughtProperty) {
+            ++sales;
+        }
+    });
+    for (int night = 0; night < 20; ++night) {
+        world.RunFor(sim::kMinutesPerDay);
+    }
+    // The market was bought into, and none of it onto the site.
+    EXPECT_GT(sales, 0U) << "no robot bought a home in twenty nights";
+    for (const sim::Robot& robot : world.State().robots) {
+        EXPECT_FALSE(InBuilding(world.State(), site, robot.apartment))
+            << "a robot bought into a building going up";
+    }
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }

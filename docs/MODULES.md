@@ -18,7 +18,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | generation | 24k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
 | validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
-| property | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Units.cpp`, `Property.cpp`, `HousingTests.cpp` |
+| property | 20k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Property.cpp`, `HousingTests.cpp` |
+| units | 15k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Units.cpp`, `VenueTests.cpp` |
 | statistics | 19k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp` |
 | careers | 22k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
@@ -129,7 +130,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Payments, loans, wages, what robots can afford | money | `Money.cpp` |
 | Nightly settlement, City Hall, taxes, the central bank | money | `Settlement.cpp` |
 | Who owns what at start | property | `Founding.cpp` |
-| Venues and stations opening or closing, prices | property | `Units.cpp` |
+| Venues and stations opening or closing, prices | units | `Units.cpp` |
 | Buying homes, mortgages, inheritance | property | `Property.cpp` |
 | A new daily statistic and its plot | statistics | `EconomyStatistics.cpp`, `app/Statistics.cpp` |
 | Jobs, shifts, hiring, firing, promotions, moving home | careers | `Careers.cpp`, `Venues.cpp` |

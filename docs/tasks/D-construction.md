@@ -11,7 +11,10 @@ was split on 2026-11-25 into D2c and D2c2: its `AddNewcomer` half lives in
 `LifeCycle.cpp`, the `life-cycle` module. D2c is done, with no save change
 (`projects` shipped in v23) and no D2d: `ReviewUnits` only works on ground-floor
 rooms, and a site's ground floor is empty until D3. D2c2 is done on 2026-11-26,
-also with no save change: a newcomer's home is a finished one.
+also with no save change: a newcomer's home is a finished one. D2c3 was added
+between D2c2 and D3 on 2026-11-26 and is done, also with no save change: a home
+a robot buys is a finished one, which needed the `property` module split (its
+venue tests moved to a new `units` module) to make room for the test.
 Save change. The biggest remaining task: take it slowly, one step per module.
 
 ## What and why
@@ -522,7 +525,7 @@ robots, 13 behind on rent: the numbers D2c's note quotes, because that city alwa
 has a free dorm and a site's homes are never dorms, so the list this step trims is
 one a newcomer there never draws from.
 
-### - [ ] D2c3. A home a robot buys is a finished one (property module)
+### - [x] D2c3. A home a robot buys is a finished one (property module)
 
 Open: `sim/src/Property.cpp` (`TradeProperty`'s choice of a home to buy, the
 "dearest it can put a fifth down on" loop), `tests/HousingTests.cpp`.
@@ -542,6 +545,69 @@ so a robot can buy its way into a half-built tower.
   did have sales that night (the test cannot pass because nothing was bought).
 - No save change, no new random draw. `property` stands at 23719 of 25000:
   make room first if the test does not fit.
+
+Done as (property module, one commit): the buy loop's candidate test gained
+`IsUnderConstruction(state_.projects, apartment.building->id)` as its last
+condition, and `Property.cpp` spells out the `Construction.hpp` include the way
+`Careers.cpp` and `LifeCycle.cpp` do. The step's claim about the other two
+loops holds as written, and was checked rather than assumed: the selling loop
+(Property.cpp:149) continues unless `FindRobot(room.owner)` finds a robot, so a
+trust-owned site home is never sold, and the `letByTrust` loop (Property.cpp:238)
+collects only homes in `lived`, which a site's homes never are - `startSite`
+raises a new building whose rooms appear floor by floor, and D2c and D2c2 keep
+workers, tenants and newcomers out of them.
+
+- What the step's text left open, and what was chosen:
+  - The test cannot trust a site's homes to be dear by accident: generation
+    and `raiseFloor` give them mid-range rents, so the test raises the site's
+    free homes one place there are above every finished home of that size,
+    doing the arithmetic through the saved `economy.rentPercent` because
+    `RentFor` (Units.cpp) reads a home through its class's market percent.
+    A buyer that can afford one therefore buys there, and one that cannot
+    still buys the dearest finished home, so sales happen either way.
+  - The site is a hand-made project on a generated habitat (`Raise`, as in
+    `CareersTests.cpp` and `LifeCycleTests.cpp`): the shortage that starts a
+    project is read off seven saved days, so a two-day city raises none.
+  - The buy is a three per cent draw a night, so one rich robot over twenty
+    nights would be luck: every tenth robot gets 20000 credits through
+    `sim::SetCredits`, gangs are cleared so robbery cannot drain them, and the
+    test asserts the city had sales rather than that one named robot bought.
+- Test `Housing.BuyersSkipSiteHomes`: seed 5 / 1000 robots one day in, the
+  site's building found by `HabitatAndVacantHome`, 20 nights run, then
+  `sales > 0` (counted from `EventKind::BoughtProperty`), no robot living in
+  the site building, and `ValidateWorldState` after. With the skip taken out
+  it fails at `tests/HousingTests.cpp:402`: `Value of: InBuilding(world.State(),
+  site, robot.apartment) Actual: true Expected: false` - "a robot bought into a
+  building going up" - for several robots.
+- First make room, as the step's last bullet says and C4c, D1a and D2b did:
+  the test put `property` at 25739 of 25000, so `tests/HousingTests.cpp` was
+  split by topic. The three venue tests (`VenuePricesFollowDemand`,
+  `QuietVenuesClose`, `EmptyUnitsOpenAsVenuesInDemand`) and their `EmptyVenue`
+  helper moved verbatim to a new `tests/VenueTests.cpp`, which joins `sim/src/Units.cpp`
+  in a new `units` module - the way D1a split the fixture tests by era into
+  `saves-frozen`. `tests/CMakeLists.txt` gained the file, `scripts/context_budget.py`
+  the module, and `docs/MODULES.md` its row and the `Units.cpp` task row. The
+  same tests run: ctest went 188 to 189 only because of the new test.
+  `property` 23719 to 20920, `units` 15564.
+- No save change: `projects` shipped in v23 (D2a) and `lots` in v22 (D1a), so
+  no field, key, migration or fixture, and `Validation` needs nothing new. No
+  random draw is added: the skip filters the candidate list before the pick, so
+  the saved stream is untouched; the outcome moves, which is the point.
+- Checked: build, ctest 189/189 including ContextBudget. Simulation code changed,
+  so the headless check ran: seed 1, 10000 robots, 40 days `--quiet` in 245 s,
+  money equal to `created in all` with `destroyed 0` on all 40 days, and day 40
+  reading `created 696 today`, wages at 108%, 24 of 10000 out of work, 6003
+  vacant apartments, 17 empty units, `supplies 913905`, gini 503, 1068 broke
+  robots, 13 behind on rent - the numbers D2c2's note quotes. Compared against
+  the same run with the skip taken out: the two logs differ in one line only,
+  day 40's `economy:` line (corporations 2774180 and banks 435470 before,
+  2773680 and 435970 after: 500 credits of one mortgage), and the two saves
+  differ in 52 fields - five robots (22901, 23759, 24844, 25617, 31830) buy
+  rooms 37072 to 37076 of "Hab Block 36566", a habitat whose project was still
+  raising floors, instead of rooms 3943 to 3946 of the finished "Hab Block
+  42". Both runs' money adds up; the skip moved five sales in the reference
+  city and nothing else. That the end state of both runs shows no robot on a
+  site is only because those projects had finished by day 40.
 
 ### - [ ] D3. Builders (careers module)
 
