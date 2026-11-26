@@ -127,26 +127,29 @@ private:
         // Buildings face their street: plans are turned half way round when
         // the street is to the north.
         bool turned{false};
+        // Drawn as a scaffold of floor slabs, not a finished block: the
+        // building's project is still raising floors (task D).
+        bool scaffold{false};
     };
     struct Box {
         glm::vec3 minimum;
         glm::vec3 maximum;
     };
-    static constexpr std::size_t kNoUnit = static_cast<std::size_t>(-1);
     struct NeonSign {
         glm::vec3 position;
         glm::vec3 color;
         sim::EntityId building;
-        // The ground-floor unit whose sign it lights, or kNoUnit for a
-        // building's own sign.
-        std::size_t unit{kNoUnit};
+        // The ground-floor unit whose sign it lights, or none for a
+        // building's own sign. The room's id, not its place in `unitSigns_`,
+        // so adding and removing a building's signs cannot shift it.
+        sim::EntityId unit{};
     };
     struct Neon {
         std::size_t lightIndex;
         glm::vec3 color;
         sim::EntityId building;
         glm::vec3 position;
-        std::size_t unit{kNoUnit};
+        sim::EntityId unit{};
     };
     // A ground-floor unit's sign over its door.
     struct UnitSign {
@@ -299,8 +302,8 @@ private:
     // The spot a robot takes in `room`, which has `count` spots, at
     // `tick`: at home the bed by night and the sofa by day, elsewhere the
     // one it was given in that room on the open floor, else its favourite.
-    [[nodiscard]] bool UnitIsVenue(std::size_t unit) const;
-    [[nodiscard]] glm::vec3 UnitColor(std::size_t unit) const;
+    [[nodiscard]] bool UnitIsVenue(sim::EntityId room) const;
+    [[nodiscard]] glm::vec3 UnitColor(sim::EntityId room) const;
     void SubmitUnitSigns(RenderQueue& queue) const;
     // Numbers flatmates 0, 1, 2 by id for the frame, for their beds and seats.
     void IndexResidents(const WorldFrame& frame);
@@ -346,6 +349,19 @@ private:
     // Groups statics_ and the building blocks into batches by building,
     // or for the rest by area, mesh and material.
     void BuildStaticBatches();
+    // Draws one building the view has not drawn yet - a project raised one
+    // on a free plot (task D): its block or scaffold, facade and signs,
+    // batched under the building so they hide while it is open.
+    void AddBuilding(const sim::Building& building);
+    // Drops every static and sign of a building the view drew and the
+    // simulation no longer has.
+    void RemoveBuilding(sim::EntityId building);
+    // Appends the items just pushed into statics_ as batches owned by
+    // `building`. statics_ is empty outside the constructor and one AddBuilding.
+    void BatchStaticsFor(std::uint64_t building);
+    // The glowing panel of a sign, flat against the front wall and spanning
+    // x; its light hangs a little further out.
+    void AddSignPanel(glm::vec3 base, float width, float tall, glm::vec3 color);
 
     sim::City city_;
     sim::RoomIndex rooms_;

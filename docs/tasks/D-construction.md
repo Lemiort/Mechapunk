@@ -23,7 +23,9 @@ D3a shipped. D3c is done on 2026-11-26, also with no save change: that
 office has staff rules and is an opening, so a site going up gets
 builders. D3d is done on 2026-11-26, also with no save change: when a site's
 nights are up its builders are laid off and its office closes into an empty
-unit, which `ReviewUnits` may then reopen.
+unit, which `ReviewUnits` may then reopen. D4 is done on 2026-11-26, also
+with no save change: the view draws a building going up as a scaffold and
+takes it in when its project raises it.
 
 ## What and why
 
@@ -964,7 +966,7 @@ station or the most wanted venue.
   step: that city raises no site (its save has 0 projects and all 31 plots),
   so the step changes nothing where there is no site.
 
-### - [ ] D4. Drawing new buildings (view-core)
+### - [x] D4. Drawing new buildings (view-core)
 
 The static batches are built once (`CityStatic.cpp`). Add
 `CityView::AddBuilding` and `RemoveBuilding` that edit `staticBatches_`,
@@ -972,6 +974,49 @@ The static batches are built once (`CityStatic.cpp`). Add
 `UpdateCity` when `cityVersion` changes and buildings differ. A building
 under construction is a scaffold of thin boxes, one floor per
 `floorsDone`.
+
+Done as (view-core module, one commit): `CityView.cpp` gained
+`AddBuilding` and `RemoveBuilding` (declared in `CityView.hpp` beside
+`BuildStaticBatches`), and `CityStatic.cpp` a `BatchStaticsFor` that appends
+the items just pushed into `statics_` as batches owned by one building id,
+so a new building's statics hide with its block while it is open, exactly
+like the generated ones.
+
+- `AddBuilding` places the building where the constructor's loop would:
+  its slot is the number of *other* buildings at its entrance node, which
+  for a construction building is the corner its project consumed (D1a: a
+  node's buildings hold its first slots in id order, and a project takes
+  the node's lowest free corner), with the same far-ring rule past four.
+  A finished one gets the block (`buildingBlocks_`), the facade, the big
+  street-side sign and a unit sign per ground-floor unit, as generated
+  buildings do.
+- A building under construction — one whose rooms include a `SiteOffice`
+  (the kind exists only while its project is up, D3d) — is drawn as a
+  scaffold instead: one thin `kConcrete` slab per finished floor at
+  `kSlabMeters`, no block, no facade, no signs. `BuildingShape` gained a
+  `scaffold` flag so `UpdateCity` can tell what it drew: it diffs every
+  building against `shapes_` and redraws (remove + add) those whose floors
+  count or scaffold flag moved — a site therefore regrows its scaffold
+  every night it raises a floor, and becomes a finished building the
+  midnight its project ends. Buildings the simulation no longer has are
+  dropped by id.
+- Signs: `NeonSign.unit` and `Neon.unit` changed from an index into
+  `unitSigns_` to the unit's room id, because `RemoveBuilding` erasing
+  unit signs would otherwise shift every later index and light the wrong
+  rooms; `UnitIsVenue`/`UnitColor` read the room through `rooms_` now, and
+  the constructor's sign-panel lambda became the shared `AddSignPanel`.
+- What the step left open, and what was chosen: a new building's neon
+  signs glow by their material but get no point light — `AddLights` runs
+  once at startup and the step does not ask to move lights; the user
+  sees the difference in game.
+- No save change, no simulation change: only `app/` files moved, so
+  `mechapunk-sim.exe` was not relinked and the headless log and save
+  cannot move (as in D1b). No new source file, so `scripts/context_budget.py`
+  is unchanged; `docs/MODULES.md` gained the view-core size (18320 to
+  20971 of 25000) and the new functions' rows.
+- ctest: 194/194 including ContextBudget (no new test: the view needs a
+  live renderer and GL context, so it is checked by building, by
+  ContextBudget and by the user in the game, per the guide).
 
 ### - [ ] D5. Construction details (inspector, statistics)
 

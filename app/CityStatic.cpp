@@ -105,6 +105,32 @@ void CityView::BuildStaticBatches() {
     statics_.shrink_to_fit();
 }
 
+// Appends the items just pushed into statics_ as batches owned by `building`,
+// so they hide with its block while it is open. Unlike BuildStaticBatches this
+// runs after the constructor, one building at a time (task D, step D4).
+void CityView::BatchStaticsFor(std::uint64_t building) {
+    struct Group {
+        const Mesh* mesh;
+        std::shared_ptr<const Material> material;
+        std::vector<Transform> transforms;
+    };
+    std::map<std::pair<const Mesh*, const Material*>, Group> groups;
+    for (const StaticItem& item : statics_) {
+        Group& group = groups[{item.mesh, item.material.get()}];
+        group.mesh = item.mesh;
+        group.material = item.material;
+        group.transforms.push_back(item.transform);
+    }
+    for (auto& [key, group] : groups) {
+        staticBatches_.push_back(
+            {.building = building,
+             .batch = MeshBatch(*group.mesh, gsl_lite::not_null{group.material},
+                                group.transforms)});
+    }
+    statics_.clear();
+    statics_.shrink_to_fit();
+}
+
 void CityView::AddPark(vec3 center, sim::Pcg32& random) {
     const std::shared_ptr<const Material> grass = assets_.palette->Get(kGrass);
     const std::shared_ptr<const Material> path = assets_.palette->Get(kPavement);

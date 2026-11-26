@@ -29,7 +29,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | saves-frozen | 14k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 12k | `World.hpp`, `main.cpp` |
-| view-core | 18k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
+| view-core | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
 | view-robots | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
 | view-interiors | 11k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
@@ -93,8 +93,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | --- | --- |
 | `SimulationHost` | Runs the World on a worker thread; publishes an immutable `WorldFrame` after each step: `RobotFrame`s, shared `RobotSocial`, `RobotDirectory`, `EconomyFrame` (organizations, loans, emissions, history, room owners; refreshed every 10 minutes), and `city` + `cityVersion` when rooms changed. |
 | `CityView.hpp` | The `CityView` class: everything drawn |
-| `CityView.cpp` | Construction, `UpdateCity`, `Submit` (the frame: robots, signs, trains, interior), picking, routes |
-| `CityStatic.cpp` | Static batches: buildings, facades, parks, street lamps |
+| `CityView.cpp` | Construction, `UpdateCity` (redrawing buildings a project raised or dropped, `AddBuilding`/`RemoveBuilding`), `Submit` (the frame: robots, signs, trains, interior), picking, routes |
+| `CityStatic.cpp` | Static batches: buildings, facades, parks, street lamps, and the batches of one new building (`BatchStaticsFor`) |
 | `CityMetro.cpp` | Elevated lines, stations, stairs, platforms, trains, doors, `LegsOf`, `StationRoute` |
 | `CityRobots.cpp` | Spots in rooms, ways out of rooms, `RobotPosition`, `FollowWalk` |
 | `CityDrivers.cpp` | Metro drivers: `PlanDriver`, `DriverPlacement`, `CabOf` |

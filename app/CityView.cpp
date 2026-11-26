@@ -48,6 +48,18 @@ constexpr vec3 kWorkplaceNeon{1.0F, 0.2F, 0.8F};
 
 constexpr vec3 kGlassColor{0.6F, 0.8F, 0.92F};
 
+// A building whose project is still raising floors: its ground floor holds
+// the site office, a room kind that exists only while the project is up
+// (task D, step D3d closes it into an ordinary unit).
+bool IsSite(const sim::Building& building) {
+    for (const sim::Room& room : building.rooms) {
+        if (room.kind == sim::RoomKind::SiteOffice) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Quadrants around an intersection: (+x,+z), (-x,+z), (+x,-z), (-x,-z).
 constexpr std::array<vec2, 4> kQuadrants{vec2{1.0F, 1.0F}, vec2{-1.0F, 1.0F},
                                          vec2{1.0F, -1.0F}, vec2{-1.0F, -1.0F}};
@@ -135,17 +147,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
         // A sign high on the street side, and one per store at street level
         // above its door.
         const float front = shape.turned ? -1.0F : 1.0F;
-        // The glowing panel of a sign, flat against the front wall and
-        // spanning x; its light hangs a little further out.
-        const auto signPanel = [&](vec3 base, float width, float tall, vec3 color) {
-            statics_.push_back(
-                {.mesh = assets_.cube.get(),
-                 .transform = {.position = base,
-                               .rotationDegrees = vec3(0.0F),
-                               .scale = {width, tall, 0.15F * kS}},
-                 .material = assets_.palette->GetGlowing(color, color * kGlow)});
-        };
-        signPanel(centerOnGround +
+        AddSignPanel(centerOnGround +
                       vec3{0.0F, (height * 0.6F) - (0.7F * kS),
                            front * ((kBuildingDepth * 0.5F) + (0.075F * kS))},
                   kBuildingWidth * 0.45F, 1.4F * kS,
@@ -176,7 +178,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
             neonSigns_.push_back({.position = unitSigns_.back().light,
                                   .color = vec3(0.0F),
                                   .building = building.id,
-                                  .unit = unitSigns_.size() - 1});
+                                  .unit = units[index]->id});
         }
     }
     for (const sim::Building& building : city_.buildings) {
@@ -219,19 +221,22 @@ float CityView::DaylightAt(double minuteOfDay) {
     return Smoothstep(-0.1F, 0.25F, SunHeight(minuteOfDay));
 }
 
-bool CityView::UnitIsVenue(std::size_t unit) const {
-    const auto room = rooms_.Find(unitSigns_.at(unit).room);
-    return room && KindHasNeonSign(room->room->kind);
+bool CityView::UnitIsVenue(sim::EntityId room) const {
+    const auto found = rooms_.Find(room);
+    return found && KindHasNeonSign(found->room->kind);
 }
 
-vec3 CityView::UnitColor(std::size_t unit) const {
-    const auto room = rooms_.Find(unitSigns_.at(unit).room);
-    return room && KindHasNeonSign(room->room->kind) ? StoreNeon(room->room->kind) : vec3(0.0F);
+vec3 CityView::UnitColor(sim::EntityId room) const {
+    const auto found = rooms_.Find(room);
+    return found && KindHasNeonSign(found->room->kind) ? StoreNeon(found->room->kind) : vec3(0.0F);
 }
 
 void CityView::UpdateCity(const sim::City& city) {
-    // Only rooms change: their kinds, names, owners and sizes. The index
-    // and every plan of a floor follow.
+    // Rooms change all the time: their kinds, names, owners and sizes. The
+    // index and every plan of a floor follow. Buildings appear when a
+    // project raises one (task D): redraw those whose drawn shape no longer
+    // matches - new, taller, scaffold turned finished - and drop any the
+    // simulation no longer has.
     city_.buildings = city.buildings;
     rooms_ = sim::RoomIndex(city_);
     plans_.clear();
@@ -239,6 +244,151 @@ void CityView::UpdateCity(const sim::City& city) {
     assignedSpots_.clear();
     crewLines_.clear();
     driverPlans_.clear();
+    for (const sim::Building& building : city_.buildings) {
+        const bool site = IsSite(building);
+        const auto drawn = shapes_.find(building.id.value);
+        if (drawn != shapes_.end() && drawn->second.floors == building.floors &&
+            drawn->second.scaffold == site) {
+            continue;
+        }
+        RemoveBuilding(building.id);
+        AddBuilding(building);
+    }
+    std::vector<std::uint64_t> gone;
+    for (const auto& [id, shape] : shapes_) {
+        if (city_.FindBuilding(sim::EntityId{id}) == nullptr) {
+            gone.push_back(id);
+        }
+    }
+    for (const std::uint64_t id : gone) {
+        RemoveBuilding(sim::EntityId{id});
+    }
+}
+
+// Draws one building the view has not drawn yet: a habitat or workplace a
+// project raised on a free plot. It takes the corner its project consumed -
+// the slot after the node's other buildings, which are all older ids and so
+// stand before it in the saved order - exactly where the constructor's
+// placement loop would put it.
+void CityView::AddBuilding(const sim::Building& building) {
+    std::uint32_t slot = 0;
+    for (const sim::Building& other : city_.buildings) {
+        if (other.entrance == building.entrance && other.id != building.id) {
+            ++slot;
+        }
+    }
+    const vec2 quadrant = kQuadrants.at(slot % kQuadrants.size());
+    // A fifth building at one corner moves to the far side of the block.
+    const float ring = slot < kQuadrants.size() ? 1.0F : 3.0F;
+    const vec3 centerOnGround =
+        NodePosition(building.entrance) +
+        vec3{quadrant.x * kQuadrantOffset.x * ring, 0.0F,
+             quadrant.y * kQuadrantOffset.y * ring};
+    const bool site = IsSite(building);
+    const float height = static_cast<float>(building.floors) * kFloorHeight;
+    shapes_[building.id.value] = {.center = centerOnGround,
+                                  .height = height,
+                                  .floors = building.floors,
+                                  // The street is to the north (-z) when the
+                                  // building sits south of its intersection.
+                                  .turned = quadrant.y > 0.0F,
+                                  .scaffold = site};
+    if (site) {
+        // A building going up is a scaffold: one thin slab per finished
+        // floor, no block, no facade and no signs until its project ends.
+        for (std::uint32_t floor = 0; floor < building.floors; ++floor) {
+            const float base = static_cast<float>(floor) * kFloorHeight;
+            AddStaticBox(centerOnGround +
+                             vec3{-kBuildingWidth * 0.5F, base, -kBuildingDepth * 0.5F},
+                         centerOnGround +
+                             vec3{kBuildingWidth * 0.5F,
+                                  base + (kSlabMeters * kS), kBuildingDepth * 0.5F},
+                         kConcrete);
+        }
+        BatchStaticsFor(building.id.value);
+        return;
+    }
+    const bool habitat = building.kind == sim::BuildingKind::Habitat;
+    buildingBlocks_.emplace(
+        building.id.value,
+        StaticItem{.mesh = assets_.cube.get(),
+                   .transform = {.position = centerOnGround,
+                                 .rotationDegrees = vec3(0.0F),
+                                 .scale = {kBuildingWidth, height, kBuildingDepth}},
+                   .material = habitat ? assets_.habitat : assets_.workplace});
+    const BuildingShape& shape = shapes_.at(building.id.value);
+    const float front = shape.turned ? -1.0F : 1.0F;
+    AddSignPanel(centerOnGround +
+                     vec3{0.0F, (height * 0.6F) - (0.7F * kS),
+                          front * ((kBuildingDepth * 0.5F) + (0.075F * kS))},
+                 kBuildingWidth * 0.45F, 1.4F * kS,
+                 habitat ? kHabitatNeon : kWorkplaceNeon);
+    neonSigns_.push_back(
+        {.position = centerOnGround +
+                     vec3{0.0F, height * 0.6F,
+                          front * ((kBuildingDepth * 0.5F) + (2.5F * kS))},
+         .color = habitat ? kHabitatNeon : kWorkplaceNeon,
+         .building = building.id});
+    // A sign over the door of each ground-floor unit, lit while it is a
+    // venue; units open and close, so these are drawn every frame.
+    std::vector<const sim::Room*> units;
+    for (const sim::Room& room : building.rooms) {
+        if (room.floor == 0) {
+            units.push_back(&room);
+        }
+    }
+    const float unitWidth =
+        21.0F / static_cast<float>(std::max<std::size_t>(units.size(), 1));
+    for (std::size_t index = 0; index < units.size(); ++index) {
+        const float x = -8.0F + (unitWidth * (static_cast<float>(index) + 0.5F));
+        unitSigns_.push_back(
+            {.room = units[index]->id,
+             .panel = ToWorld(shape, 0, {x, 2.6F, (kFootprintDepthMeters * 0.5F) + 0.075F}),
+             .width = std::min(unitWidth - 1.0F, 3.0F) * kS,
+             .light = ToWorld(shape, 0, {x, 2.9F, (kFootprintDepthMeters * 0.5F) + 2.0F})});
+        neonSigns_.push_back({.position = unitSigns_.back().light,
+                              .color = vec3(0.0F),
+                              .building = building.id,
+                              .unit = units[index]->id});
+    }
+    AddFacade(centerOnGround, kBuildingWidth, kBuildingDepth, building.floors);
+    BatchStaticsFor(building.id.value);
+    // The block itself, batched under the building so it hides while it is
+    // open, as BuildStaticBatches batches the generated ones.
+    const std::array<Transform, 1> blockTransforms{
+        buildingBlocks_.at(building.id.value).transform};
+    staticBatches_.push_back(
+        {.building = building.id.value,
+         .batch = MeshBatch(*assets_.cube.get(),
+                            gsl_lite::not_null{habitat ? assets_.habitat
+                                                      : assets_.workplace},
+                            blockTransforms)});
+}
+
+void CityView::RemoveBuilding(sim::EntityId building) {
+    shapes_.erase(building.value);
+    buildingBlocks_.erase(building.value);
+    std::erase_if(staticBatches_, [id = building.value](const StaticBatch& batch) {
+        return batch.building == id;
+    });
+    std::erase_if(neonSigns_, [building](const NeonSign& sign) {
+        return sign.building == building;
+    });
+    // A unit sign names its room; the room is gone with the building, so
+    // either it still resolves to this building or it resolves to nothing.
+    std::erase_if(unitSigns_, [this, building](const UnitSign& sign) {
+        const auto room = rooms_.Find(sign.room);
+        return !room || room->building->id == building;
+    });
+}
+
+void CityView::AddSignPanel(vec3 base, float width, float tall, vec3 color) {
+    statics_.push_back(
+        {.mesh = assets_.cube.get(),
+         .transform = {.position = base,
+                       .rotationDegrees = vec3(0.0F),
+                       .scale = {width, tall, 0.15F * kS}},
+         .material = assets_.palette->GetGlowing(color, color * kGlow)});
 }
 
 void CityView::IndexResidents(const WorldFrame& frame) {

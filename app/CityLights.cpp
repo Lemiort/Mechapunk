@@ -147,7 +147,7 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
     neonPositions.reserve(neons_.size());
     for (const Neon& sign : neons_) {
         // Units that are no venue now keep their light far underground.
-        const bool dark = sign.unit != kNoUnit && !UnitIsVenue(sign.unit);
+        const bool dark = sign.unit.IsValid() && !UnitIsVenue(sign.unit);
         neonPositions.push_back(dark ? vec3{0.0F, kHiddenDepth, 0.0F} : sign.position);
     }
     const std::vector<float> neonWeights =
@@ -157,7 +157,7 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
         if (sign.lightIndex < points.size()) {
             const bool inspected = selection.building.IsValid() &&
                                    sign.building == selection.building;
-            const vec3 color = sign.unit == kNoUnit ? sign.color : UnitColor(sign.unit);
+            const vec3 color = sign.unit.IsValid() ? UnitColor(sign.unit) : sign.color;
             points[sign.lightIndex].SetPos(neonPositions[index]);
             points[sign.lightIndex].SetColor(
                 inspected ? vec3(0.0F) : color * neon * neonWeights[index]);
