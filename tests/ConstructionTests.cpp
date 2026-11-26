@@ -1,9 +1,10 @@
-// Tests for steps D2b and D2b2 of docs/tasks/D-construction.md: `World::ReviewConstruction`
+// Tests for steps D2b, D2b2 and D3b of docs/tasks/D-construction.md: `World::ReviewConstruction`
 // (sim/src/Construction.cpp) pays a site its supplies, raises one floor a night,
 // ends the project when its nights are up, and starts a habitat when the
 // market's homes have stood under a quarter empty for seven nights, or a
 // workplace when over 5 per cent of the robots have been out of work for
-// seven nights.
+// seven nights. A site started this way has its site office on the ground
+// floor, owned by the project's owner.
 
 #include <gtest/gtest.h>
 
@@ -198,6 +199,17 @@ constexpr std::int64_t kUnemploymentPercent = 5;
     return nullptr;
 }
 
+// The site office of a building going up: the one room of kind `SiteOffice`
+// `startSite` (Construction.cpp) puts on its ground floor.
+[[nodiscard]] const sim::Room* SiteOffice(const sim::Building& building) {
+    for (const sim::Room& room : building.rooms) {
+        if (room.kind == sim::RoomKind::SiteOffice) {
+            return &room;
+        }
+    }
+    return nullptr;
+}
+
 // The plot nearest the middle of the grid, the way Construction.cpp picks
 // one: the mean of the node coordinates, and the saved order of the plots
 // breaks a tie.
@@ -242,7 +254,9 @@ TEST(Construction, HomesShortRaisesAHabitat) {
     EXPECT_EQ(site->daysLeft, 6U) << "six floors above the ground floor";
     EXPECT_EQ(site->floorsDone, 1U) << "the ground floor stands from the first night";
     EXPECT_EQ(building->floors, 1U);
-    EXPECT_TRUE(building->rooms.empty()) << "the site office comes with step D3";
+    // The ground floor is the site office, and nothing else (step D3b).
+    ASSERT_EQ(building->rooms.size(), 1U) << "the site office is the ground floor";
+    EXPECT_EQ(building->rooms.front().kind, sim::RoomKind::SiteOffice);
 
     // The home is owned by the housing trust, the homes nobody else owns.
     const sim::Organization* owner = OrganizationWithId(state, site->owner);
@@ -258,6 +272,47 @@ TEST(Construction, HomesShortRaisesAHabitat) {
     EXPECT_TRUE(WorkplaceSite(state) == nullptr) << "jobs are not short in this city";
 }
 
+TEST(Construction, AStartedSiteHasASiteOffice) {
+    // The ground floor of a building going up is its site office: the builders'
+    // room, on floor 0, owned by the site's owner, asking no rent (step D3b).
+    sim::World world = sim::World::Generate({.seed = 5, .robots = 1000});
+    const sim::Project* site = RunUntilSiteOf(world, 40, sim::BuildingKind::Habitat);
+    ASSERT_TRUE(site != nullptr) << "no habitat site in 40 days";
+    const sim::EntityId home = site->building;
+    const sim::EntityId owner = site->owner;
+    const sim::WorldState& state = world.State();
+    const sim::Building* building = BuildingWithId(state, home);
+    ASSERT_TRUE(building != nullptr);
+    const sim::Room* office = SiteOffice(*building);
+    ASSERT_TRUE(office != nullptr) << "the site has no office";
+    EXPECT_EQ(office->floor, 0U) << "the office is on the ground floor";
+    EXPECT_EQ(office->name, "Site Office");
+    EXPECT_EQ(office->owner, owner) << "the site's owner owns its office";
+    EXPECT_GT(office->capacity, 0U) << "a room of builders has places";
+    EXPECT_EQ(office->rent, 0U) << "nobody is charged for an office";
+    EXPECT_EQ(std::ranges::count_if(building->rooms,
+                                    [](const sim::Room& room) {
+                                        return room.kind == sim::RoomKind::SiteOffice;
+                                    }),
+              1)
+        << "one office per site";
+    EXPECT_TRUE(sim::ValidateWorldState(state).has_value())
+        << sim::ValidateWorldState(state).error();
+
+    // One night more: the floors above go up, and the office stays an office.
+    // `ReviewUnits` (Units.cpp) branches its ground-floor loop by kind, so it
+    // neither counts the site's quiet nights nor reopens its rooms.
+    world.RunFor(sim::kMinutesPerDay);
+    building = BuildingWithId(world.State(), home);
+    ASSERT_TRUE(building != nullptr);
+    EXPECT_EQ(building->floors, 2U);
+    office = SiteOffice(*building);
+    ASSERT_TRUE(office != nullptr) << "the office stands while the site goes up";
+    EXPECT_EQ(office->kind, sim::RoomKind::SiteOffice);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()).has_value())
+        << sim::ValidateWorldState(world.State()).error();
+}
+
 TEST(Construction, GrowsOneFloorPerNightAndEndsWhenDone) {
     sim::World world = sim::World::Generate({.seed = 5, .robots = 1000});
     const sim::Project* site = RunUntilSiteOf(world, 40, sim::BuildingKind::Habitat);
@@ -269,13 +324,20 @@ TEST(Construction, GrowsOneFloorPerNightAndEndsWhenDone) {
     const sim::Building* building = BuildingWithId(world.State(), home);
     ASSERT_TRUE(building != nullptr);
     EXPECT_EQ(building->floors, 2U);
-    EXPECT_EQ(building->rooms.size(), 6U) << "six studios on a low floor";
+    EXPECT_EQ(building->rooms.size(), 7U) << "the office and six studios";
+    int homes = 0;
     for (const sim::Room& room : building->rooms) {
-        EXPECT_EQ(room.floor, 1U) << "the new floor, and no room on the ground";
+        if (room.kind == sim::RoomKind::SiteOffice) {
+            EXPECT_EQ(room.floor, 0U) << "the office is on the ground floor";
+            continue;
+        }
+        EXPECT_EQ(room.floor, 1U) << "the new floor";
         EXPECT_TRUE(room.owner.IsValid());
         EXPECT_NE(room.apartmentClass, sim::ApartmentClass::None);
         EXPECT_GT(room.rent, 0U);
+        ++homes;
     }
+    EXPECT_EQ(homes, 6) << "six studios on a low floor";
     const auto going = std::ranges::find_if(
         world.State().projects, [home](const sim::Project& each) {
             return each.building == home;
@@ -303,9 +365,11 @@ TEST(Construction, GrowsOneFloorPerNightAndEndsWhenDone) {
     std::vector<std::uint32_t> homesPerFloor(building->floors, 0);
     for (const sim::Room& room : building->rooms) {
         ASSERT_LT(room.floor, building->floors);
-        ++homesPerFloor[room.floor];
+        if (room.kind == sim::RoomKind::Apartment) {
+            ++homesPerFloor[room.floor];
+        }
     }
-    EXPECT_EQ(homesPerFloor[0], 0U) << "the site office comes with step D3";
+    EXPECT_EQ(homesPerFloor[0], 0U) << "the ground floor holds the office, not homes";
     for (std::size_t floor = 1; floor != homesPerFloor.size(); ++floor) {
         EXPECT_GT(homesPerFloor[floor], 0U) << "floor " << floor;
     }
@@ -383,7 +447,8 @@ TEST(Construction, JobsShortRaisesAWorkplace) {
     EXPECT_EQ(building->kind, sim::BuildingKind::Workplace);
     EXPECT_EQ(site->daysLeft, 4U) << "four floors above the ground floor";
     EXPECT_EQ(building->floors, 1U);
-    EXPECT_TRUE(building->rooms.empty());
+    ASSERT_EQ(building->rooms.size(), 1U) << "the ground floor is the site office";
+    EXPECT_EQ(building->rooms.front().kind, sim::RoomKind::SiteOffice);
 
     // The jobs belong to a corporation of industry.
     const sim::Organization* employer = OrganizationWithId(state, owner);
@@ -405,12 +470,19 @@ TEST(Construction, JobsShortRaisesAWorkplace) {
     building = BuildingWithId(made->State(), workplace);
     ASSERT_TRUE(building != nullptr);
     EXPECT_EQ(building->floors, 2U);
-    EXPECT_FALSE(building->rooms.empty());
+    EXPECT_EQ(building->rooms.size(), 3U) << "the office and two workspaces";
+    int workspaces = 0;
     for (const sim::Room& room : building->rooms) {
+        EXPECT_EQ(room.owner, owner) << "the site's owner owns its rooms";
+        if (room.kind == sim::RoomKind::SiteOffice) {
+            EXPECT_EQ(room.floor, 0U) << "the office stays on the ground floor";
+            continue;
+        }
         EXPECT_EQ(room.kind, sim::RoomKind::Workspace);
         EXPECT_GT(room.capacity, 0U);
-        EXPECT_EQ(room.owner, owner);
+        ++workspaces;
     }
+    EXPECT_EQ(workspaces, 2) << "two workspaces on the floor above";
 }
 
 TEST(Construction, JobsNotShortLeavesNoWorkplace) {
@@ -458,7 +530,8 @@ TEST(Construction, ASiteTakesTheFreePlotNearestTheMiddle) {
         }
         ++raised;
         EXPECT_EQ(building.floors, 1U) << "the building stands from the first night";
-        EXPECT_TRUE(building.rooms.empty());
+        ASSERT_EQ(building.rooms.size(), 1U) << "its ground floor is the site office";
+        EXPECT_EQ(building.rooms.front().kind, sim::RoomKind::SiteOffice);
     }
     EXPECT_GT(raised, 0);
 
@@ -488,10 +561,17 @@ TEST(Construction, KeepsTheCityValidAndSavable) {
         ASSERT_TRUE(building != nullptr) << project.building.value;
         EXPECT_GE(building->floors, project.floorsDone);
         EXPECT_GT(project.daysLeft, 0U) << "a finished site is dropped";
+        int offices = 0;
         for (const sim::Room& room : building->rooms) {
-            EXPECT_GT(room.floor, 0U);
             EXPECT_EQ(room.owner, project.owner) << "the site's owner owns its rooms";
+            if (room.kind == sim::RoomKind::SiteOffice) {
+                EXPECT_EQ(room.floor, 0U) << "the office is on the ground floor";
+                ++offices;
+                continue;
+            }
+            EXPECT_GT(room.floor, 0U) << "homes and workspaces are above it";
         }
+        EXPECT_EQ(offices, 1) << "every site going up has its office";
     }
     EXPECT_TRUE(sim::ValidateWorldState(state).has_value())
         << sim::ValidateWorldState(state).error();

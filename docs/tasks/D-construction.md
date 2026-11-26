@@ -17,7 +17,9 @@ a robot buys is a finished one, which needed the `property` module split (its
 venue tests moved to a new `units` module) to make room for the test. D3
 split on 2026-11-26 into D3a to D3d; D3a is done and raised the save
 version to 24. Save change. The biggest remaining task: take it slowly,
-one step per module.
+one step per module. D3b is done on 2026-11-26 with no save change: a
+building going up gets its site office on the ground floor, the kind
+D3a shipped.
 
 ## What and why
 
@@ -693,7 +695,7 @@ Done as (generation + saves, one commit): `City.hpp`'s `RoomKind` gains
   Money adds up on all 40 days (`money` equal to `created in all`,
   `destroyed 0` every day).
 
-### - [ ] D3b. The site office room in a new building (construction)
+### - [x] D3b. The site office room in a new building (construction)
 
 Open: `Construction.cpp` (`startSite`), `ConstructionTests.cpp`.
 
@@ -705,6 +707,71 @@ Open: `Construction.cpp` (`startSite`), `ConstructionTests.cpp`.
   room alone — checked, no D3b2 for `Units.cpp` is needed.
 - Tests: a started site has the office on floor 0 of its building,
   owned by the project's owner, and the city stays valid.
+
+Done as (construction module, one commit): `startSite` pushes the office
+onto the building before it goes into `City::buildings`: kind `SiteOffice`,
+name "Site Office", floor 0, capacity `kSiteBuilders`, owner the project's
+owner; its rent is the aggregate's 0, which the new test reads back. The
+room id is allocated just after the building's, so the building's rooms
+stay sorted by id and `ValidateWorldState`'s id rules hold.
+
+- What the step left open, and what was chosen: "a capacity of builders"
+  names no number, so `Construction.cpp` sets `kSiteBuilders` to 6 - a
+  crew of six, the jobs step D3c gives out through the kind's staff rules.
+  Until D3c lands nobody works there: `FindStaffRules` (Venues.cpp) has
+  no entry for `SiteOffice`, so `JobsAt` is 0 and `OpeningsFor` offers
+  nothing, and the capacity only has to be the non-zero number
+  `ValidateWorldState` asks of every room.
+- The step's claim about `ReviewUnits` was checked, not assumed: its
+  ground-floor loop (Units.cpp:220) branches `IsVenue`, then `Workspace`,
+  then `VacantStore`, and a `SiteOffice` room matches none of the three,
+  so it neither counts a site's quiet nights nor reopens its rooms. No
+  D3b2 for `Units.cpp`.
+- Five D2b and D2b2 tests asserted a site's ground floor is empty, which
+  this step makes false, and now read the office instead: `HomesShortRaisesAHabitat`
+  and `JobsShortRaisesAWorkplace` expect one room of kind `SiteOffice`
+  in a site's first night; `GrowsOneFloorPerNightAndEndsWhenDone` counts
+  7 rooms after a night (the office and six studios) and counts homes
+  per floor over apartments only; `ASiteTakesTheFreePlotNearestTheMiddle`
+  expects the office in every new building; `KeepsTheCityValidAndSavable`
+  asks every site going up for exactly one office on floor 0 and its
+  homes and workspaces above it.
+- New test `AStartedSiteHasASiteOffice`: floor 0, the name, the owner
+  equal to the project's owner, capacity above 0, rent 0, exactly one
+  office in the building, `ValidateWorldState` after; then one night
+  more, where the floor above went up, the office is still a
+  `SiteOffice` room, and the city validates again.
+- No save change: `SiteOffice` shipped in v24 (D3a), `projects` in v23
+  (D2a) and `lots` in v22 (D1a), so no field, key, migration or fixture,
+  and `Validation` needs nothing new - a room is checked by floor,
+  capacity and id, not by a kind table. No random draw is added.
+- The step moves the entity-id stream: every site allocates one room id
+  more, so the newcomers and gangs created later get different ids, and
+  `ShiftSlot` (Venues.cpp) reads a robot's id. The reference city's story
+  therefore moves, and one population test could not tell a rap sheet
+  that fits from one trimmed to fit: `Social.KeepsItsRapSheetAsLongAsItFits`
+  counted a robot with exactly 12 crime memories as "fits", but at the
+  cap the oldest crime - its arrest - is legitimately gone. Its bound is
+  now `crimes < 12`, which is what its own comment and name already
+  meant; the guide's "leave margin" pitfall. Nothing in `Social.cpp`
+  changed.
+- Budget: `construction` 18653 to 20694 of 25000, `social` 20754 to
+  20857; `docs/MODULES.md` gained the new size and says the file also
+  raises the office. ctest: 192/192 including ContextBudget (191 before,
+  +1 new test).
+- Simulation code changed, so the headless check ran: seed 1, 10000
+  robots, 40 days `--quiet` in 255 s, money equal to `created in all`
+  with `destroyed 0` on all 40 days, day 40 reading `created 2194 today`,
+  wages at 108%, 6005 vacant apartments, 22 empty units, supplies 919058,
+  gini 504, 1080 broke robots, 10 behind on rent - the shape D2c3's note
+  quotes (created 696, wages at 108%, 6003 vacant, 17 empty units,
+  supplies 913905, gini 503, 1068 broke, 13 behind), the sites' offices
+  added to it. Its save holds 9 `siteOffice` rooms, 6 projects still
+  going up and 41 of the city's 50 plots - the same 9 sites D2c's note
+  counted, each now with its office. And the seed 7, 2000 robots, 6 days
+  `--all --save` run is byte for byte the same log and save as before
+  this step: that city raises no site, so the step changes nothing where
+  there is no site.
 
 ### - [ ] D3c. Builders: jobs at the site office while the project is up (careers)
 

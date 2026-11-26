@@ -28,11 +28,17 @@ constexpr std::size_t kStreakNights = 7;
 
 // Floors a new site raises above its ground floor, one of them a night, so
 // `daysLeft` is also the floors still to come. The ground floor stands from
-// the first night and holds nothing until step D3 puts the site office in
-// it; that keeps `ReviewUnits`, which only works on ground-floor units,
-// away from a site.
+// the first night and holds only the site office (step D3b): `ReviewUnits`,
+// which only works on ground-floor units, branches that loop by kind - a venue,
+// a workspace, an empty unit - and so leaves the office alone.
 constexpr std::uint32_t kHabitatFloors = 6;
 constexpr std::uint32_t kWorkplaceFloors = 4;
+
+// Builders a site's office holds: the crew that raises its floors while the
+// project is up, the jobs step D3c gives out. Until that step lands nobody
+// works there, and the capacity only has to be the non-zero number
+// `ValidateWorldState` asks of every room.
+constexpr std::uint32_t kSiteBuilders = 6;
 
 // Credits a night the site asks for. `PaySupplies` (Money.cpp) moves the
 // owner's sector's share of them into the supply market: half for the
@@ -156,7 +162,8 @@ void World::ReviewConstruction() {
     };
 
     // Starts a site: the building stands from the first night on the plot
-    // the project consumes, and `daysLeft` nights raise its floors.
+    // the project consumes, its ground floor is the site office, and `daysLeft`
+    // nights raise the floors above it.
     const auto startSite = [this, &nearestLot](BuildingKind kind, EntityId owner,
                                                std::uint32_t floors,
                                                std::string_view prefix) {
@@ -175,6 +182,18 @@ void World::ReviewConstruction() {
             .shift = kind == BuildingKind::Workplace ? kSiteShift : Shift{},
             .rooms = {},
         };
+        // The office of the site: the builders' room, owned by the site's
+        // owner like its floors, asking no rent because nobody is charged
+        // for an office. It is the only room on the ground floor, and
+        // `ReviewUnits` (Units.cpp) leaves a room of its kind alone.
+        building.rooms.push_back({
+            .id = state_.ids.Allocate(),
+            .name = "Site Office",
+            .kind = RoomKind::SiteOffice,
+            .floor = 0,
+            .capacity = kSiteBuilders,
+            .owner = owner,
+        });
         // The new id is the highest there is, so both lists stay sorted.
         state_.city.buildings.push_back(std::move(building));
         state_.city.lots.erase(state_.city.lots.begin() +
