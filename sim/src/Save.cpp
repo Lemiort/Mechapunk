@@ -46,7 +46,8 @@ struct glz::meta<mechapunk::sim::RoomKind> {
         "apartment", Apartment, "workspace", Workspace, "bar", Bar, "diner",
         Diner, "chargingBay", ChargingBay, "repairShop", RepairShop, "arcade",
         Arcade, "shop", Shop, "clinic", Clinic, "blackMarket", BlackMarket, "vacantStore",
-        VacantStore, "policeStation", PoliceStation, "crewRoom", CrewRoom);
+        VacantStore, "policeStation", PoliceStation, "crewRoom", CrewRoom,
+        "siteOffice", SiteOffice);
 };
 template <>
 struct glz::meta<mechapunk::sim::ApartmentClass> {
@@ -206,6 +207,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 22,
               .summary = "buildings under construction",
               .apply = &migrations::V22ToV23},
+    Migration{.fromVersion = 23,
+              .summary = "the site office room kind of a building going up",
+              .apply = &migrations::V23ToV24},
 };
 }  // namespace
 

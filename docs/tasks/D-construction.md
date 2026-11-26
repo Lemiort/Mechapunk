@@ -14,8 +14,10 @@ rooms, and a site's ground floor is empty until D3. D2c2 is done on 2026-11-26,
 also with no save change: a newcomer's home is a finished one. D2c3 was added
 between D2c2 and D3 on 2026-11-26 and is done, also with no save change: a home
 a robot buys is a finished one, which needed the `property` module split (its
-venue tests moved to a new `units` module) to make room for the test.
-Save change. The biggest remaining task: take it slowly, one step per module.
+venue tests moved to a new `units` module) to make room for the test. D3
+split on 2026-11-26 into D3a to D3d; D3a is done and raised the save
+version to 24. Save change. The biggest remaining task: take it slowly,
+one step per module.
 
 ## What and why
 
@@ -609,10 +611,131 @@ workers, tenants and newcomers out of them.
   city and nothing else. That the end state of both runs shows no robot on a
   site is only because those projects had finished by day 40.
 
-### - [ ] D3. Builders (careers module)
+### D3. Builders — split on 2026-11-26
 
-A site office room in the new building: jobs like a workspace (`JobsAt`,
-`OpeningsFor`) until the project is done, then it becomes a vacant unit.
+The step names one module, but its one sentence lives in four: the room
+kind is `generation` (`City.hpp`) and a save change (`saves`, with the
+enum names in `Save.cpp`, as C1, D1a and D2a did); the room in the new
+building is `construction` (`Construction.cpp`'s `startSite`); the jobs
+are `careers` (`JobsAt` and the staff rules in Venues.cpp, `OpeningsFor`
+in Careers.cpp); and "then it becomes a vacant unit" is `construction`
+again (the review that ends the project). Cut into D3a to D3d, one module
+(plus `saves` for the format change) and one commit each, the original
+sentence living on inside them.
+
+### - [x] D3a. The site office as a saved room kind (generation + saves)
+
+Open: `City.hpp` (the `RoomKind` enum), `Save.hpp`, `Save.cpp` (the
+`glz::meta` of `RoomKind`, the migration list), `Migrations.hpp`, the end
+of `Migrations.cpp`, `SaveTests.cpp`, plus the fixture and its README row.
+
+- `RoomKind` gains `SiteOffice`, named `"siteOffice"` in `Save.cpp`:
+  save version 24, game 0.24.0.
+- `V23ToV24` adds no key and changes no value: no version 23 game ever
+  wrote a site office, so no room of an old save can have the kind, and
+  the bump is there because a version 24 save may name a kind a version
+  23 game cannot read.
+- Fixture `tests/fixtures/saves/v24-city.json` from the guide's command,
+  plus its row and a sentence in that folder's README.
+- `CurrentVersionFixtureLoadsAndRoundTrips` points at v24;
+  `Version23FixtureMigratesAndRuns` checks the v23 fixture text has no
+  `"siteOffice"`, so what loads is the migration's work; and a hand-edited
+  save with one room of kind `"siteOffice"` loads, validates and
+  serializes back — the new name read and written.
+- First make room, as D1a did: `saves` stands at 24440 of 25000, so
+  move the frozen migrations 9 to 17 verbatim from `Migrations.cpp`
+  into `MigrationsEarly.cpp` (the same era split) before adding to it.
+- No validation change: a room is checked by floor, capacity and id,
+  not by a kind table, and no robot works at a site office until D3c.
+
+Done as (generation + saves, one commit): `City.hpp`'s `RoomKind` gains
+`SiteOffice` after `CrewRoom`, `Save.cpp` names it `"siteOffice"`, and
+`Save.hpp` raises the save version to 24 and the game to 0.24.0.
+
+- `V23ToV24` (declared in `Migrations.hpp`, registered in `kMigrations`)
+  is the version number alone: no key is new, and no version 23 game ever
+  wrote a site office, so no room of an old save can name the kind and
+  there is nothing to change; the bump is there because a version 24 save
+  may name a kind a version 23 game cannot read.
+- First make room, as the step says and D1a did: `saves` stood at 24440
+  of 25000, so the frozen migrations `V9ToV10` to `V17ToV18` moved verbatim
+  from `Migrations.cpp` into `MigrationsEarly.cpp` - the same era split,
+  code moved only, no migration edited. `saves` 24440 to 20823,
+  `saves-frozen` 8658 to 13835; `docs/MODULES.md` gained the two sizes and
+  its rows now say "frozen migrations 1 to 18" and "migrations from
+  version 18 on", and the guide's state line says version 24, game 0.24.0.
+- Fixture `tests/fixtures/saves/v24-city.json` from the guide's command
+  (seed 33, 100 robots, 28370 minutes) at game 0.24.0, plus its row and
+  a sentence in that folder's README. The fixture ran with the nightly
+  review (D2b) and raised nothing: its projects list is empty and its
+  51 plots untouched, so `CurrentVersionFixtureLoadsAndRoundTrips` keeps
+  its checks - the projects comment now says the review ran and saw no
+  seven-night shortage - and adds that no room of it is a site office.
+- `Version23FixtureMigratesAndRuns` loads v23: it asserts the fixture
+  text has no `"siteOffice"`, so what loads is the migration's work,
+  and runs the city a day. `SiteOfficeRoomKindRoundTrips` edits a seed
+  3 / 10 robots save so one room no robot references - chosen by id
+  against the robots' apartment, workspace, location and destination,
+  since a visiting robot's room must keep its venue kind - reads
+  `"siteOffice"`: it deserializes, loads through `FromState`, and
+  serializing the loaded world names the kind again. What the step left
+  open: "serializes back" is checked as the written name, not whole-
+  string equality, because `EditSave` writes compact JSON while
+  `SerializeWorld` pretty-prints.
+- No new source file, so `scripts/context_budget.py` is unchanged;
+  `generation` 24469 to 24515 (the enum comment). ctest: 191/191
+  including ContextBudget (189 before, +2 new).
+- The bump changed no behaviour: the seed 1, 10000 robots, 40 days
+  `--quiet` log matched byte for byte except its own `Simulated ... in N
+  s` line, and the seed 7, 2000 robots, 6 days `--all` log is identical
+  and its save differs only in the version and game version lines -
+  compared as parsed JSON with those two removed, the saves are equal.
+  Money adds up on all 40 days (`money` equal to `created in all`,
+  `destroyed 0` every day).
+
+### - [ ] D3b. The site office room in a new building (construction)
+
+Open: `Construction.cpp` (`startSite`), `ConstructionTests.cpp`.
+
+- `startSite` puts one room on the ground floor: kind `SiteOffice`,
+  named "Site Office", a capacity of builders, owner the project's owner,
+  rent 0. D2b left the ground floor empty for exactly this step;
+  `ReviewUnits` (Units.cpp) branches its ground-floor loop by kind
+  (`IsVenue`, `Workspace`, `VacantStore`), so it leaves a `SiteOffice`
+  room alone — checked, no D3b2 for `Units.cpp` is needed.
+- Tests: a started site has the office on floor 0 of its building,
+  owned by the project's owner, and the city stays valid.
+
+### - [ ] D3c. Builders: jobs at the site office while the project is up (careers)
+
+Open: `Venues.cpp` (a `StaffRules` entry for the kind), `Careers.cpp`
+(`OpeningsFor`), `CareersTests.cpp`.
+
+- Staff rules for `SiteOffice` — a site's shift, wage and one shift —
+  so `JobsAt`, `JobShift` and `JobKey` read it the way they read a
+  venue's staff, and the site office of a habitat gets a real shift
+  where its building has none.
+- `OpeningsFor` adds the site offices' rooms, and the D2c skip
+  (`onSite`) exempts them: a `SiteOffice` room exists only while its
+  project is going up (D3d turns it into a vacant unit when the project
+  ends), so the skip must not swallow the builders' jobs.
+- Tests: a city with a site going up gets builders there, and the
+  site's other rooms still take no workers.
+
+### - [ ] D3d. A finished site's office becomes a vacant unit (construction)
+
+Open: `Construction.cpp` (the review's end-of-project step),
+`ConstructionTests.cpp`, plus the lines of `Units.cpp` that hold `CloseUnit`
+— the layoff pattern to copy, no change to that file.
+
+- When a project's nights are used up, its office's workers are laid
+  off as `CloseUnit` does (workspace cleared, `commuteAt = kNoCommute`),
+  and the room's kind becomes `VacantStore`, which `ReviewUnits` may
+  then reopen as a venue or a workspace like any other empty unit.
+- A room changes kind only when nobody is in it or on the way to it:
+  the layoff must clear a builder whose destination is the office.
+- Tests: a finished site has a vacant unit where its office was, no
+  robot works there, `ValidateWorldState` and `ValidateEconomy` after.
 
 ### - [ ] D4. Drawing new buildings (view-core)
 

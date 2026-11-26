@@ -113,4 +113,11 @@ namespace mechapunk::sim::migrations {
 // game runs it and homes or jobs run short.
 [[nodiscard]] std::expected<void, std::string> V22ToV23(SaveDocument& world);
 
+// Version 23 to 24: rooms gain a new kind, the site office of a building
+// going up (task D, step D3a). No key is new and no stored value changes:
+// a version 23 game never wrote a site office, so no room of an old save
+// can carry the kind, and the migration changes nothing. The bump is there
+// because a version 24 save may name a kind a version 23 game cannot read.
+[[nodiscard]] std::expected<void, std::string> V23ToV24(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

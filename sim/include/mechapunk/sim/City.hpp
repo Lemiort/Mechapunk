@@ -53,6 +53,9 @@ enum class RoomKind : std::uint8_t {
     VacantStore,
     PoliceStation,
     CrewRoom,
+    // The office of a building going up: the builders' job while the
+    // project is up, a vacant unit once it is done (task D, step D3).
+    SiteOffice,
 };
 
 // Classes of apartment, from a government dorm room to a whole floor. Each

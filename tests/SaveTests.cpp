@@ -204,7 +204,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v23-city.json";
+        kFixtureDirectory / "saves" / "v24-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -306,10 +306,20 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
         }
     }
     // And from version 23 the world saves its projects: buildings under
-    // construction. Nothing starts one until the nightly review does (step
-    // D2b), so this fixture's list is empty; the round trip above is what
-    // proves the save carries the key at all.
+    // construction. The nightly review (step D2b) ran through this fixture's
+    // twenty days but never saw a shortage last seven nights, so its list
+    // is empty; the round trip above is what proves the save carries the key
+    // at all.
     EXPECT_TRUE(state->projects.empty());
+    // And from version 24 rooms may be site offices of a building going up
+    // (step D3a): nothing raises one until step D3b, so this fixture has
+    // none, and the hand-written save in `SiteOfficeRoomKindRoundTrips` is
+    // what proves the new kind name reads and writes.
+    EXPECT_TRUE(std::ranges::none_of(state->city.buildings, [](const sim::Building& building) {
+        return std::ranges::any_of(building.rooms, [](const sim::Room& room) {
+            return room.kind == sim::RoomKind::SiteOffice;
+        });
+    }));
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -460,6 +470,69 @@ TEST(Save, Version22FixtureMigratesAndRuns) {
     ASSERT_TRUE(world.has_value()) << world.error();
     world->RunFor(sim::kMinutesPerDay);
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// Version 24 gives rooms a new kind, the site office of a building going
+// up (task D, step D3a). A version 23 game never wrote one, so the fixture
+// text is checked for the absence of that kind: what loads is the
+// migration's work - which for this version is the version number alone -
+// and not a fixture that quietly grew the new kind.
+TEST(Save, Version23FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v23-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+    EXPECT_EQ(fixture.find("\"siteOffice\""), std::string::npos)
+        << path.string() << " already names the new kind";
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// The new kind reads and writes both ways: a save that names one room
+// "siteOffice" deserializes, loads through FromState - a room is checked
+// by floor, capacity and unique id, not by a kind table, and no robot
+// lives or works in the room the test picks - and serializes back with
+// the name intact.
+TEST(Save, SiteOfficeRoomKindRoundTrips) {
+    const sim::World world = sim::World::Generate({.seed = 3, .robots = 10});
+    const std::string json = Serialize(world.State());
+    std::vector<std::uint64_t> used;
+    for (const sim::Robot& robot : world.State().robots) {
+        used.push_back(robot.apartment.value);
+        used.push_back(robot.workspace.value);
+        used.push_back(robot.location.value);
+        used.push_back(robot.destination.value);
+    }
+    std::ranges::sort(used);
+    const auto edited = EditSave(json, [=](sim::SaveDocument& document) {
+        for (sim::SaveDocument& building :
+              document["world"]["city"]["buildings"].get_array()) {
+            for (sim::SaveDocument& room : building["rooms"].get_array()) {
+                const std::uint64_t id = room["id"].as<std::uint64_t>();
+                if (std::binary_search(used.begin(), used.end(), id)) {
+                    continue;
+                }
+                room["kind"] = "siteOffice";
+                return;
+            }
+        }
+    });
+    auto state = sim::DeserializeWorld(edited);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_TRUE(std::ranges::any_of(state->city.buildings, [](const sim::Building& building) {
+        return std::ranges::any_of(building.rooms, [](const sim::Room& room) {
+            return room.kind == sim::RoomKind::SiteOffice;
+        });
+    }));
+    auto loaded = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(loaded.has_value()) << loaded.error();
+    // The write direction: serializing the loaded world names the kind again.
+    EXPECT_NE(Serialize(loaded->State()).find("\"siteOffice\""), std::string::npos);
 }
 
 // A project names a building of the city and an organization that pays
