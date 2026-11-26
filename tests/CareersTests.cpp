@@ -143,6 +143,32 @@ void Raise(sim::WorldState& state, sim::EntityId building, sim::EntityId owner,
     });
 }
 
+// The site office of a building put on a site by hand, as `startSite`
+// (Construction.cpp) makes it: the builders' room on the ground floor, owned
+// by the site's owner, with room for the crew of six a site asks for. The
+// shortage that starts a real site is read off seven saved nights, so a careers
+// test that wants builders writes the room instead of waiting for one.
+sim::EntityId AddOffice(sim::WorldState& state, sim::EntityId building,
+                        sim::EntityId owner) {
+    for (sim::Building& each : state.city.buildings) {
+        if (each.id != building) {
+            continue;
+        }
+        // The new id is the highest there is, so the building's rooms stay
+        // sorted by id, as validation asks.
+        each.rooms.push_back({
+            .id = state.ids.Allocate(),
+            .name = "Site Office",
+            .kind = sim::RoomKind::SiteOffice,
+            .floor = 0,
+            .capacity = 6,
+            .owner = owner,
+        });
+        return each.rooms.back().id;
+    }
+    return {};
+}
+
 // Lays a robot off as `CloseUnit` (Units.cpp) does it: no workplace, junior,
 // no performance, no commute planned, and at home when it stood at work.
 void LayOff(sim::Robot& robot) {
@@ -451,6 +477,64 @@ TEST(Careers, SitesTakeNoWorkers) {
     }
     EXPECT_EQ(staffed, 0U) << "a site's rooms are not openings";
     EXPECT_GT(rehired, 0U) << "the laid off robots did look for work";
+    EXPECT_TRUE(sim::ValidateWorldState(after));
+}
+
+// A building going up gets its builders: the site office is an opening while
+// its project is up, and the site's other rooms still take no workers.
+TEST(Careers, SitesGetBuildersAtTheOffice) {
+    sim::World start = sim::World::Generate({.seed = 7, .robots = 200});
+    sim::WorldState state = start.State();
+    const auto [site, employer] = WorkplaceAndOwner(state);
+    ASSERT_TRUE(site.IsValid());
+    ASSERT_TRUE(employer.IsValid());
+    Raise(state, site, employer, 60);  // Still going up all fortnight.
+    const sim::EntityId office = AddOffice(state, site, employer);
+    ASSERT_TRUE(office.IsValid());
+    // Everyone whose job is a workspace is laid off, so the city looks hard
+    // for work: many robots ask for a job each night, and the office is one
+    // of the few openings they choose among.
+    std::set<std::uint64_t> workspaces;
+    for (const sim::Building& building : state.city.buildings) {
+        for (const sim::Room& room : building.rooms) {
+            if (room.kind == sim::RoomKind::Workspace) {
+                workspaces.insert(room.id.value);
+            }
+        }
+    }
+    std::uint32_t jobless = 0;
+    for (sim::Robot& robot : state.robots) {
+        if (!workspaces.contains(robot.workspace.value)) {
+            continue;
+        }
+        LayOff(robot);
+        ++jobless;
+    }
+    ASSERT_GT(jobless, 0U);
+
+    sim::World world = Load(std::move(state));
+    for (int day = 0; day < 14; ++day) {
+        world.RunFor(sim::kMinutesPerDay);
+        EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+    }
+    const sim::WorldState& after = world.State();
+    EXPECT_FALSE(after.projects.empty()) << "the site is still going up";
+    std::uint32_t builders = 0;
+    std::uint32_t staffed = 0;
+    for (const sim::Robot& robot : after.robots) {
+        if (!InBuilding(after, site, robot.workspace)) {
+            continue;
+        }
+        if (robot.workspace == office) {
+            ++builders;
+        } else {
+            ++staffed;
+        }
+    }
+    // The office fills its crew of six within the fortnight; the bound leaves
+    // room for the random stream to move in a later step.
+    EXPECT_GE(builders, 3U) << "a site's office takes builders";
+    EXPECT_EQ(staffed, 0U) << "the site's other rooms are not openings";
     EXPECT_TRUE(sim::ValidateWorldState(after));
 }
 

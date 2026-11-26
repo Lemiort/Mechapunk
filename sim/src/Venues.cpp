@@ -159,6 +159,16 @@ constexpr StaffRules kCrewStaff{.shiftStarts = {Hour(6), Hour(14), Hour(22)},
                                 .lengthMinutes = 480,
                                 .wage = 120,
                                 .guestsPerWorker = 1};
+// The builders of a site: one shift a day, the hours a site's workplace keeps
+// (Construction.cpp's `kSiteShift`), and one builder for every place the office
+// has, so the office's capacity is the crew the site asked for. A habitat's
+// building carries no shift of its own, so these rules are what gives its
+// office real hours.
+constexpr StaffRules kSiteStaff{.shiftStarts = {Hour(7)},
+                                .shifts = 1,
+                                .lengthMinutes = 480,
+                                .wage = 100,
+                                .guestsPerWorker = 1};
 }  // namespace
 
 const VenueRules* FindVenueRules(RoomKind kind) noexcept {
@@ -197,6 +207,8 @@ const StaffRules* FindStaffRules(RoomKind kind) noexcept {
             return &kPoliceStaff;
         case RoomKind::CrewRoom:
             return &kCrewStaff;
+        case RoomKind::SiteOffice:
+            return &kSiteStaff;
         default:
             return nullptr;
     }

@@ -19,7 +19,9 @@ split on 2026-11-26 into D3a to D3d; D3a is done and raised the save
 version to 24. Save change. The biggest remaining task: take it slowly,
 one step per module. D3b is done on 2026-11-26 with no save change: a
 building going up gets its site office on the ground floor, the kind
-D3a shipped.
+D3a shipped. D3c is done on 2026-11-26, also with no save change: that
+office has staff rules and is an opening, so a site going up gets
+builders.
 
 ## What and why
 
@@ -773,7 +775,7 @@ stay sorted by id and `ValidateWorldState`'s id rules hold.
   this step: that city raises no site, so the step changes nothing where
   there is no site.
 
-### - [ ] D3c. Builders: jobs at the site office while the project is up (careers)
+### - [x] D3c. Builders: jobs at the site office while the project is up (careers)
 
 Open: `Venues.cpp` (a `StaffRules` entry for the kind), `Careers.cpp`
 (`OpeningsFor`), `CareersTests.cpp`.
@@ -788,6 +790,86 @@ Open: `Venues.cpp` (a `StaffRules` entry for the kind), `Careers.cpp`
   ends), so the skip must not swallow the builders' jobs.
 - Tests: a city with a site going up gets builders there, and the
   site's other rooms still take no workers.
+
+Done as (careers module, one commit): `Venues.cpp` gained `kSiteStaff`
+beside `kPoliceStaff` and `kCrewStaff` - one shift from 07:00, 480
+minutes long, wage 100, `guestsPerWorker` 1 - and `FindStaffRules`
+returns it for `RoomKind::SiteOffice`. Those hours and that wage are
+`kSiteShift` (Construction.cpp), the shift a site's workplace building
+already keeps, so a habitat's office gets real hours where its building
+carries `Shift{}`, and `guestsPerWorker` 1 makes `StaffPerShift` the
+office's capacity: the crew of six D3b gave it. `JobsAt` is therefore
+6, `JobShift` the site's day shift and `JobKey` one key a room
+(`ShiftSlot` of a one-shift kind is always 0), which also makes
+`Validation`'s "a robot's job room holds at most `JobsAt` robots"
+accept a builder at an office: with no staff rules `JobsAt` was 0, so
+`Validation.cpp` read a robot working there as a robot with a job at
+no room at all.
+
+- `OpeningsFor` gained a fourth loop over
+  `rooms_.RoomsOfKind(RoomKind::SiteOffice)` that asks
+  `taken(...) < StaffPerShift(...)` and never calls `onSite`; the comment
+  above the skip says why, and the `World.hpp` declaration's comment and
+  the `Careers.hpp/.cpp` and `Venues.hpp/.cpp` rows of `docs/MODULES.md`
+  say the same.
+- What the step left open, and what was chosen: "a site's shift, wage
+  and one shift" names no numbers, so the office keeps the site's own
+  hours (07:00 to 15:00) and wage 100 rather than the police and crew
+  06:00/14:00/22:00 at 120: builders work the site's day shift, and the
+  wage is the site's, the same one its owner pays supplies for.
+- Test `Careers.SitesGetBuildersAtTheOffice`: the seed 7 / 200 robots
+  city, a workplace building put on a site by hand (`Raise`, 60 nights
+  left) with a site office written onto it by a new `AddOffice` helper
+  as `startSite` makes it - floor 0, "Site Office", capacity 6, the
+  project's owner, its id allocated so the building's rooms stay sorted
+  by id - because the shortage that starts a real site is read off seven
+  saved nights, so a careers test writes the room instead of waiting.
+  Everyone whose job is a workspace is laid off (`LayOff`), which leaves
+  the office one of few openings with many robots asking for one: over
+  14 midnights the office fills its crew of six, and no robot works in
+  the site's workspaces, so the D2c skip still holds. The bound asserts
+  3 builders, half what the city reached, for the random stream to move
+  in a later step (the guide's "leave margin").
+- What the step's text gets ahead of itself: it says a `SiteOffice` room
+  exists only while its project is going up, which only becomes true when
+  D3d turns the office into a vacant unit. Until then an office outlasts
+  its project - the reference city's save has 3 such rooms, 2 of them
+  with a builder in - and this step keeps hiring for them. Nothing invalid
+  happens (`ValidateWorldState` asks only that a job room holds at most
+  `JobsAt` robots), and D3d is the step that clears them.
+- No save change: `SiteOffice` shipped in v24 (D3a), `projects` in v23
+  (D2a) and `lots` in v22 (D1a), so no field, key, migration or fixture,
+  and `Validation` needed nothing new. No new random draw: the openings
+  list is built from `rooms_` vectors in a fixed order and `staff` is
+  only ever looked up, never iterated (rule 1); wages move by `PayWage`
+  through `PayOrBorrow`, the office's owner being the project's owner
+  (rule 2).
+- Budget: `careers` 22690 to 24050 of 25000, `world` 24485 to 24491
+  (the `OpeningsFor` comment); no new source file, so
+  `scripts/context_budget.py` is unchanged. Warning for the steps after
+  this: `careers` has 950 tokens left and `world` 509, so a step that
+  adds to `CareersTests.cpp` or `World.hpp` must make room first.
+- ctest: 193/193 including ContextBudget (192 before, +1 new test).
+- Simulation code changed, so the headless check ran: seed 1, 10000 robots,
+  40 days `--quiet` in 322 s, and the money adds up on all 40 days (`money`
+  equal to `created in all`, `destroyed 0` every day, checked line by line).
+  Day 40 reads `created 1775 today`, wages at 110%, 28 of 10000 out of work,
+  6004 vacant apartments, 26 empty units, supplies 924882, gini 505, 1067
+  broke robots, 13 behind on rent - the shape D3b's note quotes (created
+  2194, wages at 108%, 6005 vacant, 22 empty units, supplies 919058, gini
+  504, 1080 broke, 10 behind), wages up and `created` down because the
+  sites' builders now earn and the homes those sites raise are let. The
+  save of that run (same seed and days with `--save`) holds the same 9
+  site offices, 6 projects still going up and 41 of the city's 50 plots
+  D3b's note counted, and 2 robots working at an office - both at one of
+  the 3 offices whose project had already finished, which is what step
+  D3d turns into a vacant unit. A city this busy hires nobody there:
+  day 40 reads 28 of 10000 out of work and 26 finding a job a day, and
+  an office is one opening among thousands, so the builders' test has
+  to make jobs short by hand. The seed 7, 2000 robots, 6 days `--all
+  --save` run is unchanged - that city raises no site (its save has 0
+  projects, 0 `siteOffice` rooms and all 31 plots), so the step changes
+  nothing where there is no site.
 
 ### - [ ] D3d. A finished site's office becomes a vacant unit (construction)
 

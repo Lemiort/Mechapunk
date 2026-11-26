@@ -100,9 +100,11 @@ std::unordered_map<std::uint64_t, std::uint32_t> World::StaffCounts() const {
 std::vector<EntityId> World::OpeningsFor(
     EntityId robot, const std::unordered_map<std::uint64_t, std::uint32_t>& staff) const {
     std::vector<EntityId> openings;
-    // A building a project is still raising takes no staff: its floors are
-    // going up, so none of its rooms is an opening until the project is done
-    // (task D, step D2c).
+    // A building a project is still raising takes no staff: none of its rooms
+    // is an opening until the project is done (task D, step D2c). Its site
+    // office is the one exception, and the last loop below asks no skip: that
+    // room exists only while the project is going up (step D3d turns it into
+    // a vacant unit when the project ends), so it is where the builders work.
     const auto onSite = [this](const RoomRef& place) {
         return IsUnderConstruction(state_.projects, place.building->id);
     };
@@ -128,6 +130,14 @@ std::vector<EntityId> World::OpeningsFor(
             if (!onSite(room) && taken(*room.room) < StaffPerShift(*room.room)) {
                 openings.push_back(room.room->id);
             }
+        }
+    }
+    // Site offices: the builders' jobs, asked for the same way but without the
+    // skip above, since the office is the site's own room and stands only while
+    // the project is up.
+    for (const RoomRef& office : rooms_.RoomsOfKind(RoomKind::SiteOffice)) {
+        if (taken(*office.room) < StaffPerShift(*office.room)) {
+            openings.push_back(office.room->id);
         }
     }
     return openings;
