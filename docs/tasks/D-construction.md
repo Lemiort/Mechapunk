@@ -10,7 +10,8 @@ the two triggers D2b wrote, which as shipped could never fire as intended. D2c
 was split on 2026-11-25 into D2c and D2c2: its `AddNewcomer` half lives in
 `LifeCycle.cpp`, the `life-cycle` module. D2c is done, with no save change
 (`projects` shipped in v23) and no D2d: `ReviewUnits` only works on ground-floor
-rooms, and a site's ground floor is empty until D3.
+rooms, and a site's ground floor is empty until D3. D2c2 is done on 2026-11-26,
+also with no save change: a newcomer's home is a finished one.
 Save change. The biggest remaining task: take it slowly, one step per module.
 
 ## What and why
@@ -456,7 +457,7 @@ are the only way between areas" (docs/MODULES.md); `World.hpp` gained no member.
   The two `--quiet` logs match line for line except their own timing and save
   path lines, which also proves the header's wrapped line changed nothing.
 
-### - [ ] D2c2. A newcomer's home is a finished one (life-cycle module)
+### - [x] D2c2. A newcomer's home is a finished one (life-cycle module)
 
 Open: `sim/src/LifeCycle.cpp` (`AddNewcomer`'s scan of
 `rooms_.RoomsOfKind(RoomKind::Apartment)`), `tests/LifeCycleTests.cpp`.
@@ -467,6 +468,59 @@ Open: `sim/src/LifeCycle.cpp` (`AddNewcomer`'s scan of
 - Test: a city with a site going up never moves a newcomer into it, and the
   newcomer did get a home (the test cannot pass because the list was empty).
 - No save change, no new random draw. `life-cycle` stands at 11531 of 25000.
+
+Done as (life-cycle module, one commit): one condition in `AddNewcomer`'s scan
+of `rooms_.RoomsOfKind(RoomKind::Apartment)` - `!IsUnderConstruction(state_.projects,
+apartment.building->id)` beside the "somebody lives here" test - keeps a site's
+homes out of both lists at once, since `freeDorms` is built inside that same loop
+as a subset of `freeHomes`. `LifeCycle.cpp` gained the `Construction.hpp` include
+(`Careers.cpp` spells it out the same way, though `World.hpp` already pulls it in)
+and `scripts/context_budget.py` gained that header in the `life-cycle` module.
+
+What the step's text left open, and what was chosen:
+
+- The test has to force the newcomer's hand. A newcomer takes a free dorm when
+  there is one, and a site's homes are never dorms (`HomeClassFor`, Construction.cpp:
+  studios low, flats in the middle, two-bedroom flats near the top), so in a
+  generated city the skip changes nothing a newcomer does. The test therefore
+  writes the classes by hand: the site's empty homes become the city's only free
+  dorms, and every other free dorm becomes a studio. Without the skip the newcomer
+  then moves onto the site for sure; with it, it takes a finished home.
+- The site is a hand-made project on a generated habitat building (`Raise`, as
+  D2c's tests have it): the shortage that starts a project is read off seven
+  saved days, so a two-day city raises none by itself. Its owner is the housing
+  trust, which pays the site's supplies at the midnight the test runs through.
+- The newcomer is made by wearing one robot out at day 2, 23:00 (`wear = kMaxWear
+  - 1`) and running 90 minutes: `AgeRobots` scraps it and calls `AddNewcomer`.
+- It cannot pass on an empty list: the test asserts the city had a free finished
+  home before the run, that a robot with a new id arrived, that its apartment is
+  valid, and that it is not a room of the site; `ValidateWorldState` after. With
+  the skip taken out it fails at `tests/LifeCycleTests.cpp:275`: `Value of:
+  InBuilding(after, site, robot.apartment) Actual: true Expected: false` - "a
+  newcomer moved onto a site".
+- The file had no helpers of its own, so `HousingTrust`, `Raise`,
+  `HabitatWithFreeHome` and `InBuilding` are local copies of `CareersTests.cpp`'s,
+  which the split forbids reaching into.
+
+No save change: `projects` shipped in v23 (D2a) and `lots` in v22 (D1a), no field,
+key, migration or fixture was added, and `Validation` needs nothing new. No random
+draw is added: the skip filters a candidate list before the pick. The saved stream
+moves only where the trim empties that list - a city whose only free homes stand
+on a site - and there the newcomer simply does not move in, which is the point.
+
+Budget: `life-cycle` 11531 to 13592 of 25000; no new source file, so `docs/MODULES.md`
+gained the module's new size and file, and its `Construction.hpp` row now says a
+newcomer's choice of home asks it too. ctest: 188/188 including ContextBudget (187
+before, +1 new).
+
+Simulation code changed, so the headless check ran: seed 1, 10000 robots, 40 days
+`--quiet` finished in 241 s, and the money adds up on all 40 days (`money` equal to
+`created in all`, `destroyed 0` every day) - the watch D2b deferred to after D2c
+holds. Day 40 reads `created 696 today`, `wages at 108%`, 24 of 10000 out of work,
+6003 vacant apartments, 17 empty units, `supplies 913905`, gini 503, 1068 broke
+robots, 13 behind on rent: the numbers D2c's note quotes, because that city always
+has a free dorm and a site's homes are never dorms, so the list this step trims is
+one a newcomer there never draws from.
 
 ### - [ ] D2c3. A home a robot buys is a finished one (property module)
 

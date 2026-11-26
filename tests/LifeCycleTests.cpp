@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Social.hpp"
 #include "mechapunk/sim/Venues.hpp"
@@ -26,6 +27,64 @@ bool Remembers(const sim::Robot& robot, sim::MemoryKind kind,
     return std::ranges::any_of(robot.memories, [&](const sim::Memory& memory) {
         return memory.kind == kind && (!other.IsValid() || memory.robot == other);
     });
+}
+
+// The housing trust: the organization that owns a habitat's homes and pays
+// what a habitat site costs a night.
+sim::EntityId HousingTrust(const sim::WorldState& state) {
+    for (const sim::Organization& organization : state.economy.organizations) {
+        if (organization.sector == sim::Sector::Housing) {
+            return organization.id;
+        }
+    }
+    return {};
+}
+
+// Puts a building on a site: a project raises it for `nights` more nights,
+// owned by `owner`. The cities these tests write have no project yet - the
+// shortage that starts one is read off seven saved days - so the list stays
+// sorted by building id, as validation asks.
+void Raise(sim::WorldState& state, sim::EntityId building, sim::EntityId owner,
+           std::uint32_t nights) {
+    state.projects.push_back({
+        .building = building,
+        .owner = owner,
+        .daysLeft = nights,
+        .floorsDone = 1,
+    });
+}
+
+// A habitat building with a home nobody lives in: one a test can put on a
+// site and still expect free homes in it.
+sim::EntityId HabitatWithFreeHome(const sim::WorldState& state) {
+    std::set<std::uint64_t> homes;
+    for (const sim::Robot& robot : state.robots) {
+        homes.insert(robot.apartment.value);
+    }
+    for (const sim::Building& building : state.city.buildings) {
+        if (building.kind != sim::BuildingKind::Habitat) {
+            continue;
+        }
+        for (const sim::Room& room : building.rooms) {
+            if (room.kind == sim::RoomKind::Apartment && !homes.contains(room.id.value)) {
+                return building.id;
+            }
+        }
+    }
+    return {};
+}
+
+// True when `room` is one of the rooms of `building`; an invalid room id,
+// such as a robot with no job, answers false.
+bool InBuilding(const sim::WorldState& state, sim::EntityId building, sim::EntityId room) {
+    for (const sim::Building& each : state.city.buildings) {
+        if (each.id != building) {
+            continue;
+        }
+        return std::ranges::any_of(
+            each.rooms, [room](const sim::Room& held) { return held.id == room; });
+    }
+    return false;
 }
 }  // namespace
 
@@ -158,4 +217,65 @@ TEST(LifeCycle, TheCityRenewsItself) {
     for (const sim::DepartedRobot& departed : world.State().departed) {
         EXPECT_TRUE(remembered.contains(departed.id.value)) << departed.name;
     }
+}
+
+// A home in a building a project is still raising is not a free home: the
+// newcomer that replaces a scrapped robot moves into a finished one even
+// when the site's empty homes are the city's only free dorms, which is what
+// a newcomer reaches for first.
+TEST(LifeCycle, NewcomersSkipSiteHomes) {
+    sim::World start = sim::World::Generate({.seed = 7, .robots = 200});
+    start.RunFor(sim::kMinutesPerDay + (23 * 60));  // Day 2, 23:00.
+    sim::WorldState state = start.State();
+    const sim::EntityId site = HabitatWithFreeHome(state);
+    const sim::EntityId trust = HousingTrust(state);
+    ASSERT_TRUE(site.IsValid());
+    ASSERT_TRUE(trust.IsValid());
+    Raise(state, site, trust, 30);  // Still going up all week.
+    // The site's empty homes are the city's only free dorms, and every other
+    // free home is off that list: without the skip the newcomer therefore
+    // moves onto the site for sure, and with it it takes a finished home.
+    std::set<std::uint64_t> homes;
+    for (const sim::Robot& robot : state.robots) {
+        homes.insert(robot.apartment.value);
+    }
+    std::uint32_t freeFinished = 0;
+    for (sim::Building& building : state.city.buildings) {
+        for (sim::Room& room : building.rooms) {
+            if (room.kind != sim::RoomKind::Apartment || homes.contains(room.id.value)) {
+                continue;
+            }
+            if (building.id == site) {
+                room.apartmentClass = sim::ApartmentClass::Dorm;
+                continue;
+            }
+            if (room.apartmentClass == sim::ApartmentClass::Dorm) {
+                room.apartmentClass = sim::ApartmentClass::Studio;
+            }
+            ++freeFinished;
+        }
+    }
+    ASSERT_GT(freeFinished, 0U) << "the city has a finished free home";
+    // One robot wears out at the next midnight: its place goes and a
+    // newcomer moves into the city.
+    sim::Robot& doomed = state.robots[10];
+    doomed.wear = sim::kMaxWear - 1;
+    const std::uint64_t lastId = state.robots.back().id.value;
+
+    sim::World world = Load(std::move(state));
+    world.RunFor(90);  // Past midnight and the walk to the new home.
+    const sim::WorldState& after = world.State();
+    std::uint32_t arrivals = 0;
+    for (const sim::Robot& robot : after.robots) {
+        if (robot.id.value <= lastId) {
+            continue;
+        }
+        ++arrivals;
+        EXPECT_TRUE(robot.apartment.IsValid()) << "the newcomer got no home";
+        EXPECT_FALSE(InBuilding(after, site, robot.apartment)) << "a newcomer moved onto a site";
+        EXPECT_TRUE(Remembers(robot, sim::MemoryKind::ArrivedInCity));
+    }
+    EXPECT_GT(arrivals, 0U) << "the scrapped robot was not replaced";
+    EXPECT_FALSE(after.projects.empty()) << "the site is still going up";
+    EXPECT_TRUE(sim::ValidateWorldState(after));
 }

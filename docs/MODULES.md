@@ -22,7 +22,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | statistics | 19k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp` |
 | careers | 22k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
-| life-cycle | 11k | `World.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
+| life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
 | saves | 24k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
 | saves-frozen | 8k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
@@ -68,7 +68,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |
 | `Chronicle.hpp` | The saved story (`ChronicleEntry`, `kChronicleCap`) |
 | `Chronicle.cpp` | `World::Chronicle`: which events `Emit` keeps in the chronicle |
-| `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done) and `IsUnderConstruction`, which hiring and moving home ask per room (task D, step D2c) |
+| `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done) and `IsUnderConstruction`, which hiring, moving home and a newcomer's choice of home ask per room (task D, steps D2c and D2c2) |
 | `Construction.cpp` | `World::ReviewConstruction`: a site's supplies and its floors, and the shortage that starts a new one |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
@@ -79,7 +79,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Settlement.cpp` | `SettleEconomy`, `RunCityHall`, `SetPolicyRate` |
 | `EconomyStatistics.cpp` | `RecordStatistics`, `GiniPerMille`, sector and emission names |
 | `Social.hpp/.cpp` | Interests, bonds, memories (`MemoryKind`, `MemoryText`), talks, `Remember` (also counts daily statistics) |
-| `LifeCycle.cpp` | Aging, wear, `Scrap` (with `Bequeath`), `AddNewcomer` |
+| `LifeCycle.cpp` | Aging, wear, `Scrap` (with `Bequeath`), `AddNewcomer` (whose home skips a site's) |
 | `Transit.cpp`, `Metro.hpp/.cpp` | Trip planning, the metro network, timetable, trains, `PlanDriverRun` |
 | `Weather.*`, `Random.*`, `GameTime.*`, `Ids.hpp` | As named |
 | `Save.hpp/.cpp` | glaze JSON, enum names, the migration list |

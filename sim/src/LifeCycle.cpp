@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "Names.hpp"
+#include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace mechapunk::sim {
@@ -129,11 +130,14 @@ void World::AddNewcomer() {
     for (const Robot& robot : state_.robots) {
         homes.insert(robot.apartment.value);
     }
-    // Newcomers start in a free dorm room if there is one.
+    // Newcomers start in a free dorm room if there is one. A home in a
+    // building a project is still raising is not free: its floors are going
+    // up, so nobody moves in until the project is done (task D, step D2c2).
     std::vector<EntityId> freeHomes;
     std::vector<EntityId> freeDorms;
     for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
-        if (!homes.contains(apartment.room->id.value)) {
+        if (!homes.contains(apartment.room->id.value) &&
+            !IsUnderConstruction(state_.projects, apartment.building->id)) {
             freeHomes.push_back(apartment.room->id);
             if (apartment.room->apartmentClass == ApartmentClass::Dorm) {
                 freeDorms.push_back(apartment.room->id);
