@@ -91,7 +91,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 
 | File | What lives there |
 | --- | --- |
-| `SimulationHost` | Runs the World on a worker thread; publishes an immutable `WorldFrame` after each step: `RobotFrame`s, shared `RobotSocial`, `RobotDirectory`, `EconomyFrame` (organizations, loans, emissions, history, room owners; refreshed every 10 minutes), and `city` + `cityVersion` when rooms changed. |
+| `SimulationHost` | Runs the World on a worker thread; publishes an immutable `WorldFrame` after each step: `RobotFrame`s, shared `RobotSocial`, `RobotDirectory`, `EconomyFrame` (organizations, loans, emissions, history, room owners; refreshed every 10 minutes), the projects (the buildings going up; refreshed at midnight, where the review that changes them runs), and `city` + `cityVersion` when rooms changed. |
 | `CityView.hpp` | The `CityView` class: everything drawn |
 | `CityView.cpp` | Construction, `UpdateCity` (redrawing buildings a project raised or dropped, `AddBuilding`/`RemoveBuilding`), `Submit` (the frame: robots, signs, trains, interior), picking, routes |
 | `CityStatic.cpp` | Static batches: buildings, facades, parks, street lamps, and the batches of one new building (`BatchStaticsFor`) |

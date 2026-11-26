@@ -25,7 +25,9 @@ builders. D3d is done on 2026-11-26, also with no save change: when a site's
 nights are up its builders are laid off and its office closes into an empty
 unit, which `ReviewUnits` may then reopen. D4 is done on 2026-11-26, also
 with no save change: the view draws a building going up as a scaffold and
-takes it in when its project raises it.
+takes it in when its project raises it. D5 split on 2026-11-26 into D5a to
+D5e - its bullets live in four modules, not the two it names - and D5a is
+done, also with no save change: the published frame carries the projects.
 
 ## What and why
 
@@ -1018,31 +1020,117 @@ like the generated ones.
   live renderer and GL context, so it is checked by building, by
   ContextBudget and by the user in the game, per the guide).
 
-### - [ ] D5. Construction details (inspector, statistics)
+### D5. Construction details — split on 2026-11-26
 
-Follow the guide's section 9 (detail pages). Open: a new
-`app/InspectorProject.cpp`, `app/ProjectLists.hpp/.cpp` and
-`tests/ProjectListsTests.cpp`, `app/Links.*`, `app/Inspector.cpp`
-(building page), `app/InspectorOrganization.cpp`, `app/Statistics.cpp`,
-`app/SimulationHost.hpp/.cpp` (projects into `WorldFrame`).
+The step names two modules, `inspector` and `statistics`, but its bullets live
+in four: the frame data is `ui` (`app/SimulationHost.hpp/.cpp`), the testable
+lists are a new `project-lists` module (as `organization-lists`, `gang-lists`
+and `chronicle-lists` are their own), the page and its links are `inspector`,
+and the Property tab's section is `statistics`. Cut into D5a to D5e, one module
+and one commit each, the original bullets living on inside them.
+
+Warning for the steps after this: `inspector` stands at 23237 of 25000, 1.7k
+short, so the step that adds `app/InspectorProject.cpp` must make room first.
+
+### - [x] D5a. The projects in `WorldFrame` (ui module)
+
+Open: `app/SimulationHost.hpp`, `app/SimulationHost.cpp`.
 
 - `WorldFrame` gains the projects (a shared list, copied only when they
-  change); `Selection` gains `project`; `ProjectLink`.
+  change): the guide's section 9, item 5, a shared list in `WorldFrame` by id
+  and never by a look-alike.
+- `ReviewConstruction` is the only code that touches `state_.projects`
+  (Construction.cpp) and it runs at midnight (World.cpp), so frames of a night
+  share one copy and the copy is made at the night's first minute, the way
+  `history_` and `owners_` already are.
+- No `RobotFrame` field: a builder's project is found through its job room's
+  building id (D5b's list function), not by an id carried per robot.
+- No save change, no simulation change: only `app/` files move.
+
+Done as (ui module, one commit): `WorldFrame` gained
+`std::shared_ptr<const std::vector<sim::Project>> projects` beside the
+chronicle, `SimulationHost` the members `projects_` and `projectsDay_`, and
+`Publish` a block that recopies the list when `sim::StartOfDay(frame.tick)`
+moved on - the same test the economy block uses for `history_` and `owners_`.
+`SimulationHost.hpp` includes `mechapunk/sim/Construction.hpp` for the type.
+
+- Why the day boundary is the right trigger, checked rather than assumed:
+  `state_.projects` is written only in `Construction.cpp` (the `push_back`
+  that starts a site, the advance loop's floors and `daysLeft`, the `erase_if`
+  that ends one), called only from `World.cpp`'s second midnight block, and
+  `Step` raises `state_.tick` before that block, so the frame published at a
+  midnight minute is the first that has to show the new list.
+- No new test: `SimulationHost` runs the world on a worker thread and is in
+  no test target - the `ui` module has none, as for the chronicle's and the
+  gangs' frame fields. The data is tested where it is read: D5b's `ProjectLists`
+  tests build a `WorldFrame` by hand, projects included.
+- Budget: no new source file, so `scripts/context_budget.py` is unchanged;
+  `ui` 16176 to 16518 of 25000. `docs/MODULES.md` gained the projects in the
+  `SimulationHost` row, and the guide's task table row for D its modules.
+- ctest: 194/194 including ContextBudget. Only `app/` files changed, so
+  `mechapunk-sim.exe` was not relinked and the headless log and save cannot
+  move (as in D1b and D4).
+
+### - [ ] D5b. `ProjectLists`: the rows a project page shows (new project-lists module)
+
+Open: a new `app/ProjectLists.hpp/.cpp` (the `mechapunk_layout` library), a
+new `tests/ProjectListsTests.cpp`, `app/OrganizationLists.hpp/.cpp` and
+`tests/OrganizationListsTests.cpp` as the model, `app/SimulationHost.hpp`
+(only `WorldFrame`).
+
 - `ProjectLists` (plain, tested): builders of a project (robots whose job
-  is its site office), projects of an organization, the lot or building a
-  project is on.
+  is its site office - the robot's `workspace` room, that room's building,
+  the project on that building), projects of an organization, the lot or
+  building a project is on.
+- Tests for every list function; add the new files to a new `project-lists`
+  module in the budget script, and the module and its rows to
+  `docs/MODULES.md`.
+
+### - [ ] D5c. The project page (inspector module)
+
+Open: a new `app/InspectorProject.cpp`, `app/InspectorInternal.hpp`,
+`app/Inspector.cpp` (the dispatch), `app/Links.hpp/.cpp`, `app/CityView.hpp`
+(only `Selection`), `app/main.cpp` (only the block that applies requests),
+`app/ProjectLists.hpp`.
+
+- `Selection` gains `project`; `ProjectLink` in `Links`, labelled
+  `"<text>##project<id>"`; `DrawInspector` dispatches to `DrawProject`.
+- First make room, as D1a, D2b and D2c3 did: `inspector` stands at 23237 of
+  25000.
 - **Project page**: what is built (habitat or workplace) and where
   (`BuildingLink`); owner (`OrganizationLink`); progress (floors done of
   floors, days left, as a bar); what it has cost so far and costs a night;
   why it was started (low vacancy or too few jobs, with the number);
   builders as a clipped table (name, level, shift, now).
+- What the step's text assumes and `Project` does not save, so ask the user
+  before inventing it: the floors still to come (readable as `floorsDone`
+  plus `daysLeft`, since a site raises one floor a night); what the site has
+  cost so far (no field - `DayCounters::supplies` counts every payment of
+  the night, not one site's); why it was started (no field - the trigger is
+  read off seven saved nights of `history`, so only tonight's numbers can be
+  recomputed). Saving any of them is a save change (guide rule 3).
+
+### - [ ] D5d. Links back to the project (inspector module)
+
+Open: `app/Inspector.cpp` (the building page and the robot page),
+`app/InspectorOrganization.cpp`, `app/ProjectLists.hpp`.
+
 - **Links back**: a building under construction says "Being built:
   <ProjectLink>" and lists its builders; the organization page gets a
   "Building now" list; a builder's robot page shows its project as a link.
+
+### - [ ] D5e. The Construction section (statistics module)
+
+Open: `app/Statistics.cpp` (the Property tab), `app/StatisticsInternal.hpp`
+if a helper is shared, `app/ProjectLists.hpp`.
+
 - **Statistics**: a "Construction" section in the Property tab: projects
   started, finished, builders employed, by day, and a table of current
   projects with links.
-- Tests for every list function; add the new files to the budget script.
+- What is not saved: `DailyStats` and `DayCounters` count no construction
+  (no projects started or finished per day), so "by day" needs either new
+  saved counters - a save change, guide rule 3 - or the section shows only
+  what the current projects allow. Ask the user which.
 
 ## Done when
 

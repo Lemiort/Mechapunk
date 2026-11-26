@@ -16,6 +16,7 @@
 #include "SnapshotBuffer.hpp"
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Chronicle.hpp"
+#include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -122,6 +123,11 @@ struct WorldFrame {
     // share one copy until a notable event adds an entry; Publish recopies
     // only when the list changed.
     std::shared_ptr<const std::vector<sim::ChronicleEntry>> chronicle;
+    // The buildings going up, by building id (see sim::Project). A site starts,
+    // grows or finishes only at midnight, where `ReviewConstruction` runs, so
+    // frames of a night share one copy; the page for a project and the lists
+    // of its builders read this list rather than the world.
+    std::shared_ptr<const std::vector<sim::Project>> projects;
 };
 
 // Runs a World on a SimulationThread. The world belongs to the worker while
@@ -207,6 +213,11 @@ private:
     sim::Tick economyDay_{};
     std::shared_ptr<const sim::City> cityFrame_;
     std::uint64_t cityVersion_{};
+    std::shared_ptr<const std::vector<sim::Project>> projects_;
+    // Day the projects projects_ was copied from: `ReviewConstruction` is the
+    // only code that changes the list and it runs at midnight, so the list
+    // changes exactly when the day does.
+    sim::Tick projectsDay_{};
     // Written by the worker in its event sink, read by the render thread.
     mutable std::mutex logMutex_;
     std::unordered_map<std::uint64_t, std::deque<std::string>> log_;

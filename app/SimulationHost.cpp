@@ -257,6 +257,14 @@ void SimulationHost::Publish() {
     }
     frame.chronicle = chronicle_;
     frame.economy = economy_;
+    // A site starts, grows or finishes only at midnight, where
+    // `ReviewConstruction` runs (World.cpp), so the projects are recopied at
+    // the night's first minute and the frames of that night share one copy.
+    if (projects_ == nullptr || projectsDay_ != sim::StartOfDay(frame.tick)) {
+        projects_ = std::make_shared<const std::vector<sim::Project>>(world_.State().projects);
+        projectsDay_ = sim::StartOfDay(frame.tick);
+    }
+    frame.projects = projects_;
     if (cityFrame_ == nullptr || cityVersion_ != world_.CityVersion()) {
         cityFrame_ = std::make_shared<const sim::City>(world_.State().city);
         cityVersion_ = world_.CityVersion();
