@@ -317,6 +317,14 @@ struct CitySettings {
     // Workspaces of the seed town's workshop.
     std::int64_t seedWorkspaces{2};
 
+    // When fewer free plots than this remain, a ring of streets is added around
+    // the grid (task K, step K9), until the grid is `maxGridSize` intersections
+    // a side. 0 turns it off, as in a full city, which is laid out once; a town
+    // sets 4.
+    std::int64_t freePlotsMin{0};
+
+    std::int64_t maxGridSize{30};
+
     bool operator==(const CitySettings&) const = default;
 };
 

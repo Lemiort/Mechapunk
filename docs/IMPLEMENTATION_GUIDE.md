@@ -4,7 +4,7 @@ How to continue the game without earlier conversations. Written for models
 with a small context (about 57k tokens): everything is split so one step of
 one task needs only this guide, one task file and one module.
 
-State as of 2026-11-27: save version 33, game version 0.33.0, all tests
+State as of 2026-11-27: save version 34, game version 0.34.0, all tests
 passing (`sim_tests`, `layout_tests` and `ContextBudget`; ctest counts them
 individually).
 
@@ -95,7 +95,7 @@ python scripts/context_budget.py                                                
 
 1. **Determinism.** The same `WorldState` and the same `SimSettings` give the
    same future on every machine. Settings (`sim/include/mechapunk/sim/Settings.hpp`)
-   are the knobs of the simulation (171 of them: crime, construction,
+   are the knobs of the simulation (173 of them: crime, construction,
    behaviour, careers, the city's layout, money, population, social life,
    venues; defaults = the game's values; `mechapunk-sim --list-settings`) - passed with the seed to
    `World::Generate` (`WorldParams::settings`) or to `World::FromState`, set

@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 33,
-   "gameVersion": "0.33.0",
+   "version": 34,
+   "gameVersion": "0.34.0",
    "world": {
       "tick": 28370,
       "seed": 33,
@@ -19448,7 +19448,9 @@
             "seedTown": 0,
             "seedGridSize": 3,
             "seedDormFloors": 4,
-            "seedWorkspaces": 2
+            "seedWorkspaces": 2,
+            "freePlotsMin": 0,
+            "maxGridSize": 30
          },
          "economy": {
             "minPolicyRate": 2,

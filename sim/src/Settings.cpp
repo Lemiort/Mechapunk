@@ -108,6 +108,8 @@ const std::array kEntries{
     MECHAPUNK_SETTING(city, seedGridSize, 3, 9),
     MECHAPUNK_SETTING(city, seedDormFloors, 2, 12),
     MECHAPUNK_SETTING(city, seedWorkspaces, 1, 8),
+    MECHAPUNK_SETTING(city, freePlotsMin, 0, 1000),
+    MECHAPUNK_SETTING(city, maxGridSize, 3, 100),
     MECHAPUNK_SETTING(construction, workspacesPerFloor, 0, 1000),
     MECHAPUNK_SETTING(construction, workspacePlaces, 0, 1000),
     MECHAPUNK_SETTING(construction, baseRent, 0, 3000),

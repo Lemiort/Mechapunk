@@ -217,7 +217,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v33-city.json";
+        kFixtureDirectory / "saves" / "v34-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 

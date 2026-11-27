@@ -24,6 +24,7 @@ add_library(mechapunk_sim STATIC
     src/Save.cpp
     src/Settings.cpp
     src/Social.cpp
+    src/Streets.cpp
     src/Transit.cpp
     src/Venues.cpp
     src/Weather.cpp

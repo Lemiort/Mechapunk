@@ -502,6 +502,8 @@ private:
     // At midnight, after the units: a site going up pays its supplies and
     // raises a floor (Construction.cpp).
     void ReviewConstruction();
+    // Adds a ring of streets around the grid when free plots run short.
+    void ReviewStreets();
     [[nodiscard]] std::int64_t UpkeepOf(const Room& apartment) const;
     // Changes an apartment's owner for `price`, paid by the buyer.
     void Transfer(EntityId apartment, EntityId buyer, std::int64_t price);

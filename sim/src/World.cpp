@@ -135,6 +135,7 @@ void World::Step() {
         // After the settlement: the city raises a building when homes or
         // jobs have run short, and its sites pay supplies and grow
         // (Construction.cpp).
+        ReviewStreets();
         ReviewConstruction();
     }
     // Robots act in id order, so random draws happen in a fixed order.
