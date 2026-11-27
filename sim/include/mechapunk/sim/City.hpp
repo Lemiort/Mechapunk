@@ -141,6 +141,10 @@ struct Building {
     std::vector<Room> rooms;
 };
 
+// "plain block", "stepped block", "sawtooth yard", ...: what the style makes of
+// a building, to follow "a" in a sentence ("a stepped block of 9 floors").
+[[nodiscard]] std::string_view StyleName(BuildingStyle style) noexcept;
+
 // The style of a building, read off the three facts the city already has:
 // its id, its kind and its saved floor count (the ground floor counted). A
 // hash of them picks the massing that kind may have and that this many floors

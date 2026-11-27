@@ -187,6 +187,11 @@ void World::ReviewConstruction() {
             .kind = kind,
             .entrance = lot.node,
             .floors = 1,
+            // The style of the building it will be: the site is drawn as a
+            // scaffold until it ends, and the final height is the ground floor
+            // plus the `floors` nights it takes. A pure function of the id,
+            // the kind and that height, so no draw from the random stream.
+            .style = StyleOf(kind, id, floors + 1),
             .shift = kind == BuildingKind::Workplace ? kSiteShift : Shift{},
             .rooms = {},
         };

@@ -65,6 +65,28 @@ std::uint64_t StyleHash(BuildingKind kind, EntityId id,
 
 }  // namespace
 
+std::string_view StyleName(BuildingStyle style) noexcept {
+    switch (style) {
+        case BuildingStyle::Plain:
+            return "plain block";
+        case BuildingStyle::Setback:
+            return "setback block";
+        case BuildingStyle::Stepped:
+            return "stepped block";
+        case BuildingStyle::TwinTowers:
+            return "pair of twin towers";
+        case BuildingStyle::Plinth:
+            return "tower on a plinth";
+        case BuildingStyle::Gabled:
+            return "gabled block";
+        case BuildingStyle::Sawtooth:
+            return "sawtooth yard";
+        case BuildingStyle::Tower:
+            return "crowned tower";
+    }
+    return "block";
+}
+
 // The style of a building, read off its id, its kind and its saved floor
 // count. No random number is drawn, so a city's layout, its rooms and its
 // story do not move when the styles are read, and one seed dresses the city
