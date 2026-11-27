@@ -5,7 +5,9 @@
 // workplace when over 5 per cent of the robots have been out of work for
 // seven nights. A site started this way has its site office on the ground
 // floor, owned by the project's owner - the tests that read the office itself
-// live in `tests/SiteOfficeTests.cpp`, split by topic as D2c3 split the venue
+// live in `tests/SiteOfficeTests.cpp`, and the tests of what a site pays and
+// records - its supplies, its cost so far, its reason - in
+// `tests/SiteSuppliesTests.cpp`, both split by topic as D2c3 split the venue
 // tests from the housing ones.
 
 #include <gtest/gtest.h>
@@ -36,17 +38,6 @@ namespace {
 // the line `Units.cpp` already reopens an empty unit at.
 constexpr std::int64_t kMarketVacancyPercent = 25;
 constexpr std::int64_t kUnemploymentPercent = 5;
-
-// The economy's organization of a sector, in the order `Economy` keeps them.
-[[nodiscard]] const sim::Organization* SectorOrganization(
-    const sim::WorldState& state, sim::Sector sector) {
-    for (const sim::Organization& organization : state.economy.organizations) {
-        if (organization.sector == sector) {
-            return &organization;
-        }
-    }
-    return nullptr;
-}
 
 // The economy's organization with this id.
 [[nodiscard]] const sim::Organization* OrganizationWithId(
@@ -244,6 +235,8 @@ TEST(Construction, HomesShortRaisesAHabitat) {
     EXPECT_EQ(building->kind, sim::BuildingKind::Habitat);
     EXPECT_EQ(site->daysLeft, 6U) << "six floors above the ground floor";
     EXPECT_EQ(site->floorsDone, 1U) << "the ground floor stands from the first night";
+    EXPECT_EQ(site->reason, sim::ProjectReason::HomesShort)
+        << "the market's homes ran short for seven nights";
     EXPECT_EQ(building->floors, 1U);
     // The ground floor is the site office, and nothing else (step D3b).
     ASSERT_EQ(building->rooms.size(), 1U) << "the site office is the ground floor";
@@ -325,43 +318,6 @@ TEST(Construction, GrowsOneFloorPerNightAndEndsWhenDone) {
     }
 }
 
-TEST(Construction, TheOwnerPaysTheSuppliesTheSiteCosts) {
-    sim::World world = sim::World::Generate({.seed = 5, .robots = 1000});
-    ASSERT_TRUE(RunUntilSiteOf(world, 40, sim::BuildingKind::Habitat) != nullptr);
-    // One night more, so the site has paid its supplies and raised a floor.
-    world.RunFor(sim::kMinutesPerDay);
-
-    const sim::WorldState& state = world.State();
-    // Only a site that was already going up pays tonight: the review advances
-    // the sites first and starts new ones after, so a site started this very
-    // midnight has not paid yet. `floorsDone` above the ground floor says it
-    // has raised a floor, so it was there to pay.
-    int sitesPaying = 0;
-    for (const sim::Project& project : state.projects) {
-        const sim::Building* building = ProjectBuilding(state, project);
-        if (building != nullptr && building->kind == sim::BuildingKind::Habitat &&
-            project.floorsDone > 1) {
-            ++sitesPaying;
-        }
-    }
-    ASSERT_GT(sitesPaying, 0);
-
-    // The books rolled over before the review, so tonight's supplies are
-    // only what the sites paid: the housing trust's sector share of the
-    // site's cost, and nothing for an industry corporation, whose supplies
-    // are what the other sectors buy from it (PaySupplies, Money.cpp).
-    const sim::Organization* trust = SectorOrganization(state, sim::Sector::Housing);
-    const sim::Organization* industry = SectorOrganization(state, sim::Sector::Industry);
-    ASSERT_TRUE(trust != nullptr);
-    ASSERT_TRUE(industry != nullptr);
-    EXPECT_EQ(trust->today.supplies, 100 * sitesPaying);
-    EXPECT_EQ(industry->today.supplies, 0) << "no workplace is going up here";
-
-    // Money still adds up, with the supply market taking the site's share.
-    EXPECT_TRUE(sim::ValidateEconomy(state).has_value())
-        << sim::ValidateEconomy(state).error();
-}
-
 TEST(Construction, HomesNotShortLeavesNoHabitat) {
     // The same city 15 nights in: 44 per cent of the market's homes still stand
     // empty, well over the quarter, so nothing is raised.
@@ -396,6 +352,8 @@ TEST(Construction, JobsShortRaisesAWorkplace) {
     ASSERT_TRUE(building != nullptr);
     EXPECT_EQ(building->kind, sim::BuildingKind::Workplace);
     EXPECT_EQ(site->daysLeft, 4U) << "four floors above the ground floor";
+    EXPECT_EQ(site->reason, sim::ProjectReason::JobsShort)
+        << "jobs ran short for seven nights";
     EXPECT_EQ(building->floors, 1U);
     ASSERT_EQ(building->rooms.size(), 1U) << "the ground floor is the site office";
     EXPECT_EQ(building->rooms.front().kind, sim::RoomKind::SiteOffice);

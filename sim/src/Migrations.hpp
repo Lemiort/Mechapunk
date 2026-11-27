@@ -120,4 +120,12 @@ namespace mechapunk::sim::migrations {
 // because a version 24 save may name a kind a version 23 game cannot read.
 [[nodiscard]] std::expected<void, std::string> V23ToV24(SaveDocument& world);
 
+// Version 24 to 25: a project gains the credits its site has paid for
+// supplies so far and the shortage that started it (task D, step D5b2). A
+// version 24 save knows neither: that game paid the supplies into the night's
+// books without naming a site, and it read the shortage off seven saved
+// nights without recording which of the two it saw, so every project of an
+// old save gains cost 0 and the reason `unknown`.
+[[nodiscard]] std::expected<void, std::string> V24ToV25(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

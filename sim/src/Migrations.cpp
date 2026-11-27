@@ -130,4 +130,22 @@ std::expected<void, std::string> V23ToV24(SaveDocument& world) try {
         std::format("the version 23 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V24ToV25(SaveDocument& world) try {
+    // Version 25 gives every project two keys: the credits its site has paid
+    // for supplies since the night it started, and the shortage that started
+    // it. A version 24 save knows neither - the supplies went into the night's
+    // books with no site named, and the review read the shortage off seven
+    // saved nights without recording which of the two it saw - so an old
+    // project starts at cost 0 and the reason "unknown", which the game reads
+    // as a site whose story begins when the save is loaded.
+    for (SaveDocument& project : world["projects"].get_array()) {
+        project["costSoFar"] = std::int64_t{0};
+        project["reason"] = "unknown";
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 24 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

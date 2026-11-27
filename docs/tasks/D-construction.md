@@ -29,7 +29,10 @@ takes it in when its project raises it. D5 split on 2026-11-26 into D5a to
 D5e - its bullets live in four modules, not the two it names - and D5a is
 done, also with no save change: the published frame carries the projects. D5b
 is done on 2026-11-26, also with no save change: the layout library has the
-lists a project's pages show.
+lists a project's pages show. D5b2 was added on 2026-11-27, after D5b, and
+is done: a project saves the credits its site has paid for its supplies and
+the shortage that started it, which raised the save version to 25 and the
+game to 0.25.0.
 
 ## What and why
 
@@ -1142,6 +1145,84 @@ and the city's `RoomIndex`, and `app/ProjectLists.cpp` implements them:
   module grew, so the `inspector` warning above still stands for D5c.
 - ctest: 199/199 including ContextBudget (194 before, +5 new).
 
+### - [x] D5b2. A site's cost and reason as saved state (construction + saves)
+
+Added on 2026-11-27, before D5c, because the page D5c draws asks for two
+numbers `Project` does not save - what a site has cost so far and why it
+was started - and D5c's own text says saving either is a save change. The
+user decided the fields come first, so this step is that save change and
+D5c is left to draw what it can read.
+
+Open: `Construction.hpp`, `Construction.cpp` (`startSite` and the advance
+loop), `Save.hpp`, `Save.cpp` (the enum names, the migration list),
+`Migrations.hpp`, the end of `Migrations.cpp`, `Validation.cpp`,
+`SaveTests.cpp`, plus the fixture and its README row.
+
+Done as (construction + saves, one commit): `Project` gains `costSoFar`,
+the credits the site has paid for its supplies since the night it started,
+and `reason`, the shortage that started it; save version 25, game 0.25.0.
+
+- `reason` is `ProjectReason {Unknown, HomesShort, JobsShort}` in
+  `Construction.hpp`, named in `Save.cpp` the way `RoomKind` is:
+  `"unknown"`, `"homesShort"`, `"jobsShort"`. An enum rather than a free
+  string, so a save naming no known reason fails at the read and the page
+  can say which of the two shortages it was.
+- `startSite` takes the reason and records it: `HomesShort` where the
+  market's homes ran short, `JobsShort` where jobs did.
+- The advance loop adds what the site was charged that night to
+  `costSoFar`: it reads the owner's credits before and after the existing
+  `PaySupplies` call and adds the difference, which is the money that
+  really moved - the owner's sector share of the 200 a site asks, half for
+  the housing trust and nothing for an industry corporation. No new
+  accounting path and nothing counted twice (rule 2); no new random draw
+  (rule 1), so the saved stream is untouched.
+- `V24ToV25` (declared in `Migrations.hpp`, registered in `kMigrations`,
+  at the end of `Migrations.cpp`) gives every project of a version 24
+  save `"costSoFar": 0` and `"reason": "unknown"`. That game paid the
+  supplies into the night's books without naming a site, and read the
+  shortage off seven saved nights without recording which of the two it
+  saw, so the migration cannot know either and must not invent it: an
+  old project reads as a site that has paid nothing yet for reasons the
+  save never told.
+- Validation (rule 5): a project's `costSoFar` cannot be negative. The
+  reason needs no check - an unknown name fails at the read.
+- Fixture `tests/fixtures/saves/v25-city.json` from the guide's command
+  (seed 33, 100 robots, 28370 minutes) at game 0.25.0, plus its row and a
+  sentence in that folder's README. Like the v24 one it raised no site,
+  so its projects list is empty and the new keys appear in no fixture:
+  the hand-written saves are what prove them.
+- Tests: `Save.ProjectCostAndReasonRoundTrips` writes a project with cost
+  500 and reason `"jobsShort"` into a current save, reads both back and
+  serializes them again; `Save.Version24FixtureMigratesAndRuns` checks the
+  v24 fixture names neither key (`"reason"` alone would prove nothing, an
+  emission has one, so the test looks for `"costSoFar"` and for
+  `"unknown"`), loads it and runs it a day, then writes a project into
+  that fixture as a version 24 game would - four keys - and reads the
+  loaded project as cost 0 and reason `Unknown`;
+  `CurrentVersionFixtureLoadsAndRoundTrips` points at v25.
+  `SiteSupplies.SiteCountsItsCostAndNamesItsReason` runs the seed 5 /
+  1000 robots city to its first habitat: the site raised that midnight
+  has paid nothing, and two nights later it has paid 100 a night, the
+  trust's half of the ask, with the reason `HomesShort`; the two trigger
+  tests read their own reason.
+- First make room, as D1a, D2b, D2c3 and D3d did: `construction` stood at
+  23853 of 25000 and this step's additions put it at 25045, so the two
+  tests of what a site pays - D2b's `TheOwnerPaysTheSuppliesTheSiteCosts`
+  and the new one - moved to a new `tests/SiteSuppliesTests.cpp` (suite
+  `SiteSupplies`), which joins a new `site-supplies` module: `construction`
+  24031, `site-supplies` 15709, `saves` 20823 to 22647. Warning for the
+  steps after this: `construction` has 969 tokens left.
+- ctest: 202/202 including ContextBudget (200 before this step, +2 new;
+  the two moved tests were not added - the count the task file last
+  recorded, 199, was one behind the tree).
+- Simulation code changed, so the headless check ran: the seed 1, 10000
+  robots, 40 days `--quiet` log adds up money on all 40 days and reads
+  day 40 as D3d's note quotes it; the seed 7, 2000 robots, 6 days
+  `--all --save` run is byte for byte the same log, except its own timing
+  and save-path lines, and its save's `world` is equal to the old one
+  as parsed JSON - only `version` and `gameVersion` moved, and that city
+  raises no site, so no project gains a key.
+
 ### - [ ] D5c. The project page (inspector module)
 
 Open: a new `app/InspectorProject.cpp`, `app/InspectorInternal.hpp`,
@@ -1158,13 +1239,12 @@ Open: a new `app/InspectorProject.cpp`, `app/InspectorInternal.hpp`,
   floors, days left, as a bar); what it has cost so far and costs a night;
   why it was started (low vacancy or too few jobs, with the number);
   builders as a clipped table (name, level, shift, now).
-- What the step's text assumes and `Project` does not save, so ask the user
-  before inventing it: the floors still to come (readable as `floorsDone`
-  plus `daysLeft`, since a site raises one floor a night); what the site has
-  cost so far (no field - `DayCounters::supplies` counts every payment of
-  the night, not one site's); why it was started (no field - the trigger is
-  read off seven saved nights of `history`, so only tonight's numbers can be
-  recomputed). Saving any of them is a save change (guide rule 3).
+- What the step's text assumes: the floors still to come are readable as
+  `floorsDone` plus `daysLeft`, since a site raises one floor a night; what
+  the site has cost so far and why it was started are saved now - `Project`'s
+  `costSoFar` and `reason`, step D5b2, save version 25 - so nothing about
+  this page needs asking the user again. A project an older save started
+  reads as cost 0 and reason `unknown`, which is what the page says.
 
 ### - [ ] D5d. Links back to the project (inspector module)
 
@@ -1184,9 +1264,13 @@ if a helper is shared, `app/ProjectLists.hpp`.
   started, finished, builders employed, by day, and a table of current
   projects with links.
 - What is not saved: `DailyStats` and `DayCounters` count no construction
-  (no projects started or finished per day), so "by day" needs either new
-  saved counters - a save change, guide rule 3 - or the section shows only
-  what the current projects allow. Ask the user which.
+  (no projects started or finished per day), so "by day" needs new saved
+  counters, and that is a save change of its own (guide rule 3): version
+  26, a `V25ToV26` at the end of `Migrations.cpp`, a new fixture and its
+  tests, the way step D5b2 did version 25. The counters go in `DailyStats`
+  - every `world.history[i]` gains the keys - not in `Project`, which
+  step D5b2 already grew. Decided, not asked: until that step lands this
+  section draws only what the current projects allow.
 
 ## Done when
 

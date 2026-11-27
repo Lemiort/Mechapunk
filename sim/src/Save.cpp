@@ -57,6 +57,12 @@ struct glz::meta<mechapunk::sim::ApartmentClass> {
                   "twoBedroom", TwoBedroom, "penthouse", Penthouse);
 };
 template <>
+struct glz::meta<mechapunk::sim::ProjectReason> {
+    using enum mechapunk::sim::ProjectReason;
+    static constexpr auto value =
+        enumerate("unknown", Unknown, "homesShort", HomesShort, "jobsShort", JobsShort);
+};
+template <>
 struct glz::meta<mechapunk::sim::RobotActivity> {
     using enum mechapunk::sim::RobotActivity;
     static constexpr auto value =
@@ -210,6 +216,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 23,
               .summary = "the site office room kind of a building going up",
               .apply = &migrations::V23ToV24},
+    Migration{.fromVersion = 24,
+              .summary = "a site's supplies paid so far and the shortage that started it",
+              .apply = &migrations::V24ToV25},
 };
 }  // namespace
 

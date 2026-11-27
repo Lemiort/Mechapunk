@@ -4,7 +4,7 @@ How to continue the game without earlier conversations. Written for models
 with a small context (about 57k tokens): everything is split so one step of
 one task needs only this guide, one task file and one module.
 
-State as of 2026-11-26: save version 24, game version 0.24.0, all tests
+State as of 2026-11-27: save version 25, game version 0.25.0, all tests
 passing (`sim_tests`, `layout_tests` and `ContextBudget`; ctest counts them
 individually).
 
@@ -104,6 +104,7 @@ python scripts/context_budget.py                                                
       | `Robot` | every `world.robots[i]` |
       | `WorldState` | `world` |
       | `Economy` | `world.economy` |
+      | `Project` | every `world.projects[i]` |
       | `DayCounters` | `world.today` and every `world.history[i].counted` |
       | `DailyStats` | every `world.history[i]` |
       | `Books` | every `world.economy.organizations[i].today` and `.yesterday` |
@@ -232,7 +233,7 @@ Do them in this order; each file lists its steps and which are done.
 | A. Organizations in the inspector; every name a link (done; user to check in game) | `docs/tasks/A-organizations-and-links.md` | inspector, statistics | no |
 | B. Gangs (B1-B11d done, all steps) | `docs/tasks/B-gangs.md` | gangs, inspector, statistics | done (v18) |
 | C. Chronicle (done; user to check in game) | `docs/tasks/C-chronicle.md` | chronicle-lists, statistics, inspector | yes (v21) |
-| D. Construction (D1a to D4 done; D5 split into D5a to D5e, D5a and D5b done) | `docs/tasks/D-construction.md` | generation, saves, construction, careers, life-cycle, property, view-core, ui, project-lists, inspector, statistics | yes (v24) |
+| D. Construction (D1a to D5b2 done; D5 split into D5a to D5e, D5a, D5b and D5b2 done) | `docs/tasks/D-construction.md` | generation, saves, construction, site-supplies, careers, life-cycle, property, view-core, ui, project-lists, inspector, statistics | yes (v25, and v26 for step D5e's counters) |
 | E. Simulation level of detail | `docs/tasks/E-level-of-detail.md` | world | maybe |
 | F. See-through windows | `docs/tasks/F-windows.md` | view-core, view-interiors | no |
 | G. Unions | `docs/tasks/G-unions.md` | money, careers | yes |

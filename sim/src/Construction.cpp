@@ -1,7 +1,9 @@
 // Buildings going up: `World::ReviewConstruction` pays a site the supplies
-// it costs, raises one of its floors, ends a project whose nights are up -
-// its office becoming an empty unit again (step D3d) - and starts a new
-// habitat or workplace when homes or jobs have run short for a week.
+// it costs - counting into the project what that site has paid so far -
+// raises one of its floors, ends a project whose nights are up - its office
+// becoming an empty unit again (step D3d) - and starts a new habitat or
+// workplace when homes or jobs have run short for a week, naming the
+// shortage that started it.
 
 #include <algorithm>
 #include <array>
@@ -164,10 +166,12 @@ void World::ReviewConstruction() {
 
     // Starts a site: the building stands from the first night on the plot
     // the project consumes, its ground floor is the site office, and `daysLeft`
-    // nights raise the floors above it.
+    // nights raise the floors above it. `reason` names the shortage that
+    // started it, which the site's page shows and the save carries.
     const auto startSite = [this, &nearestLot](BuildingKind kind, EntityId owner,
                                                std::uint32_t floors,
-                                               std::string_view prefix) {
+                                               std::string_view prefix,
+                                               ProjectReason reason) {
         const std::size_t plot = nearestLot();
         if (plot == noPlot) {
             return;
@@ -205,6 +209,11 @@ void World::ReviewConstruction() {
             .daysLeft = floors,
             // The ground floor is finished the night the site starts.
             .floorsDone = 1,
+            // Nothing paid yet: the review advances the sites going up before
+            // it starts this one, so its first night's supplies come at the
+            // next midnight.
+            .costSoFar = 0,
+            .reason = reason,
         });
     };
 
@@ -324,7 +333,17 @@ void World::ReviewConstruction() {
     for (Project& project : state_.projects) {
         Organization* owner = MutableOrganization(project.owner);
         if (owner != nullptr) {
+            // The site's own books count what its owner was charged tonight:
+            // `PaySupplies` (Money.cpp) moves the owner's sector's share of
+            // the night's ask - half for the housing trust, nothing for an
+            // industry corporation - out of the owner's credits, and those
+            // credits are the amount added up here. Counting the difference
+            // the call made, rather than the ask, keeps the site's cost equal
+            // to money that really moved (rule 2: no new accounting path,
+            // nothing counted twice).
+            const std::int64_t creditsBefore = owner->credits;
             PaySupplies(*owner, kSiteSuppliesNight);
+            project.costSoFar += creditsBefore - owner->credits;
         }
         if (project.daysLeft == 0) {
             // A save may hold a site an older game left finished: nothing
@@ -380,13 +399,15 @@ void World::ReviewConstruction() {
     // corner. The housing trust owns the homes nobody else owns; an
     // industry corporation owns the jobs.
     if (homesShortNow && housing_.IsValid()) {
-        startSite(BuildingKind::Habitat, housing_, kHabitatFloors, "Hab Block");
+        startSite(BuildingKind::Habitat, housing_, kHabitatFloors, "Hab Block",
+                  ProjectReason::HomesShort);
         cityChanged = true;
     }
     if (jobsShortNow) {
         const EntityId employer = industryEmployer();
         if (employer.IsValid()) {
-            startSite(BuildingKind::Workplace, employer, kWorkplaceFloors, "Work Yard");
+            startSite(BuildingKind::Workplace, employer, kWorkplaceFloors, "Work Yard",
+                      ProjectReason::JobsShort);
             cityChanged = true;
         }
     }

@@ -318,8 +318,9 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
     // Projects: the buildings going up, sorted by building id. Unlike the
     // chronicle's ids, a project's building and owner must exist: the
     // building stands on its lot from the night the project starts, and
-    // its owner pays the supplies the site costs every night; and no
-    // project can have finished more floors than its building has.
+    // its owner pays the supplies the site costs every night; no project
+    // can have finished more floors than its building has, and a site
+    // cannot have paid a negative number of credits for its supplies.
     {
         EntityId previousProject;
         for (const Project& project : state.projects) {
@@ -353,6 +354,12 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                                         project.building.value,
                                         project.floorsDone,
                                         building->floors));
+            }
+            if (project.costSoFar < 0) {
+                return fail(std::format("Project on building {} has paid {} "
+                                        "credits for its supplies",
+                                        project.building.value,
+                                        project.costSoFar));
             }
         }
     }

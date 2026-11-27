@@ -45,6 +45,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
 | chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 | construction | 24k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionTests.cpp`, `SiteOfficeTests.cpp` |
+| site-supplies | 16k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `SiteSuppliesTests.cpp` |
 
 ## What lives where
 
@@ -70,8 +71,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |
 | `Chronicle.hpp` | The saved story (`ChronicleEntry`, `kChronicleCap`) |
 | `Chronicle.cpp` | `World::Chronicle`: which events `Emit` keeps in the chronicle |
-| `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done) and `IsUnderConstruction`, which hiring, moving home and a newcomer's choice of home ask per room (task D, steps D2c and D2c2) |
-| `Construction.cpp` | `World::ReviewConstruction`: a site's supplies, its floors and the site office on its ground floor, the finished site's office closing into an empty unit, and the shortage that starts a new one |
+| `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done, the credits its site has paid for supplies and the shortage that started it, as `ProjectReason`) and `IsUnderConstruction`, which hiring, moving home and a newcomer's choice of home ask per room (task D, steps D2c and D2c2) |
+| `Construction.cpp` | `World::ReviewConstruction`: a site's supplies counted into its cost, its floors and the site office on its ground floor, the finished site's office closing into an empty unit, and the shortage that starts a new one |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
 | `Founding.cpp` | `FoundEconomy` (organizations, owners, starting money), `IndexEconomy` |

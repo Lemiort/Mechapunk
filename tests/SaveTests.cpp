@@ -59,15 +59,19 @@ void PushChronicleEntry(sim::SaveDocument& chronicle, std::uint64_t tick) {
     chronicle.get_array().push_back(std::move(entry));
 }
 
-// Appends one project to a save document: all four keys the format has
-// for a project, one day left and `floorsDone` floors finished.
+// Appends one project to a save document: all six keys the format has for a
+// project, one day left, `floorsDone` floors finished, `costSoFar` credits
+// paid for its supplies and the shortage `reason` that started it.
 void PushProject(sim::SaveDocument& projects, std::uint64_t building,
-                 std::uint64_t owner, std::uint64_t floorsDone = 1) {
+                 std::uint64_t owner, std::uint64_t floorsDone = 1,
+                 std::int64_t costSoFar = 0, std::string_view reason = "homesShort") {
     sim::SaveDocument project = sim::SaveDocument::object_t{};
     project["building"] = building;
     project["owner"] = owner;
     project["daysLeft"] = std::uint64_t{1};
     project["floorsDone"] = floorsDone;
+    project["costSoFar"] = costSoFar;
+    project["reason"] = std::string(reason);
     projects.get_array().push_back(std::move(project));
 }
 
@@ -204,7 +208,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v24-city.json";
+        kFixtureDirectory / "saves" / "v25-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -320,6 +324,12 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
             return room.kind == sim::RoomKind::SiteOffice;
         });
     }));
+    // And from version 25 a project carries the credits its site has paid
+    // for its supplies and the shortage that started it (step D5b2). This
+    // fixture raised no site, so its list is empty and the two hand-written
+    // saves - `ProjectCostAndReasonRoundTrips` and
+    // `Version24FixtureMigratesAndRuns` - are what prove the keys read, write
+    // and migrate.
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -493,6 +503,52 @@ TEST(Save, Version23FixtureMigratesAndRuns) {
     EXPECT_TRUE(sim::ValidateWorldState(world->State()));
 }
 
+// Version 25 gives a project the credits its site has paid for its supplies
+// and the shortage that started it (task D, step D5b2). The version 24 fixture
+// names neither key, so what loads is the migration's work; and a version 24
+// save that does have a project names only its four old keys, which the
+// migration fills with cost 0 and a reason it cannot know.
+TEST(Save, Version24FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v24-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+    // The fixture names neither new key: `"reason"` alone would prove nothing,
+    // an emission of any version has one, so the test looks for the cost key
+    // and for the reason name only version 25 writes into a project.
+    EXPECT_EQ(fixture.find("\"costSoFar\""), std::string::npos)
+        << path.string() << " already names the new cost";
+    EXPECT_EQ(fixture.find("\"unknown\""), std::string::npos)
+        << path.string() << " already names the new reason";
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+
+    // The same fixture with one project written in as a version 24 game
+    // would have written it: the loaded project has the two keys the
+    // migration added, and reads as a site that has paid nothing yet for
+    // reasons the save never told.
+    const auto migrated = sim::DeserializeWorld(
+        EditSave(fixture, [](sim::SaveDocument& document) {
+            const auto& buildings = document["world"]["city"]["buildings"].get_array();
+            const auto& organizations = document["world"]["economy"]["organizations"].get_array();
+            sim::SaveDocument project = sim::SaveDocument::object_t{};
+            project["building"] = buildings[0]["id"].as<std::uint64_t>();
+            project["owner"] = organizations[0]["id"].as<std::uint64_t>();
+            project["daysLeft"] = std::uint64_t{1};
+            project["floorsDone"] = std::uint64_t{1};
+            document["world"]["projects"].get_array().push_back(std::move(project));
+        }));
+    ASSERT_TRUE(migrated.has_value()) << migrated.error();
+    ASSERT_EQ(migrated->projects.size(), 1U);
+    EXPECT_EQ(migrated->projects.front().costSoFar, 0);
+    EXPECT_EQ(migrated->projects.front().reason, sim::ProjectReason::Unknown);
+}
+
 // The new kind reads and writes both ways: a save that names one room
 // "siteOffice" deserializes, loads through FromState - a room is checked
 // by floor, capacity and unique id, not by a kind table, and no robot
@@ -533,6 +589,28 @@ TEST(Save, SiteOfficeRoomKindRoundTrips) {
     ASSERT_TRUE(loaded.has_value()) << loaded.error();
     // The write direction: serializing the loaded world names the kind again.
     EXPECT_NE(Serialize(loaded->State()).find("\"siteOffice\""), std::string::npos);
+}
+
+// The two keys version 25 adds to a project read and write both ways: a save
+// that names the credits a site has paid and the shortage that started it
+// loads with them, and serializing what loaded names them again.
+TEST(Save, ProjectCostAndReasonRoundTrips) {
+    const sim::World world = sim::World::Generate({.seed = 3, .robots = 10});
+    const std::string json = Serialize(world.State());
+    const std::uint64_t building = world.State().city.buildings.back().id.value;
+    const std::uint64_t owner = world.State().economy.organizations.front().id.value;
+    const auto loaded = sim::DeserializeWorld(
+        EditSave(json, [=](sim::SaveDocument& document) {
+            PushProject(document["world"]["projects"], building, owner, 1, 500,
+                        "jobsShort");
+        }));
+    ASSERT_TRUE(loaded.has_value()) << loaded.error();
+    ASSERT_EQ(loaded->projects.size(), 1U);
+    EXPECT_EQ(loaded->projects.front().costSoFar, 500);
+    EXPECT_EQ(loaded->projects.front().reason, sim::ProjectReason::JobsShort);
+    const std::string written = Serialize(loaded.value());
+    EXPECT_NE(written.find("\"costSoFar\": 500"), std::string::npos) << written;
+    EXPECT_NE(written.find("\"jobsShort\""), std::string::npos) << written;
 }
 
 // A project names a building of the city and an organization that pays
