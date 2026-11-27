@@ -1,10 +1,9 @@
-// The Construction section of the statistics window's Property tab: the sites
-// going up now, their facts, and each one as a clickable link to its project
-// page. The "by day" part the step asks for - projects started, projects
-// finished and builders employed per day - needs saved counters `DailyStats`
-// does not have yet: they come with step D5e2's save change (save version 26,
-// a key in every `world.history[i]`), and until that step lands the section
-// draws only what the current projects allow, as that step's note decided.
+// The Construction section of the statistics window's Property tab: the by-day
+// plots of the construction counters (step D5e2a's save change, version 26:
+// `DayCounters::projectsStarted` and `projectsFinished` over the days kept,
+// and `DailyStats::buildersEmployed`), the sites going up now, their facts -
+// the last kept day's counters among them - and each one as a clickable link
+// to its project page.
 
 #include "StatisticsInternal.hpp"
 
@@ -21,6 +20,7 @@
 
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Construction.hpp"
+#include "mechapunk/sim/Economy.hpp"
 
 namespace mechapunk {
 
@@ -35,13 +35,27 @@ const char* KindOf(const sim::Building& building) {
 
 }  // namespace
 
-// Draws the Property tab's Construction section. The frame's projects (step
+// Draws the Property tab's Construction section. The by-day plots come first:
+// they read the counters step D5e2a saved, so they tell the city's building
+// story even in a frame where no site is going up. The frame's projects (step
 // D5a) are the sites going up: `WorldState` keeps them sorted by building id,
 // so a row keeps its place between frames and the player can click the same
 // site twice.
-void DrawConstruction(const WorldFrame& frame, const CityView& city,
+void DrawConstruction(const std::vector<sim::DailyStats>& history,
+                      const WorldFrame& frame, const CityView& city,
                       std::optional<InspectorRequest>* request) {
     ImGui::SeparatorText("Construction");
+    // By day: the sites the review started and ended that day - the review
+    // runs after the books roll over, so a site counts into the day it ran
+    // into, as Construction.cpp's comment records - and the builders at the
+    // site offices that night, the definition `RecordStatistics` and
+    // `ProjectLists` share.
+    PlotCount("Sites started", history,
+              [](const auto& d) { return d.counted.projectsStarted; });
+    PlotCount("Sites finished", history,
+              [](const auto& d) { return d.counted.projectsFinished; });
+    PlotCount("Builders employed", history,
+              [](const auto& d) { return d.buildersEmployed; });
     if (frame.projects == nullptr || frame.projects->empty()) {
         ImGui::TextDisabled("No sites going up.");
         return;
@@ -71,6 +85,14 @@ void DrawConstruction(const WorldFrame& frame, const CityView& city,
         Row("Sites going up", std::to_string(frame.projects->size()));
         Row("Builders at their site offices", std::to_string(builders));
         Row("Supplies paid so far", Credits(cost));
+        // The last kept day's counters (step D5e2a), the plots' last point:
+        // the day the Property tab's own facts above read.
+        if (!history.empty()) {
+            const sim::DailyStats& day = history.back();
+            Row("Sites started that day", std::to_string(day.counted.projectsStarted));
+            Row("Sites finished that day", std::to_string(day.counted.projectsFinished));
+            Row("Builders employed that day", std::to_string(day.buildersEmployed));
+        }
         ImGui::EndTable();
     }
     constexpr ImGuiTableFlags kFlags =

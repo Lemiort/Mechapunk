@@ -4,10 +4,13 @@
 // big tabs in separate files, like the inspector keeps its pages; never
 // include this header from outside app/.
 
+#include <cfloat>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <imgui.h>
 
@@ -15,6 +18,8 @@
 #include "Inspector.hpp"
 #include "Statistics.hpp"
 #include "SimulationHost.hpp"
+
+#include "mechapunk/sim/Economy.hpp"
 
 namespace mechapunk {
 
@@ -46,6 +51,34 @@ inline void Row(const char* label, const std::string& value) {
     ImGui::TextUnformatted(value.c_str());
 }
 
+// A labelled line chart of one statistic over the days kept, with the latest
+// value written over it. Step D5e2b moved these plot helpers out of
+// `Statistics.cpp`'s anonymous namespace, the way step D5e moved Credits,
+// BeginFacts and Row: the Construction section's by-day plots read them too.
+using Stat = std::function<double(const sim::DailyStats&)>;
+
+inline constexpr float kPlotHeight = 46.0F;
+
+inline void Plot(const char* label, const std::vector<sim::DailyStats>& history,
+                 const Stat& stat, const std::function<std::string(double)>& format) {
+    std::vector<float> values;
+    values.reserve(history.size());
+    for (const sim::DailyStats& day : history) {
+        values.push_back(static_cast<float>(stat(day)));
+    }
+    const std::string overlay =
+        values.empty() ? std::string{"no days yet"}
+                       : std::format("{}: {}", label, format(stat(history.back())));
+    ImGui::PlotLines(std::format("##{}", label).c_str(), values.data(),
+                     static_cast<int>(values.size()), 0, overlay.c_str(), FLT_MAX, FLT_MAX,
+                     ImVec2{-1.0F, kPlotHeight});
+}
+
+inline void PlotCount(const char* label, const std::vector<sim::DailyStats>& history,
+                      const Stat& stat) {
+    Plot(label, history, stat, [](double value) { return std::format("{:.0f}", value); });
+}
+
 // The Chronicle tab of the statistics window, drawn in StatisticsChronicle.cpp
 // while the other tabs sit in Statistics.cpp: the city's saved story
 // (`WorldFrame::chronicle`), newest entry first, every robot, room, building
@@ -59,13 +92,14 @@ void DrawChronicle(StatisticsView& view, const WorldFrame& frame,
 
 // The Construction section of the Property tab, drawn in
 // StatisticsConstruction.cpp while the tab's own facts and plots sit in
-// Statistics.cpp: the sites going up now (`WorldFrame::projects`, step D5a),
-// their facts and each one as a clickable link to its project page; `request`
-// reports what the player clicked this frame, as the Crime tab does. The
-// "by day" counters - projects started, finished and builders employed per
-// day - come with step D5e2's save change, so until that lands the section
-// draws only what the current projects allow.
-void DrawConstruction(const WorldFrame& frame, const CityView& city,
+// Statistics.cpp: the by-day plots of the construction counters (step D5e2a's
+// save change, version 26 - the sites the review started and ended that day
+// and the builders at the site offices that night), the sites going up now
+// (`WorldFrame::projects`, step D5a), their facts - the last kept day's
+// counters among them - and each one as a clickable link to its project page;
+// `request` reports what the player clicked this frame, as the Crime tab does.
+void DrawConstruction(const std::vector<sim::DailyStats>& history,
+                      const WorldFrame& frame, const CityView& city,
                       std::optional<InspectorRequest>* request);
 
 }  // namespace mechapunk

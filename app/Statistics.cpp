@@ -3,11 +3,9 @@
 #include <imgui.h>
 
 #include <algorithm>
-#include <cfloat>
 #include <cstddef>
 #include <cstdint>
 #include <format>
-#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -26,9 +24,7 @@
 namespace mechapunk {
 
 namespace {
-using Stat = std::function<double(const sim::DailyStats&)>;
 
-constexpr float kPlotHeight = 46.0F;
 constexpr ImVec4 kGood{0.45F, 0.9F, 0.55F, 1.0F};
 constexpr ImVec4 kBad{1.0F, 0.4F, 0.35F, 1.0F};
 
@@ -42,32 +38,13 @@ std::string Share(std::int64_t part, std::int64_t whole) {
                      : std::string{"-"};
 }
 
-// A labelled line chart of one statistic over the days kept, with the
-// latest value written over it.
-void Plot(const char* label, const std::vector<sim::DailyStats>& history, const Stat& stat,
-          const std::function<std::string(double)>& format) {
-    std::vector<float> values;
-    values.reserve(history.size());
-    for (const sim::DailyStats& day : history) {
-        values.push_back(static_cast<float>(stat(day)));
-    }
-    const std::string overlay =
-        values.empty() ? std::string{"no days yet"}
-                       : std::format("{}: {}", label, format(stat(history.back())));
-    ImGui::PlotLines(std::format("##{}", label).c_str(), values.data(),
-                     static_cast<int>(values.size()), 0, overlay.c_str(), FLT_MAX, FLT_MAX,
-                     ImVec2{-1.0F, kPlotHeight});
-}
-
+// `Plot` and `PlotCount` live in `StatisticsInternal.hpp` (step D5e2b: the
+// Construction section's plots read them too); the two wrappers below and the
+// tabs of this file call them.
 void PlotCredits(const char* label, const std::vector<sim::DailyStats>& history,
                  const Stat& stat) {
     Plot(label, history, stat,
          [](double value) { return Credits(static_cast<std::int64_t>(value)); });
-}
-
-void PlotCount(const char* label, const std::vector<sim::DailyStats>& history,
-               const Stat& stat) {
-    Plot(label, history, stat, [](double value) { return std::format("{:.0f}", value); });
 }
 
 void PlotPerMille(const char* label, const std::vector<sim::DailyStats>& history,
@@ -307,8 +284,9 @@ void DrawProperty(const std::vector<sim::DailyStats>& history, const WorldFrame&
     PlotCount("Sales", history, [](const auto& d) { return d.counted.propertySales; });
 
     // The Construction section sits in its own file, as the Chronicle tab
-    // does: the sites going up now, their facts and their links.
-    DrawConstruction(frame, city, request);
+    // does: the by-day plots of the construction counters, the sites going
+    // up now, their facts and their links.
+    DrawConstruction(history, frame, city, request);
 }
 
 std::optional<InspectorRequest> DrawOrganizations(StatisticsView& view, const WorldFrame& frame) {

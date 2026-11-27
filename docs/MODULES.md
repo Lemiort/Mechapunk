@@ -20,7 +20,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 20k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Property.cpp`, `HousingTests.cpp` |
 | units | 15k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Units.cpp`, `VenueTests.cpp` |
-| statistics | 21k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
+| statistics | 22k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
 | careers | 24k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
@@ -122,7 +122,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `ProjectLists` | Which rows a construction project's pages show: the builders of a site (robots whose job is its site office), the projects of an organization, the project on a building, and the lot a project stands on. |
 | `InspectorProject.cpp` | The construction project's page in the inspector: what the site is raising and where, its owner, its progress as a bar, what it has cost so far and asks a night, the shortage that started it, and the builders at its office as a clipped table. |
 | `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank, Crime and Chronicle tabs, plots from `DailyStats`; the Chronicle tab and its filter controls (group buttons, day range, name box, held in `StatisticsView`) are drawn in `StatisticsChronicle.cpp`, and the Property tab's Construction section in `StatisticsConstruction.cpp`. |
-| `StatisticsConstruction.cpp` | The Construction section of the Property tab: the sites going up now (`WorldFrame::projects`), their facts and each one as a link to its project page; the by-day counters come with step D5e2's save change. |
+| `StatisticsConstruction.cpp` | The Construction section of the Property tab: the by-day plots of the construction counters (step D5e2a's save change), the sites going up now (`WorldFrame::projects`), their facts - the last kept day's counters among them - and each one as a link to its project page. |
 | `main.cpp` | Window, input, camera, panels, applying frames. |
 
 

@@ -1,6 +1,6 @@
 # Task D: construction
 
-Status: open. D1 split on 2026-11-24 into D1a and D1b; D1a is done and
+Status: complete. D1 split on 2026-11-24 into D1a and D1b; D1a is done and
 raised the save version to 22, and D1b is done (the view draws parks from
 the saved plots, no save change). D2 split on 2026-11-25 into D2a to D2c;
 D2a is done and raised the save version to 23, and D2b is done (no save
@@ -38,13 +38,15 @@ inspector has a project's own page, opened by a new link. D5d is done on
 pages link the site, which needed the robot page out of `Inspector.cpp` into a
 new `robot-pages` module. D5e is done on 2026-11-27, also with no save change:
 the Property tab has a Construction section, drawn in a new
-`StatisticsConstruction.cpp`. D5e2 was added on 2026-11-27, after D5e, and is
-open: the section's "by day" needs saved counters in `DailyStats`, which is a
-save change of its own (version 26), the way D5b2 did version 25. D5e2 was split on 2026-11-27 into D5e2a and
-D5e2b: D5e2a is done and raised the save version to 26 and the game to
-0.26.0 - the daily statistics now count the sites the review started and
-ended and the builders at the site offices - and D5e2b, the Construction
-section's by-day plots, is open.
+`StatisticsConstruction.cpp`. D5e2 was added on 2026-11-27, after D5e: the
+section's "by day" needs saved counters in `DailyStats`, which is a save
+change of its own (version 26), the way D5b2 did version 25. D5e2 was split
+on 2026-11-27 into D5e2a and D5e2b: D5e2a is done and raised the save version
+to 26 and the game to 0.26.0 - the daily statistics now count the sites the
+review started and ended and the builders at the site offices - and D5e2b
+is done on 2026-11-27, also with no save change: the Construction section
+plots those counters, so task D is complete and its view and pages are for
+the user to check in the game.
 
 ## What and why
 
@@ -1569,18 +1571,59 @@ pinned by the test.
   JSON once the version lines and the three new keys are removed - that
   city raises no site, and the step writes counts and nothing else.
 
-### - [ ] D5e2b. The by-day plots (statistics module)
+### - [x] D5e2b. The by-day plots (statistics module)
 
 Then `app/StatisticsConstruction.cpp` gains the plots: projects started,
 finished and builders employed over the days kept, `PlotCount` over the
 new keys, and the facts table can read the last night's counters. `statistics`
 stands at 21345 of 25000.
 
+Done as (statistics module, one commit): the section draws three `PlotCount`
+charts over the days kept - "Sites started" and "Sites finished" through
+`counted.projectsStarted` and `counted.projectsFinished`, "Builders employed"
+through `buildersEmployed`, the keys step D5e2a saved - and its facts table
+gains "Sites started that day", "Sites finished that day" and "Builders
+employed that day" read off `history.back()`, the last kept day the Property
+tab's own facts above read. The plots come before the "No sites going up."
+line, so the section still tells the city's building story in a frame where
+no site is going up; the facts and projects tables keep that early return.
+
+- `DrawConstruction` gained the `history` parameter the other tabs take
+  (`DrawProperty` already has it and passes it on) instead of re-reading
+  `frame.economy->history`; the call site is one line in `Statistics.cpp`.
+- `Plot`, `PlotCount`, `Stat` and `kPlotHeight` moved from `Statistics.cpp`'s
+  anonymous namespace into `StatisticsInternal.hpp` as inline functions, the
+  way step D5e moved `Credits`, `BeginFacts` and `Row`: code moved only, and
+  `PlotCredits` and `PlotPerMille` stay in `Statistics.cpp` calling the
+  header's `Plot`; `<cfloat>` and `<functional>` went with the move.
+- No new test: the section needs a live renderer and a GL context, so it is
+  checked by building, by ContextBudget and by the user in the game (as D4,
+  D5a, D5c, D5d and D5e did); the counters it plots are what D5e2a's
+  `ConstructionCounters` tests pin down. ctest: 205/205 including ContextBudget,
+  unchanged.
+- No save change, no simulation change: only `app/` files moved, so
+  `mechapunk-sim.exe` was not relinked and the headless log and save cannot
+  move (as in D1b, D4 and the rest of D5). No random draw, no money movement,
+  nothing new for `Validation`.
+- Budget: `statistics` 21345 to 21973 of 25000; no new source file, so
+  `scripts/context_budget.py` is unchanged; `docs/MODULES.md` gained the
+  module's new size and the section's new row, and the guide's task table
+  row for D marks the task done.
+
 ## Done when
 
-- [ ] New homes and workplaces are built when short, by builders, paid from
-  supplies; money adds up over 40 days at 10000 robots.
-- [ ] The view shows scaffolds and finished buildings without a restart.
-- [ ] Every project has an inspector page with its builders, linked from its
-  building, owner and builders.
-- [ ] The guide's task table marks D done.
+- [x] New homes and workplaces are built when short, by builders, paid from
+  supplies; money adds up over 40 days at 10000 robots. (D2b, D2b2, D3c, D3d:
+  the two rules raise a habitat or a workplace after seven nights of shortage,
+  the office hires the builders, the supplies go through `PaySupplies`; the
+  seed 1 / 10000 robots / 40 days `--quiet` run adds up money on all 40 days,
+  D5e2a's note)
+- [x] The view shows scaffolds and finished buildings without a restart. (D4:
+  `AddBuilding`/`RemoveBuilding` and the scaffold flag; for the user to see
+  in the game)
+- [x] Every project has an inspector page with its builders, linked from its
+  building, owner and builders. (D5c, D5d: the project page, `ProjectLink`,
+  the building, organization and robot pages link it; for the user to check
+  in the game)
+- [x] The guide's task table marks D done. (D5e2b done: the row reads
+  "done; user to check in game")
