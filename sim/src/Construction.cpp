@@ -117,8 +117,11 @@ constexpr Shift kSiteShift{.startMinute = 7 * 60, .lengthMinutes = 480, .wage = 
 
 // Runs at midnight after `SettleEconomy`, so tonight's statistics are already
 // in `state_.history` and the supplies a site pays count into the new day's
-// books. No random number is taken: the same city raises the same buildings
-// on every machine (rule 1), and the saved random stream is left alone.
+// books, as do the sites this review starts and ends: their counts go into
+// `state_.today`, which that day's `RecordStatistics` snapshots into its
+// `DailyStats` at the next midnight. No random number is taken: the same city
+// raises the same buildings on every machine (rule 1), and the saved random
+// stream is left alone.
 void World::ReviewConstruction() {
     // The city's buildings by id, the order `City::buildings` keeps.
     const auto buildingFor = [this](EntityId id) -> Building* {
@@ -215,6 +218,10 @@ void World::ReviewConstruction() {
             .costSoFar = 0,
             .reason = reason,
         });
+        // The day the review ran into counts the site it started, beside the
+        // supplies that day's sites pay: `RecordStatistics` snapshots these
+        // books into that day's `DailyStats` at the next midnight.
+        ++state_.today.projectsStarted;
     };
 
     // One floor of a site: the floor above those standing, of the class the
@@ -391,6 +398,13 @@ void World::ReviewConstruction() {
             break;
         }
     }
+    // The sites whose nights are up count as finished in the day the review
+    // ran into, the way the started ones do: this is the night their last
+    // floor went up, and a save may hold a site an older game left finished.
+    state_.today.projectsFinished += static_cast<std::int64_t>(
+        std::ranges::count_if(state_.projects, [](const Project& project) {
+            return project.daysLeft == 0;
+        }));
     std::erase_if(state_.projects,
                   [](const Project& project) { return project.daysLeft == 0; });
 

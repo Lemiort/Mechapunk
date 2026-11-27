@@ -40,7 +40,11 @@ new `robot-pages` module. D5e is done on 2026-11-27, also with no save change:
 the Property tab has a Construction section, drawn in a new
 `StatisticsConstruction.cpp`. D5e2 was added on 2026-11-27, after D5e, and is
 open: the section's "by day" needs saved counters in `DailyStats`, which is a
-save change of its own (version 26), the way D5b2 did version 25.
+save change of its own (version 26), the way D5b2 did version 25. D5e2 was split on 2026-11-27 into D5e2a and
+D5e2b: D5e2a is done and raised the save version to 26 and the game to
+0.26.0 - the daily statistics now count the sites the review started and
+ended and the builders at the site offices - and D5e2b, the Construction
+section's by-day plots, is open.
 
 ## What and why
 
@@ -1439,20 +1443,23 @@ limit and the section put it over, so the split was forced, not chosen.
   row, the `Statistics` row and the task row. ctest: 202/202 including
   ContextBudget, unchanged.
 
-### D5e2. Construction counters as saved state (statistics + construction + saves)
+### D5e2. Construction counters as saved state — split on 2026-11-27
 
-Added on 2026-11-27, after D5e, because the section's "by day" needs counters
-`DailyStats` does not have, and that is a save change of its own (guide rule
-3), the way D5b2 shipped the site's cost and reason as version 25 before D5c
-drew them. Open: the task's last step.
+The step's bullets live in three modules: the counters are `construction`
+and `statistics` state with the save change in `saves`, and the section's
+plots are `statistics` again. A save change is one unit - fields, counting,
+migration, fixture and tests land together, the way D5b2 shipped version
+25 - so the cut falls between the counters and the plots: D5e2a and D5e2b,
+one commit each, the original bullets living on inside them.
+
+### - [x] D5e2a. The counters as saved state (construction + statistics + saves)
 
 Open: `Economy.hpp` (`DailyStats`), `EconomyStatistics.cpp` (`RecordStatistics`),
 `Construction.cpp` (the review that starts and ends projects), `Save.hpp`,
 `Save.cpp` (the migration list), `Migrations.hpp`, the end of `Migrations.cpp`,
-`Validation.cpp`, `SaveTests.cpp`, plus the fixture and its README row, and
-`app/StatisticsConstruction.cpp` (the section gains its plots).
+`Validation.cpp`, `SaveTests.cpp`, plus the fixture and its README row.
 
-- `DailyStats` gains `projectsStarted`, `projectsFinished` and
+- The daily statistics gain `projectsStarted`, `projectsFinished` and
   `buildersEmployed`, counted per night: the review (Construction.cpp) counts
   the sites it started and ended at that midnight, `RecordStatistics` counts
   the robots whose job room is a `SiteOffice` room (the builders, as
@@ -1474,12 +1481,100 @@ Open: `Economy.hpp` (`DailyStats`), `EconomyStatistics.cpp` (`RecordStatistics`)
   after `RecordStatistics` and after the books roll over (guide section 4),
   so the natural reading is the day the review ran into, but the choice
   must be recorded in the code and the test.
-- Then `app/StatisticsConstruction.cpp` gains the plots: projects started,
-  finished and builders employed over the days kept, `PlotCount` over the
-  new keys, and the facts table can read the last night's counters.
-- Budget warning: `statistics` stands at 21221 of 25000 and `construction`
-  at 24031, 969 short; the step must make room in `construction` first, as
-  D1a, D2b, D2c3, D3d and D5b2 did.
+
+Done as (construction + statistics + saves, one commit): the two event
+counters went into `DayCounters` and the one state counter into `DailyStats`,
+not all three into `DailyStats` as the step's text says: the review runs
+after the books roll over, so its counts must survive a save taken in the
+middle of a day, and `DayCounters` (`state_.today`) is the saved "counted
+through the day" state - the guide's rule 3 table routes a `DayCounters`
+field to `world.today` and every `world.history[i].counted`. `buildersEmployed`
+is a night's state like `employed`, so it is the one key of every
+`world.history[i]`. The step's open question - which night a site counts
+into - was decided as the day the review ran into, the same day that night's
+sites already pay their supplies into (`today.supplies`, since the review
+runs after the rollover); the choice is recorded in the review's comment and
+pinned by the test.
+
+- `Economy.hpp`: `DayCounters` gains `projectsStarted` and `projectsFinished`
+  beside `venuesClosed`, `DailyStats` gains `buildersEmployed` beside
+  `employed`.
+- `Construction.cpp`: `startSite` raises `state_.today.projectsStarted` when
+  it really starts a site (no plot, no count), and before the review erases
+  the finished projects it adds their number to `state_.today.projectsFinished`
+  - the site that just raised its last floor, and a site a save left
+  finished. No random draw, no money movement: the saved stream is untouched
+  and the city's story cannot move (rule 1).
+- `EconomyStatistics.cpp`: `RecordStatistics` collects the ids of the
+  `SiteOffice` rooms from `rooms_` and counts a robot whose job room is one
+  into `buildersEmployed` - the definition `ProjectLists` (app) uses; a
+  finished site's office is an ordinary empty unit (D3d), so it counts only
+  while the project is up.
+- `V25ToV26` (declared in `Migrations.hpp`, registered in `kMigrations`, at
+  the end of `Migrations.cpp`) writes 0 into `world.today`'s two counters,
+  every `world.history[i].counted`'s two counters and every
+  `world.history[i]`'s `buildersEmployed`, the way `V17ToV18` wrote the gang
+  counters. `Save.hpp` raises the save version to 26 and the game to 0.26.0.
+- Validation: nothing new, checked rather than assumed - `Validation.cpp`
+  puts no range on any `DayCounters` or `DailyStats` field (not on
+  `today.created` either), and the game only ever raises these counters.
+- Fixture `tests/fixtures/saves/v26-city.json` from the guide's command at
+  game 0.26.0, plus its row and a sentence in that folder's README. Like the
+  v24 and v25 ones it raised no site, so its counters are all 0 and name
+  nothing: the hand-written saves are what prove the keys.
+- Tests: `CurrentVersionFixtureLoadsAndRoundTrips` points at v26 and checks
+  today's books and every saved day count no construction;
+  `Version25FixtureMigratesAndRuns` checks the v25 fixture names none of the
+  three keys (`"projects"` alone would prove nothing, the world has carried
+  that list since version 23), loads with every counter reading 0 - the
+  zero a version 25 game wrote by never counting, not a count the migration
+  invented - and runs the city a day; and two new tests in a new
+  `tests/ConstructionCountersTests.cpp` (suite `ConstructionCounters`),
+  neither able to skip: `SitesCountIntoTheDayTheReviewRanInto` runs the seed
+  5 / 1000 robots city to its first habitat - the midnight that raised it
+  leaves the count in `today` and in no history entry, one night more and
+  `history.back().counted.projectsStarted` holds it; run to the midnight the
+  site ends, `today.projectsFinished >= 1`, one night more and history holds
+  that too; `BuildersAtTheOfficeAreEmployedThatNight` gives four robots at
+  home the site's office as their job - what a builder off its shift looks
+  like, and the office's staff rules (D3c) give it the six places
+  `ValidateWorldState` asks a job room to hold - and reads the night's
+  `buildersEmployed >= 3`, the bound leaving margin for a robot scrapped
+  on the way (the guide's "leave margin"). A busy city hires nobody at an
+  office by itself (D3c's note), so the builders are made by hand.
+- First make room, as the step's warning and D1a, D2b, D2c3, D3d and D5b2
+  did: `construction` stood at 24031 of 25000, so the new tests went into
+  the new file joining a new `construction-counters` module (as D5b2 made
+  `site-supplies`): `construction` 24031 to 24284 - only the review's
+  counting lines - and `construction-counters` 16336. And `tests/SaveTests.cpp`
+  went to 10254, over the 10k file limit, so the version 19 to 24
+  fixture-migration tests moved verbatim to `tests/SaveFixtureTests.cpp` -
+  the era split D1a used, with a local copy of the `EditSave` helper -
+  leaving the current version's fixture and the previous version's test in
+  `SaveTests.cpp` as that file's header says. `saves` 22667 to 24006,
+  `statistics` 21070 to 21345, `money` 23409 to 23508, `property` 20920 to
+  21019, `units` 15570 to 15669 (the two headers every one of them reads).
+  Warning for D5e2b: `saves` has 994 tokens left.
+- ctest: 205/205 including ContextBudget (202 before, +3 new tests; the
+  moved fixture tests were not added).
+- Simulation code changed, so the headless check ran: the seed 1, 10000
+  robots, 40 days `--quiet` log adds up money on all 40 days (`money` equal
+  to `created in all`, `destroyed 0` every day, checked line by line) and
+  reads day 40 exactly as D3d's note quotes it - created 700, wages at 110%,
+  29 out of work, 6004 vacant apartments, 29 empty units, supplies 926911,
+  gini 505, 1071 broke, 11 behind: the step counts, it does not decide. And
+  the seed 7, 2000 robots, 6 days `--all --save` run made before the step
+  (the sim files stashed and the runner rebuilt) and after it: the logs are
+  identical to the last two lines, and the two saves are equal as parsed
+  JSON once the version lines and the three new keys are removed - that
+  city raises no site, and the step writes counts and nothing else.
+
+### - [ ] D5e2b. The by-day plots (statistics module)
+
+Then `app/StatisticsConstruction.cpp` gains the plots: projects started,
+finished and builders employed over the days kept, `PlotCount` over the
+new keys, and the facts table can read the last night's counters. `statistics`
+stands at 21345 of 25000.
 
 ## Done when
 

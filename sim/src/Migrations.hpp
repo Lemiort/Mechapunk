@@ -128,4 +128,13 @@ namespace mechapunk::sim::migrations {
 // old save gains cost 0 and the reason `unknown`.
 [[nodiscard]] std::expected<void, std::string> V24ToV25(SaveDocument& world);
 
+// Version 25 to 26: the daily statistics count construction (task D, step
+// D5e2): the day's `DayCounters` gain the sites the nightly review started
+// and ended, and every `DailyStats` the robots whose job is a site office.
+// A version 25 game ran the review without counting it and never looked at
+// the offices, so every counter of an old save - today's books and every
+// saved day - gains 0: the migration must not invent counts it never
+// recorded.
+[[nodiscard]] std::expected<void, std::string> V25ToV26(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

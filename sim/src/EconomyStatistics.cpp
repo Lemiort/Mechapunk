@@ -164,12 +164,23 @@ void World::RecordStatistics() {
         stats.openVenues = venues;
         stats.emptyUnits = static_cast<std::int64_t>(rooms_.RoomsOfKind(RoomKind::VacantStore).size());
     }
+    // The builders: the robots whose job is a site office, the way
+    // `ProjectLists` (app) defines a builder. A finished site's office became
+    // an ordinary empty unit (step D3d), so only a going-up site's offices
+    // are here, and a robot working at one is a builder.
+    std::vector<std::uint64_t> officeIds;
+    for (const RoomRef& office : rooms_.RoomsOfKind(RoomKind::SiteOffice)) {
+        officeIds.push_back(office.room->id.value);
+    }
     for (const Robot& robot : state.robots) {
         stats.robotMoney += robot.credits;
         stats.robotSavings += robot.savings;
         if (robot.workspace.IsValid()) {
             ++stats.employed;
             ++stats.jobLevels.at(std::min<std::size_t>(robot.jobLevel, stats.jobLevels.size() - 1));
+            if (std::ranges::find(officeIds, robot.workspace.value) != officeIds.end()) {
+                ++stats.buildersEmployed;
+            }
         }
         stats.averageCharge += robot.needs.charge;
         stats.averageCondition += robot.needs.condition;

@@ -148,4 +148,25 @@ std::expected<void, std::string> V24ToV25(SaveDocument& world) try {
         std::format("the version 24 world is malformed ({})", error.what()));
 }
 
+std::expected<void, std::string> V25ToV26(SaveDocument& world) try {
+    // Version 26 counts construction in the daily statistics (task D, step
+    // D5e2): the sites the nightly review started and ended in a day, and
+    // the robots whose job is a site office that night. A version 25 game
+    // ran the review without counting its sites and never looked at the
+    // offices, so no old counter can be read back - every one gains 0, in
+    // today's books and in every saved day, rather than a count the old
+    // game never recorded.
+    world["today"]["projectsStarted"] = std::int64_t{0};
+    world["today"]["projectsFinished"] = std::int64_t{0};
+    for (SaveDocument& day : world["history"].get_array()) {
+        day["counted"]["projectsStarted"] = std::int64_t{0};
+        day["counted"]["projectsFinished"] = std::int64_t{0};
+        day["buildersEmployed"] = std::int64_t{0};
+    }
+    return {};
+} catch (const std::exception& error) {
+    return std::unexpected(
+        std::format("the version 25 world is malformed ({})", error.what()));
+}
+
 }  // namespace mechapunk::sim::migrations

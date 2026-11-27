@@ -25,7 +25,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 22k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
+| saves | 24k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
 | saves-frozen | 13k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 12k | `World.hpp`, `main.cpp` |
@@ -48,6 +48,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 | construction | 24k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionTests.cpp`, `SiteOfficeTests.cpp` |
 | site-supplies | 15k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `SiteSuppliesTests.cpp` |
+| construction-counters | 16k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionCountersTests.cpp` |
 
 ## What lives where
 
@@ -74,7 +75,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Chronicle.hpp` | The saved story (`ChronicleEntry`, `kChronicleCap`) |
 | `Chronicle.cpp` | `World::Chronicle`: which events `Emit` keeps in the chronicle |
 | `Construction.hpp` | The buildings going up (`Project`: the building, its owner, the nights left, the floors done, the credits its site has paid for supplies and the shortage that started it, as `ProjectReason`) and `IsUnderConstruction`, which hiring, moving home and a newcomer's choice of home ask per room (task D, steps D2c and D2c2) |
-| `Construction.cpp` | `World::ReviewConstruction`: a site's supplies counted into its cost, its floors and the site office on its ground floor, the finished site's office closing into an empty unit, and the shortage that starts a new one |
+| `Construction.cpp` | `World::ReviewConstruction`: a site's supplies counted into its cost, its floors and the site office on its ground floor, the finished site's office closing into an empty unit, the sites it started and ended counted into the day's books, and the shortage that starts a new one |
 | `Economy.hpp` | Organizations, loans, emissions, `DayCounters`, `DailyStats` |
 | `Economy.cpp` | `SetCredits` (tests), `ValidateEconomy` |
 | `Founding.cpp` | `FoundEconomy` (organizations, owners, starting money), `IndexEconomy` |
@@ -82,7 +83,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Units.cpp` | Prices and rents, `CloseUnit`, `OpenUnit`, `ReviewUnits`, `SetPrices` |
 | `Property.cpp` | `Transfer`, `Bequeath`, `TradeProperty` (sales, mortgages) |
 | `Settlement.cpp` | `SettleEconomy`, `RunCityHall`, `SetPolicyRate` |
-| `EconomyStatistics.cpp` | `RecordStatistics`, `GiniPerMille`, sector and emission names |
+| `EconomyStatistics.cpp` | `RecordStatistics`, `GiniPerMille`, sector and emission names, and the builders employed at the site offices |
 | `Social.hpp/.cpp` | Interests, bonds, memories (`MemoryKind`, `MemoryText`), talks, `Remember` (also counts daily statistics) |
 | `LifeCycle.cpp` | Aging, wear, `Scrap` (with `Bequeath`), `AddNewcomer` (whose home skips a site's) |
 | `Transit.cpp`, `Metro.hpp/.cpp` | Trip planning, the metro network, timetable, trains, `PlanDriverRun` |

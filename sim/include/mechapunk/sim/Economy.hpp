@@ -127,6 +127,11 @@ struct DayCounters {
     std::int64_t movedInTogether{};
     std::int64_t venuesOpened{};
     std::int64_t venuesClosed{};
+    // Construction: the sites the nightly review started and ended. The review
+    // runs after the books roll over, so a site counts into the day it ran
+    // into - the same day its supplies do.
+    std::int64_t projectsStarted{};
+    std::int64_t projectsFinished{};
     std::int64_t wageTax{};
     std::int64_t propertyTax{};
     std::int64_t profitTax{};
@@ -157,6 +162,7 @@ struct DailyStats {
     std::int64_t population{};
     std::int64_t employed{};
     std::int64_t unemployed{};
+    std::int64_t buildersEmployed{};  // Robots whose job is a site office.
     std::int64_t averageCharge{};
     std::int64_t averageCondition{};
     std::int64_t averageSocial{};

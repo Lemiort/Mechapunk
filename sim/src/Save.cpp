@@ -219,6 +219,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 24,
               .summary = "a site's supplies paid so far and the shortage that started it",
               .apply = &migrations::V24ToV25},
+    Migration{.fromVersion = 25,
+              .summary = "construction counters in the daily statistics",
+              .apply = &migrations::V25ToV26},
 };
 }  // namespace
 
