@@ -99,13 +99,16 @@ void CityView::AddLights(Scene& scene) {
         scene.AddPointLight(PointLight(0.0F, kHiddenDepth, 0.0F, 0.0F, 0.0F,
                                        0.0F, kLampPower));
     }
-    for (const vec3& bulb : streetLamps_) {
-        scene.AddSpotLight(SpotLight(bulb.x, 0.0F, bulb.z, 0.0F, 0.0F, 0.0F,
-                                     bulb.x, bulb.y, bulb.z, kStreetLampCutoff));
-    }
 }
 
 void CityView::SyncLights(Scene& scene) {
+    // Street lamps of streets the city grew since the last call (all of them
+    // the first time): a spot light each, off by day like the others.
+    for (; streetLampsLit_ < streetLamps_.size(); ++streetLampsLit_) {
+        const vec3& bulb = streetLamps_[streetLampsLit_];
+        scene.AddSpotLight(SpotLight(bulb.x, 0.0F, bulb.z, 0.0F, 0.0F, 0.0F,
+                                     bulb.x, bulb.y, bulb.z, kStreetLampCutoff));
+    }
     for (NeonSign& sign : neonSigns_) {
         if (sign.lit) {
             continue;

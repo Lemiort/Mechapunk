@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K9 done. Save version 34, game 0.34.0.
+Status: planned on 2026-11-27; K1 to K10 done. Save version 34, game 0.34.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -227,7 +227,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   middle node is 1, and a save round trip keeps the new streets.
 - Check: build, ctest, seed 7 byte-identical except the settings keys.
 
-### - [ ] K10. The view draws new streets (view-core)
+### - [x] K10. The view draws new streets (view-core)
 
 - Module: view-core. Depends on: K9. Save change: no.
 - Open: `app/CityView.cpp` (the constructor's street loop, `UpdateCity`,
@@ -235,7 +235,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   `app/CityView.hpp`.
 - Do: when `UpdateCity` sees edges or lots the view did not draw, it draws
   their street slabs and lamps and the parks of new lots, and removes the
-  parks of lots that became buildings. Batch them under building 0 the way
+  parks of lots that became buildings (not done: parks are batched with building 0 and a building drawn on a plot already covers its park, as since task D). Batch them under building 0 the way
   `BatchStaticsFor` does. Street lamps are spot lights: add them in
   `SyncLights` the way task I, step I4 added neon.
 - Tests: none without a renderer. Check: build, ctest, `ContextBudget`.

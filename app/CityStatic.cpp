@@ -238,9 +238,9 @@ void CityView::AddFacade(vec3 center, std::span<const MassBox> boxes, sim::Build
     }
 }
 
-void CityView::AddStreetLamps() {
+void CityView::AddStreetLamps(std::size_t firstEdge) {
     const PropModel& lamp = Prop(PropKind::StreetLamp);
-    for (const sim::CityEdge& edge : city_.edges) {
+    for (const sim::CityEdge& edge : std::span{city_.edges}.subspan(firstEdge)) {
         const vec3 from = NodePosition(edge.from);
         const vec3 to = NodePosition(edge.to);
         const float length = glm::length(to - from);

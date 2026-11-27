@@ -73,6 +73,58 @@ float Smoothstep(float edge0, float edge1, float value) {
 
 // namespace
 
+// Draws what a grown city added: the street slabs, their lamps, a wider
+// ground, and a park on every free plot that came inside the city's bounds.
+// Batched under building 0, as the constructor's statics are.
+void CityView::AddGrownStreets(std::size_t firstNode, std::size_t firstEdge,
+                               vec3 oldMinimum, vec3 oldMaximum) {
+    vec3 minimum{0.0F};
+    vec3 maximum{0.0F};
+    for (const sim::CityNode& node : city_.nodes) {
+        const vec3 position = NodePosition(node.id);
+        minimum = glm::min(minimum, position);
+        maximum = glm::max(maximum, position);
+    }
+    minimum_ = minimum;
+    maximum_ = maximum;
+    center_ = (minimum + maximum) * 0.5F;
+    extent_ = std::max(maximum.x - minimum.x, maximum.z - minimum.z);
+    const float groundSize = extent_ + 8.0F;
+    statics_.push_back({.mesh = assets_.plane.get(),
+                        .transform = {.position = center_,
+                                      .rotationDegrees = vec3(0.0F),
+                                      .scale = {groundSize, 1.0F, groundSize}},
+                        .material = assets_.ground});
+    for (const sim::CityEdge& edge : std::span{city_.edges}.subspan(firstEdge)) {
+        const vec3 from = NodePosition(edge.from);
+        const vec3 to = NodePosition(edge.to);
+        const vec3 span = glm::abs(to - from);
+        statics_.push_back(
+            {.mesh = assets_.cube.get(),
+             .transform = {.position = (from + to) * 0.5F,
+                           .rotationDegrees = vec3(0.0F),
+                           .scale = {std::max(span.x, kStreetWidth), kStreetHeight,
+                                     std::max(span.z, kStreetWidth)}},
+             .material = assets_.street});
+    }
+    AddStreetLamps(firstEdge);
+    const auto inside = [](vec3 position, vec3 low, vec3 high) {
+        return position.x > low.x && position.z > low.z && position.x < high.x &&
+               position.z < high.z;
+    };
+    sim::Pcg32 random = sim::Pcg32::FromSeed(firstNode, kDecorationStream);
+    for (const sim::CityLot& lot : city_.lots) {
+        const vec2 quadrant = kQuadrants.at(lot.corner);
+        const vec3 position =
+            NodePosition(lot.node) +
+            vec3{quadrant.x * kQuadrantOffset.x, 0.0F, quadrant.y * kQuadrantOffset.y};
+        if (inside(position, minimum, maximum) && !inside(position, oldMinimum, oldMaximum)) {
+            AddPark(position, random);
+        }
+    }
+    BatchStaticsFor(0);
+}
+
 CityView::CityView(const sim::City& city, std::uint64_t seed,
                    RenderAssets& assets)
     : city_(city), rooms_(city_), routes_(city_), metro_(city_), assets_(assets) {
@@ -83,6 +135,8 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
         minimum = glm::min(minimum, position);
         maximum = glm::max(maximum, position);
     }
+    minimum_ = minimum;
+    maximum_ = maximum;
     center_ = (minimum + maximum) * 0.5F;
     extent_ = std::max(maximum.x - minimum.x, maximum.z - minimum.z);
 
@@ -242,6 +296,21 @@ void CityView::UpdateCity(const sim::City& city) {
     // project raises one (task D): redraw those whose drawn shape no longer
     // matches - new, taller, scaffold turned finished - and drop any the
     // simulation no longer has.
+    // Streets the city grew (task K, step K9): draw them before the buildings
+    // that may stand on them.
+    if (city.nodes.size() > city_.nodes.size()) {
+        const std::size_t firstNode = city_.nodes.size();
+        const std::size_t firstEdge = city_.edges.size();
+        // Which plots were inside the drawn city, to park only the new ones.
+        const vec3 oldMinimum = minimum_;
+        const vec3 oldMaximum = maximum_;
+        city_.nodes = city.nodes;
+        city_.edges = city.edges;
+        city_.lots = city.lots;
+        routes_ = sim::RoutePlanner(city_);
+        routeCache_.clear();
+        AddGrownStreets(firstNode, firstEdge, oldMinimum, oldMaximum);
+    }
     city_.buildings = city.buildings;
     rooms_ = sim::RoomIndex(city_);
     plans_.clear();

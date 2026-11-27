@@ -352,7 +352,12 @@ private:
     // Adds a model that never moves, such as a street lamp, to the statics.
     void AddStaticModel(const PropModel& model, glm::vec3 origin,
                         float yawDegrees);
-    void AddStreetLamps();
+    // Lamps along the edges from `firstEdge` on (a grown city adds only the new ones).
+    void AddStreetLamps(std::size_t firstEdge = 0);
+    // Draws the streets, lamps and parks a grown city added: nodes from
+    // `firstNode` and edges from `firstEdge` on, and the plots that came inside.
+    void AddGrownStreets(std::size_t firstNode, std::size_t firstEdge, glm::vec3 oldMinimum,
+                         glm::vec3 oldMaximum);
     // Grass, trees and benches on a corner without a building.
     void AddPark(glm::vec3 center, sim::Pcg32& random);
     void SubmitBox(RenderQueue& queue, glm::vec3 minimum, glm::vec3 maximum,
@@ -439,8 +444,13 @@ private:
     std::vector<glm::vec3> streetLamps_;
     // Point lights reserved for the lamps of the open floor.
     std::size_t lampPoolStart_{};
+    // How many of `streetLamps_` already have a spot light in the scene.
+    std::size_t streetLampsLit_{0};
     std::vector<LitLamp> litLamps_;
     glm::vec3 center_{0.0F};
+    // The corners of the grid as drawn, to tell which plots a growth brings inside.
+    glm::vec3 minimum_{0.0F};
+    glm::vec3 maximum_{0.0F};
     float extent_{1.0F};
     // Where things were drawn in the last frame, for picking.
     std::vector<Marker> robotMarkers_;
