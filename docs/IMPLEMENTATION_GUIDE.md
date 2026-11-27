@@ -247,11 +247,14 @@ Do them in this order; each file lists its steps and which are done.
 | B. Gangs (B1-B11d done, all steps) | `docs/tasks/B-gangs.md` | gangs, inspector, statistics | done (v18) |
 | C. Chronicle (done; user to check in game) | `docs/tasks/C-chronicle.md` | chronicle-lists, statistics, inspector | yes (v21) |
 | D. Construction (done; user to check in game) | `docs/tasks/D-construction.md` | generation, saves, construction, site-supplies, careers, life-cycle, property, view-core, ui, project-lists, construction-counters, statistics, project-pages, inspector, robot-pages | yes (v25, and v26 for step D5e2a's counters) |
-| E. Simulation level of detail | `docs/tasks/E-level-of-detail.md` | world | maybe |
+| E. Simulation level of detail (E1 and E3 moved to J) | `docs/tasks/E-level-of-detail.md` | world | maybe |
 | F. See-through windows | `docs/tasks/F-windows.md` | view-core, view-interiors | no |
 | G. Unions | `docs/tasks/G-unions.md` | money, careers | yes |
 | H. Engine (NEE, pull requests only) | `docs/tasks/H-engine.md` | external | no |
 | I. Architecture: more building types (done; user to check in game) | `docs/tasks/I-architecture.md` | generation, saves, view-core, construction, inspector, statistics | yes (v27) |
+| J. Performance: snapshots at render rate, cheaper trips, trip planning on all cores | `docs/tasks/J-performance.md` | ui, world, metro, city-streets, threads (new) | no |
+| K. A city that grows from one dormitory: newcomers, buildings, metro, banks, corporations, gangs | `docs/tasks/K-growing-city.md` | generation, validation, money, life-cycle, construction, metro, careers, view-core, property, gangs, chronicle, statistics, runner | yes |
+| L. Robot bodies (head, hands, legs) and skins, used by the simulation | `docs/tasks/L-bodies-and-skins.md` | bodies (new), saves, world, life-cycle, careers, social, units, money, gangs, view-robots, rendering, robot-pages, statistics | yes |
 
 ## 9. Detail pages (the pattern from task A)
 
