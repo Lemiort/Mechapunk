@@ -91,8 +91,10 @@ void CityView::BuildStaticBatches() {
     for (const StaticItem& item : statics_) {
         add(owner(item), item);
     }
-    for (const auto& [id, block] : buildingBlocks_) {
-        add(id, block);
+    for (const auto& [id, blocks] : buildingBlocks_) {
+        for (const StaticItem& block : blocks) {
+            add(id, block);
+        }
     }
     staticBatches_.reserve(groups.size());
     for (auto& [key, group] : groups) {
@@ -162,8 +164,7 @@ void CityView::AddPark(vec3 center, sim::Pcg32& random) {
     }
 }
 
-void CityView::AddFacade(vec3 center, float width, float depth,
-                         std::uint32_t floors) {
+void CityView::AddFacade(vec3 center, std::span<const MassBox> boxes) {
     // Windows every 3.5 m on every side and floor, standing a little proud
     // of the wall so they read from a distance.
     const std::shared_ptr<const Material> glass =
@@ -171,6 +172,7 @@ void CityView::AddFacade(vec3 center, float width, float depth,
     const std::shared_ptr<const Material> litGlass =
         assets_.palette->GetGlowing(kFacadeGlass, kWindowLight);
     // Which windows are lit is fixed per window, mixed from its place.
+    // `face` also tells the boxes of one building apart.
     const auto lit = [&](std::uint32_t face, std::uint32_t floor, int window) {
         std::uint32_t hash =
             (static_cast<std::uint32_t>(std::lround(center.x)) * 73856093U) ^
@@ -187,17 +189,20 @@ void CityView::AddFacade(vec3 center, float width, float depth,
     constexpr float kHeight = 1.4F * kS;
     constexpr float kSill = 0.9F * kS;
     constexpr float kProud = 0.06F * kS;
-    const auto side = [&](float length, bool alongX, float offset) {
+    const auto side = [&](const MassBox& box, std::uint32_t index, float length, bool alongX,
+                          float offset) {
+        const vec3 middle =
+            center + vec3{(box.x0 + box.x1) * 0.5F * kS, 0.0F, (box.z0 + box.z1) * 0.5F * kS};
         const int count = std::max(1, static_cast<int>(length / kSpacing));
-        const std::uint32_t face = (alongX ? 0U : 2U) + (offset > 0.0F ? 1U : 0U);
-        for (std::uint32_t floor = 0; floor < floors; ++floor) {
+        const std::uint32_t face = (alongX ? 0U : 2U) + (offset > 0.0F ? 1U : 0U) + (4U * index);
+        for (std::uint32_t floor = box.firstFloor; floor < box.endFloor; ++floor) {
             const float y = (static_cast<float>(floor) * kFloorHeight) + kSill;
             for (int window = 0; window < count; ++window) {
                 const float along =
                     (-length * 0.5F) +
                     (length / static_cast<float>(count) *
                      (static_cast<float>(window) + 0.5F));
-                Transform transform{.position = center, .rotationDegrees = vec3(0.0F)};
+                Transform transform{.position = middle, .rotationDegrees = vec3(0.0F)};
                 if (alongX) {
                     transform.position += vec3{along, y, offset};
                     transform.scale = {kWidth, kHeight, kProud * 2.0F};
@@ -214,10 +219,15 @@ void CityView::AddFacade(vec3 center, float width, float depth,
             }
         }
     };
-    side(width, true, depth * 0.5F);
-    side(width, true, -depth * 0.5F);
-    side(depth, false, width * 0.5F);
-    side(depth, false, -width * 0.5F);
+    for (std::uint32_t index = 0; index < boxes.size(); ++index) {
+        const MassBox& box = boxes[index];
+        const float width = (box.x1 - box.x0) * kS;
+        const float depth = (box.z1 - box.z0) * kS;
+        side(box, index, width, true, depth * 0.5F);
+        side(box, index, width, true, -depth * 0.5F);
+        side(box, index, depth, false, width * 0.5F);
+        side(box, index, depth, false, -width * 0.5F);
+    }
 }
 
 void CityView::AddStreetLamps() {

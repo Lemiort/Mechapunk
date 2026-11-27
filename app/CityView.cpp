@@ -134,27 +134,22 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                  // The street is to the north (-z) when the building sits
                  // south of its intersection: turn its plans to face it.
                  .turned = quadrant.y > 0.0F};
-        buildingBlocks_.emplace(
-            building.id.value,
-            StaticItem{.mesh = assets_.cube.get(),
-                       .transform = {.position = centerOnGround,
-                                     .rotationDegrees = vec3(0.0F),
-                                     .scale = {kBuildingWidth, height,
-                                               kBuildingDepth}},
-                       .material = habitat ? assets_.habitat
-                                           : assets_.workplace});
+        buildingBlocks_.emplace(building.id.value, MassingBlocks(building, centerOnGround));
+        // The sign hangs on the wall that reaches the street, not in the air
+        // beside a setback or between twin towers.
+        const float signY = SignHeightMeters(building.style, building.floors) * kS;
 
         // A sign high on the street side, and one per store at street level
         // above its door.
         const float front = shape.turned ? -1.0F : 1.0F;
         AddSignPanel(centerOnGround +
-                      vec3{0.0F, (height * 0.6F) - (0.7F * kS),
+                      vec3{0.0F, signY - (0.7F * kS),
                            front * ((kBuildingDepth * 0.5F) + (0.075F * kS))},
                   kBuildingWidth * 0.45F, 1.4F * kS,
                   habitat ? kHabitatNeon : kWorkplaceNeon);
         neonSigns_.push_back(
             {.position = centerOnGround +
-                         vec3{0.0F, height * 0.6F,
+                         vec3{0.0F, signY,
                               front * ((kBuildingDepth * 0.5F) + (2.5F * kS))},
              .color = habitat ? kHabitatNeon : kWorkplaceNeon,
              .building = building.id});
@@ -183,7 +178,8 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     }
     for (const sim::Building& building : city_.buildings) {
         const BuildingShape& shape = shapes_.at(building.id.value);
-        AddFacade(shape.center, kBuildingWidth, kBuildingDepth, shape.floors);
+        AddFacade(shape.center, MassingOf(building.style, building.floors));
+        AddRoof(building, shape.center);
     }
 
     // Corners without a building are small parks. The city saves exactly
@@ -309,23 +305,18 @@ void CityView::AddBuilding(const sim::Building& building) {
         return;
     }
     const bool habitat = building.kind == sim::BuildingKind::Habitat;
-    buildingBlocks_.emplace(
-        building.id.value,
-        StaticItem{.mesh = assets_.cube.get(),
-                   .transform = {.position = centerOnGround,
-                                 .rotationDegrees = vec3(0.0F),
-                                 .scale = {kBuildingWidth, height, kBuildingDepth}},
-                   .material = habitat ? assets_.habitat : assets_.workplace});
+    buildingBlocks_.emplace(building.id.value, MassingBlocks(building, centerOnGround));
+    const float signY = SignHeightMeters(building.style, building.floors) * kS;
     const BuildingShape& shape = shapes_.at(building.id.value);
     const float front = shape.turned ? -1.0F : 1.0F;
     AddSignPanel(centerOnGround +
-                     vec3{0.0F, (height * 0.6F) - (0.7F * kS),
+                     vec3{0.0F, signY - (0.7F * kS),
                           front * ((kBuildingDepth * 0.5F) + (0.075F * kS))},
                  kBuildingWidth * 0.45F, 1.4F * kS,
                  habitat ? kHabitatNeon : kWorkplaceNeon);
     neonSigns_.push_back(
         {.position = centerOnGround +
-                     vec3{0.0F, height * 0.6F,
+                     vec3{0.0F, signY,
                           front * ((kBuildingDepth * 0.5F) + (2.5F * kS))},
          .color = habitat ? kHabitatNeon : kWorkplaceNeon,
          .building = building.id});
@@ -351,12 +342,15 @@ void CityView::AddBuilding(const sim::Building& building) {
                               .building = building.id,
                               .unit = units[index]->id});
     }
-    AddFacade(centerOnGround, kBuildingWidth, kBuildingDepth, building.floors);
+    AddFacade(centerOnGround, MassingOf(building.style, building.floors));
+    AddRoof(building, centerOnGround);
     BatchStaticsFor(building.id.value);
     // The block itself, batched under the building so it hides while it is
     // open, as BuildStaticBatches batches the generated ones.
-    const std::array<Transform, 1> blockTransforms{
-        buildingBlocks_.at(building.id.value).transform};
+    std::vector<Transform> blockTransforms;
+    for (const StaticItem& block : buildingBlocks_.at(building.id.value)) {
+        blockTransforms.push_back(block.transform);
+    }
     staticBatches_.push_back(
         {.building = building.id.value,
          .batch = MeshBatch(*assets_.cube.get(),

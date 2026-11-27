@@ -103,7 +103,7 @@ One module and one commit each. Steps that change saved state follow rule 3.
   `scripts/context_budget.py`, with `docs/MODULES.md` regenerated. After:
   `generation` 23626, `city-styles` 13780, `saves` 20503 of 25000.
 
-### - [ ] I2. The block is drawn per style (view-core)
+### - [x] I2. The block is drawn per style (view-core)
 
 - Open: `app/CityStatic.cpp` (the building block and `AddFacade`),
   `app/CityView.cpp` (`BuildStaticBatches`, `AddBuilding`, `RemoveBuilding`,
@@ -120,6 +120,22 @@ One module and one commit each. Steps that change saved state follow rule 3.
   slabs: the style appears when the building is finished.
 - No test is possible without a renderer: build, `ContextBudget`, and the
   user looking at the city.
+- Done, with notes. The shapes are pure geometry in new `app/Massing.hpp/.cpp`
+  (in `mechapunk_layout`), so `tests/MassingTests.cpp` checks them: every box
+  and roof piece lies in the footprint and the first box is a full-width base
+  from the ground. `app/CityMassing.cpp` turns them into statics. The step as
+  drafted left three things out that it needed: (1) `AddFacade` now puts
+  windows on each box's own walls, or windows would hang in the air beside a
+  setback; the lit rule is unchanged for `Plain`; (2) the street sign and its
+  neon follow `SignHeightMeters`, so they never float beside a setback, a
+  plinth or between twin towers; (3) `buildingBlocks_` holds a list of boxes
+  per building. `TwinTowers` has a full-width base of up to two floors, so
+  the ground-floor units and their signs stay as they are; `Tower`'s crown
+  is one floor above the building, outside the pick box. Picking still uses
+  the full footprint and height. New module `view-massing` (11165 of 25000);
+  `view-core` stands at 20934. I could not look at it in the game: roof tilt
+  signs (the gabled slopes and the sawtooth teeth) follow glm's right-handed
+  rotation and should be checked by the user.
 
 ### - [ ] I3. Facade and roof detail per style (view-core)
 

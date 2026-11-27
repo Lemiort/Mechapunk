@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -15,6 +16,7 @@
 
 #include "GameRenderer.hpp"
 #include "Interior.hpp"
+#include "Massing.hpp"
 #include "Light.hpp"
 #include "Material.hpp"
 #include "MeshBatch.hpp"
@@ -348,8 +350,13 @@ private:
                    glm::vec3 color, bool glass);
     void SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
                         double renderTick, const Selection& selection);
-    void AddFacade(glm::vec3 center, float width, float depth,
-                   std::uint32_t floors);
+    // Windows on every wall of the boxes a style makes of a building.
+    void AddFacade(glm::vec3 center, std::span<const MassBox> boxes);
+    // The wall blocks of a finished building by its style, and its roof
+    // (task I, step I2); CityMassing.cpp.
+    std::vector<StaticItem> MassingBlocks(const sim::Building& building,
+                                          glm::vec3 center) const;
+    void AddRoof(const sim::Building& building, glm::vec3 center);
     // Groups statics_ and the building blocks into batches by building,
     // or for the rest by area, mesh and material.
     void BuildStaticBatches();
@@ -391,7 +398,7 @@ private:
         MeshBatch batch;
     };
     std::vector<StaticBatch> staticBatches_;
-    std::map<std::uint64_t, StaticItem> buildingBlocks_;
+    std::map<std::uint64_t, std::vector<StaticItem>> buildingBlocks_;
     std::map<std::uint64_t, BuildingShape> shapes_;
     std::map<std::pair<std::uint64_t, std::uint32_t>, FloorPlan> plans_;
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<glm::vec3>>

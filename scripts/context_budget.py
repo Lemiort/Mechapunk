@@ -62,6 +62,8 @@ MODULES = {
     "runner": [I + "World.hpp", "tools/sim_runner/main.cpp"],
     "view-core": ["app/CityView.hpp", "app/CityViewInternal.hpp", "app/CityView.cpp",
                   "app/CityStatic.cpp", "app/CityLights.cpp"],
+    "view-massing": ["app/CityView.hpp", "app/CityViewInternal.hpp", "app/Massing.hpp",
+                     "app/Massing.cpp", "app/CityMassing.cpp", "tests/MassingTests.cpp"],
     "view-robots": ["app/CityView.hpp", "app/CityViewInternal.hpp", "app/CityRobots.cpp",
                     "app/CityMetro.cpp", "app/CityDrivers.cpp", I + "Metro.hpp"],
     "view-interiors": ["app/CityView.hpp", "app/CityViewInternal.hpp", "app/CityInteriors.cpp",

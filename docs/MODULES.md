@@ -32,6 +32,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 12k | `World.hpp`, `main.cpp` |
 | view-core | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
+| view-massing | 11k | `CityView.hpp`, `CityViewInternal.hpp`, `Massing.hpp`, `Massing.cpp`, `CityMassing.cpp`, `MassingTests.cpp` |
 | view-robots | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
 | view-interiors | 12k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |

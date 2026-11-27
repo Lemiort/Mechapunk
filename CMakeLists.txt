@@ -26,6 +26,7 @@ add_library(mechapunk_layout STATIC
     app/InteriorHomes.cpp
     app/InteriorStores.cpp
     app/InteriorWorkplaces.cpp
+    app/Massing.cpp
     app/OrganizationLists.cpp
     app/ProjectLists.cpp
     app/Props.cpp)
@@ -41,6 +42,7 @@ add_executable(mechapunk
     app/CityDrivers.cpp
     app/CityInteriors.cpp
     app/CityLights.cpp
+    app/CityMassing.cpp
     app/CityMetro.cpp
     app/CityRobots.cpp
     app/CityStatic.cpp

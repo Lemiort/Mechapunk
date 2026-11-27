@@ -40,6 +40,7 @@ add_executable(
     ChronicleListsTests.cpp
     GangListsTests.cpp
     LayoutTests.cpp
+    MassingTests.cpp
     OrganizationListsTests.cpp
     ProjectListsTests.cpp
 )
