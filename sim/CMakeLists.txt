@@ -17,6 +17,7 @@ add_library(mechapunk_sim STATIC
     src/LifeCycle.cpp
     src/Metro.cpp
     src/Migrations.cpp
+    src/MigrationsMid.cpp
     src/MigrationsEarly.cpp
     src/Random.cpp
     src/Save.cpp

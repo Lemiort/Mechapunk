@@ -32,7 +32,24 @@ commit body, because the city layout will then legitimately change.
 
 One module and one commit each. Steps that change saved state follow rule 3.
 
-### - [ ] I1. A building's style is saved state (generation + saves)
+### - [x] I1a. Make room in generation and saves (pure moves)
+
+- Split `tests/CityTests.cpp` by topic: buildings and their rooms stay in
+  `CityTests.cpp` (module `generation`), the streets, the route planner and
+  the free plots go to a new `tests/CityStreetTests.cpp`, module `city-streets`
+  (`World.hpp`, `City.hpp`, the new file). Moved the frozen migrations V19ToV20
+  through V25ToV26 out of `Migrations.cpp` into a new `sim/src/MigrationsMid.cpp`
+  - the first draft said `MigrationsEarly.cpp`, but that file would pass the
+  10k file budget - and the fixture tests of versions 19 to 24 out of
+  `SaveFixtureTests.cpp` into `SaveFixtureTestsEarly.cpp` (with the `EditSave`
+  helper, which only those tests use). Code moved only; the files went into
+  `sim/CMakeLists.txt`, `tests/CMakeLists.txt` and `scripts/context_budget.py`,
+  and the table in `docs/MODULES.md` was regenerated.
+- After: `generation` 22954, `saves` 18838, `saves-frozen` 19503 of 25000.
+  Proved nothing changed: `--seed 7 --robots 2000 --days 6 --all --save X`
+  before and after, log and save byte for byte identical.
+
+### - [ ] I1b. A building's style is saved state (generation + saves)
 
 - Open: `sim/include/mechapunk/sim/City.hpp` (the `Building` struct, next to
   `BuildingKind`), `sim/src/City.cpp` (`GenerateCity`, where a building is
@@ -61,13 +78,6 @@ One module and one commit each. Steps that change saved state follow rule 3.
   kinds use more than one style, and no style is more than half of its kind's
   buildings; the style survives a save round-trip; the v26 fixture gains the
   style the same function gives it and runs a day.
-- **Make room first**: `generation` has 479 tokens left and `saves` 994. Split
-  `tests/CityTests.cpp` by topic into a new module (streets and stations
-  against buildings and rooms), the way `SaveFixtureTestsEarly.cpp` split the
-  saves tests, and move the frozen migrations from version 19 on into
-  `MigrationsEarly.cpp` and their fixture tests into
-  `SaveFixtureTestsEarly.cpp`. Code moved only; prove it with the headless
-  check before and after, byte for byte.
 - Headless: the log must be **identical** to the run before the step (no new
   draw); the seed 7 / 2000 / 6 days save differs only in the version lines and
   the new `"style"` key on every building.

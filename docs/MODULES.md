@@ -15,18 +15,19 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | Module | Tokens | Files |
 |---|---:|---|
 | world | 24k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
-| generation | 24k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
+| generation | 22k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
+| city-streets | 11k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
 | validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
-| property | 20k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Property.cpp`, `HousingTests.cpp` |
+| property | 21k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Property.cpp`, `HousingTests.cpp` |
 | units | 15k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Units.cpp`, `VenueTests.cpp` |
-| statistics | 22k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
+| statistics | 21k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
 | careers | 24k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 24k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
-| saves-frozen | 13k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
+| saves | 18k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
+| saves-frozen | 19k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `MigrationsMid.cpp`, `SaveFixtureTestsEarly.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 12k | `World.hpp`, `main.cpp` |
 | view-core | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
@@ -47,7 +48,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
 | chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 | construction | 24k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionTests.cpp`, `SiteOfficeTests.cpp` |
-| site-supplies | 15k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `SiteSuppliesTests.cpp` |
+| site-supplies | 16k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `SiteSuppliesTests.cpp` |
 | construction-counters | 16k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionCountersTests.cpp` |
 
 ## What lives where
@@ -89,7 +90,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Transit.cpp`, `Metro.hpp/.cpp` | Trip planning, the metro network, timetable, trains, `PlanDriverRun` |
 | `Weather.*`, `Random.*`, `GameTime.*`, `Ids.hpp` | As named |
 | `Save.hpp/.cpp` | glaze JSON, enum names, the migration list |
-| `Migrations.cpp` | Migrations from version 18 on: append new ones here |
+| `Migrations.cpp` | The save migrations still in play: append new ones here; once frozen, a migration moves unchanged to `MigrationsMid.cpp` or `MigrationsEarly.cpp` to keep the module small |
+| `MigrationsMid.cpp` | Frozen migrations 19 to 26 |
 | `MigrationsEarly.cpp` | Frozen migrations 1 to 18 |
 
 ### Game (`app/`, namespace `mechapunk`)

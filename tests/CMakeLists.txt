@@ -12,6 +12,7 @@ add_executable(sim_tests
     SiteSuppliesTests.cpp
     ConstructionCountersTests.cpp
     CityTests.cpp
+    CityStreetTests.cpp
     EconomyTests.cpp
     HousingTests.cpp
     VenueTests.cpp
