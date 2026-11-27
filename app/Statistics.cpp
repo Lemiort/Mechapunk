@@ -3,6 +3,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -282,6 +283,34 @@ void DrawProperty(const std::vector<sim::DailyStats>& history, const WorldFrame&
     PlotCount("Landlords", history, [](const auto& d) { return d.landlords; });
     PlotCount("Let by corporations", history, [](const auto& d) { return d.corporateApartments; });
     PlotCount("Sales", history, [](const auto& d) { return d.counted.propertySales; });
+
+    // Buildings by style, habitats and workplaces apart, counted from the
+    // city the view holds: the style is saved with each building, so there is
+    // no counter of its own (task I, step I7).
+    ImGui::SeparatorText("Buildings by style");
+    constexpr std::size_t kStyles = static_cast<std::size_t>(sim::BuildingStyle::Tower) + 1;
+    std::array<std::array<std::uint32_t, 2>, kStyles> byStyle{};
+    for (const sim::Building& building : city.City().buildings) {
+        ++byStyle.at(static_cast<std::size_t>(building.style))
+              .at(building.kind == sim::BuildingKind::Habitat ? 0 : 1);
+    }
+    if (ImGui::BeginTable("styles", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV)) {
+        ImGui::TableSetupColumn("Style");
+        ImGui::TableSetupColumn("Habitats");
+        ImGui::TableSetupColumn("Workplaces");
+        ImGui::TableHeadersRow();
+        for (std::size_t style = 0; style != kStyles; ++style) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(
+                std::string{sim::StyleName(static_cast<sim::BuildingStyle>(style))}.c_str());
+            ImGui::TableNextColumn();
+            ImGui::Text("%u", byStyle.at(style).at(0));
+            ImGui::TableNextColumn();
+            ImGui::Text("%u", byStyle.at(style).at(1));
+        }
+        ImGui::EndTable();
+    }
 
     // The Construction section sits in its own file, as the Chronicle tab
     // does: the by-day plots of the construction counters, the sites going

@@ -238,7 +238,7 @@ Do them in this order; each file lists its steps and which are done.
 | F. See-through windows | `docs/tasks/F-windows.md` | view-core, view-interiors | no |
 | G. Unions | `docs/tasks/G-unions.md` | money, careers | yes |
 | H. Engine (NEE, pull requests only) | `docs/tasks/H-engine.md` | external | no |
-| I. Architecture: more building types (planned, nothing done) | `docs/tasks/I-architecture.md` | generation, saves, view-core, construction, inspector, statistics | yes (v27) |
+| I. Architecture: more building types (done; user to check in game) | `docs/tasks/I-architecture.md` | generation, saves, view-core, construction, inspector, statistics | yes (v27) |
 
 ## 9. Detail pages (the pattern from task A)
 

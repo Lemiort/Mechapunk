@@ -1,6 +1,6 @@
 # Task I: architecture
 
-Status: I1 done (steps I1a and I1b), the rest planned on 2026-11-27. Save
+Status: all steps done on 2026-11-27 (I2 to I7 still to be looked at by the user in the game). Save
 version is 27 and the game is 0.27.0. Budgets that are tight: `world` 24491,
 `careers` 24405 and `construction` 24284 of 25000; after step I1b,
 `generation` stands at 23626, the new `city-styles` at 13780 and `saves` at
@@ -206,24 +206,27 @@ One module and one commit each. Steps that change saved state follow rule 3.
   line; the site's page says "It will be a sawtooth yard of 5 floors" under
   its progress. Not seen in the game.
 
-### - [ ] I7. Buildings by style in the statistics window (statistics)
+### - [x] I7. Buildings by style in the statistics window (statistics)
 
 - Open: `app/Statistics.cpp` (the Property tab), `app/StatisticsInternal.hpp`.
 - A small table or bar row in the Property tab: how many buildings of each
   style, habitats and workplaces apart, counted from the frame's city - no
   saved counter, so no save change.
 - No test; the counting is one loop over `city.buildings`.
+- Done. A "Buildings by style" table (style, habitats, workplaces) sits in
+  `DrawProperty` between the plots and the Construction section. Not seen in
+  the game.
 
 ## Done when
 
 - [x] Every building has a style, saved, migrated and tested (I1).
-- [ ] The city looks like a city and not a row of slabs: massing, facades,
+- [x] The city looks like a city and not a row of slabs: massing, facades,
       roofs and lights differ by style (I2, I3, I4).
-- [ ] A building raised at midnight gets a style and turns into it when it
+- [x] A building raised at midnight gets a style and turns into it when it
       is finished (I5).
-- [ ] The style is readable in the inspector and counted in the statistics
+- [x] The style is readable in the inspector and counted in the statistics
       window (I6, I7).
-- [ ] The guide's task table marks I done.
+- [x] The guide's task table marks I done.
 
 ## Open question for the user
 
