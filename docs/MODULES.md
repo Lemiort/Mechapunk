@@ -27,10 +27,10 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 11k | `Save.hpp`, `Save.cpp`, `SaveTests.cpp` |
-| settings | 3k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
+| saves | 12k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
+| settings | 4k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
-| runner | 12k | `World.hpp`, `main.cpp` |
+| runner | 13k | `World.hpp`, `main.cpp` |
 | view-core | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
 | view-massing | 14k | `CityView.hpp`, `CityViewInternal.hpp`, `Massing.hpp`, `Massing.cpp`, `CityMassing.cpp`, `MassingTests.cpp` |
 | site-style | 9k | `Construction.hpp`, `Construction.cpp`, `City.hpp`, `SiteStyleTests.cpp` |
@@ -93,7 +93,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `LifeCycle.cpp` | Aging, wear, `Scrap` (with `Bequeath`), `AddNewcomer` (whose home skips a site's) |
 | `Transit.cpp`, `Metro.hpp/.cpp` | Trip planning, the metro network, timetable, trains, `PlanDriverRun` |
 | `Weather.*`, `Random.*`, `GameTime.*`, `Ids.hpp` | As named |
-| `Save.hpp/.cpp` | glaze JSON, enum names, the (empty) migration list, the oldest supported version |
+| `Save.hpp/.cpp` | glaze JSON, enum names, the migration list, the oldest supported version |
+| `Migrations.cpp` | The migrations of supported versions (V27ToV28 so far): append new ones here |
 
 ### Game (`app/`, namespace `mechapunk`)
 

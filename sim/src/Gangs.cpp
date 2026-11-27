@@ -546,7 +546,7 @@ void World::ConsiderCrime(Robot& first, Robot& second,
     // every eligible pair robbed and an officer held crime down rather than
     // changing it.
     const std::uint32_t roll = state_.random.UniformInt(1, 100);
-    if (static_cast<std::int64_t>(roll) > settings_.crime.robberyPercent) {
+    if (static_cast<std::int64_t>(roll) > state_.settings.crime.robberyPercent) {
         return;
     }
 
@@ -607,7 +607,7 @@ std::vector<EntityId> World::GangOuting(const Robot& robot) {
     if (!robot.gang.IsValid()) return {};
     const Gang* gang = FindGangOf(state_.gangs, robot);
     if (gang == nullptr) return {};
-    if (static_cast<std::int64_t>(state_.random.UniformInt(1, 100)) > settings_.crime.gangOutingPercent) return {};
+    if (static_cast<std::int64_t>(state_.random.UniformInt(1, 100)) > state_.settings.crime.gangOutingPercent) return {};
 
     // The turfs this outing could hang round: its gang's own, then those of
     // the gangs it rivals - `FoundGangs` writes a pair's stance both ways,
@@ -646,7 +646,7 @@ std::vector<EntityId> World::GangOuting(const Robot& robot) {
             const auto meters =
                 routes_.DistanceMeters(hostBuilding->entrance,
                                       venue.building->entrance);
-            if (meters && static_cast<std::int64_t>(*meters) <= settings_.crime.turfReachMeters) {
+            if (meters && static_cast<std::int64_t>(*meters) <= state_.settings.crime.turfReachMeters) {
                 venues.push_back(venue.room->id);
             }
         }

@@ -168,8 +168,8 @@ void World::Patrol(Robot& robot, Tick shiftEnd) {
                 const EntityId id = venue.room->id;
                 const Tick there = TravelMinutes(robot.location, id);
                 const Tick back = TravelMinutes(id, robot.location);
-                if (there <= static_cast<Tick>(settings_.crime.patrolReachMinutes) &&
-                    state_.tick + there + static_cast<Tick>(settings_.crime.patrolStayMinutes) + back <= shiftEnd) {
+                if (there <= static_cast<Tick>(state_.settings.crime.patrolReachMinutes) &&
+                    state_.tick + there + static_cast<Tick>(state_.settings.crime.patrolStayMinutes) + back <= shiftEnd) {
                     candidates.push_back(id);
                 }
             }
@@ -187,7 +187,7 @@ void World::Patrol(Robot& robot, Tick shiftEnd) {
         std::vector<EntityId> crimeRooms;
         for (auto it = state_.chronicle.rbegin();
              it != state_.chronicle.rend() &&
-             it->tick + static_cast<Tick>(settings_.crime.crimeLookbackMinutes) >= state_.tick;
+             it->tick + static_cast<Tick>(state_.settings.crime.crimeLookbackMinutes) >= state_.tick;
              ++it) {
             if (it->kind == EventKind::Robbed && it->room.IsValid()) {
                 crimeRooms.push_back(it->room);
@@ -230,7 +230,7 @@ void World::Arrive(Robot& robot) {
             robot.nextActionAt = std::min(NextPatrolAt(robot), shiftEnd);
         } else {
             // At the venue: look round for a while, then head back.
-            robot.nextActionAt = std::min(now + static_cast<Tick>(settings_.crime.patrolStayMinutes), shiftEnd);
+            robot.nextActionAt = std::min(now + static_cast<Tick>(state_.settings.crime.patrolStayMinutes), shiftEnd);
         }
         return;
     }

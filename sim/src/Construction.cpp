@@ -161,7 +161,7 @@ void World::ReviewConstruction() {
             .name = "Site Office",
             .kind = RoomKind::SiteOffice,
             .floor = 0,
-            .capacity = static_cast<std::uint32_t>(settings_.construction.siteBuilders),
+            .capacity = static_cast<std::uint32_t>(state_.settings.construction.siteBuilders),
             .owner = owner,
         });
         // The new id is the highest there is, so both lists stay sorted.
@@ -246,10 +246,10 @@ void World::ReviewConstruction() {
     }
     const std::int64_t market = marketHomes[0] + marketHomes[1] + marketHomes[2] + marketHomes[3];
     const auto homesShort = [this, market]() {
-        if (state_.history.size() < static_cast<std::size_t>(settings_.construction.streakNights) || market == 0) {
+        if (state_.history.size() < static_cast<std::size_t>(state_.settings.construction.streakNights) || market == 0) {
             return false;
         }
-        const std::size_t first = state_.history.size() - static_cast<std::size_t>(settings_.construction.streakNights);
+        const std::size_t first = state_.history.size() - static_cast<std::size_t>(state_.settings.construction.streakNights);
         for (std::size_t day = first; day != state_.history.size(); ++day) {
             const DailyStats& stats = state_.history[day];
             // Robots living in the market's homes: `residentsByClass` starts at
@@ -259,23 +259,23 @@ void World::ReviewConstruction() {
                 lived += stats.residentsByClass.at(index);
             }
             const std::int64_t vacant = market > lived ? market - lived : 0;
-            if (vacant * 100 >= settings_.construction.marketVacancyPercent * market) {
+            if (vacant * 100 >= state_.settings.construction.marketVacancyPercent * market) {
                 return false;
             }
         }
         return true;
     };
     const auto jobsShort = [this]() {
-        if (state_.history.size() < static_cast<std::size_t>(settings_.construction.streakNights)) {
+        if (state_.history.size() < static_cast<std::size_t>(state_.settings.construction.streakNights)) {
             return false;
         }
-        const std::size_t first = state_.history.size() - static_cast<std::size_t>(settings_.construction.streakNights);
+        const std::size_t first = state_.history.size() - static_cast<std::size_t>(state_.settings.construction.streakNights);
         for (std::size_t day = first; day != state_.history.size(); ++day) {
             const DailyStats& stats = state_.history[day];
             // `DailyStats::unemployed` counts the robots with no workplace, as
             // `ReviewUnits` counts them when it decides whether to reopen a
             // unit; `population` is the robots that night.
-            if (stats.unemployed * 100 <= settings_.construction.unemploymentPercent * stats.population) {
+            if (stats.unemployed * 100 <= state_.settings.construction.unemploymentPercent * stats.population) {
                 return false;
             }
         }
@@ -311,7 +311,7 @@ void World::ReviewConstruction() {
             // to money that really moved (rule 2: no new accounting path,
             // nothing counted twice).
             const std::int64_t creditsBefore = owner->credits;
-            PaySupplies(*owner, settings_.construction.siteSuppliesNight);
+            PaySupplies(*owner, state_.settings.construction.siteSuppliesNight);
             project.costSoFar += creditsBefore - owner->credits;
         }
         if (project.daysLeft == 0) {
@@ -375,14 +375,14 @@ void World::ReviewConstruction() {
     // corner. The housing trust owns the homes nobody else owns; an
     // industry corporation owns the jobs.
     if (homesShortNow && housing_.IsValid()) {
-        startSite(BuildingKind::Habitat, housing_, static_cast<std::uint32_t>(settings_.construction.habitatFloors), "Hab Block",
+        startSite(BuildingKind::Habitat, housing_, static_cast<std::uint32_t>(state_.settings.construction.habitatFloors), "Hab Block",
                   ProjectReason::HomesShort);
         cityChanged = true;
     }
     if (jobsShortNow) {
         const EntityId employer = industryEmployer();
         if (employer.IsValid()) {
-            startSite(BuildingKind::Workplace, employer, static_cast<std::uint32_t>(settings_.construction.workplaceFloors), "Work Yard",
+            startSite(BuildingKind::Workplace, employer, static_cast<std::uint32_t>(state_.settings.construction.workplaceFloors), "Work Yard",
                       ProjectReason::JobsShort);
             cityChanged = true;
         }

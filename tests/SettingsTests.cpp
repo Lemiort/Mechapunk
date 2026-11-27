@@ -107,4 +107,5 @@ TEST(Settings, ConstructionKnobsRaiseASiteInTwoNights) {
     ASSERT_TRUE(sim::ApplySetting(strict, "construction.streakNights", 365));
     world.SetSettings(strict);
     EXPECT_EQ(world.Settings().construction.streakNights, 365);
+    EXPECT_EQ(world.State().settings.construction.streakNights, 365) << "the state holds them";
 }

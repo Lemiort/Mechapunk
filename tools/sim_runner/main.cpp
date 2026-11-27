@@ -17,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "mechapunk/sim/GameTime.hpp"
@@ -43,6 +44,8 @@ struct Options {
     std::optional<std::string> save;
     // Settings changed with --set name=value (see Settings.hpp).
     sim::SimSettings settings;
+    // The same settings by name: --load applies them to the saved city's own.
+    std::vector<std::pair<std::string, std::int64_t>> sets;
 };
 
 void PrintUsage() {
@@ -59,6 +62,7 @@ void PrintUsage() {
         "  --quiet       print only daily summaries\n"
         "  --save FILE   save the world when done\n"
         "  --set NAME=N  change a simulation setting, e.g. crime.robberyPercent=100\n"
+        "                (the settings are saved with the city; --load keeps them)\n"
         "                (repeatable; --list-settings shows the names)\n"
         "  --list-settings  print every setting name");
 }
@@ -132,6 +136,8 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
                            !applied) {
                     std::println(stderr, "--set: {}", applied.error());
                     ok = false;
+                } else {
+                    options.sets.emplace_back(std::string{text->substr(0, equals)}, value);
                 }
             }
         } else if (name == "--list-settings") {
@@ -387,7 +393,14 @@ int Run(std::span<char*> arguments) {
                          state.error());
             return EXIT_FAILURE;
         }
-        auto loaded = sim::World::FromState(std::move(*state), options->settings);
+        // A saved city keeps its own settings; --set changes the ones named.
+        for (const auto& [setting, value] : options->sets) {
+            if (auto applied = sim::ApplySetting(state->settings, setting, value); !applied) {
+                std::println(stderr, "--set: {}", applied.error());
+                return EXIT_FAILURE;
+            }
+        }
+        auto loaded = sim::World::FromState(std::move(*state));
         if (!loaded) {
             std::println(stderr, "Invalid save {}: {}", *options->load,
                          loaded.error());

@@ -27,6 +27,9 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
     const auto fail = [](std::string message) {
         return std::unexpected(std::move(message));
     };
+    if (auto settings = ValidateSettings(state.settings); !settings) {
+        return fail(std::move(settings.error()));
+    }
     const City& city = state.city;
     if (city.nodes.empty()) {
         return fail("The city has no street nodes");

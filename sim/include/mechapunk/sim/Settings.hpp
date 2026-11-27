@@ -6,10 +6,9 @@
 // default below is the value the game has always used, so `SimSettings{}`
 // plays exactly as before.
 //
-// The settings are NOT part of the saved state: a loaded save runs with the
-// defaults unless the caller passes others (`World::FromState`). A run that
-// should repeat must therefore be started with the same seed, the same
-// settings and, for a save, the same settings again.
+// The settings are part of the saved state (`WorldState::settings`, save
+// version 28): a city keeps the knobs it was made with after a save and a
+// load, so a saved experiment repeats.
 //
 // Every field is an int64 so one table can name and range-check them all
 // (`ApplySetting`, used by `mechapunk-sim --set name=value`); the code that
@@ -126,6 +125,10 @@ struct SimSettings {
 [[nodiscard]] std::expected<void, std::string> ApplySetting(SimSettings& settings,
                                                             std::string_view name,
                                                             std::int64_t value);
+
+// Fails when any setting is outside the range `ApplySetting` allows; a
+// loaded save is checked with it (`ValidateWorldState`).
+[[nodiscard]] std::expected<void, std::string> ValidateSettings(const SimSettings& settings);
 
 // Every name `ApplySetting` knows, in declaration order.
 [[nodiscard]] std::span<const std::string_view> SettingNames() noexcept;

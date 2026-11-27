@@ -1,3 +1,4 @@
+#include "Migrations.hpp"
 #include "mechapunk/sim/Save.hpp"
 
 #include <array>
@@ -153,9 +154,13 @@ constexpr glz::opts kWriteOptions{.prettify = true};
 // instead of silently filling in a default.
 constexpr glz::opts kReadOptions{.error_on_missing_keys = true};
 
-// None yet: every older format was dropped (kOldestSupportedSaveVersion).
-// The next format change appends its migration here.
-constexpr std::array<Migration, 0> kMigrations{};
+// Every older format was dropped (kOldestSupportedSaveVersion). The next
+// format change appends its migration here.
+constexpr std::array kMigrations{
+    Migration{.fromVersion = 27,
+              .summary = "the simulation's settings are saved with the city",
+              .apply = &migrations::V27ToV28},
+};
 }  // namespace
 
 std::span<const Migration> SaveMigrations() noexcept { return kMigrations; }

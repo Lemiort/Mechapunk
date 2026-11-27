@@ -212,8 +212,8 @@ World World::Generate(const WorldParams& params) {
     state.weather = StartingWeather(params.seed, state.tick);
 
     state.random = Pcg32::FromSeed(params.seed, kRuntimeStream);
+    state.settings = params.settings;
     World world(std::move(state));
-    world.settings_ = params.settings;
     Pcg32 gangRandom = Pcg32::FromSeed(params.seed, kGangStream);
     world.FoundGangs(gangRandom);
     world.FoundEconomy(params.seed);

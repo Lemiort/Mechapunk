@@ -144,6 +144,8 @@ struct WorldState {
     // Gangs, sorted by id.
     std::vector<Gang> gangs;
     Weather weather;
+    // The knobs this city runs with (Settings.hpp), saved with it.
+    SimSettings settings;
     Economy economy;
     // Counted since midnight.
     DayCounters today;
@@ -266,10 +268,10 @@ public:
     [[nodiscard]] static World Generate(const WorldParams& params);
     // Validates a loaded or hand-made state and rebuilds derived data.
     [[nodiscard]] static std::expected<World, std::string> FromState(
-        WorldState state, SimSettings settings = {});
-    // The settings this world runs with; they are not saved (Settings.hpp).
-    [[nodiscard]] const SimSettings& Settings() const noexcept { return settings_; }
-    void SetSettings(const SimSettings& settings) noexcept { settings_ = settings; }
+        WorldState state);
+    // The settings this world runs with: part of its state, so saved.
+    [[nodiscard]] const SimSettings& Settings() const noexcept { return state_.settings; }
+    void SetSettings(const SimSettings& settings) noexcept { state_.settings = settings; }
 
     // Derived lookups point into the state, so a World can be moved but not
     // copied.
@@ -509,7 +511,6 @@ private:
     [[nodiscard]] std::int64_t ReserveOf(const Organization& organization) const;
 
     WorldState state_;
-    SimSettings settings_;
     RoutePlanner routes_;
     RoomIndex rooms_;
     Metro metro_;

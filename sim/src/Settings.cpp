@@ -64,6 +64,18 @@ std::expected<void, std::string> ApplySetting(SimSettings& settings, std::string
     return std::unexpected(std::format("unknown setting '{}'", name));
 }
 
+std::expected<void, std::string> ValidateSettings(const SimSettings& settings) {
+    SimSettings scratch = settings;
+    for (const Entry& entry : kEntries) {
+        const std::int64_t value = entry.field(scratch);
+        if (value < entry.minimum || value > entry.maximum) {
+            return std::unexpected(std::format("Setting {} is {}, outside {} to {}", entry.name,
+                                               value, entry.minimum, entry.maximum));
+        }
+    }
+    return {};
+}
+
 std::span<const std::string_view> SettingNames() noexcept { return kNames; }
 
 }  // namespace mechapunk::sim

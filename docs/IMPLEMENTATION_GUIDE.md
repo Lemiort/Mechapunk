@@ -4,7 +4,7 @@ How to continue the game without earlier conversations. Written for models
 with a small context (about 57k tokens): everything is split so one step of
 one task needs only this guide, one task file and one module.
 
-State as of 2026-11-27: save version 27, game version 0.27.0, all tests
+State as of 2026-11-27: save version 28, game version 0.28.0, all tests
 passing (`sim_tests`, `layout_tests` and `ContextBudget`; ctest counts them
 individually).
 
@@ -83,8 +83,9 @@ python scripts/context_budget.py                                                
    and so on, defaults = the game's values - passed with the seed to
    `World::Generate` (`WorldParams::settings`) or to `World::FromState`, set
    in a test with `ApplySetting` or `World::SetSettings`, and on the command
-   line with `mechapunk-sim --set crime.robberyPercent=100`. They are **not
-   saved**: a loaded save runs with the defaults unless told otherwise. A new
+   line with `mechapunk-sim --set crime.robberyPercent=100`. They are **saved**
+   with the city (`WorldState::settings`, save version 28), checked on load
+   by `ValidateSettings`, and `--load` keeps them unless `--set` changes one. A new
    tunable number goes into `SimSettings` and its table in `Settings.cpp`,
    not into a `constexpr` in a source file. All simulation randomness comes from `state_.random` (a saved
    `Pcg32`) or `Pcg32::FromSeed(seed, stream)` with a fixed stream during

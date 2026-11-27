@@ -3,19 +3,27 @@
 Saves older than `kOldestSupportedSaveVersion` (`Save.hpp`) are not
 supported: their migrations, fixtures and tests were removed, and the game
 refuses them with "Save version N is not supported". Only the fixture of the
-current version is kept.
+current version and of the one before it (which its migration is tested on)
+are kept.
 
 | File            | Version | How it was made                                                         |
 | --------------- | ------- | ----------------------------------------------------------------------- |
 | `v27-city.json` | 27      | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v27-city.json` (game 0.27.0) |
+| `v28-city.json` | 28      | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v28-city.json` (game 0.28.0) |
 
-`v27-city.json` stops on the third Saturday (Day 20, 16:50) in a town of 100
+`v27-city.json` (before settings were saved) stops on the third Saturday (Day 20, 16:50) in a town of 100
 robots, with every system of the game running: City Hall collecting taxes,
 venues with prices and rents moved, apartment classes, police and metro
 staff, gangs, a chronicle that names accounts, the city's free plots and
 every building's architectural style. It raised no construction site, so its
-projects are empty; `CurrentVersionFixtureLoadsAndRoundTrips` loads it,
+projects are empty; `CurrentVersionFixtureLoadsAndRoundTrips` loads the current one,
 checks that saving it again reproduces it byte for byte, and runs a day.
+
+`v28-city.json` stops at the same moment in the same kind of city: from this
+version the simulation's settings (`WorldState::settings`, Settings.hpp) are
+saved with the city, and this one was made with the defaults.
+`Version27FixtureMigratesAndRuns` loads the v27 fixture through
+`V27ToV28`, which gives it those defaults.
 
 ## Changing the save format
 

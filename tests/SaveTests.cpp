@@ -217,13 +217,16 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v27-city.json";
+        kFixtureDirectory / "saves" / "v28-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
     auto state = sim::DeserializeWorld(fixture);
     ASSERT_TRUE(state.has_value()) << state.error();
     EXPECT_EQ(Serialize(*state), fixture);
+    // From version 28 the simulation's settings are saved with the city; this
+    // fixture was made with the defaults.
+    EXPECT_EQ(state->settings, sim::SimSettings{});
     // Saved with City Hall collecting taxes,
     EXPECT_GT(state->history.back().counted.wageTax, 0);
     // Saved with venues asking more and less than usual, rents moved,
@@ -532,3 +535,46 @@ TEST(Save, RejectsChroniclesOutOfOrderOrOverfull) {
         << rejected.error();
 }
 
+
+// The previous version's fixture: a version 27 city has no settings, and the
+// migration gives it the defaults that game ran with.
+TEST(Save, Version27FixtureMigratesAndRuns) {
+    const std::filesystem::path path = kFixtureDirectory / "saves" / "v27-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    EXPECT_EQ(state->settings, sim::SimSettings{});
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// A city made with other settings keeps them through a save and a load, and
+// a save whose settings are out of range is refused.
+TEST(Save, CustomSettingsSurviveSaveAndLoad) {
+    sim::SimSettings custom;
+    ASSERT_TRUE(sim::ApplySetting(custom, "crime.robberyPercent", 77));
+    ASSERT_TRUE(sim::ApplySetting(custom, "construction.streakNights", 2));
+    const sim::World world =
+        sim::World::Generate({.seed = 3, .robots = 20, .settings = custom});
+    const std::string json = Serialize(world.State());
+    EXPECT_NE(json.find("\"robberyPercent\": 77"), std::string::npos);
+
+    auto loaded = sim::DeserializeWorld(json);
+    ASSERT_TRUE(loaded.has_value()) << loaded.error();
+    EXPECT_EQ(loaded->settings, custom);
+    auto again = sim::World::FromState(std::move(*loaded));
+    ASSERT_TRUE(again.has_value()) << again.error();
+    EXPECT_EQ(again->Settings(), custom);
+
+    const auto broken = sim::DeserializeWorld(
+        EditSave(json, [](sim::SaveDocument& document) {
+            document["world"]["settings"]["crime"]["robberyPercent"] = 500;
+        }));
+    ASSERT_TRUE(broken.has_value()) << broken.error();
+    auto refused = sim::World::FromState(std::move(*broken));
+    ASSERT_FALSE(refused);
+    EXPECT_NE(refused.error().find("robberyPercent"), std::string::npos) << refused.error();
+}
