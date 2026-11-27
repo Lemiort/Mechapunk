@@ -79,6 +79,9 @@ struct Options {
     std::filesystem::path savePath{"mechapunk-save.json"};
     // A robot to select and follow from the start, by id; 0 for none.
     std::uint64_t follow{0};
+    // --town: a seed town that grows (sim::TownSettings), 30 robots unless --robots says.
+    bool town{false};
+    bool robotsGiven{false};
 };
 
 std::optional<Options> ParseOptions(std::span<char*> arguments) {
@@ -96,18 +99,25 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
             options.startNew = true;
         } else if (name == "--seed" && hasValue && parse(options.seed)) {
             options.startNew = true;
+        } else if (name == "--town") {
+            options.town = true;
+            options.startNew = true;
         } else if (name == "--robots" && hasValue && parse(options.robots) &&
                    options.robots > 0) {
             options.startNew = true;
+            options.robotsGiven = true;
         } else if (name == "--save" && hasValue) {
             options.savePath = arguments[++index];
         } else if (name == "--follow" && hasValue && parse(options.follow)) {
         } else {
             spdlog::error(
-                "Usage: mechapunk [--new] [--seed N] [--robots N] "
+                "Usage: mechapunk [--new] [--town] [--seed N] [--robots N] "
                 "[--save FILE] [--follow ROBOT_ID]");
             return std::nullopt;
         }
+    }
+    if (options.town && !options.robotsGiven) {
+        options.robots = sim::kTownRobots;
     }
     return options;
 }
@@ -136,7 +146,9 @@ sim::World LoadOrCreateWorld(const Options& options) {
     spdlog::info("Starting a new city: seed {}, {} robots", options.seed,
                  options.robots);
     return sim::World::Generate(
-        {.seed = options.seed, .robots = options.robots});
+        {.seed = options.seed,
+         .robots = options.robots,
+         .settings = options.town ? sim::TownSettings() : sim::SimSettings{}});
 }
 
 class Game {
