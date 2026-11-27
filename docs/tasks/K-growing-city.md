@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K12 done. Save version 35, game 0.35.0.
+Status: planned on 2026-11-27; K1 to K13 done. Save version 35, game 0.35.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -281,7 +281,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   crew room; drivers are hired within 2 days; trains run.
 - Check: build, ctest, seed 7 byte-identical.
 
-### - [ ] K13. The view follows new stations and lines (view-robots)
+### - [x] K13. The view follows new stations and lines (view-robots)
 
 - Module: view-robots (22733 of 25000; make room first if `ContextBudget`
   fails). Depends on: K11. Save change: no.

@@ -164,6 +164,9 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     AddStreetLamps();
     AddElevatedLines();
     AddStations();
+    for (const sim::MetroLine& line : metro_.Lines()) {
+        drawnLines_.push_back({.axis = line.axis, .stations = line.stations});
+    }
 
     // Simulated buildings take the corners next to their entrance first.
     // Which corners are left free is saved state (`City::lots`), so the
@@ -310,6 +313,16 @@ void CityView::UpdateCity(const sim::City& city) {
         routes_ = sim::RoutePlanner(city_);
         routeCache_.clear();
         AddGrownStreets(firstNode, firstEdge, oldMinimum, oldMaximum);
+    }
+    // Stations the metro opened (task K, step K11): the view takes them, rebuilds
+    // its metro and draws the new platforms and track.
+    if (city.stations.size() > city_.stations.size()) {
+        const std::size_t firstStation = city_.stations.size();
+        city_.stations = city.stations;
+        metro_ = sim::Metro(city_);
+        stationRoutes_.clear();
+        rideLegs_.clear();
+        AddGrownMetro(firstStation);
     }
     city_.buildings = city.buildings;
     rooms_ = sim::RoomIndex(city_);

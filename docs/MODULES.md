@@ -36,9 +36,9 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 13k | `World.hpp`, `main.cpp` |
 | view-core | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
-| view-massing | 14k | `CityView.hpp`, `CityViewInternal.hpp`, `Massing.hpp`, `Massing.cpp`, `CityMassing.cpp`, `MassingTests.cpp` |
+| view-massing | 15k | `CityView.hpp`, `CityViewInternal.hpp`, `Massing.hpp`, `Massing.cpp`, `CityMassing.cpp`, `MassingTests.cpp` |
 | site-style | 10k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `City.hpp`, `SiteStyleTests.cpp` |
-| view-robots | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
+| view-robots | 23k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
 | view-interiors | 12k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |

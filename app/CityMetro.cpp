@@ -127,9 +127,10 @@ vec3 CityView::PlatformSpot(sim::EntityId robot, std::uint32_t station,
            (AcrossOf(axis) * (side * across * kS));
 }
 
-void CityView::AddStations() {
+void CityView::AddStations(std::size_t firstStation) {
     const float deck = kDeckThickness * kS;
-    for (std::uint32_t station = 0; station < city_.stations.size(); ++station) {
+    for (auto station = static_cast<std::uint32_t>(firstStation); station < city_.stations.size();
+         ++station) {
         const vec3 node = NodePosition(city_.stations[station].node);
         for (const sim::LineAxis axis : {sim::LineAxis::Row, sim::LineAxis::Column}) {
             if (!metro_.LineOf(station, axis)) {
@@ -198,10 +199,34 @@ void CityView::AddStations() {
     }
 }
 
-void CityView::AddElevatedLines() {
+// A grown metro (task K, step K13): the new stations and every line whose
+// stations are not those of a line already drawn. Lines that gained a station
+// keep their old deck under the longer one; the old depot of a line whose first
+// station changed stays where it was, since drawn statics are never removed.
+void CityView::AddGrownMetro(std::size_t firstStation) {
+    AddStations(firstStation);
+    std::vector<bool> fresh(metro_.Lines().size(), false);
+    for (std::size_t index = 0; index < fresh.size(); ++index) {
+        const sim::MetroLine& line = metro_.Lines()[index];
+        fresh[index] = std::ranges::none_of(drawnLines_, [&](const DrawnLine& drawn) {
+            return drawn.axis == line.axis && drawn.stations == line.stations;
+        });
+    }
+    AddElevatedLines(&fresh);
+    drawnLines_.clear();
+    for (const sim::MetroLine& line : metro_.Lines()) {
+        drawnLines_.push_back({.axis = line.axis, .stations = line.stations});
+    }
+    BatchStaticsFor(0);
+}
+
+void CityView::AddElevatedLines(const std::vector<bool>* only) {
     const float deck = kDeckThickness * kS;
     const float tail = static_cast<float>(sim::kTailMeters);
     for (std::uint32_t index = 0; index < metro_.Lines().size(); ++index) {
+        if (only != nullptr && !(*only)[index]) {
+            continue;
+        }
         const sim::MetroLine& line = metro_.Lines()[index];
         const LineFrame frame = FrameOf(index);
         const float length = static_cast<float>(line.meters.back());

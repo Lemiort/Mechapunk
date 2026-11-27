@@ -255,7 +255,11 @@ private:
     // A box turned to run from one point to another.
     void AddStaticBeam(glm::vec3 from, glm::vec3 to, float width, float height,
                        glm::vec3 color);
-    void AddElevatedLines();
+    // Draws the lines flagged in `only` (all of them when null).
+    void AddElevatedLines(const std::vector<bool>* only = nullptr);
+    // Draws what a grown metro added: new stations (from `firstStation`) and the
+    // lines that are new or changed, after the view has taken the new stations.
+    void AddGrownMetro(std::size_t firstStation);
     // A box that never moves; `glows` makes it shine with its own color.
     void AddStaticBox(glm::vec3 minimum, glm::vec3 maximum, glm::vec3 color,
                       bool glows = false);
@@ -273,7 +277,7 @@ private:
     // Intersections walked through from a building to a station.
     const std::vector<glm::vec3>& StationRoute(sim::EntityId building,
                                                std::uint32_t station);
-    void AddStations();
+    void AddStations(std::size_t firstStation = 0);
     // A metro driver's shift: from the crew room up to its line's first
     // platform, into the cab of its train through the front door, driving
     // it until the last time it stands at that platform before the shift
@@ -395,6 +399,12 @@ private:
     sim::RoomIndex rooms_;
     sim::RoutePlanner routes_;
     sim::Metro metro_;
+    // The lines the view has drawn, to tell a new or changed line when the metro grows.
+    struct DrawnLine {
+        sim::LineAxis axis{};
+        std::vector<std::uint32_t> stations;
+    };
+    std::vector<DrawnLine> drawnLines_;
     struct RideLegs {
         bool known{false};
         sim::Tick boardsAt{};
