@@ -32,20 +32,6 @@ namespace {
 constexpr ImGuiTableFlags kListFlags =
     ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY;
 
-// Credits as "1 234 567 cr", the money format every table of the game uses.
-std::string Credits(std::int64_t credits) {
-    // 1234567 -> "1 234 567 cr"
-    std::string digits = std::to_string(credits < 0 ? -credits : credits);
-    std::string grouped;
-    for (std::size_t index = 0; index < digits.size(); ++index) {
-        if (index > 0 && (digits.size() - index) % 3 == 0) {
-            grouped += ' ';
-        }
-        grouped += digits[index];
-    }
-    return std::format("{}{} cr", credits < 0 ? "-" : "", grouped);
-}
-
 // What an entry records, in the few words a table column allows. Only the
 // kinds `World::Chronicle` keeps get a name of their own; a `Remembered`
 // entry reads better by its memory kind - "close friends" tells what

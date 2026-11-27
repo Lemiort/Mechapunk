@@ -36,7 +36,11 @@ game to 0.25.0. D5c is done on 2026-11-27, also with no save change: the
 inspector has a project's own page, opened by a new link. D5d is done on
 2026-11-27, also with no save change: the building, the owner and the builder
 pages link the site, which needed the robot page out of `Inspector.cpp` into a
-new `robot-pages` module.
+new `robot-pages` module. D5e is done on 2026-11-27, also with no save change:
+the Property tab has a Construction section, drawn in a new
+`StatisticsConstruction.cpp`. D5e2 was added on 2026-11-27, after D5e, and is
+open: the section's "by day" needs saved counters in `DailyStats`, which is a
+save change of its own (version 26), the way D5b2 did version 25.
 
 ## What and why
 
@@ -1370,10 +1374,16 @@ drawing helper is shared, so each page stays in its own file.
   for D gained the module and its progress. ctest: 202/202 including
   ContextBudget, unchanged.
 
-### - [ ] D5e. The Construction section (statistics module)
+### - [x] D5e. The Construction section (statistics module)
 
 Open: `app/Statistics.cpp` (the Property tab), `app/StatisticsInternal.hpp`
 if a helper is shared, `app/ProjectLists.hpp`.
+
+Split on 2026-11-27: the bullet's "by day" needs saved counters, which is a
+save change of its own in the `saves` and `construction` modules besides
+`statistics` - three modules - so this step lands as the section alone,
+drawing only what the current projects allow as its own last bullet decided,
+and the counters became step D5e2 after it.
 
 - **Statistics**: a "Construction" section in the Property tab: projects
   started, finished, builders employed, by day, and a table of current
@@ -1386,6 +1396,90 @@ if a helper is shared, `app/ProjectLists.hpp`.
   - every `world.history[i]` gains the keys - not in `Project`, which
   step D5b2 already grew. Decided, not asked: until that step lands this
   section draws only what the current projects allow.
+
+Done as (statistics module, one commit): `DrawProperty` gained the frame, the
+city and the request pointer, the way `DrawCrime` has them, and ends with
+`DrawConstruction(frame, city, request)`; the section itself lives in a new
+`app/StatisticsConstruction.cpp`, the way the Chronicle tab lives in
+`StatisticsChronicle.cpp` - `Statistics.cpp` stood at 9653 of the 10k file
+limit and the section put it over, so the split was forced, not chosen.
+
+- The section: a facts table - sites going up, builders at their site offices,
+  supplies paid so far (the sum of `costSoFar`) - and a scrolling table of
+  the current projects: the site as a `ProjectLink` (D5c's link), what it is
+  raising (the building's own kind, as the project's page reads it), the
+  owner as an `OrganizationLink`, floors done of the floors it will have
+  (`floorsDone` plus `daysLeft`, since a site raises one floor a night),
+  nights left, cost so far, builders. The rows are `WorldFrame::projects`
+  in the saved order (by building id, D2a), so a row keeps its place between
+  frames and the player can click the same site twice; the builders are
+  `BuildersOf` (ProjectLists.hpp, D5b), read once per frame, and the "no
+  sites going up" line covers the empty and null list (before D5a's first
+  copy).
+- What the step's "by day" needs and is left to D5e2: `DailyStats` counts
+  no construction, so plots of projects started, finished and builders
+  employed per day wait for the counters; the section says so in a comment
+  and draws only what the current projects allow, as its bullet decided.
+- Shared helpers, the step's "if a helper is shared": `Credits`, `BeginFacts`
+  and `Row` moved from `Statistics.cpp`'s anonymous namespace into
+  `StatisticsInternal.hpp` as inline functions, and `StatisticsChronicle.cpp`'s
+  duplicate of `Credits` went with them - code moved only, the same tests
+  and the same drawing.
+- No new test: the section needs a live renderer and a GL context, so it is
+  checked by building, by ContextBudget and by the user in the game (as D4,
+  D5a, D5c and D5d did); the rows it draws are what D5b's `ProjectLists`
+  tests already pin down, and none of those functions changed.
+- No save change, no simulation change: only `app/` files moved, so
+  `mechapunk-sim.exe` was not relinked and the headless log and save cannot
+  move (as in D1b, D4, D5a, D5b, D5c and D5d). No random draw, no money
+  movement, nothing new for `Validation`.
+- Budget: `statistics` 19313 to 21221 of 25000; `scripts/context_budget.py`
+  gained `app/StatisticsConstruction.cpp` in the module and `CMakeLists.txt`
+  the file; `docs/MODULES.md` the module row (19k to 21k), a `StatisticsConstruction.cpp`
+  row, the `Statistics` row and the task row. ctest: 202/202 including
+  ContextBudget, unchanged.
+
+### D5e2. Construction counters as saved state (statistics + construction + saves)
+
+Added on 2026-11-27, after D5e, because the section's "by day" needs counters
+`DailyStats` does not have, and that is a save change of its own (guide rule
+3), the way D5b2 shipped the site's cost and reason as version 25 before D5c
+drew them. Open: the task's last step.
+
+Open: `Economy.hpp` (`DailyStats`), `EconomyStatistics.cpp` (`RecordStatistics`),
+`Construction.cpp` (the review that starts and ends projects), `Save.hpp`,
+`Save.cpp` (the migration list), `Migrations.hpp`, the end of `Migrations.cpp`,
+`Validation.cpp`, `SaveTests.cpp`, plus the fixture and its README row, and
+`app/StatisticsConstruction.cpp` (the section gains its plots).
+
+- `DailyStats` gains `projectsStarted`, `projectsFinished` and
+  `buildersEmployed`, counted per night: the review (Construction.cpp) counts
+  the sites it started and ended at that midnight, `RecordStatistics` counts
+  the robots whose job room is a `SiteOffice` room (the builders, as
+  ProjectLists.hpp defines them).
+- Save version 26, game 0.26.0: `V25ToV26` (declared in `Migrations.hpp`,
+  registered in `kMigrations`) writes the three keys as 0 into every
+  `world.history[i]` - a version 25 game counted no construction, and a
+  migration must not invent counts it never recorded.
+- Fixture `tests/fixtures/saves/v26-city.json` from the guide's command
+  (seed 33, 100 robots, 28370 minutes) at game 0.26.0, plus its row and a
+  sentence in that folder's README.
+- Tests: `CurrentVersionFixtureLoadsAndRoundTrips` points at v26;
+  `Version25FixtureMigratesAndRuns` checks the v25 fixture names none of the
+  three keys, so what loads is the migration's work, and runs the city a day;
+  a construction test runs a city that raises and finishes a site and reads
+  one started on that night and one finished on the night it ends.
+- What this step leaves open, to be decided when it lands: which night's
+  `DailyStats` a site started at a midnight counts into - the review runs
+  after `RecordStatistics` and after the books roll over (guide section 4),
+  so the natural reading is the day the review ran into, but the choice
+  must be recorded in the code and the test.
+- Then `app/StatisticsConstruction.cpp` gains the plots: projects started,
+  finished and builders employed over the days kept, `PlotCount` over the
+  new keys, and the facts table can read the last night's counters.
+- Budget warning: `statistics` stands at 21221 of 25000 and `construction`
+  at 24031, 969 short; the step must make room in `construction` first, as
+  D1a, D2b, D2c3, D3d and D5b2 did.
 
 ## Done when
 

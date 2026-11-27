@@ -233,7 +233,7 @@ Do them in this order; each file lists its steps and which are done.
 | A. Organizations in the inspector; every name a link (done; user to check in game) | `docs/tasks/A-organizations-and-links.md` | inspector, statistics | no |
 | B. Gangs (B1-B11d done, all steps) | `docs/tasks/B-gangs.md` | gangs, inspector, statistics | done (v18) |
 | C. Chronicle (done; user to check in game) | `docs/tasks/C-chronicle.md` | chronicle-lists, statistics, inspector | yes (v21) |
-| D. Construction (D1a to D5d done; D5 split into D5a to D5e, D5a, D5b, D5b2, D5c and D5d done) | `docs/tasks/D-construction.md` | generation, saves, construction, site-supplies, careers, life-cycle, property, view-core, ui, project-lists, project-pages, inspector, robot-pages, statistics | yes (v25, and v26 for step D5e's counters) |
+| D. Construction (D1a to D5e done; D5 split into D5a to D5e2, D5e2 open) | `docs/tasks/D-construction.md` | generation, saves, construction, site-supplies, careers, life-cycle, property, view-core, ui, project-lists, project-pages, inspector, robot-pages, statistics | yes (v25, and v26 for step D5e2's counters) |
 | E. Simulation level of detail | `docs/tasks/E-level-of-detail.md` | world | maybe |
 | F. See-through windows | `docs/tasks/F-windows.md` | view-core, view-interiors | no |
 | G. Unions | `docs/tasks/G-unions.md` | money, careers | yes |

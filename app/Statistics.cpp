@@ -32,19 +32,6 @@ constexpr float kPlotHeight = 46.0F;
 constexpr ImVec4 kGood{0.45F, 0.9F, 0.55F, 1.0F};
 constexpr ImVec4 kBad{1.0F, 0.4F, 0.35F, 1.0F};
 
-std::string Credits(std::int64_t credits) {
-    // 1234567 -> "1 234 567 cr"
-    std::string digits = std::to_string(credits < 0 ? -credits : credits);
-    std::string grouped;
-    for (std::size_t index = 0; index < digits.size(); ++index) {
-        if (index > 0 && (digits.size() - index) % 3 == 0) {
-            grouped += ' ';
-        }
-        grouped += digits[index];
-    }
-    return std::format("{}{} cr", credits < 0 ? "-" : "", grouped);
-}
-
 std::string PerMille(std::int64_t value) {
     return std::format("{:.1f}%", static_cast<double>(value) / 10.0);
 }
@@ -87,19 +74,6 @@ void PlotPerMille(const char* label, const std::vector<sim::DailyStats>& history
                   const Stat& stat) {
     Plot(label, history, stat,
          [](double value) { return PerMille(static_cast<std::int64_t>(value)); });
-}
-
-// Two columns of label and value.
-void Row(const char* label, const std::string& value) {
-    ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);
-    ImGui::TextUnformatted(label);
-    ImGui::TableSetColumnIndex(1);
-    ImGui::TextUnformatted(value.c_str());
-}
-
-bool BeginFacts(const char* id) {
-    return ImGui::BeginTable(id, 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg);
 }
 
 std::int64_t MoneyInAccounts(const WorldFrame& frame) {
@@ -289,7 +263,10 @@ void DrawSociety(const std::vector<sim::DailyStats>& history) {
     PlotCount("Venue visits", history, [](const auto& d) { return d.counted.visits; });
 }
 
-void DrawProperty(const std::vector<sim::DailyStats>& history) {
+// Draws the Property tab. The Construction section's links report what the
+// player clicked through `request`, as the Crime tab's links do.
+void DrawProperty(const std::vector<sim::DailyStats>& history, const WorldFrame& frame,
+                  const CityView& city, std::optional<InspectorRequest>* request) {
     if (history.empty()) {
         ImGui::TextDisabled("Statistics start at the end of the first day.");
         return;
@@ -328,6 +305,10 @@ void DrawProperty(const std::vector<sim::DailyStats>& history) {
     PlotCount("Landlords", history, [](const auto& d) { return d.landlords; });
     PlotCount("Let by corporations", history, [](const auto& d) { return d.corporateApartments; });
     PlotCount("Sales", history, [](const auto& d) { return d.counted.propertySales; });
+
+    // The Construction section sits in its own file, as the Chronicle tab
+    // does: the sites going up now, their facts and their links.
+    DrawConstruction(frame, city, request);
 }
 
 std::optional<InspectorRequest> DrawOrganizations(StatisticsView& view, const WorldFrame& frame) {
@@ -577,7 +558,7 @@ std::optional<InspectorRequest> DrawStatistics(StatisticsView& view, const World
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Property")) {
-                DrawProperty(history);
+                DrawProperty(history, frame, city, &request);
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Organizations")) {

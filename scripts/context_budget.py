@@ -38,7 +38,7 @@ MODULES = {
     "statistics": [I + "Economy.hpp", "sim/src/EconomyInternal.hpp",
                    "sim/src/EconomyStatistics.cpp", "app/Statistics.hpp",
                    "app/StatisticsInternal.hpp", "app/Statistics.cpp",
-                   "app/StatisticsChronicle.cpp"],
+                   "app/StatisticsChronicle.cpp", "app/StatisticsConstruction.cpp"],
     "careers": [I + "World.hpp", I + "Careers.hpp", I + "Construction.hpp", "sim/src/Careers.cpp",
                 I + "Venues.hpp", "sim/src/Venues.cpp", "tests/CareersTests.cpp"],
     "social": [I + "World.hpp", I + "Social.hpp", "sim/src/Social.cpp",
