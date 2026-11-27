@@ -46,8 +46,9 @@ can break a leg or take a hand in one minute.
 2. **Parts can be lost and replaced.** A hand or the legs at 0 are lost. A
    clinic fits a new part, and the black market fits a cheap second-hand one
    that is sometimes dodgy (today's bad part).
-3. **Skins are not part of this task.** They are colours only (task M) and
-   change nothing a robot can do.
+3. **Skins are not part of this task.** They are chameleon coverage installed
+   on the parts and show colours only (task M), changing nothing a robot can
+   do. A lost part loses its coverage, and a fitted part comes bare.
 
 ## Steps
 
