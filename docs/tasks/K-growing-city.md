@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K11 done. Save version 35, game 0.35.0.
+Status: planned on 2026-11-27; K1 to K12 done. Save version 35, game 0.35.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -264,7 +264,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   up; a save round trip keeps the stations.
 - Check: build, ctest, seed 7 byte-identical except the settings keys.
 
-### - [ ] K12. The Metro Authority comes with the first line (new module `metro-authority`)
+### - [x] K12. The Metro Authority comes with the first line (new module `metro-authority`)
 
 - Module: metro-authority (new: `sim/src/MetroAuthority.cpp`). Depends on: K11,
   K5. Save change: no.

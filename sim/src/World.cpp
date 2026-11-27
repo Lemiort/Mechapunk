@@ -137,6 +137,7 @@ void World::Step() {
         // (Construction.cpp).
         ReviewStreets();
         ReviewTransit();
+        ReviewMetroAuthority();
         ReviewConstruction();
     }
     // Robots act in id order, so random draws happen in a fixed order.

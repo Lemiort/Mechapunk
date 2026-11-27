@@ -506,6 +506,8 @@ private:
     void ReviewStreets();
     // Opens metro stations where buildings are out of reach of every station.
     void ReviewTransit();
+    // Founds the Metro Authority and a crew room for each line of a town's metro.
+    void ReviewMetroAuthority();
     [[nodiscard]] std::int64_t UpkeepOf(const Room& apartment) const;
     // Changes an apartment's owner for `price`, paid by the buyer.
     void Transfer(EntityId apartment, EntityId buyer, std::int64_t price);

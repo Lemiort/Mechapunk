@@ -17,6 +17,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | world | 24k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
 | generation | 21k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
 | city-buildings | 9k | `City.hpp`, `CityInternal.hpp`, `CityBuildings.cpp`, `CityTests.cpp` |
+| metro-authority | 9k | `World.hpp`, `MetroAuthority.cpp`, `MetroAuthorityTests.cpp` |
 | streets | 5k | `City.hpp`, `Streets.cpp`, `StreetsTests.cpp` |
 | seed-town | 7k | `City.hpp`, `SeedTownTests.cpp` |
 | city-streets | 12k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
@@ -55,7 +56,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 | construction-rules | 1k | `ConstructionRules.hpp`, `ConstructionRules.cpp` |
 | construction | 24k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `World.hpp`, `ConstructionTests.cpp`, `SiteOfficeTests.cpp` |
-| site-supplies | 15k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `World.hpp`, `SiteSuppliesTests.cpp` |
+| site-supplies | 16k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `World.hpp`, `SiteSuppliesTests.cpp` |
 | construction-counters | 16k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `World.hpp`, `ConstructionCountersTests.cpp` |
 
 ## What lives where

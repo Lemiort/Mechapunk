@@ -29,6 +29,7 @@ MODULES = {
                    I + "City.hpp", "sim/src/City.cpp", "sim/src/Names.hpp", "tests/CityTests.cpp"],
     "city-buildings": [I + "City.hpp", "sim/src/CityInternal.hpp", "sim/src/CityBuildings.cpp",
                        "tests/CityTests.cpp"],
+    "metro-authority": [I + "World.hpp", "sim/src/MetroAuthority.cpp", "tests/MetroAuthorityTests.cpp"],
     "streets": [I + "City.hpp", "sim/src/Streets.cpp", "tests/StreetsTests.cpp"],
     "seed-town": [I + "City.hpp", "tests/SeedTownTests.cpp"],
     "city-streets": [I + "World.hpp", I + "City.hpp", "tests/CityStreetTests.cpp"],
