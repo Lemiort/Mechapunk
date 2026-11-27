@@ -310,3 +310,36 @@ TEST(SeedTown, ImmigrantsArriveWhileThereIsRoom) {
         EXPECT_TRUE(sim::ValidateWorldState(world.State()));
     }
 }
+
+// A seed town grows (task K, step K8): 120 days with the town's rules on.
+namespace {
+sim::SimSettings GrowingTown() {
+    sim::SimSettings settings;
+    settings.city.seedTown = 1;
+    settings.population.wealthSpread = 1;
+    settings.population.immigration = 1;
+    settings.population.immigrantsPerNight = 5;
+    settings.construction.streakNights = 2;
+    settings.construction.freeBedsPercent = 10;
+    return settings;
+}
+}  // namespace
+
+TEST(SeedTown, GrowsInAHundredTwentyDays) {
+    sim::World world =
+        sim::World::Generate({.seed = 1, .robots = 30, .settings = GrowingTown()});
+    for (int day = 1; day <= 120; ++day) {
+        world.RunFor(sim::kMinutesPerDay);
+        if (day % 20 == 0) {
+            ASSERT_TRUE(sim::ValidateWorldState(world.State())) << "day " << day;
+        }
+    }
+    const sim::WorldState& state = world.State();
+    EXPECT_GT(state.city.buildings.size(), 5U);
+    EXPECT_GT(state.robots.size(), 60U);
+    for (const sim::Robot& robot : state.robots) {
+        EXPECT_TRUE(robot.apartment.IsValid()) << robot.name << " has no bed";
+    }
+    EXPECT_TRUE(sim::ValidateEconomy(state));
+    EXPECT_TRUE(sim::ValidateWorldState(state));
+}

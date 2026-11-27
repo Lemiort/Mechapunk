@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K7 done. Save version 33, game 0.33.0.
+Status: planned on 2026-11-27; K1 to K8 done. Save version 33, game 0.33.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -187,7 +187,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   more robots than beds.
 - Check: build, ctest, seed 7 byte-identical except the settings keys.
 
-### - [ ] K8. A seed town grows for 120 days (seed-town)
+### - [x] K8. A seed town grows for 120 days (seed-town)
 
 - Module: seed-town (tests only). Depends on: K5, K6, K7. Save change: no.
 - Open: `tests/SeedTownTests.cpp`.
