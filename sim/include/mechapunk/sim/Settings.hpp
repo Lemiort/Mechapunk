@@ -58,6 +58,15 @@ struct CrimeSettings {
     // city robbed within this many minutes instead, when one is within reach.
     std::int64_t crimeLookbackMinutes{60};
 
+    // One gang for this many robots, but at least `minGangs` and at most `maxGangs`:
+    // a city is founded with that many, and a growing town founds one more each
+    // time its robots pass another multiple (step K18). A town sets `minGangs` 0.
+    std::int64_t robotsPerGang{1500};
+
+    std::int64_t minGangs{2};
+
+    std::int64_t maxGangs{6};
+
     bool operator==(const CrimeSettings&) const = default;
 };
 

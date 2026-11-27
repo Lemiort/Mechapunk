@@ -95,7 +95,7 @@ MODULES = {
                         "app/ChroniclePagesInternal.hpp", "app/InspectorInternal.hpp",
                         "app/Links.hpp", "app/ChronicleLists.hpp", "app/Inspector.hpp"],
     "gangs": [I + "Gangs.hpp", "sim/src/Gangs.cpp", "tests/GangRosterTests.cpp",
-              "tests/GangCrimeTests.cpp"],
+              "tests/GangCrimeTests.cpp", "tests/GangGrowthTests.cpp"],
     "gang-officer": [I + "Gangs.hpp", "tests/GangOfficerTests.cpp"],
     "gang-lists": ["app/GangLists.hpp", "app/GangLists.cpp", "tests/GangListsTests.cpp"],
     "chronicle-lists": ["app/ChronicleLists.hpp", "app/ChronicleLists.cpp",

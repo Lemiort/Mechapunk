@@ -401,6 +401,9 @@ private:
     // Gangs, in Gangs.cpp.
     void FoundGangs(Pcg32& random);
     void ReviewGangs();
+    // Founds one more gang, on the edge habitat no gang holds, with a stance to
+    // every gang there is (both ways), drawn from kGangStream and its index.
+    void FoundGang();
     // On a gang outing: the venues within a walk of one turf, its gang's own
     // or a rival gang's, picked by lot. Empty means an ordinary outing over
     // the whole city; `Decide` only weighs these venues otherwise (B14b: rival

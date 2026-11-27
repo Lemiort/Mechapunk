@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K17 done. Save version 39, game 0.39.0.
+Status: planned on 2026-11-27; K1 to K18 done. Save version 40, game 0.40.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -359,7 +359,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   policy rate fell to 8 to 9 in the first days and the town stayed valid. A small town
   swings with its few venues; the target only moves the rate, a step a night.
 
-### - [ ] K18. Gangs form as the town grows (gangs)
+### - [x] K18. Gangs form as the town grows (gangs)
 
 - Module: gangs. Depends on: K3. Save change: yes, settings only.
 - Open: `sim/src/Gangs.cpp` (`FoundGangs`, `ReviewGangs`).

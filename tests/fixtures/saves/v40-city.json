@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 39,
-   "gameVersion": "0.39.0",
+   "version": 40,
+   "gameVersion": "0.40.0",
    "world": {
       "tick": 28370,
       "seed": 33,
@@ -19366,7 +19366,10 @@
             "turfReachMeters": 40,
             "patrolReachMinutes": 10,
             "patrolStayMinutes": 15,
-            "crimeLookbackMinutes": 60
+            "crimeLookbackMinutes": 60,
+            "robotsPerGang": 1500,
+            "minGangs": 2,
+            "maxGangs": 6
          },
          "construction": {
             "streakNights": 7,

@@ -49,11 +49,11 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | robot-pages | 9k | `InspectorRobot.cpp`, `InspectorInternal.hpp`, `Links.hpp`, `Inspector.hpp` |
 | project-pages | 6k | `InspectorProject.cpp`, `InspectorInternal.hpp`, `Links.hpp`, `ProjectLists.hpp`, `Inspector.hpp` |
 | chronicle-pages | 8k | `InspectorHistory.cpp`, `InspectorChronicle.cpp`, `ChroniclePagesInternal.hpp`, `InspectorInternal.hpp`, `Links.hpp`, `ChronicleLists.hpp`, `Inspector.hpp` |
-| gangs | 17k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
+| gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp`, `GangGrowthTests.cpp` |
 | gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
 | gang-lists | 5k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
 | chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
-| chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
+| chronicle | 10k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 | construction-rules | 1k | `ConstructionRules.hpp`, `ConstructionRules.cpp` |
 | construction | 24k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `World.hpp`, `ConstructionTests.cpp`, `SiteOfficeTests.cpp` |
 | site-supplies | 16k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `World.hpp`, `SiteSuppliesTests.cpp` |

@@ -118,7 +118,10 @@ void World::HandleOfficerAffinity(Robot& first, Robot& second) {
 
 void World::FoundGangs(Pcg32& random) {
     std::uint32_t numRobots = static_cast<std::uint32_t>(state_.robots.size());
-    std::uint32_t numGangs = std::max(2u, std::min(6u, numRobots / 1500));
+    const auto minGangs = static_cast<std::uint32_t>(state_.settings.crime.minGangs);
+    const auto maxGangs = static_cast<std::uint32_t>(state_.settings.crime.maxGangs);
+    std::uint32_t numGangs = std::max(
+        minGangs, std::min(maxGangs, numRobots / static_cast<std::uint32_t>(state_.settings.crime.robotsPerGang)));
 
     // Collect habitat buildings and find those nearest the city edge.
     std::vector<EntityId> habitatBuildings;
@@ -237,6 +240,54 @@ void World::FoundGangs(Pcg32& random) {
     }
 }
 
+void World::FoundGang() {
+    const std::size_t index = state_.gangs.size();
+    Gang gang;
+    gang.id = state_.ids.Allocate();
+    gang.name = kGangName[index % kGangNames];
+    gang.color = kGangColor[index % kGangNames];
+    // Its turf: the habitat farthest from the middle of the grid that no gang holds,
+    // the smaller id when two stand as far.
+    std::int32_t minX = INT32_MAX, maxX = INT32_MIN, minZ = INT32_MAX, maxZ = INT32_MIN;
+    for (const CityNode& node : state_.city.nodes) {
+        minX = std::min(minX, node.x);
+        maxX = std::max(maxX, node.x);
+        minZ = std::min(minZ, node.z);
+        maxZ = std::max(maxZ, node.z);
+    }
+    const std::int64_t centerX = (static_cast<std::int64_t>(minX) + maxX) / 2;
+    const std::int64_t centerZ = (static_cast<std::int64_t>(minZ) + maxZ) / 2;
+    std::int64_t farthest = -1;
+    for (const Building& building : state_.city.buildings) {
+        if (building.kind != BuildingKind::Habitat ||
+            std::ranges::any_of(state_.gangs, [&](const Gang& other) { return other.turf == building.id; })) {
+            continue;
+        }
+        const CityNode& node = state_.city.nodes[static_cast<std::size_t>(building.entrance.value)];
+        const std::int64_t dx = node.x - centerX;
+        const std::int64_t dz = node.z - centerZ;
+        if ((dx * dx) + (dz * dz) > farthest) {
+            farthest = (dx * dx) + (dz * dz);
+            gang.turf = building.id;
+        }
+    }
+    // A stance to every gang there is, written both ways so relations stay
+    // symmetric; the second gang is always a rival of the first, as at founding.
+    Pcg32 random = Pcg32::FromSeed(state_.seed, kGangStream + 1000 + index);
+    for (Gang& other : state_.gangs) {
+        Stance stance;
+        if (index == 1) {
+            stance = Stance::Rival;
+        } else {
+            const std::uint32_t roll = random.UniformInt(0, 99);
+            stance = roll < 25 ? Stance::Friendly : (roll < 70 ? Stance::Neutral : Stance::Rival);
+        }
+        other.relations.push_back({gang.id, stance});
+        gang.relations.push_back({other.id, stance});
+    }
+    state_.gangs.push_back(std::move(gang));
+}
+
 void World::ReviewGangs() {
     // A world saved before gangs existed (version 17) has none: found them
     // on this first midnight, from the saved seed and kGangStream - the
@@ -251,6 +302,13 @@ void World::ReviewGangs() {
     if (state_.gangs.empty()) {
         Pcg32 gangRandom = Pcg32::FromSeed(state_.seed, kGangStream);
         FoundGangs(gangRandom);
+    }
+    // A growing town: one more gang each time its robots pass another multiple
+    // of robotsPerGang, up to maxGangs.
+    if (state_.gangs.size() < static_cast<std::size_t>(state_.settings.crime.maxGangs) &&
+        state_.robots.size() / static_cast<std::size_t>(state_.settings.crime.robotsPerGang) >
+            state_.gangs.size()) {
+        FoundGang();
     }
 
     for (Robot& robot : state_.robots) {
