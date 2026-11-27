@@ -175,7 +175,7 @@ One module and one commit each. Steps that change saved state follow rule 3.
   raises later has working neon and nothing leaks. The aerial's beacon on a
   roof is such a sign, in red. Not seen in the game.
 
-### - [ ] I5. A site raises a styled building (construction)
+### - [x] I5. A site raises a styled building (construction)
 
 - Open: `sim/src/Construction.cpp` (`startSite`), `sim/include/mechapunk/sim/City.hpp`
   (only to read `StyleOf`).
@@ -185,6 +185,12 @@ One module and one commit each. Steps that change saved state follow rule 3.
 - Test in `tests/ConstructionTests.cpp` (or a new file if the 10k file limit
   bites): a site's building has a style, and it is the one `StyleOf` gives it.
   `construction` stands at 24284 of 25000: make room first if needed.
+- Done. `startSite` writes `.style = StyleOf(kind, id, floors + 1)`: the
+  final height is the ground floor plus the `floors` nights, so the site
+  already knows its style while the view draws scaffold, and the finished
+  building keeps it. No save change; no draw, so the log is unchanged. The
+  test is a new `tests/SiteStyleTests.cpp` (module `site-style`) instead of
+  `ConstructionTests.cpp`, whose module has no room (24262 of 25000).
 
 ### - [ ] I6. The style in the inspector (inspector)
 

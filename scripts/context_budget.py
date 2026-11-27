@@ -64,6 +64,8 @@ MODULES = {
                   "app/CityStatic.cpp", "app/CityLights.cpp"],
     "view-massing": ["app/CityView.hpp", "app/CityViewInternal.hpp", "app/Massing.hpp",
                      "app/Massing.cpp", "app/CityMassing.cpp", "tests/MassingTests.cpp"],
+    "site-style": [I + "Construction.hpp", "sim/src/Construction.cpp", I + "City.hpp",
+                   "tests/SiteStyleTests.cpp"],
     "view-robots": ["app/CityView.hpp", "app/CityViewInternal.hpp", "app/CityRobots.cpp",
                     "app/CityMetro.cpp", "app/CityDrivers.cpp", I + "Metro.hpp"],
     "view-interiors": ["app/CityView.hpp", "app/CityViewInternal.hpp", "app/CityInteriors.cpp",
