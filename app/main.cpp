@@ -428,9 +428,10 @@ private:
             selection_.organization = next.organization;
             selection_.robot = {};
             selection_.room = {};
-            // A page selected in place names no gang, so the gang page is
-            // no longer what the player is looking at.
+            // A page selected in place names no gang and no project, so neither
+            // page is what the player is looking at any more.
             selection_.gang = {};
+            selection_.project = {};
             return;
         }
         if (!next.building.IsValid()) {
@@ -448,8 +449,10 @@ private:
         selection_.organization = {};
         // OpenBuilding replaced the whole selection, so the gang has to be
         // put back: a gang link names its turf to move the camera and the
-        // gang to choose the page, and both must survive.
+        // gang to choose the page, and both must survive. A project link
+        // names its building and the project the same way.
         selection_.gang = next.gang;
+        selection_.project = next.project;
         camera_.FocusTarget(
             city_.FloorCenter(selection_.building, selection_.floor));
     }

@@ -3,6 +3,8 @@
 #include <format>
 #include <unordered_map>
 
+#include "ProjectLists.hpp"
+
 #include "mechapunk/sim/Gangs.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
@@ -108,6 +110,31 @@ std::optional<InspectorRequest> BuildingLink(const CityView& city,
                     building.value);
     if (Link(label)) {
         return InspectorRequest{.selection = {.building = building, .floor = 0}};
+    }
+    return std::nullopt;
+}
+
+// The site going up on a building: the same name as the building's own link,
+// ending in "##project<id>" so the two never share an ImGui id. A click shows
+// the project's page and opens the building it raises, so the player reads
+// the facts and sees the scaffold. A building whose project has since ended
+// is plain text, like an unknown gang's name in `GangLink`.
+std::optional<InspectorRequest> ProjectLink(const CityView& city,
+                                            const WorldFrame& frame,
+                                            sim::EntityId building,
+                                            std::string_view prefix) {
+    if (ProjectOn(frame, building) == nullptr) {
+        ImGui::TextDisabled("%.*s%s", static_cast<int>(prefix.size()),
+                            prefix.data(), "no site there");
+        return std::nullopt;
+    }
+    const std::string label =
+        std::format("{}{}##project{}", prefix, BuildingName(city, building),
+                    building.value);
+    if (Link(label)) {
+        return InspectorRequest{.selection = {.building = building,
+                                             .floor = 0,
+                                             .project = building}};
     }
     return std::nullopt;
 }

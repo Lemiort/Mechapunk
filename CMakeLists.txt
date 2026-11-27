@@ -50,6 +50,7 @@ add_executable(mechapunk
     app/InspectorHistory.cpp
     app/InspectorChronicle.cpp
     app/InspectorOrganization.cpp
+    app/InspectorProject.cpp
     app/Links.cpp
     app/StatisticsChronicle.cpp
     app/Statistics.cpp

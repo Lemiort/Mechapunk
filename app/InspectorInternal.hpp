@@ -92,6 +92,11 @@ inline std::string SectorLabel(sim::Sector sector) {
 [[nodiscard]] std::optional<InspectorRequest> DrawGangPage(
     const Selection& selection, const WorldFrame& frame, const CityView& city);
 
+// The construction project's page in the inspector, in InspectorProject.cpp:
+// `selection.project` is the building the project raises (see sim::Project).
+[[nodiscard]] std::optional<InspectorRequest> DrawProject(
+    const Selection& selection, const WorldFrame& frame, const CityView& city);
+
 // The "History" section of the robot page, in InspectorHistory.cpp: the
 // chronicle entries naming this robot, newest first, every entity in one a
 // link. Takes the page's request by pointer, as the Chronicle tab does, so a

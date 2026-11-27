@@ -41,6 +41,13 @@ std::optional<InspectorRequest> RoomLink(
 std::optional<InspectorRequest> BuildingLink(
     const CityView& city, sim::EntityId building, std::string_view prefix);
 
+// The building a project is raising: a click shows the project's page and
+// opens the site's building. Nothing when no project is on that building
+// anymore - the frame's list says, as on the project's own page.
+std::optional<InspectorRequest> ProjectLink(
+    const CityView& city, const WorldFrame& frame, sim::EntityId building,
+    std::string_view prefix);
+
 // An organization's name: a click shows it in the inspector.
 std::optional<InspectorRequest> OrganizationLink(const WorldFrame& frame,
                                                  sim::EntityId organization,

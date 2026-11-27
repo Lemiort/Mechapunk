@@ -38,6 +38,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | project-lists | 5k | `ProjectLists.hpp`, `ProjectLists.cpp`, `ProjectListsTests.cpp` |
 | inspector | 23k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
+| project-pages | 6k | `InspectorProject.cpp`, `InspectorInternal.hpp`, `Links.hpp`, `ProjectLists.hpp`, `Inspector.hpp` |
 | chronicle-pages | 8k | `InspectorHistory.cpp`, `InspectorChronicle.cpp`, `ChroniclePagesInternal.hpp`, `InspectorInternal.hpp`, `Links.hpp`, `ChronicleLists.hpp`, `Inspector.hpp` |
 | gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
 | gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
@@ -116,6 +117,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `ChroniclePagesInternal.hpp` | The helpers the two history files share: the scrolling table's flags and height, an entry's credits and what its kind reads as, so one entry reads alike on every page. |
 | `ChronicleLists` | Which chronicle entries a history list shows: about a robot, room, building or organization, newest first, plus the Chronicle tab's filters (kind group, day range, name). |
 | `ProjectLists` | Which rows a construction project's pages show: the builders of a site (robots whose job is its site office), the projects of an organization, the project on a building, and the lot a project stands on. |
+| `InspectorProject.cpp` | The construction project's page in the inspector: what the site is raising and where, its owner, its progress as a bar, what it has cost so far and asks a night, the shortage that started it, and the builders at its office as a clipped table. |
 | `Statistics` | Statistics window (T): Overview, Economy, Society, Property, Organizations, Central bank, Crime and Chronicle tabs, plots from `DailyStats`; the Chronicle tab and its filter controls (group buttons, day range, name box, held in `StatisticsView`) are drawn in `StatisticsChronicle.cpp`. |
 | `main.cpp` | Window, input, camera, panels, applying frames. |
 
@@ -152,6 +154,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Which rows a gang page shows, sorted | gang-lists | `app/GangLists.cpp` |
 | Which rows a history list shows, filtered | chronicle-lists | `app/ChronicleLists.cpp` |
 | Which rows a project page shows, sorted | project-lists | `app/ProjectLists.cpp` |
+| A construction project's page in the inspector | project-pages | `app/InspectorProject.cpp` |
 | A robot's, room's, building's or organization's history section in the inspector | chronicle-pages | `app/InspectorHistory.cpp`, `app/InspectorChronicle.cpp` |
 | A building going up: its project, its lot, its owner | construction | `Construction.hpp` (`Project`), `Construction.cpp` (`ReviewConstruction`) |
 | Panels, input, camera; frames from the simulation thread | ui | `main.cpp`, `SimulationHost.cpp` |

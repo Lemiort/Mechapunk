@@ -75,6 +75,8 @@ MODULES = {
     "inspector": ["app/Inspector.hpp", "app/Inspector.cpp", "app/Links.hpp",
                   "app/Links.cpp", "app/InspectorInternal.hpp",
                   "app/InspectorOrganization.cpp", "app/InspectorGang.cpp"],
+    "project-pages": ["app/InspectorProject.cpp", "app/InspectorInternal.hpp",
+                      "app/Links.hpp", "app/ProjectLists.hpp", "app/Inspector.hpp"],
     "chronicle-pages": ["app/InspectorHistory.cpp", "app/InspectorChronicle.cpp",
                         "app/ChroniclePagesInternal.hpp", "app/InspectorInternal.hpp",
                         "app/Links.hpp", "app/ChronicleLists.hpp", "app/Inspector.hpp"],

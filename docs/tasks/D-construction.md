@@ -32,7 +32,8 @@ is done on 2026-11-26, also with no save change: the layout library has the
 lists a project's pages show. D5b2 was added on 2026-11-27, after D5b, and
 is done: a project saves the credits its site has paid for its supplies and
 the shortage that started it, which raised the save version to 25 and the
-game to 0.25.0.
+game to 0.25.0. D5c is done on 2026-11-27, also with no save change: the
+inspector has a project's own page, opened by a new link.
 
 ## What and why
 
@@ -1223,7 +1224,7 @@ and `reason`, the shortage that started it; save version 25, game 0.25.0.
   as parsed JSON - only `version` and `gameVersion` moved, and that city
   raises no site, so no project gains a key.
 
-### - [ ] D5c. The project page (inspector module)
+### - [x] D5c. The project page (inspector module)
 
 Open: a new `app/InspectorProject.cpp`, `app/InspectorInternal.hpp`,
 `app/Inspector.cpp` (the dispatch), `app/Links.hpp/.cpp`, `app/CityView.hpp`
@@ -1245,6 +1246,69 @@ Open: a new `app/InspectorProject.cpp`, `app/InspectorInternal.hpp`,
   `costSoFar` and `reason`, step D5b2, save version 25 - so nothing about
   this page needs asking the user again. A project an older save started
   reads as cost 0 and reason `unknown`, which is what the page says.
+
+Done as (project-pages module, one commit): `Selection` (CityView.hpp) gained
+`project`: the id of the building whose project is raising it, the way
+`WorldState` and `WorldFrame::projects` key the sites (step D5a's rule: by
+id, never by a look-alike); the camera and the cutaway ignore it, as they
+ignore the gang. `Links.hpp/.cpp` gained `ProjectLink`: the site's building
+name ending in `"##project<id>"`, so it never shares an ImGui id with the
+same building's `"##building<id>"` link; a click shows the project's page
+and opens the building at its ground floor, so the player reads the facts
+and sees the scaffold, and a building whose project ended since the click
+reads as disabled "no site there" the way an unknown gang does in `GangLink`
+(the frame's list answers through `ProjectOn`, ProjectLists.hpp). `DrawInspector`
+dispatches to `DrawProject` - declared in `InspectorInternal.hpp` the way
+`DrawGangPage` is - after the gang branch and before the building page, and
+a project alone opens the window. `ApplySelection` (main.cpp): the building
+branch puts `project` back the way it puts `gang` back (a project link names
+its building and its project together), and a page selected in place clears
+it with the gang.
+
+- The page, in a new `app/InspectorProject.cpp`: the building's name as its
+  title with "a habitat"/"a workplace" beside it, read from the building's
+  own `kind` (City.hpp) rather than guessed from its rooms; "Where:" a
+  `BuildingLink`; "Owner:" an `OrganizationLink`; a Progress section -
+  `ImGui::ProgressBar` (the robot page's widget for needs and wear) of
+  `floorsDone` over `floorsDone + daysLeft`, overlaid "3/7", with the line
+  "N floors done of M, K nights left": the step's assumption that the floors
+  still to come are `daysLeft` holds, since a site raises one floor a night
+  (Construction.cpp); a Cost section - `costSoFar` and the 200 cr a night
+  the site asks, with a comment that the two read alike only for the
+  housing trust, whose share `PaySupplies` moves; a "Why it started" line
+  naming the rule with its share - under 25 per cent of the market's homes
+  empty, or over 5 per cent of the robots out of work, seven nights running
+  (the step's "with the number": the number of the night that fired is not
+  saved, so the page names the rule) - and "not recorded: an older game
+  started this site" for `Unknown`; and the Builders as a clipped table
+  (name a `RobotLink`, level through `JobTitle`, shift through `JobShift`
+  read over the office as the organization page reads a worker's, now) from
+  `BuildersOf` (ProjectLists.hpp, D5b).
+- The step's "First make room" bullet, and what was done instead: the text
+  assumed the page would join `inspector`, 23237 of 25000. The C4c precedent
+  fits better - that step moved its history pages into a `chronicle-pages`
+  module rather than crowd the inspector - so the new file joined a new
+  `project-pages` module with the headers it leans on (`InspectorInternal.hpp`,
+  `Links.hpp`, `ProjectLists.hpp`, `Inspector.hpp`) and no source file moved:
+  `inspector` grew only by the dispatch, the declaration and the link, 23237
+  to 23856 of 25000, `project-pages` 6465. Warning for D5d: `inspector` has
+  1144 tokens left and `Inspector.cpp` stands at 9653 of the 10k file limit,
+  so D5d must make room first.
+- No save change, no simulation change: only `app/` files moved, so
+  `mechapunk-sim.exe` was not relinked and the headless log and save cannot
+  move (as in D1b, D4, D5a and D5b). No random draw and no money movement:
+  the page only reads the published frame.
+- No new test: the page needs a live renderer and a GL context, so it is
+  checked by building, by ContextBudget and by the user in the game (as D4
+  and D5a did); the data it shows is what D5b's `ProjectLists` tests already
+  pin down. ctest: 202/202 including ContextBudget, unchanged.
+- Budget: `view-core` 20971 to 21041, `view-robots` 22475 to 22545 and
+  `view-interiors` 12136 to 12206 (the `Selection` field in `CityView.hpp`,
+  which all three modules read), `ui` 16518 to 16566 (the `ApplySelection`
+  lines). `CMakeLists.txt` gained `app/InspectorProject.cpp`; `scripts/context_budget.py`
+  the `project-pages` module; `docs/MODULES.md` the module row, the
+  `InspectorProject.cpp` row and the task row; the guide's task table row
+  for D its new module and its progress.
 
 ### - [ ] D5d. Links back to the project (inspector module)
 

@@ -707,10 +707,10 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
                                               bool& following) {
     // Nothing selected at all: no window. A gang alone is a page, even with
     // no building open, which is how a gang clicked in the Statistics window
-    // opens one.
+    // opens one; a project alone is a page the same way.
     if (!selection.organization.IsValid() && !selection.building.IsValid() &&
         !selection.robot.IsValid() && !selection.room.IsValid() &&
-        !selection.gang.IsValid()) {
+        !selection.gang.IsValid() && !selection.project.IsValid()) {
         return std::nullopt;
     }
     const ImGuiViewport& viewport = *ImGui::GetMainViewport();
@@ -746,6 +746,8 @@ std::optional<InspectorRequest> DrawInspector(const Selection& selection,
             clicked = DrawOrganization(selection, frame, city);
         } else if (selection.gang.IsValid()) {
             clicked = DrawGangPage(selection, frame, city);
+        } else if (selection.project.IsValid()) {
+            clicked = DrawProject(selection, frame, city);
         } else {
             clicked = DrawBuilding(selection, frame, city, host);
         }
