@@ -1,11 +1,11 @@
 # Task I: architecture
 
-Status: planned on 2026-11-27, nothing done yet. Save version is 26 and the
-game is 0.26.0; I1 raises it to 27 and the game to 0.27.0. Budgets that are
-already tight and will have to be made smaller first: `generation` 24521 of
-25000, `saves` 24006, `world` 24491, `careers` 24405, `construction` 24284.
-`view-core` has room (21041), `inspector` has room (19070), `statistics` has
-room (21973).
+Status: I1 done (steps I1a and I1b), the rest planned on 2026-11-27. Save
+version is 27 and the game is 0.27.0. Budgets that are tight: `world` 24491,
+`careers` 24405 and `construction` 24284 of 25000; after step I1b,
+`generation` stands at 23626, the new `city-styles` at 13780 and `saves` at
+20503. `view-core` has room (21041), `inspector` has room (19070),
+`statistics` has room (21973).
 
 ## What and why
 
@@ -49,7 +49,7 @@ One module and one commit each. Steps that change saved state follow rule 3.
   Proved nothing changed: `--seed 7 --robots 2000 --days 6 --all --save X`
   before and after, log and save byte for byte identical.
 
-### - [ ] I1b. A building's style is saved state (generation + saves)
+### - [x] I1b. A building's style is saved state (generation + saves)
 
 - Open: `sim/include/mechapunk/sim/City.hpp` (the `Building` struct, next to
   `BuildingKind`), `sim/src/City.cpp` (`GenerateCity`, where a building is
@@ -81,6 +81,27 @@ One module and one commit each. Steps that change saved state follow rule 3.
 - Headless: the log must be **identical** to the run before the step (no new
   draw); the seed 7 / 2000 / 6 days save differs only in the version lines and
   the new `"style"` key on every building.
+- Done as written, with four notes. The floors a style needs are my choice,
+  and the first draft's rule (a roof style needing a floor above the ground)
+  left 23 of the 39 workplaces of seed 1's 1000-robot city plain, which fails
+  the spread test: a one floor workshop with roof lights and a one floor house
+  with a pitched roof are ordinary, so `Sawtooth` and `Gabled` are allowed
+  from one floor up, `Setback` and `Plinth` from three and `TwinTowers` from
+  two, and the styles spread. `V26ToV27` calls `StyleOf` - the one migration
+  that reads game code - because the style is derivable from the id, kind and
+  floor count the save already holds; the names it writes are spelled out in
+  `Migrations.cpp` and must match `glz::meta<BuildingStyle>` in `Save.cpp`.
+  `Validation.cpp` checks nothing new: an unknown style name fails when the
+  save is read. The fixture README had no row for v26, left out by step D5e2;
+  it has one now.
+- The step did not fit one module as drafted: `City.cpp` passed the 10k file
+  budget and `generation` the 25k module budget. Split by topic the way step
+  I1a split `CityTests.cpp`: `StyleOf`, the massing tables and the hash went
+  to a new `sim/src/CityStyle.cpp`, the style test to a new
+  `tests/CityStyleTests.cpp`, and both files into a new module `city-styles`
+  (`City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp`) in
+  `scripts/context_budget.py`, with `docs/MODULES.md` regenerated. After:
+  `generation` 23626, `city-styles` 13780, `saves` 20503 of 25000.
 
 ### - [ ] I2. The block is drawn per style (view-core)
 
@@ -154,7 +175,7 @@ One module and one commit each. Steps that change saved state follow rule 3.
 
 ## Done when
 
-- [ ] Every building has a style, saved, migrated and tested (I1).
+- [x] Every building has a style, saved, migrated and tested (I1).
 - [ ] The city looks like a city and not a row of slabs: massing, facades,
       roofs and lights differ by style (I2, I3, I4).
 - [ ] A building raised at midnight gets a style and turns into it when it

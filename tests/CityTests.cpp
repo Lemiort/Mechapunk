@@ -1,7 +1,8 @@
 // Buildings and their rooms: what a generated city puts inside its
 // buildings - floors, rooms, venues, sorting and findability - and that
-// the same seed gives the same city. The streets, the route planner and
-// the free plots of the grid are in CityStreetTests.cpp.
+// the same seed gives the same city. The style each building is dressed in
+// is in CityStyleTests.cpp; the streets, the route planner and the free
+// plots of the grid are in CityStreetTests.cpp.
 
 #include <gtest/gtest.h>
 

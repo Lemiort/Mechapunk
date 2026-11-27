@@ -30,6 +30,8 @@ every fixture, so old saves keep working as the format evolves.
 | `v23-city.json` | 23     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v23-city.json` (game 0.23.0) |
 | `v24-city.json` | 24     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v24-city.json` (game 0.24.0) |
 | `v25-city.json` | 25     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v25-city.json` (game 0.25.0) |
+| `v26-city.json` | 26     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v26-city.json` (game 0.26.0) |
+| `v27-city.json` | 27     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v27-city.json` (game 0.27.0) |
 
 All other fixtures stop at the same moment as the older ones: Day 20 Sat 16:50.
 `v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
@@ -96,6 +98,15 @@ D3a). `v25-city.json` stops at the same moment in the same kind of city:
 from this version a project carries the credits its site has paid for its
 supplies and the shortage that started it, and this fixture raised no
 site, so its list is empty and names neither key (see step D5b2).
+`v26-city.json` stops at the same moment in the same kind of city: from
+this version the daily statistics count construction - the sites the
+nightly review started and ended in a day, and the robots whose job is a
+site office - and this fixture raised no site, so every one of those
+counters reads 0 (see step D5e2). `v27-city.json` stops at the same
+moment in the same kind of city: from this version every building names
+the style it is dressed in - its massing and its roof, which change
+nothing a robot does - and its buildings carry more than one style (see
+step I1b).
 `Version1FixtureMigratesAndRuns` loads the v1
 fixture through the migration, checks every robot kept its home and
 workplace, and runs two days of evenings; `Version2FixtureMigratesAndRuns`

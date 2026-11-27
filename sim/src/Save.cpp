@@ -40,6 +40,14 @@ struct glz::meta<mechapunk::sim::BuildingKind> {
         enumerate("habitat", Habitat, "workplace", Workplace);
 };
 template <>
+struct glz::meta<mechapunk::sim::BuildingStyle> {
+    using enum mechapunk::sim::BuildingStyle;
+    static constexpr auto value =
+        enumerate("plain", Plain, "setback", Setback, "stepped", Stepped,
+                  "twinTowers", TwinTowers, "plinth", Plinth, "gabled", Gabled,
+                  "sawtooth", Sawtooth, "tower", Tower);
+};
+template <>
 struct glz::meta<mechapunk::sim::RoomKind> {
     using enum mechapunk::sim::RoomKind;
     static constexpr auto value = enumerate(
@@ -222,6 +230,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 25,
               .summary = "construction counters in the daily statistics",
               .apply = &migrations::V25ToV26},
+    Migration{.fromVersion = 26,
+              .summary = "every building gains its architectural style",
+              .apply = &migrations::V26ToV27},
 };
 }  // namespace
 

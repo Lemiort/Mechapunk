@@ -28,6 +28,8 @@ MODULES = {
     "generation": [I + "World.hpp", "sim/src/WorldInternal.hpp", "sim/src/Generation.cpp",
                    I + "City.hpp", "sim/src/City.cpp", "sim/src/Names.hpp", "tests/CityTests.cpp"],
     "city-streets": [I + "World.hpp", I + "City.hpp", "tests/CityStreetTests.cpp"],
+    "city-styles": [I + "City.hpp", "sim/src/City.cpp", "sim/src/CityStyle.cpp",
+                    "tests/CityStyleTests.cpp"],
     "validation": [I + "World.hpp", "sim/src/Validation.cpp", "sim/src/Describe.cpp"],
     "money": [I + "World.hpp", I + "Economy.hpp", "sim/src/EconomyInternal.hpp",
               "sim/src/Economy.cpp", "sim/src/Money.cpp", "sim/src/Settlement.cpp",

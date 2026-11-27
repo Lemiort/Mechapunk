@@ -137,4 +137,17 @@ namespace mechapunk::sim::migrations {
 // recorded.
 [[nodiscard]] std::expected<void, std::string> V25ToV26(SaveDocument& world);
 
+// Version 26 to 27: every building gains its architectural style (task I,
+// step I1b) - its massing and its roof, which change no room, no job, no
+// price and no walk. A version 26 save already names the three facts the
+// style is read from: the building's id, its kind and its floor count, and
+// `StyleOf` in City.cpp is a pure function of exactly those, drawing no
+// random number, so the migration writes the style the current game would
+// give the building instead of inventing a plain box for every old city.
+// This is the one migration that reads today's game code, and it is honest
+// only because the fact is derivable: unlike the account a chronicle entry
+// names (task C, step C4e1), there is nothing here the old game could have
+// failed to record.
+[[nodiscard]] std::expected<void, std::string> V26ToV27(SaveDocument& world);
+
 }  // namespace mechapunk::sim::migrations

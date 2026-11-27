@@ -208,7 +208,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // one loading through the migration (see tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v26-city.json";
+        kFixtureDirectory / "saves" / "v27-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -343,6 +343,23 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
         EXPECT_EQ(day.counted.projectsFinished, 0);
         EXPECT_EQ(day.buildersEmployed, 0);
     }
+    // And from version 27 every building names the style it is dressed in
+    // (task I, step I1b): its massing and its roof, which change nothing a
+    // robot does. The round trip above is what proves the key is written and
+    // read back; what is checked here is that the fixture's town wears more
+    // than one style and that each building carries the one its own id, kind
+    // and floor count give it.
+    {
+        std::set<sim::BuildingStyle> styles;
+        for (const sim::Building& building : state->city.buildings) {
+            EXPECT_EQ(building.style,
+                      sim::StyleOf(building.kind, building.id,
+                                   building.floors))
+                << building.name;
+            styles.insert(building.style);
+        }
+        EXPECT_GE(styles.size(), 2U);
+    }
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();
@@ -378,6 +395,37 @@ TEST(Save, Version25FixtureMigratesAndRuns) {
         EXPECT_EQ(day.counted.projectsFinished, 0);
         EXPECT_EQ(day.buildersEmployed, 0);
     }
+
+    auto world = sim::World::FromState(std::move(*state));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    world->RunFor(sim::kMinutesPerDay);
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}
+
+// Version 27 dresses every building: its style is saved with it (task I,
+// step I1b). The version 26 fixture names no "style" key at all, so what
+// loads is the migration's work, and every building must read as the style
+// `StyleOf` gives the id, kind and floor count that save already had - not
+// as the plain box a migration that invented rather than derived would have
+// written for every old city.
+TEST(Save, Version26FixtureMigratesAndRuns) {
+    const std::filesystem::path path =
+        kFixtureDirectory / "saves" / "v26-city.json";
+    const std::string fixture = ReadText(path);
+    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
+    EXPECT_EQ(fixture.find("\"style\""), std::string::npos)
+        << path.string() << " already names the style";
+
+    auto state = sim::DeserializeWorld(fixture);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    std::set<sim::BuildingStyle> styles;
+    for (const sim::Building& building : state->city.buildings) {
+        EXPECT_EQ(building.style,
+                  sim::StyleOf(building.kind, building.id, building.floors))
+            << building.name;
+        styles.insert(building.style);
+    }
+    EXPECT_GE(styles.size(), 2U);
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();

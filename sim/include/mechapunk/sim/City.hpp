@@ -36,6 +36,21 @@ struct Station {
 
 enum class BuildingKind : std::uint8_t { Habitat, Workplace };
 
+// How a building is dressed: its massing and its roof, and nothing else.
+// Purely architectural - it changes no room, no job, no price, no money and
+// no walk - and saved with the building, so one city looks the same on every
+// run and after a save round trip.
+enum class BuildingStyle : std::uint8_t {
+    Plain,      // The box as it is today: one slab to the flat roof.
+    Setback,    // The top third of the floors pulled in from the street.
+    Stepped,    // Pulled in twice, a ziggurat against the sky.
+    TwinTowers, // Two shafts with a gap between them.
+    Plinth,     // A wide base two floors high under a narrower shaft.
+    Gabled,     // A pitched roof, the homes' style.
+    Sawtooth,   // A row of angled roof lights, the workshops' style.
+    Tower,      // A slim crown raised on the top floor.
+};
+
 enum class RoomKind : std::uint8_t {
     Apartment,
     Workspace,
@@ -118,11 +133,26 @@ struct Building {
     BuildingKind kind{BuildingKind::Habitat};
     NodeId entrance;
     std::uint32_t floors{1};
+    // How the block is dressed and roofed; see `StyleOf` below.
+    BuildingStyle style{BuildingStyle::Plain};
     // Used by workplaces only.
     Shift shift;
     // Sorted by id.
     std::vector<Room> rooms;
 };
+
+// The style of a building, read off the three facts the city already has:
+// its id, its kind and its saved floor count (the ground floor counted). A
+// hash of them picks the massing that kind may have and that this many floors
+// can carry - a habitat never gets the sawtooth lights of a workshop, a
+// workplace never gets a gabled roof or a crowned tower, and a one floor
+// depot is a plain box or a single-storey workshop with roof lights. Never
+// a draw from the city's random stream: the layout, the rooms and the story
+// of a city do not move when the styles are read, so the headless log stays
+// byte for byte identical, and one seed dresses the city the same way on
+// every machine.
+[[nodiscard]] BuildingStyle StyleOf(BuildingKind kind, EntityId id,
+                                    std::uint32_t floors) noexcept;
 
 // An intersection has room for four buildings, one on each corner; the
 // view numbers those corners 0 to 3, and generation never puts a fifth

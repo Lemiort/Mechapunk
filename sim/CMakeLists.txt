@@ -13,6 +13,7 @@ add_library(mechapunk_sim STATIC
     src/Settlement.cpp
     src/Units.cpp
     src/City.cpp
+    src/CityStyle.cpp
     src/GameTime.cpp
     src/LifeCycle.cpp
     src/Metro.cpp

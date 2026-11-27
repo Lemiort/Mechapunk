@@ -15,8 +15,9 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | Module | Tokens | Files |
 |---|---:|---|
 | world | 24k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
-| generation | 22k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
+| generation | 23k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
 | city-streets | 11k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
+| city-styles | 13k | `City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp` |
 | validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 21k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Property.cpp`, `HousingTests.cpp` |
@@ -26,7 +27,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 18k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
+| saves | 20k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
 | saves-frozen | 19k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `MigrationsMid.cpp`, `SaveFixtureTestsEarly.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 12k | `World.hpp`, `main.cpp` |
@@ -69,7 +70,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Residents.cpp` | `RentOf`, `ResidentsOf`, `CountResidents`, `CollectRent` |
 | `Describe.cpp` | `Describe`, `DescribeRoom`: event and room text |
 | `Validation.cpp` | `ValidateWorldState` |
-| `City.hpp/.cpp` | Streets, stations, buildings, rooms, `RoomKind`, `ApartmentClass`, free plots (`CityLot`, `City::lots`), `GenerateCity`, `RoomIndex`, `RoutePlanner` |
+| `City.hpp/.cpp` | Streets, stations, buildings, rooms, `RoomKind`, `ApartmentClass`, `BuildingStyle`, free plots (`CityLot`, `City::lots`), `GenerateCity`, `RoomIndex`, `RoutePlanner` |
+| `CityStyle.cpp` | `StyleOf`: the massing each kind of building may have, and the hash of a building's id, kind and floor count that picks one |
 | `Venues.hpp/.cpp` | `VenueRules` per venue kind (hours, price, effects, capacity), `StaffRules` (also police and crew rooms, and a site's office), `FindStaffRules`, `StaffPerShift`, `JobsAt`, `ShiftSlot` |
 | `Careers.hpp/.cpp` | Wages, promotions, firing, `ReviewJobs`, `ReviewHomes` (eviction, moving up, friends moving in together), `JobShift`, `JobKey`, `OpeningsFor` (a site's office is an opening, its other rooms are not) |
 | `Gangs.hpp` | Gangs (`Stance`, `GangRelation`, `Gang`) |
@@ -136,6 +138,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Needs, the minute step, the midnight order | world | `World.cpp` (`Step`, `UpdateNeeds`) |
 | Rent collection, who lives where | world | `Residents.cpp` |
 | New city layout, buildings, depots, stations at start | generation | `City.cpp` (`GenerateCity`), `Generation.cpp` |
+| A building's architectural style, and the style an old save gains | city-styles | `CityStyle.cpp` (`StyleOf`) |
 | A new invariant, a validation error | validation | `Validation.cpp` |
 | Event text in the log | validation | `Describe.cpp` |
 | Payments, loans, wages, what robots can afford | money | `Money.cpp` |

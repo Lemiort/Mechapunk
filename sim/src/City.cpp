@@ -335,6 +335,7 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
         }
     }
     building.floors = floors + 1;
+    building.style = StyleOf(building.kind, building.id, building.floors);
     return building;
 }
 
@@ -375,6 +376,7 @@ Building MakeWorkplace(const CityParams& params, Pcg32& random,
         building.floors = floor + 1;
         staffed += size;
     }
+    building.style = StyleOf(building.kind, building.id, building.floors);
     return building;
 }
 }  // namespace
@@ -568,6 +570,9 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
              .kind = RoomKind::CrewRoom,
              .floor = 0,
              .capacity = std::max<std::uint32_t>(2, line.trains)});
+        // A depot is one floor high, so it is dressed as a plain box or as
+        // a single-storey workshop with roof lights.
+        depot.style = StyleOf(depot.kind, depot.id, depot.floors);
         city.buildings.push_back(std::move(depot));
     }
 
