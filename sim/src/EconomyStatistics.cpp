@@ -163,6 +163,15 @@ void World::RecordStatistics() {
         stats.venuePricePercent = venues > 0 ? percent / venues : 100;
         stats.openVenues = venues;
         stats.emptyUnits = static_cast<std::int64_t>(rooms_.RoomsOfKind(RoomKind::VacantStore).size());
+        // The price index: venue prices and market rents, half each, in per mille of
+        // their starting levels (a price of 100 percent is 1000).
+        std::int64_t rentPercent = 0;
+        for (const std::int64_t rent : state_.economy.rentPercent) {
+            rentPercent += rent;
+        }
+        const std::int64_t rentMille =
+            rentPercent * 10 / static_cast<std::int64_t>(state_.economy.rentPercent.size());
+        stats.priceIndex = venues > 0 ? ((percent * 10 / venues) + rentMille) / 2 : rentMille;
     }
     // The builders: the robots whose job is a site office, the way
     // `ProjectLists` (app) defines a builder. A finished site's office became

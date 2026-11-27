@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 37,
-   "gameVersion": "0.37.0",
+   "version": 38,
+   "gameVersion": "0.38.0",
    "world": {
       "tick": 28370,
       "seed": 33,
@@ -23488,6 +23488,7 @@
             "venuePricePercent": 99,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 992,
             "gangMembers": 0
          },
          {
@@ -23611,6 +23612,7 @@
             "venuePricePercent": 99,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 988,
             "gangMembers": 0
          },
          {
@@ -23734,6 +23736,7 @@
             "venuePricePercent": 99,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 984,
             "gangMembers": 0
          },
          {
@@ -23857,6 +23860,7 @@
             "venuePricePercent": 99,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 980,
             "gangMembers": 0
          },
          {
@@ -23980,6 +23984,7 @@
             "venuePricePercent": 99,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 976,
             "gangMembers": 0
          },
          {
@@ -24103,6 +24108,7 @@
             "venuePricePercent": 98,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 972,
             "gangMembers": 0
          },
          {
@@ -24226,6 +24232,7 @@
             "venuePricePercent": 98,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 966,
             "gangMembers": 0
          },
          {
@@ -24349,6 +24356,7 @@
             "venuePricePercent": 98,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 962,
             "gangMembers": 0
          },
          {
@@ -24472,6 +24480,7 @@
             "venuePricePercent": 98,
             "openVenues": 11,
             "emptyUnits": 0,
+            "priceIndex": 957,
             "gangMembers": 0
          },
          {
@@ -24595,6 +24604,7 @@
             "venuePricePercent": 98,
             "openVenues": 11,
             "emptyUnits": 3,
+            "priceIndex": 953,
             "gangMembers": 0
          },
          {
@@ -24718,6 +24728,7 @@
             "venuePricePercent": 98,
             "openVenues": 11,
             "emptyUnits": 3,
+            "priceIndex": 949,
             "gangMembers": 2
          },
          {
@@ -24841,6 +24852,7 @@
             "venuePricePercent": 98,
             "openVenues": 11,
             "emptyUnits": 3,
+            "priceIndex": 945,
             "gangMembers": 2
          },
          {
@@ -24964,6 +24976,7 @@
             "venuePricePercent": 97,
             "openVenues": 11,
             "emptyUnits": 2,
+            "priceIndex": 940,
             "gangMembers": 2
          },
          {
@@ -25087,6 +25100,7 @@
             "venuePricePercent": 97,
             "openVenues": 12,
             "emptyUnits": 1,
+            "priceIndex": 937,
             "gangMembers": 2
          },
          {
@@ -25210,6 +25224,7 @@
             "venuePricePercent": 97,
             "openVenues": 12,
             "emptyUnits": 1,
+            "priceIndex": 932,
             "gangMembers": 2
          },
          {
@@ -25333,6 +25348,7 @@
             "venuePricePercent": 97,
             "openVenues": 12,
             "emptyUnits": 1,
+            "priceIndex": 928,
             "gangMembers": 3
          },
          {
@@ -25456,6 +25472,7 @@
             "venuePricePercent": 97,
             "openVenues": 13,
             "emptyUnits": 0,
+            "priceIndex": 925,
             "gangMembers": 3
          },
          {
@@ -25579,6 +25596,7 @@
             "venuePricePercent": 97,
             "openVenues": 13,
             "emptyUnits": 0,
+            "priceIndex": 920,
             "gangMembers": 3
          },
          {
@@ -25702,6 +25720,7 @@
             "venuePricePercent": 97,
             "openVenues": 13,
             "emptyUnits": 0,
+            "priceIndex": 915,
             "gangMembers": 3
          }
       ],

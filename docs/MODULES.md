@@ -26,7 +26,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 24k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Banks.cpp`, `Corporations.cpp`, `Property.cpp`, `HousingTests.cpp`, `BanksTests.cpp` |
 | units | 15k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Units.cpp`, `VenueTests.cpp` |
-| statistics | 21k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
+| statistics | 22k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
 | careers | 24k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 14k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |

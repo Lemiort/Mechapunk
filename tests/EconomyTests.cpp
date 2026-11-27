@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <map>
 #include <unordered_set>
@@ -102,6 +103,24 @@ TEST(Economy, EverythingHasAnOwnerFromTheStart) {
 // Money only moves between accounts: every day, all the money in the city
 // is exactly what the central bank created less what it destroyed, and
 // every creation is in its log.
+// The price index (task K, step K16): 1000 while prices stand where they started,
+// and it follows prices and rents.
+TEST(Economy, PriceIndexStartsAtAThousandAndMoves) {
+    sim::World world = sim::World::Generate({.seed = 5, .robots = 200});
+    world.RunFor(sim::kMinutesPerDay + 5);
+    ASSERT_FALSE(world.State().history.empty());
+    // One night's price step is a percent at most, so the first night is near 1000.
+    EXPECT_NEAR(static_cast<double>(world.State().history.front().priceIndex), 1000.0, 15.0);
+    world.RunFor(30 * sim::kMinutesPerDay);
+    EXPECT_TRUE(std::ranges::any_of(world.State().history, [](const sim::DailyStats& day) {
+        return day.priceIndex != 1000;
+    })) << "prices never moved";
+    for (const sim::DailyStats& day : world.State().history) {
+        EXPECT_GT(day.priceIndex, 400);
+        EXPECT_LT(day.priceIndex, 3500);
+    }
+}
+
 TEST(Economy, MoneyAddsUpEveryDay) {
     sim::World world = sim::World::Generate({.seed = 5, .robots = 300});
     std::int64_t logged = 0;

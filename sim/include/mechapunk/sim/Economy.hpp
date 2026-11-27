@@ -222,6 +222,9 @@ struct DailyStats {
     std::int64_t venuePricePercent{};
     std::int64_t openVenues{};
     std::int64_t emptyUnits{};
+    // The average of venue prices and market rents, in per mille of what they were
+    // when the city started (1000 = unchanged): what the central bank steers by.
+    std::int64_t priceIndex{1000};
     // Gangs and crime statistics.
     std::int64_t gangMembers{};
 };

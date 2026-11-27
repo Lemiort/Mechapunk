@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K15 done. Save version 37, game 0.37.0.
+Status: planned on 2026-11-27; K1 to K16 done. Save version 38, game 0.38.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -324,7 +324,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   industry corporation; the money adds up.
 - Check: build, ctest, seed 7 byte-identical except the settings keys.
 
-### - [ ] K16. A price index in the daily statistics (statistics)
+### - [x] K16. A price index in the daily statistics (statistics)
 
 - Module: statistics (`EconomyStatistics.cpp`). Depends on: none. Save change:
   yes (a `DailyStats` field: add it to every `world.history[i]`, rule 3 table).
