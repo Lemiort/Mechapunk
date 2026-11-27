@@ -14,6 +14,7 @@
 
 #include "GangLists.hpp"
 #include "Links.hpp"
+#include "ProjectLists.hpp"
 #include "StatisticsInternal.hpp"
 
 #include "mechapunk/sim/Economy.hpp"
@@ -287,10 +288,14 @@ void DrawProperty(const std::vector<sim::DailyStats>& history, const WorldFrame&
     // Buildings by style, habitats and workplaces apart, counted from the
     // city the view holds: the style is saved with each building, so there is
     // no counter of its own (task I, step I7).
-    ImGui::SeparatorText("Buildings by style");
+    ImGui::SeparatorText("Buildings by style (sites going up left out)");
     constexpr std::size_t kStyles = static_cast<std::size_t>(sim::BuildingStyle::Tower) + 1;
     std::array<std::array<std::uint32_t, 2>, kStyles> byStyle{};
     for (const sim::Building& building : city.City().buildings) {
+        // A site is a scaffold, not yet the style it carries.
+        if (ProjectOn(frame, building.id) != nullptr) {
+            continue;
+        }
         ++byStyle.at(static_cast<std::size_t>(building.style))
               .at(building.kind == sim::BuildingKind::Habitat ? 0 : 1);
     }

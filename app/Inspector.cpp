@@ -156,9 +156,16 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
     const bool habitat = building->kind == sim::BuildingKind::Habitat;
     ImGui::Text("%s, %u floors", habitat ? "Habitat" : "Workplace",
                 building->floors);
-    ImGui::TextDisabled("A %s of %u floor%s",
-                        std::string{sim::StyleName(building->style)}.c_str(), building->floors,
-                        building->floors == 1 ? "" : "s");
+    // A site's style is the one of the finished block, which its standing
+    // floors do not show yet: its project's page says what it will be.
+    if (ProjectOn(frame, selection.building) != nullptr) {
+        ImGui::TextDisabled("A scaffold of %u floor%s", building->floors,
+                            building->floors == 1 ? "" : "s");
+    } else {
+        ImGui::TextDisabled("A %s of %u floor%s",
+                            std::string{sim::StyleName(building->style)}.c_str(), building->floors,
+                            building->floors == 1 ? "" : "s");
+    }
     if (!habitat) {
         ImGui::TextDisabled(
             "Shift %s-%s, %u cr",

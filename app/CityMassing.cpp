@@ -36,6 +36,16 @@ std::vector<CityView::StaticItem> CityView::MassingBlocks(const sim::Building& b
     return blocks;
 }
 
+void CityView::AddScaffold(std::uint32_t floors, vec3 center) {
+    for (std::uint32_t floor = 0; floor < floors; ++floor) {
+        const float base = static_cast<float>(floor) * kFloorHeight;
+        AddStaticBox(center + vec3{-kBuildingWidth * 0.5F, base, -kBuildingDepth * 0.5F},
+                     center + vec3{kBuildingWidth * 0.5F, base + (kSlabMeters * kS),
+                                   kBuildingDepth * 0.5F},
+                     kConcrete);
+    }
+}
+
 void CityView::AddRoof(const sim::Building& building, vec3 center) {
     const auto material = [this](RoofMaterial kind) -> std::shared_ptr<const Material> {
         switch (kind) {

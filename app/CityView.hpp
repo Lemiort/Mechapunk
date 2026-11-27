@@ -367,6 +367,8 @@ private:
     std::vector<StaticItem> MassingBlocks(const sim::Building& building,
                                           glm::vec3 center) const;
     void AddRoof(const sim::Building& building, glm::vec3 center);
+    // The thin slab of every standing floor of a building going up.
+    void AddScaffold(std::uint32_t floors, glm::vec3 center);
     // Groups statics_ and the building blocks into batches by building,
     // or for the rest by area, mesh and material.
     void BuildStaticBatches();

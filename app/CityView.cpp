@@ -133,7 +133,13 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                  .floors = building.floors,
                  // The street is to the north (-z) when the building sits
                  // south of its intersection: turn its plans to face it.
-                 .turned = quadrant.y > 0.0F};
+                 .turned = quadrant.y > 0.0F,
+                 .scaffold = IsSite(building)};
+        if (shape.scaffold) {
+            // A site a saved city holds is a scaffold, as AddBuilding draws one.
+            AddScaffold(building.floors, centerOnGround);
+            continue;
+        }
         buildingBlocks_.emplace(building.id.value, MassingBlocks(building, centerOnGround));
         // The sign hangs on the wall that reaches the street, not in the air
         // beside a setback or between twin towers.
@@ -178,6 +184,9 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     }
     for (const sim::Building& building : city_.buildings) {
         const BuildingShape& shape = shapes_.at(building.id.value);
+        if (shape.scaffold) {
+            continue;
+        }
         AddFacade(shape.center, MassingOf(building.style, building.floors), building.style);
         AddRoof(building, shape.center);
     }
@@ -292,15 +301,7 @@ void CityView::AddBuilding(const sim::Building& building) {
     if (site) {
         // A building going up is a scaffold: one thin slab per finished
         // floor, no block, no facade and no signs until its project ends.
-        for (std::uint32_t floor = 0; floor < building.floors; ++floor) {
-            const float base = static_cast<float>(floor) * kFloorHeight;
-            AddStaticBox(centerOnGround +
-                             vec3{-kBuildingWidth * 0.5F, base, -kBuildingDepth * 0.5F},
-                         centerOnGround +
-                             vec3{kBuildingWidth * 0.5F,
-                                  base + (kSlabMeters * kS), kBuildingDepth * 0.5F},
-                         kConcrete);
-        }
+        AddScaffold(building.floors, centerOnGround);
         BatchStaticsFor(building.id.value);
         return;
     }
