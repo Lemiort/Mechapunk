@@ -28,7 +28,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
 | saves | 14k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
-| settings | 11k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
+| settings | 12k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 13k | `World.hpp`, `main.cpp` |
 | view-core | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |

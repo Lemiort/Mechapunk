@@ -6,9 +6,12 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 
 #include "mechapunk/sim/GameTime.hpp"
+#include "mechapunk/sim/Save.hpp"
 #include "mechapunk/sim/Settings.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -154,4 +157,46 @@ TEST(Settings, OneKnobOfEveryGroupChangesTheCityOrItsDays) {
     }
     EXPECT_EQ(wageTax, 0);
     EXPECT_TRUE(sim::ValidateWorldState(free.State()));
+}
+
+// The ranges of the settings are rules of thumb, so every setting is put at
+// its lowest and at its highest allowed value in turn and a small city is run
+// for two days: it must not crash, stay valid, and survive a save round trip.
+// ApplySetting refuses a value that breaks a min/max pair; that bound is
+// skipped here.
+TEST(Settings, EverySettingAtItsLimitsKeepsTheCityRunning) {
+    // MECHAPUNK_ONLY=name runs one setting, so a script can find every crash.
+    const char* only = std::getenv("MECHAPUNK_ONLY");
+    for (const std::string_view name : sim::SettingNames()) {
+        if (only != nullptr && name != only) {
+            continue;
+        }
+        for (const bool high : {false, true}) {
+            // Find the limit by asking: the range is in the refusal's text.
+            sim::SimSettings probe;
+            const auto refused = sim::ApplySetting(probe, name, high ? (std::int64_t{1} << 40)
+                                                                      : -(std::int64_t{1} << 40));
+            ASSERT_FALSE(refused) << name;
+            const std::string text = refused.error();
+            const auto from = text.find("from ");
+            const auto to = text.find(" to ", from);
+            ASSERT_NE(from, std::string::npos) << text;
+            const std::int64_t low = std::stoll(text.substr(from + 5, to - from - 5));
+            const std::int64_t top = std::stoll(text.substr(to + 4));
+            sim::SimSettings settings;
+            const auto applied = sim::ApplySetting(settings, name, high ? top : low);
+            if (!applied) {
+                continue;  // The other half of a min/max pair is in the way.
+            }
+            std::fprintf(stderr, "limit %s = %lld\n", std::string{name}.c_str(),
+                         static_cast<long long>(high ? top : low));
+            std::fflush(stderr);
+            sim::World world =
+                sim::World::Generate({.seed = 4, .robots = 80, .settings = settings});
+            world.RunFor(2 * sim::kMinutesPerDay);
+            EXPECT_TRUE(sim::ValidateWorldState(world.State())) << name;
+            auto again = sim::DeserializeWorld(*sim::SerializeWorld(world.State()));
+            EXPECT_TRUE(again.has_value()) << name;
+        }
+    }
 }

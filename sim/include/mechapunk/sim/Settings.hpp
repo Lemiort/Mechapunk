@@ -7,7 +7,7 @@
 // plays exactly as before.
 //
 // The settings are part of the saved state (`WorldState::settings`, save
-// version 28 on): a city keeps the knobs it was made with after a save and a
+// version 28): a city keeps the knobs it was made with after a save and a
 // load, so a saved experiment repeats.
 //
 // Every field is an int64 so one table can name and range-check them all
