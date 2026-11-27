@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27, nothing done. Save version 29, game 0.29.0.
+Status: planned on 2026-11-27; K1 done. Save version 29, game 0.29.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -63,7 +63,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 
 ## Steps
 
-### - [ ] K1. Make room in the generation module (generation)
+### - [x] K1. Make room in the generation module (generation)
 
 - Module: generation (23274 of 25000). Depends on: none. Save change: no.
 - Open: `sim/src/City.cpp`, `scripts/context_budget.py`, `sim/CMakeLists.txt`.

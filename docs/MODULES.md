@@ -15,9 +15,10 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | Module | Tokens | Files |
 |---|---:|---|
 | world | 23k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
-| generation | 23k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
+| generation | 20k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
+| city-buildings | 7k | `City.hpp`, `CityInternal.hpp`, `CityBuildings.cpp`, `CityTests.cpp` |
 | city-streets | 11k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
-| city-styles | 13k | `City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp` |
+| city-styles | 11k | `City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp` |
 | validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 20k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Property.cpp`, `HousingTests.cpp` |
@@ -139,6 +140,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Rent collection, who lives where | world | `Residents.cpp` |
 | New city layout, buildings, depots, stations at start | generation | `City.cpp` (`GenerateCity`), `Generation.cpp` |
 | A building's architectural style | city-styles | `CityStyle.cpp` (`StyleOf`) |
+| How habitats and workplaces are made (`MakeHabitat`, `MakeWorkplace`, `kWorkplaceTypes`) | city-buildings | `CityBuildings.cpp`, `CityInternal.hpp` |
 | A new invariant, a validation error | validation | `Validation.cpp` |
 | Event text in the log | validation | `Describe.cpp` |
 | Payments, loans, wages, what robots can afford | money | `Money.cpp` |

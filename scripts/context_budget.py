@@ -27,6 +27,8 @@ MODULES = {
               "sim/src/Behaviour.cpp", "sim/src/Residents.cpp", "tests/WorldTests.cpp"],
     "generation": [I + "World.hpp", "sim/src/WorldInternal.hpp", "sim/src/Generation.cpp",
                    I + "City.hpp", "sim/src/City.cpp", "sim/src/Names.hpp", "tests/CityTests.cpp"],
+    "city-buildings": [I + "City.hpp", "sim/src/CityInternal.hpp", "sim/src/CityBuildings.cpp",
+                       "tests/CityTests.cpp"],
     "city-streets": [I + "World.hpp", I + "City.hpp", "tests/CityStreetTests.cpp"],
     "city-styles": [I + "City.hpp", "sim/src/City.cpp", "sim/src/CityStyle.cpp",
                     "tests/CityStyleTests.cpp"],
