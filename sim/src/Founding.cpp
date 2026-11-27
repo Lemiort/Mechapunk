@@ -64,16 +64,24 @@ void World::FoundEconomy(std::uint64_t seed) {
             {.id = state_.ids.Allocate(), .name = std::move(name), .kind = kind, .sector = sector});
         return economy.organizations.back();
     };
+    // A seed town (task K) starts with one bank and no Metro Authority; the
+    // metro and its authority come when the town has spread.
+    const bool seedTown = state_.settings.city.seedTown != 0;
     found("Central Reserve", OrganizationKind::CentralBank, Sector::Banking);
     std::vector<std::size_t> banks;
     for (const std::string_view name : kBankNames) {
+        if (seedTown && !banks.empty()) {
+            break;
+        }
         banks.push_back(economy.organizations.size());
         found(std::string{name}, OrganizationKind::Bank, Sector::Banking);
     }
     found("Habitat Trust", OrganizationKind::Corporation, Sector::Housing);
     found("City Hall", OrganizationKind::Government, Sector::Government);
     found("Gridline Power & Water", OrganizationKind::Corporation, Sector::Utilities);
-    found("Metro Authority", OrganizationKind::Corporation, Sector::Transit);
+    if (!seedTown) {
+        found("Metro Authority", OrganizationKind::Corporation, Sector::Transit);
+    }
 
     // Industry: corporations of about four workplaces each.
     std::vector<Building*> workplaces;
@@ -194,6 +202,24 @@ void World::FoundEconomy(std::uint64_t seed) {
                 break;
         }
     }
+    // A seed town's industry, venue chains and bank are not handed their
+    // capital: robots buy shares in them below, and the central bank lends a
+    // bank what the shares leave short.
+    std::vector<std::pair<EntityId, std::int64_t>> capital;
+    const auto sold = [](const Organization& organization) {
+        return organization.kind == OrganizationKind::Bank ||
+               (organization.kind == OrganizationKind::Corporation &&
+                (organization.sector == Sector::Industry ||
+                 organization.sector == Sector::Venues));
+    };
+    if (seedTown) {
+        for (Organization& organization : economy.organizations) {
+            if (sold(organization)) {
+                capital.emplace_back(organization.id, organization.credits);
+                organization.credits = 0;
+            }
+        }
+    }
     std::int64_t savings = 0;
     for (Robot& robot : state_.robots) {
         savings += robot.credits;
@@ -225,6 +251,9 @@ void World::FoundEconomy(std::uint64_t seed) {
             organization.kind == OrganizationKind::Government) {
             continue;  // Public: nobody's to own.
         }
+        if (seedTown && sold(organization)) {
+            continue;  // Its owners are the robots that buy its shares.
+        }
         const std::uint32_t owners = random.UniformInt(1, 3);
         for (std::uint32_t index = 0; index < owners; ++index) {
             EntityId owner;
@@ -247,6 +276,56 @@ void World::FoundEconomy(std::uint64_t seed) {
     for (Organization& organization : economy.organizations) {
         if (organization.sector == Sector::Transit) {
             organization.owners = {{.owner = office, .shares = 100}};
+        }
+    }
+    if (seedTown) {
+        SellShares(capital, banks.empty() ? EntityId{} : economy.organizations[banks.front()].id,
+                   central);
+    }
+}
+
+// The capital of a seed town's organizations, bought as shares by the richest
+// robots with credits that move through Pay, so the money still adds up. A
+// buyer keeps back two fifths of what it has, to live on. A bank that the
+// shares leave short of its floor is lent the rest by the central bank, which
+// is the only money created. An organization nobody could pay for still gets
+// the richest robot as a token owner, so that it has one.
+void World::SellShares(const std::vector<std::pair<EntityId, std::int64_t>>& capital,
+                       EntityId bank, EntityId central) {
+    std::vector<EntityId> buyers;
+    for (const Robot& robot : state_.robots) {
+        buyers.push_back(robot.id);
+    }
+    // Richest first; equal credits by id.
+    std::ranges::stable_sort(buyers, [&](EntityId left, EntityId right) {
+        return Balance(left) > Balance(right);
+    });
+    constexpr std::int64_t kCreditsPerShare = 10;
+    for (const auto& [id, wanted] : capital) {
+        Organization& organization = *MutableOrganization(id);
+        std::int64_t raised = 0;
+        for (const EntityId buyer : buyers) {
+            const std::int64_t paying = std::min(wanted - raised, Balance(buyer) * 3 / 5);
+            if (paying <= 0) {
+                continue;
+            }
+            Pay(buyer, id, paying);
+            raised += paying;
+            organization.owners.push_back(
+                {.owner = buyer,
+                 .shares = static_cast<std::uint32_t>(std::max<std::int64_t>(
+                     1, paying / kCreditsPerShare))});
+            if (raised >= wanted) {
+                break;
+            }
+        }
+        if (organization.owners.empty() && !buyers.empty()) {
+            organization.owners.push_back({.owner = buyers.front(), .shares = 1});
+        }
+        std::ranges::sort(organization.owners, {},
+                          [](const Share& share) { return share.owner.value; });
+        if (id == bank && raised < wanted) {
+            Lend(central, bank, wanted - raised);
         }
     }
 }

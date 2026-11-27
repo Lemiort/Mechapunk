@@ -178,3 +178,55 @@ TEST(SeedTown, RichNewcomersBringMoreSavings) {
         }
     }
 }
+
+// The smallest economy that adds up (task K, step K5): one bank, a trust, City
+// Hall and the corporations that own the town's rooms; their capital is bought
+// as shares by robots, and the central bank lends what a bank still lacks.
+TEST(SeedTown, SmallestEconomyAddsUp) {
+    sim::SimSettings settings;
+    settings.city.seedTown = 1;
+    settings.population.wealthSpread = 1;
+    sim::World world =
+        sim::World::Generate({.seed = 1, .robots = 30, .settings = settings});
+    const auto check = [&](const char* when) {
+        const sim::WorldState& state = world.State();
+        EXPECT_TRUE(sim::ValidateEconomy(state)) << when;
+        EXPECT_EQ(std::ranges::count_if(state.economy.organizations,
+                                        [](const sim::Organization& organization) {
+                                            return organization.kind ==
+                                                   sim::OrganizationKind::Bank;
+                                        }),
+                  1)
+            << when;
+        for (const sim::Building& building : state.city.buildings) {
+            for (const sim::Room& room : building.rooms) {
+                EXPECT_TRUE(room.owner.IsValid()) << room.name << " " << when;
+            }
+        }
+        for (const sim::Organization& organization : state.economy.organizations) {
+            if (organization.kind != sim::OrganizationKind::Corporation &&
+                organization.kind != sim::OrganizationKind::Bank) {
+                continue;
+            }
+            EXPECT_FALSE(organization.owners.empty()) << organization.name << " " << when;
+            for (const sim::Share& share : organization.owners) {
+                if (organization.sector == sim::Sector::Industry ||
+                    organization.sector == sim::Sector::Venues ||
+                    organization.kind == sim::OrganizationKind::Bank) {
+                    EXPECT_TRUE(std::ranges::any_of(
+                        state.robots,
+                        [&](const sim::Robot& robot) { return robot.id == share.owner; }))
+                        << organization.name << " is owned by a robot " << when;
+                }
+            }
+        }
+    };
+    check("on day 0");
+    world.RunFor(20 * sim::kMinutesPerDay);
+    check("after 20 days");
+    std::int64_t wages = 0;
+    for (std::size_t day = 0; day < 7 && day < world.State().history.size(); ++day) {
+        wages += world.State().history[day].counted.wages;
+    }
+    EXPECT_GT(wages, 0) << "the town paid no wages in its first week";
+}

@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K4 done. Save version 31, game 0.31.0.
+Status: planned on 2026-11-27; K1 to K5 done. Save version 31, game 0.31.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -133,7 +133,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   today's.
 - Check: build, ctest, seed 7 byte-identical except the settings keys.
 
-### - [ ] K5. The smallest economy that adds up (property)
+### - [x] K5. The smallest economy that adds up (property)
 
 - Module: property (`Founding.cpp` is in it). Depends on: K3, K4. Save
   change: no.
