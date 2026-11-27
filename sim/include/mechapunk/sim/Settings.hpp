@@ -398,6 +398,12 @@ struct EconomySettings {
     // founded at the start; a town sets 400.
     std::int64_t robotsPerBank{0};
 
+    // A corporation of industry owns at most this many workplaces: a site that
+    // would be one more is given to a new corporation, whose capital robots buy as
+    // shares. 0 turns it off (the first corporation owns every new workplace), as in
+    // a full city; a town sets 3.
+    std::int64_t workplacesPerCorporation{0};
+
     // Each night, the chance in percent that a robot able to buy an apartment
     // does, and the nights of rent it keeps after paying.
     std::int64_t buyPercent{3};

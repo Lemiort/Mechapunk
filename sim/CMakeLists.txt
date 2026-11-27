@@ -4,6 +4,7 @@ add_library(mechapunk_sim STATIC
     src/Careers.cpp
     src/Chronicle.cpp
     src/Construction.cpp
+    src/Corporations.cpp
     src/ConstructionRules.cpp
     src/Economy.cpp
     src/EconomyStatistics.cpp

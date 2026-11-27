@@ -151,6 +151,7 @@ const std::array kEntries{
     MECHAPUNK_SETTING(economy, workDaysPerWeek, 0, 1000),
     MECHAPUNK_SETTING(economy, comfortableSavings, 0, 100000),
     MECHAPUNK_SETTING(economy, robotsPerBank, 0, 100000),
+    MECHAPUNK_SETTING(economy, workplacesPerCorporation, 0, 100000),
     MECHAPUNK_SETTING(economy, buyPercent, 0, 100),
     MECHAPUNK_SETTING(economy, buyReserveNights, 0, 2000),
     MECHAPUNK_SETTING(economy, depositPercent, 0, 200),

@@ -238,17 +238,6 @@ void World::ReviewConstruction() {
         }
         return true;
     };
-    // The corporation that owns a new workplace: the first of industry, the
-    // order `Economy::organizations` keeps.
-    const auto industryEmployer = [this]() -> EntityId {
-        for (const Organization& organization : state_.economy.organizations) {
-            if (organization.kind == OrganizationKind::Corporation &&
-                organization.sector == Sector::Industry) {
-                return organization.id;
-            }
-        }
-        return EntityId{};
-    };
 
     const bool homesShortNow = homesShort();
     const bool bedsShortNow = DormBedsShort(state_, rooms_);
@@ -348,7 +337,8 @@ void World::ReviewConstruction() {
         cityChanged = true;
     }
     if (jobsShortNow) {
-        const EntityId employer = industryEmployer();
+        // The corporation that owns a new workplace (Corporations.cpp).
+        const EntityId employer = EmployerForNewWorkplace();
         if (employer.IsValid()) {
             startSite(BuildingKind::Workplace, employer, static_cast<std::uint32_t>(state_.settings.construction.workplaceFloors), "Work Yard",
                       ProjectReason::JobsShort);

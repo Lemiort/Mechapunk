@@ -450,6 +450,9 @@ private:
                     EntityId bank, EntityId central, std::int64_t keep = -1);
     // Founds a bank when robots outnumber `economy.robotsPerBank` to a bank.
     void ReviewBanks();
+    // The industry corporation a new workplace belongs to: the first with room
+    // for another workplace, or a new one founded for it (Corporations.cpp).
+    [[nodiscard]] EntityId EmployerForNewWorkplace();
     void IndexEconomy();
     [[nodiscard]] Organization* MutableOrganization(EntityId id) noexcept;
     [[nodiscard]] Robot* MutableRobot(EntityId id) noexcept;

@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K14 done. Save version 36, game 0.36.0.
+Status: planned on 2026-11-27; K1 to K15 done. Save version 37, game 0.37.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -310,13 +310,13 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   up, and robots hold accounts at both.
 - Check: build, ctest, seed 7 byte-identical except the settings keys.
 
-### - [ ] K15. New corporations (property)
+### - [x] K15. New corporations (property)
 
 - Module: property. Depends on: K14. Save change: yes, settings only.
 - Open: `sim/src/Founding.cpp`, `sim/src/ConstructionRules.cpp` or
   `Construction.cpp` (where a workplace site's owner is chosen:
   `industryEmployer`).
-- Do: add the setting `economy.workplacesPerCorporation` (3). When a site
+- Do: add the setting `economy.workplacesPerCorporation` (default 0 = off so a full city is unchanged; a town sets 3). When a site
   raises a workplace and every corporation of its sector already owns that
   many workplaces, found a corporation for it, with its capital bought as
   shares as in K5.
@@ -390,7 +390,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Open: `tools/sim_runner/main.cpp` (options), then `app/main.cpp` (options).
 - Do: `--town` sets `city.seedTown = 1`, `population.immigration = 1`,
   `population.wealthSpread = 1`, `economy.inflationTarget = 1` and
-  `crime.minGangs = 0`, `construction.freeBedsPercent = 10`, `city.freePlotsMin = 4` `metro.minBuildings = 6` and `economy.robotsPerBank = 400`, with 30 robots unless `--robots` says otherwise.
+  `crime.minGangs = 0`, `construction.freeBedsPercent = 10`, `city.freePlotsMin = 4` `metro.minBuildings = 6`, `economy.robotsPerBank = 400` and `economy.workplacesPerCorporation = 3`, with 30 robots unless `--robots` says otherwise.
   Explicit `--set` options still win.
 - Check: run `mechapunk-sim --town --days 365 --quiet` and write in this file
   how big the town got.
