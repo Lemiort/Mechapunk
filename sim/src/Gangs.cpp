@@ -27,23 +27,6 @@ constexpr std::uint32_t kGangColor[kGangNames] = {
     0x9ACD32, 0xDAA520, 0xBA55DC, 0x00FA9A, 0xDC143C, 0x48D1CC,
 };
 
-// B4: percent of the eligible pairs that try a robbery at all. An officer on
-// shift in the room turns such an attempt into an arrest (B5).
-constexpr std::uint32_t kRobberyPercent = 3;
-
-// B14b: percent of a member's outings that hang round a gang. Members used to
-// pick their outing out of the city's ~484 venues as if they were not in a
-// gang, so two rival members shared a room barely at all and the 1% fight roll
-// had almost nothing to act on (24 fights in 40 days at 10000 robots).
-constexpr std::uint32_t kGangOutingPercent = 50;
-
-// How near a gang's turf counts as the neighbourhood it hangs round, in street
-// meters: 40 of them is the turf's own street corner, where up to four
-// buildings stand and where its ground floor venues are. Narrow on purpose:
-// it is what crowds a gang's members into a handful of venues, so the members
-// of the gang it fights turn up in the same rooms.
-constexpr std::uint32_t kTurfReachMeters = 40;
-
 // --- Gang helpers used by ConsiderCrime ---
 
 const Gang* FindGangOf(const std::vector<Gang>& gangs, const Robot& robot) noexcept {
@@ -563,7 +546,7 @@ void World::ConsiderCrime(Robot& first, Robot& second,
     // every eligible pair robbed and an officer held crime down rather than
     // changing it.
     const std::uint32_t roll = state_.random.UniformInt(1, 100);
-    if (roll > kRobberyPercent) {
+    if (static_cast<std::int64_t>(roll) > settings_.crime.robberyPercent) {
         return;
     }
 
@@ -624,7 +607,7 @@ std::vector<EntityId> World::GangOuting(const Robot& robot) {
     if (!robot.gang.IsValid()) return {};
     const Gang* gang = FindGangOf(state_.gangs, robot);
     if (gang == nullptr) return {};
-    if (state_.random.UniformInt(1, 100) > kGangOutingPercent) return {};
+    if (static_cast<std::int64_t>(state_.random.UniformInt(1, 100)) > settings_.crime.gangOutingPercent) return {};
 
     // The turfs this outing could hang round: its gang's own, then those of
     // the gangs it rivals - `FoundGangs` writes a pair's stance both ways,
@@ -663,7 +646,7 @@ std::vector<EntityId> World::GangOuting(const Robot& robot) {
             const auto meters =
                 routes_.DistanceMeters(hostBuilding->entrance,
                                       venue.building->entrance);
-            if (meters && *meters <= kTurfReachMeters) {
+            if (meters && static_cast<std::int64_t>(*meters) <= settings_.crime.turfReachMeters) {
                 venues.push_back(venue.room->id);
             }
         }

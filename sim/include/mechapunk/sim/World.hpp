@@ -16,6 +16,7 @@
 #include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Gangs.hpp"
+#include "mechapunk/sim/Settings.hpp"
 #include "mechapunk/sim/Ids.hpp"
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/GameTime.hpp"
@@ -157,6 +158,8 @@ struct WorldState {
 struct WorldParams {
     std::uint64_t seed{1};
     std::uint32_t robots{100};
+    // The knobs of the simulation (Settings.hpp); the defaults are the game's.
+    SimSettings settings{};
 };
 
 // A walk in progress, between two rooms.
@@ -263,7 +266,10 @@ public:
     [[nodiscard]] static World Generate(const WorldParams& params);
     // Validates a loaded or hand-made state and rebuilds derived data.
     [[nodiscard]] static std::expected<World, std::string> FromState(
-        WorldState state);
+        WorldState state, SimSettings settings = {});
+    // The settings this world runs with; they are not saved (Settings.hpp).
+    [[nodiscard]] const SimSettings& Settings() const noexcept { return settings_; }
+    void SetSettings(const SimSettings& settings) noexcept { settings_ = settings; }
 
     // Derived lookups point into the state, so a World can be moved but not
     // copied.
@@ -503,6 +509,7 @@ private:
     [[nodiscard]] std::int64_t ReserveOf(const Organization& organization) const;
 
     WorldState state_;
+    SimSettings settings_;
     RoutePlanner routes_;
     RoomIndex rooms_;
     Metro metro_;

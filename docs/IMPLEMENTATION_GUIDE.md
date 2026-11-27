@@ -77,8 +77,16 @@ python scripts/context_budget.py                                                
 
 ## 3. Rules that must never break
 
-1. **Determinism.** The same `WorldState` gives the same future on every
-   machine. All simulation randomness comes from `state_.random` (a saved
+1. **Determinism.** The same `WorldState` and the same `SimSettings` give the
+   same future on every machine. Settings (`sim/include/mechapunk/sim/Settings.hpp`)
+   are the knobs of the simulation - robbery chance, construction thresholds
+   and so on, defaults = the game's values - passed with the seed to
+   `World::Generate` (`WorldParams::settings`) or to `World::FromState`, set
+   in a test with `ApplySetting` or `World::SetSettings`, and on the command
+   line with `mechapunk-sim --set crime.robberyPercent=100`. They are **not
+   saved**: a loaded save runs with the defaults unless told otherwise. A new
+   tunable number goes into `SimSettings` and its table in `Settings.cpp`,
+   not into a `constexpr` in a source file. All simulation randomness comes from `state_.random` (a saved
    `Pcg32`) or `Pcg32::FromSeed(seed, stream)` with a fixed stream during
    generation. Robots act in id order. Never let the iteration order of an
    `unordered_map`/`unordered_set` decide an outcome or a random draw:

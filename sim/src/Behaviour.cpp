@@ -60,20 +60,6 @@ constexpr std::int32_t kBadPartWear = 60;
 // Arriving late costs this much performance.
 constexpr std::int32_t kLatePerformance = 3;
 
-// Officers patrol venues within this walk of the station, and look round
-// each for this long before walking back.
-constexpr Tick kPatrolReachMinutes = 10;
-
-constexpr Tick kPatrolStayMinutes = 15;
-
-// B14: how far back the chronicle is searched for robberies when an officer
-// picks the venue to patrol. A uniform pick out of the city's ~484 venues
-// left B13's arrest rule invisible at 9 arrests in 40 days, because an
-// officer almost never stood where the robbers were standing; robbers of a
-// fresh crime still are at its venue, so the officer goes to a venue the
-// city robbed within this many minutes instead, when one is within reach.
-constexpr Tick kCrimeLookbackMinutes = 60;
-
 // Weights of the evening decision. Going home is judged by an hour of rest.
 constexpr std::int32_t kHomePeriods = 6;
 
@@ -182,8 +168,8 @@ void World::Patrol(Robot& robot, Tick shiftEnd) {
                 const EntityId id = venue.room->id;
                 const Tick there = TravelMinutes(robot.location, id);
                 const Tick back = TravelMinutes(id, robot.location);
-                if (there <= kPatrolReachMinutes &&
-                    state_.tick + there + kPatrolStayMinutes + back <= shiftEnd) {
+                if (there <= static_cast<Tick>(settings_.crime.patrolReachMinutes) &&
+                    state_.tick + there + static_cast<Tick>(settings_.crime.patrolStayMinutes) + back <= shiftEnd) {
                     candidates.push_back(id);
                 }
             }
@@ -201,7 +187,7 @@ void World::Patrol(Robot& robot, Tick shiftEnd) {
         std::vector<EntityId> crimeRooms;
         for (auto it = state_.chronicle.rbegin();
              it != state_.chronicle.rend() &&
-             it->tick + kCrimeLookbackMinutes >= state_.tick;
+             it->tick + static_cast<Tick>(settings_.crime.crimeLookbackMinutes) >= state_.tick;
              ++it) {
             if (it->kind == EventKind::Robbed && it->room.IsValid()) {
                 crimeRooms.push_back(it->room);
@@ -244,7 +230,7 @@ void World::Arrive(Robot& robot) {
             robot.nextActionAt = std::min(NextPatrolAt(robot), shiftEnd);
         } else {
             // At the venue: look round for a while, then head back.
-            robot.nextActionAt = std::min(now + kPatrolStayMinutes, shiftEnd);
+            robot.nextActionAt = std::min(now + static_cast<Tick>(settings_.crime.patrolStayMinutes), shiftEnd);
         }
         return;
     }

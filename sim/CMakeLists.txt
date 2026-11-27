@@ -19,6 +19,7 @@ add_library(mechapunk_sim STATIC
     src/Metro.cpp
     src/Random.cpp
     src/Save.cpp
+    src/Settings.cpp
     src/Social.cpp
     src/Transit.cpp
     src/Venues.cpp

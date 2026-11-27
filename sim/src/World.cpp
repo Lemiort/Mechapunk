@@ -74,11 +74,14 @@ World::World(WorldState state)
     }
 }
 
-std::expected<World, std::string> World::FromState(WorldState state) {
+std::expected<World, std::string> World::FromState(WorldState state,
+                                                    SimSettings settings) {
     if (auto valid = ValidateWorldState(state); !valid) {
         return std::unexpected(std::move(valid.error()));
     }
-    return World(std::move(state));
+    World world(std::move(state));
+    world.settings_ = settings;
+    return world;
 }
 
 bool World::IsGuestTrip(const Robot& robot, EntityId destination) const {

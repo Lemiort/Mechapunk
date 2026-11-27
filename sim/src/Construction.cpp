@@ -24,49 +24,6 @@
 namespace mechapunk::sim {
 namespace {
 
-// Nights of the same shortage before the city raises another building. One
-// tight night is weather; a week of it is the city running short of homes
-// or of jobs.
-constexpr std::size_t kStreakNights = 7;
-
-// Floors a new site raises above its ground floor, one of them a night, so
-// `daysLeft` is also the floors still to come. The ground floor stands from
-// the first night and holds only the site office (step D3b): `ReviewUnits`,
-// which only works on ground-floor units, branches that loop by kind - a venue,
-// a workspace, an empty unit - and so leaves the office alone.
-constexpr std::uint32_t kHabitatFloors = 6;
-constexpr std::uint32_t kWorkplaceFloors = 4;
-
-// Builders a site's office holds: the crew that raises its floors while the
-// project is up, the jobs step D3c gives out. Until that step lands nobody
-// works there, and the capacity only has to be the non-zero number
-// `ValidateWorldState` asks of every room.
-constexpr std::uint32_t kSiteBuilders = 6;
-
-// Credits a night the site asks for. `PaySupplies` (Money.cpp) moves the
-// owner's sector's share of them into the supply market: half for the
-// housing trust, and nothing for an industry corporation, whose supplies
-// are what every other sector buys from it.
-constexpr std::int64_t kSiteSuppliesNight = 200;
-
-// The share of the market's homes that may stand empty before homes are short.
-// The market's homes are the ones `SetPrices` (Units.cpp) counts class by class
-// when it moves market rents: every apartment but a government dorm room, that
-// is the homes a robot can afford and move into. A quarter of them standing
-// empty is room enough to live in; under that for a week the city is running
-// out of homes. Measured: a young city leaves 75 to 85 per cent of them empty
-// around its twelfth night (most robots still live in a dorm bed) and fills
-// them by its thirtieth, so this bites when the market really runs out.
-constexpr std::int64_t kMarketVacancyPercent = 25;
-
-// The share of the population out of work above which jobs are short: the
-// same share at which `ReviewUnits` (Units.cpp) reopens an empty unit as a
-// workspace. Below it the city has work for everyone it needs; above it for a
-// week it needs more, and a workplace is raised when no empty unit is left.
-// Measured: a young city has 0 to 3 per cent of its robots out of work, so
-// this bites only in a city whose jobs really have gone.
-constexpr std::int64_t kUnemploymentPercent = 5;
-
 // Workplaces on a finished floor of a new workplace, and the places in one.
 constexpr std::uint32_t kWorkspacesPerFloor = 2;
 constexpr std::uint32_t kWorkspacePlaces = 8;
@@ -204,7 +161,7 @@ void World::ReviewConstruction() {
             .name = "Site Office",
             .kind = RoomKind::SiteOffice,
             .floor = 0,
-            .capacity = kSiteBuilders,
+            .capacity = static_cast<std::uint32_t>(settings_.construction.siteBuilders),
             .owner = owner,
         });
         // The new id is the highest there is, so both lists stay sorted.
@@ -289,10 +246,10 @@ void World::ReviewConstruction() {
     }
     const std::int64_t market = marketHomes[0] + marketHomes[1] + marketHomes[2] + marketHomes[3];
     const auto homesShort = [this, market]() {
-        if (state_.history.size() < kStreakNights || market == 0) {
+        if (state_.history.size() < static_cast<std::size_t>(settings_.construction.streakNights) || market == 0) {
             return false;
         }
-        const std::size_t first = state_.history.size() - kStreakNights;
+        const std::size_t first = state_.history.size() - static_cast<std::size_t>(settings_.construction.streakNights);
         for (std::size_t day = first; day != state_.history.size(); ++day) {
             const DailyStats& stats = state_.history[day];
             // Robots living in the market's homes: `residentsByClass` starts at
@@ -302,23 +259,23 @@ void World::ReviewConstruction() {
                 lived += stats.residentsByClass.at(index);
             }
             const std::int64_t vacant = market > lived ? market - lived : 0;
-            if (vacant * 100 >= kMarketVacancyPercent * market) {
+            if (vacant * 100 >= settings_.construction.marketVacancyPercent * market) {
                 return false;
             }
         }
         return true;
     };
     const auto jobsShort = [this]() {
-        if (state_.history.size() < kStreakNights) {
+        if (state_.history.size() < static_cast<std::size_t>(settings_.construction.streakNights)) {
             return false;
         }
-        const std::size_t first = state_.history.size() - kStreakNights;
+        const std::size_t first = state_.history.size() - static_cast<std::size_t>(settings_.construction.streakNights);
         for (std::size_t day = first; day != state_.history.size(); ++day) {
             const DailyStats& stats = state_.history[day];
             // `DailyStats::unemployed` counts the robots with no workplace, as
             // `ReviewUnits` counts them when it decides whether to reopen a
             // unit; `population` is the robots that night.
-            if (stats.unemployed * 100 <= kUnemploymentPercent * stats.population) {
+            if (stats.unemployed * 100 <= settings_.construction.unemploymentPercent * stats.population) {
                 return false;
             }
         }
@@ -354,7 +311,7 @@ void World::ReviewConstruction() {
             // to money that really moved (rule 2: no new accounting path,
             // nothing counted twice).
             const std::int64_t creditsBefore = owner->credits;
-            PaySupplies(*owner, kSiteSuppliesNight);
+            PaySupplies(*owner, settings_.construction.siteSuppliesNight);
             project.costSoFar += creditsBefore - owner->credits;
         }
         if (project.daysLeft == 0) {
@@ -418,14 +375,14 @@ void World::ReviewConstruction() {
     // corner. The housing trust owns the homes nobody else owns; an
     // industry corporation owns the jobs.
     if (homesShortNow && housing_.IsValid()) {
-        startSite(BuildingKind::Habitat, housing_, kHabitatFloors, "Hab Block",
+        startSite(BuildingKind::Habitat, housing_, static_cast<std::uint32_t>(settings_.construction.habitatFloors), "Hab Block",
                   ProjectReason::HomesShort);
         cityChanged = true;
     }
     if (jobsShortNow) {
         const EntityId employer = industryEmployer();
         if (employer.IsValid()) {
-            startSite(BuildingKind::Workplace, employer, kWorkplaceFloors, "Work Yard",
+            startSite(BuildingKind::Workplace, employer, static_cast<std::uint32_t>(settings_.construction.workplaceFloors), "Work Yard",
                       ProjectReason::JobsShort);
             cityChanged = true;
         }

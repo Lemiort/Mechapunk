@@ -51,6 +51,7 @@ MODULES = {
     "metro": [I + "Metro.hpp", "sim/src/Metro.cpp", "sim/src/Transit.cpp",
               "tests/MetroTests.cpp", "tests/TransitTests.cpp"],
     "saves": [I + "Save.hpp", "sim/src/Save.cpp", "tests/SaveTests.cpp"],
+    "settings": [I + "Settings.hpp", "sim/src/Settings.cpp", "tests/SettingsTests.cpp"],
     "basics": [I + "GameTime.hpp", I + "Ids.hpp", I + "Random.hpp", I + "Weather.hpp",
                "sim/src/GameTime.cpp", "sim/src/Random.cpp", "sim/src/Weather.cpp",
                "tests/RandomTests.cpp", "tests/WeatherTests.cpp"],

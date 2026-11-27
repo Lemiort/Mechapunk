@@ -41,6 +41,8 @@ struct Options {
     bool help{false};
     std::optional<std::string> load;
     std::optional<std::string> save;
+    // Settings changed with --set name=value (see Settings.hpp).
+    sim::SimSettings settings;
 };
 
 void PrintUsage() {
@@ -55,7 +57,10 @@ void PrintUsage() {
         "  --follow N    print events of the first N robots (default 3)\n"
         "  --all         print events of every robot\n"
         "  --quiet       print only daily summaries\n"
-        "  --save FILE   save the world when done");
+        "  --save FILE   save the world when done\n"
+        "  --set NAME=N  change a simulation setting, e.g. crime.robberyPercent=100\n"
+        "                (repeatable; --list-settings shows the names)\n"
+        "  --list-settings  print every setting name");
 }
 
 template <typename T>
@@ -112,6 +117,28 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
                 (name == "--load" ? options.load : options.save) =
                     std::string{*path};
             }
+        } else if (name == "--set") {
+            const auto text = next();
+            ok = text.has_value();
+            if (ok) {
+                const auto equals = text->find('=');
+                std::int64_t value{};
+                if (equals == std::string_view::npos ||
+                    !ParseNumber(text->substr(equals + 1), value)) {
+                    std::println(stderr, "--set needs NAME=NUMBER");
+                    ok = false;
+                } else if (auto applied = sim::ApplySetting(
+                               options.settings, text->substr(0, equals), value);
+                           !applied) {
+                    std::println(stderr, "--set: {}", applied.error());
+                    ok = false;
+                }
+            }
+        } else if (name == "--list-settings") {
+            for (const std::string_view setting : sim::SettingNames()) {
+                std::println("{}", setting);
+            }
+            options.help = true;
         } else if (name == "--help" || name == "-h") {
             options.help = true;
         } else {
@@ -360,7 +387,7 @@ int Run(std::span<char*> arguments) {
                          state.error());
             return EXIT_FAILURE;
         }
-        auto loaded = sim::World::FromState(std::move(*state));
+        auto loaded = sim::World::FromState(std::move(*state), options->settings);
         if (!loaded) {
             std::println(stderr, "Invalid save {}: {}", *options->load,
                          loaded.error());
@@ -371,7 +398,9 @@ int Run(std::span<char*> arguments) {
                      sim::FormatTime(world->CurrentTick()));
     } else {
         world.emplace(sim::World::Generate(
-            {.seed = options->seed, .robots = options->robots}));
+            {.seed = options->seed,
+             .robots = options->robots,
+             .settings = options->settings}));
         std::println("Generated seed {}: {} robots, {} buildings",
                      options->seed, world->State().robots.size(),
                      world->State().city.buildings.size());
