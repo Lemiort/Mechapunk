@@ -34,6 +34,7 @@ const std::array kEntries{
     MECHAPUNK_SETTING(construction, siteBuilders, 1, 100),
     MECHAPUNK_SETTING(construction, siteSuppliesNight, 0, 1000000),
     MECHAPUNK_SETTING(construction, marketVacancyPercent, 0, 100),
+    MECHAPUNK_SETTING(construction, freeBedsPercent, 0, 100),
     MECHAPUNK_SETTING(construction, unemploymentPercent, 0, 100),
     MECHAPUNK_SETTING(careers, evictionNights, 0, 1000),
     MECHAPUNK_SETTING(careers, firingPerformance, -100000, 0),

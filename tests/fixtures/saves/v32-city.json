@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 31,
-   "gameVersion": "0.31.0",
+   "version": 32,
+   "gameVersion": "0.32.0",
    "world": {
       "tick": 28370,
       "seed": 33,
@@ -19374,6 +19374,7 @@
             "workplaceFloors": 4,
             "siteBuilders": 6,
             "siteSuppliesNight": 200,
+            "freeBedsPercent": 0,
             "marketVacancyPercent": 25,
             "unemploymentPercent": 5,
             "workspacesPerFloor": 2,

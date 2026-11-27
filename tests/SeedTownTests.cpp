@@ -230,3 +230,43 @@ TEST(SeedTown, SmallestEconomyAddsUp) {
     }
     EXPECT_GT(wages, 0) << "the town paid no wages in its first week";
 }
+
+// The beds rule (task K, step K6): with every dorm bed taken for two nights the
+// city raises a dormitory, on its own, of dorm rooms on every floor.
+TEST(SeedTown, FullDormsRaiseADormitory) {
+    sim::SimSettings settings;
+    settings.city.seedTown = 1;
+    settings.city.seedDormFloors = 2;  // 24 beds.
+    settings.construction.streakNights = 2;
+    settings.construction.freeBedsPercent = 10;
+    sim::World world =
+        sim::World::Generate({.seed = 1, .robots = 24, .settings = settings});
+    const sim::Building* dormitory = nullptr;
+    for (int night = 0; night < 3 && dormitory == nullptr; ++night) {
+        world.RunFor(sim::kMinutesPerDay);
+        for (const sim::Project& project : world.State().projects) {
+            for (const sim::Building& building : world.State().city.buildings) {
+                if (building.id == project.building && building.name.starts_with("Dormitory")) {
+                    dormitory = &building;
+                }
+            }
+        }
+    }
+    ASSERT_NE(dormitory, nullptr) << "no dormitory site within three nights";
+    // Let it finish: every home on its floors is a dorm room.
+    world.RunFor(10 * sim::kMinutesPerDay);
+    for (const sim::Building& building : world.State().city.buildings) {
+        if (building.id != dormitory->id) {
+            continue;
+        }
+        std::uint32_t beds = 0;
+        for (const sim::Room& room : building.rooms) {
+            if (room.kind == sim::RoomKind::Apartment) {
+                EXPECT_EQ(room.apartmentClass, sim::ApartmentClass::Dorm);
+                beds += room.capacity;
+            }
+        }
+        EXPECT_GE(beds, 12U);
+    }
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}

@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "mechapunk/sim/City.hpp"
+#include "mechapunk/sim/World.hpp"
 
 namespace mechapunk::sim::construction {
 
@@ -27,5 +28,19 @@ inline constexpr Shift kSiteShift{.startMinute = 7 * 60, .lengthMinutes = 480, .
 [[nodiscard]] std::uint32_t RentPercent(ApartmentClass kind) noexcept;
 
 [[nodiscard]] std::string_view HomeLabel(ApartmentClass kind) noexcept;
+
+// A dormitory site is a habitat whose floors are all dorm rooms; its name
+// starts with this, which is how `raiseFloor` tells it from a hab block
+// without a new saved field.
+inline constexpr std::string_view kDormitoryPrefix = "Dormitory";
+
+[[nodiscard]] bool IsDormitorySite(const Building& building) noexcept;
+
+// Whether the city is short of dorm beds: for `construction.streakNights`
+// nights running, the beds of finished dormitories were filled up to within
+// `construction.freeBedsPercent` of all of them. The robots that slept in
+// dorms on a past night are `DailyStats::residentsByClass[0]`; the beds are
+// counted as they are now, as the homes rule does with the market's homes.
+[[nodiscard]] bool DormBedsShort(const WorldState& state, const RoomIndex& rooms);
 
 }  // namespace mechapunk::sim::construction

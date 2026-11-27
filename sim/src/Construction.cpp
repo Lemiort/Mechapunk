@@ -149,7 +149,9 @@ void World::ReviewConstruction() {
         building.floors += 1;
         ++project.floorsDone;
         if (building.kind == BuildingKind::Habitat) {
-            const ApartmentClass kind = HomeClassFor(floor, floors);
+            const bool dormitory = IsDormitorySite(building);
+            const ApartmentClass kind =
+                dormitory ? ApartmentClass::Dorm : HomeClassFor(floor, floors);
             const std::uint32_t perFloor = ApartmentsPerFloor(kind);
             for (std::uint32_t index = 0; index != perFloor; ++index) {
                 building.rooms.push_back({
@@ -159,7 +161,9 @@ void World::ReviewConstruction() {
                     .kind = RoomKind::Apartment,
                     .floor = floor,
                     .capacity = Sleeps(kind),
-                    .rent = (static_cast<std::uint32_t>(state_.settings.construction.baseRent) + floor) * RentPercent(kind) / 100,
+                    .rent = dormitory
+                                ? static_cast<std::uint32_t>(state_.settings.city.dormRent) + (floor / 4)
+                                : (static_cast<std::uint32_t>(state_.settings.construction.baseRent) + floor) * RentPercent(kind) / 100,
                     .owner = project.owner,
                     .apartmentClass = kind,
                 });
@@ -247,6 +251,7 @@ void World::ReviewConstruction() {
     };
 
     const bool homesShortNow = homesShort();
+    const bool bedsShortNow = DormBedsShort(state_, rooms_);
     const bool jobsShortNow = jobsShort();
 
     // The sites going up: pay the supplies the site costs, raise a floor,
@@ -330,6 +335,16 @@ void World::ReviewConstruction() {
     if (homesShortNow && housing_.IsValid()) {
         startSite(BuildingKind::Habitat, housing_, static_cast<std::uint32_t>(state_.settings.construction.habitatFloors), "Hab Block",
                   ProjectReason::HomesShort);
+        cityChanged = true;
+    } else if (bedsShortNow && housing_.IsValid() &&
+               std::ranges::none_of(state_.projects, [&](const Project& project) {
+                   const Building* site = buildingFor(project.building);
+                   return site != nullptr && site->kind == BuildingKind::Habitat;
+               })) {
+        // Beds run short: a dormitory, one habitat at a time. It shares the
+        // homes shortage's reason, which keeps the saved reasons as they were.
+        startSite(BuildingKind::Habitat, housing_, static_cast<std::uint32_t>(state_.settings.construction.habitatFloors),
+                  std::string_view{kDormitoryPrefix}, ProjectReason::HomesShort);
         cityChanged = true;
     }
     if (jobsShortNow) {

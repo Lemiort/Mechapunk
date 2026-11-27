@@ -100,6 +100,13 @@ struct ConstructionSettings {
     // out of homes. Measured: a young city leaves 75 to 85 per cent of them empty
     // around its twelfth night (most robots still live in a dorm bed) and fills
     // them by its thirtieth, so this bites when the market really runs out.
+    // Free dorm beds (beds no robot sleeps in, in finished dormitories) under this
+    // share of all dorm beds, for `streakNights` nights, make the city raise a
+    // dormitory: a habitat of dorm rooms on every floor, owned by the housing trust.
+    // 0 turns the rule off, as in a full city, whose dorms start about full and
+    // empty as robots move out; a growing town sets 10.
+    std::int64_t freeBedsPercent{0};
+
     std::int64_t marketVacancyPercent{25};
 
     // The share of the population out of work above which jobs are short: the

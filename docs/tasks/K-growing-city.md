@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K5 done. Save version 31, game 0.31.0.
+Status: planned on 2026-11-27; K1 to K6 done. Save version 32, game 0.32.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -154,7 +154,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Check: build, ctest, seed 7 byte-identical (a full city's founding must
   not change).
 
-### - [ ] K6. Make room in the construction module, then raise dormitories (construction)
+### - [x] K6. Make room in the construction module, then raise dormitories (construction)
 
 - Module: construction (23643 of 25000: make room first). Depends on: K3.
   Save change: yes, settings only.
@@ -164,7 +164,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
      a new `sim/src/ConstructionRules.cpp` with its own module. Commit that
      on its own.
   2. Add a **beds rule**: when free dorm beds stay under
-     `construction.freeBedsPercent` (new setting, 10) of all dorm beds for
+     `construction.freeBedsPercent` (new setting; default 0 = off, so a full city, whose dorms start about full, is unchanged; a town sets 10) of all dorm beds for
      `streakNights` nights, raise a habitat whose floors are all dorm rooms (a
      dormitory, named "Dormitory N"). It is owned by the housing trust.
 - Tests (`tests/SiteStyleTests.cpp` or a new file): in a seed town with
@@ -390,7 +390,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Open: `tools/sim_runner/main.cpp` (options), then `app/main.cpp` (options).
 - Do: `--town` sets `city.seedTown = 1`, `population.immigration = 1`,
   `population.wealthSpread = 1`, `economy.inflationTarget = 1` and
-  `crime.minGangs = 0`, with 30 robots unless `--robots` says otherwise.
+  `crime.minGangs = 0` and `construction.freeBedsPercent = 10`, with 30 robots unless `--robots` says otherwise.
   Explicit `--set` options still win.
 - Check: run `mechapunk-sim --town --days 365 --quiet` and write in this file
   how big the town got.
