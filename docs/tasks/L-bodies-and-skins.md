@@ -32,18 +32,17 @@ money moves through `Sell` (rule 2).
 Every number is a setting (a new `body` and `skin` group in `Settings.hpp`),
 so tests can break a leg in a day.
 
-## Open questions for the user (ask before L1)
+## Decisions (the user, 2026-11-27)
 
-1. Does `Robot::wear` stay as the total that scraps a robot (the sum or the
-   worst of its parts), or does a robot scrap when its head is gone? The
-   proposal: `wear` stays the lasting total, and the parts carry today's
-   `condition` split four ways.
-2. Can a part be lost completely (a missing hand) and be replaced with a
-   new or second-hand one? The proposal: yes, at clinics (new) and the black
-   market (cheap, sometimes dodgy: today's bad part goes into one part).
-3. Are skins only how a robot looks and what it says, or do they protect
-   (armour plating against fights)? The proposal: looks and status only at
-   first.
+1. **A robot is scrapped when its head is destroyed.** Total wear no longer
+   scraps it by itself. Age wears the head most, so old robots still die of
+   age. `Robot::wear` becomes the head's lasting wear, or is replaced by the
+   parts; say which in L1's note.
+2. **Parts can be lost and replaced.** A hand or the legs at 0 are gone. A
+   clinic fits a new part, and the black market fits a cheap second-hand one
+   that is sometimes dodgy (today's bad part).
+3. **Skins also protect.** Heavier skins (plating) take a share of the damage
+   in fights and robberies. They cost more and wear out faster.
 
 ## Steps
 
@@ -63,13 +62,19 @@ so tests can break a leg in a day.
   migration and never call game code. Also add enum names to `Save.cpp`, a
   new fixture and tests.
 - Validation (rule 5): every part's numbers in range, a valid dominant hand,
-  a known pattern and finish.
+  a known pattern and finish, armour from 0 to 100, and no living robot
+  with a destroyed head.
+- A part at 0 is lost (decision 2). Add a flag, or treat condition 0 with
+  full wear as lost; say which in the note.
 - New robots (`World::Generate`, `AddNewcomer`) get their parts from the same
   draws as today's condition and wear, and their skin and hand from a new
   fixed random stream (never `state_.random`, so today's draws do not move).
 
 ### - [ ] L2. Parts wear and are what condition means (world, life-cycle)
 
+- Scrapping (decision 1): `AgeRobots` scraps a robot when its head's wear
+  reaches `kMaxWear`, and only then. Age wears the head the most
+  (`body.headAgeShare`), so the old-age rule keeps working.
 - `Needs::condition` becomes the worst part's condition, computed rather than
   stored. If that is too wide a change, keep it as a stored mirror updated in
   one place. Say which in the note.
@@ -98,22 +103,30 @@ so tests can break a leg in a day.
 
 ### - [ ] L4. Repairs by part (units, money)
 
-- Repair shops mend hands and legs, clinics mend the head and fit new parts,
-  and the black market fits cheap second-hand parts (sometimes dodgy).
+- Repair shops mend hands and legs, and clinics mend the head. A lost hand
+  or lost legs are replaced: new and dear at a clinic, or second-hand and
+  cheap at the black market, where the part is sometimes dodgy and starts
+  worn (decision 2). A robot with lost legs cannot walk to a venue: say in
+  the note how it gets one (a clinic visit by metro only, or a part
+  delivered home).
   `Decide` picks a repair by the worst part; prices depend on the part.
 - Every payment goes through `Sell` (rule 2); `ValidateEconomy` must pass.
 
 ### - [ ] L5. Injuries in crime (gangs, chronicle)
 
 - A robbery damages a part of the victim (a draw from `state_.random` in id
-  order, rule 1), and a fight damages both robots. Chronicle entries name the
+  order, rule 1), and a fight damages both robots. A skin's armour takes
+  `armour` percent of the damage, and the skin wears by that share times
+  `skin.armourWear` (decision 3). A destroyed head scraps the robot: it is
+  killed in a fight, which the chronicle tells. Chronicle entries name the
   part ("lost a hand in a fight with ..."). A new `MemoryKind` "was injured"
   is a save change.
 
 ### - [ ] L6. Skins: bought, worn, chosen by taste and standing (social, money)
 
-- Shops sell skins. A robot with budget to spare and a worn or out-of-fashion
-  skin buys one: gang members pick their gang's colours, rich robots pick
+- Shops sell skins. Heavier armour costs more (decision 3), so gang members
+  and police officers favour plating and others favour looks. A robot with
+  budget to spare and a worn or out-of-fashion skin buys one: gang members pick their gang's colours, rich robots pick
   chrome, others a pattern from their interests. Skins wear daily and in
   fights.
 - The money moves through `Sell` at the shop. A skin's price comes from the

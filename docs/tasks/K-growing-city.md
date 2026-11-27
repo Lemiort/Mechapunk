@@ -47,16 +47,29 @@ The full city stays the default. A seed town is a setting
 - Newcomers: `World::AddNewcomer` (`sim/src/LifeCycle.cpp`) only replaces
   scrapped robots.
 
-## Open questions for the user (ask before K1)
+## Decisions (the user, 2026-11-27)
 
-1. What does a seed town hold? The proposal: one dormitory of 4 floors, one
-   workshop of 2 workspaces, a charging bay and a diner on the dormitory's
-   ground floor, and 30 robots.
-2. Does the street grid grow too, or is it laid out at its full size from
-   the start, with parks on every free plot? The proposal: full size from the
-   start; growing streets is a later task.
-3. Who runs the metro before there is one? The proposal: the Metro Authority
-   is founded with the first line (K6), not before.
+1. **Start:** one dormitory of 4 floors, one workshop of 2 workspaces, a
+   charging bay and a diner on the dormitory's ground floor, and 30 robots.
+2. **Streets grow with the town.** A seed town starts with a few
+   intersections around the middle, and the review adds streets and plots at
+   the edge as the town fills up (step K5b). `City::nodes`, `edges` and `lots`
+   are saved already, so the type does not change, only the rules that may
+   add to them.
+3. **The Metro Authority is founded with the first line** (K6b), with its
+   depot and crew room.
+4. **Money comes with the robots.** Every robot that arrives brings savings,
+   some poor and some rich (a spread set by settings). That money is created
+   on arrival as today (`EmissionReason::NewcomerSavings`), and it must be
+   enough to start the economy. New banks and corporations raise their
+   capital from robots and organizations buying shares, through `Pay`; the
+   city already has shareholders and dividends. The central bank creates
+   money only by lending, and moves its policy rate to keep **inflation**
+   inside a target band, about 1% (K7b). Today `SetPolicyRate` reacts to money
+   creation instead.
+   - Still to confirm: whether the 1% target is per year of game time or per
+     some other period. The proposal is per year (365 game days), measured
+     over the last 30 days.
 
 ## Steps
 
@@ -64,11 +77,14 @@ The full city stays the default. A seed town is a setting
 
 - Open: `sim/include/mechapunk/sim/City.hpp` (`CityParams`), `sim/src/City.cpp`
   (`GenerateCity`), `sim/include/mechapunk/sim/Settings.hpp`, `sim/src/Settings.cpp`.
-- New settings `city.seedTown` (0 or 1, default 0), `city.seedDormFloors` and
-  `city.seedJobs`. With `seedTown = 1`, `GenerateCity` lays out the full street
-  grid for the residents the town may grow to (a new setting
-  `city.seedGrowthResidents`), then places one dormitory and one workplace
-  next to the middle, no stations, and leaves every other corner a free plot.
+- New settings `city.seedTown` (0 or 1, default 0), `city.seedDormFloors` (4),
+  `city.seedJobs` (2 workspaces) and `city.seedGridSize` (3: a 3 by 3 block of
+  intersections). With `seedTown = 1`, `GenerateCity` lays out only that small
+  grid around the middle and places the dormitory, with a charging bay and a
+  diner on its ground floor, and the workshop. It adds no stations, and every
+  other corner is a free plot. Node ids keep being the node's index, and
+  node coordinates stay on the same block grid a full city uses, so step
+  K5b can extend the grid outward.
 - New settings are saved state: bump the save version, add a migration that
   writes the defaults, a fixture and tests (rule 3).
 - Tests (new `tests/SeedTownTests.cpp`, new module): a seed town has exactly
@@ -88,12 +104,20 @@ The full city stays the default. A seed town is a setting
 
 ### - [ ] K3. The smallest economy that adds up (money)
 
-- Open: `sim/src/Founding.cpp` (`FoundEconomy`), `sim/src/EconomyInternal.hpp`.
+- Open: `sim/src/Founding.cpp` (`FoundEconomy`), `sim/src/EconomyInternal.hpp`,
+  `sim/src/Generation.cpp` (starting credits).
+- The first 30 robots arrive with savings drawn from a skewed spread, most
+  poor and a few rich (settings `population.startingWealthMedian`,
+  `population.richShare` and `population.richMultiplier`). Newcomers in K4 use
+  the same draw. The money is created on arrival as today.
 - A seed town is founded with City Hall, the central bank, one bank, the
   housing trust and one corporation per sector that has a room: the workshop
-  and the two venues. The founding capital scales with the robots, as now.
+  and the two venues. The bank's and the corporations' capital is bought as
+  shares by the richest robots, through `Pay`. The central bank lends the bank
+  what it still needs, which is the only money it creates.
 - Tests: `ValidateEconomy` passes on day 0 and after 20 days; every room has
-  an owner.
+  an owner; the shares add up to each organization's capital; a seed town
+  started with 30 robots can pay its first week of wages.
 
 ### - [ ] K4. Newcomers arrive while there is room (life-cycle)
 
@@ -121,6 +145,27 @@ The full city stays the default. A seed town is a setting
   yet (a dormitory of dorm rooms, not studios), add it here.
 - Test: after 120 fast days the town has more than 5 buildings, every robot
   has a bed, and the city is valid.
+
+### - [ ] K5b. The street grid grows at the edge (city-streets, view-core)
+
+- A midnight `ReviewStreets` that runs before `ReviewConstruction`. When the
+  free plots fall under `city.freePlotsMin`, it adds the next ring of
+  intersections and streets around the grid (or the side where most
+  buildings stand), and the corners of the new intersections become free
+  plots. A ring adds about a block in every direction, to at most
+  `city.maxGridSize`. Deterministic: no draws, or draws from a fixed
+  stream.
+- Saved state grows (`nodes`, `edges`, `lots`), but no type changes. Check
+  `ValidateWorldState`: node ids equal indices, and every edge and lot names
+  a node.
+- Rebuild what depends on the grid: `routes_` (and task J's distance table),
+  `Centrality` (which floors a building gets: it must use the grid's current
+  middle, or the town's first buildings stay its tallest; say which in the
+  note), and the view. The view draws streets, lamps and parks once in the
+  `CityView` constructor. Make them follow `cityVersion` the way
+  `AddBuilding` follows new buildings (task D, step D4).
+- Test: a seed town with few plots left grows a ring of streets at midnight,
+  every plot is reachable, and a save round trip keeps the new streets.
 
 ### - [ ] K6. The metro opens stations as the town spreads (metro, saves)
 
@@ -150,13 +195,26 @@ The full city stays the default. A seed town is a setting
   `economy.robotsPerBank`, a new bank is founded. When a construction site
   raises a workplace and every corporation of that sector already owns
   `economy.workplacesPerCorporation`, a new corporation is founded to own it.
-- Founding capital is either created with `ChangeMoney` (a new
-  `EmissionReason`, which is a save change) or lent by the central bank.
-  Ask the user which. Rule 2 decides how the money moves.
+- Founding capital is bought as shares (decision 4). The richest robots and
+  organizations with money to spare buy in through `Pay`, and the shares pay
+  dividends as today's do. A bank short of capital borrows the rest from the
+  central bank.
 - Organizations are sorted by id today (check `Economy::organizations`); keep
   every order rule and `ValidateEconomy` in step.
 - Tests: a growing seed town founds a second bank and a second corporation;
   the money adds up before and after; robots open accounts at the new bank.
+
+### - [ ] K7b. The central bank targets inflation (money)
+
+- Open: `sim/src/Settlement.cpp` (`SetPolicyRate`), `sim/include/mechapunk/sim/Economy.hpp`.
+- A price index from what robots pay (venue prices and market rents, weighted
+  by what was spent) is recorded each day in `DailyStats` (save change). The
+  policy rate rises while inflation over the last 30 days runs above
+  `economy.inflationTargetPermille` (10, 1% a year) plus a band, and falls
+  while it runs below. The central bank keeps creating money only by lending.
+- This changes a full city's economy too: run the 40-day check at 10000
+  robots before and after, and compare inflation, debts and the rate.
+- Statistics: plot the price index and inflation in the Economy tab.
 
 ### - [ ] K8. Gangs form as the town grows (gangs)
 
@@ -194,7 +252,8 @@ The full city stays the default. A seed town is a setting
 
 - [ ] A seed town can be started (K1, K10) and runs valid with its money
       adding up (K2, K3).
-- [ ] It grows: robots arrive, buildings rise, the metro spreads, banks,
-      corporations and gangs appear (K4-K8).
+- [ ] It grows: robots arrive, streets and buildings spread, the metro
+      opens, banks, corporations and gangs appear, and the central bank
+      keeps inflation on target (K4-K8).
 - [ ] The growth shows in the chronicle and the statistics (K9).
 - [ ] The guide's task table marks K done.
