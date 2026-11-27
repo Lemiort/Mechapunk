@@ -1,192 +1,349 @@
 # Task L: body parts
 
-Status: planned on 2026-11-27, revised the same day to keep skins apart
-(skins are colours only: task M, `docs/tasks/M-skins.md`). Nothing done. Save
-version 29, game 0.29.0. Steps that change saved state take the next free
-save version at the time (rule 3).
+Status: planned on 2026-11-27 and revised the same day; nothing done. Save
+version 29, game 0.29.0. Skins are colours only, in task M
+(`docs/tasks/M-skins.md`). Steps that change saved state take the next free
+save version (rule 3); settings follow the guide's "adding a setting" recipe.
+
+Every step has: **Module**, **Depends on**, **Save change**, **Open** (the only
+files to read in full), **Do**, **Tests**, **Check**. Do one step, commit, push,
+tick it, and stop. Steps that change results say so. All others must leave
+the seed 7 headless log byte-identical (guide section 2) apart from new save
+keys.
 
 ## What and why
 
-A robot's body is two numbers today: `Robot::wear` (lasting damage, 0 to
-`kMaxWear`, which scraps the robot at the top) and `Needs::condition` (wear and
-tear that repair shops and clinics fix). Nothing a robot can or cannot do
-depends on its body, apart from going to be repaired.
+A robot's body is two numbers today: `Robot::wear` (lasting damage that
+scraps the robot at `kMaxWear`) and `Needs::condition` (wear and tear that
+repair shops and clinics fix). This task gives every robot five **parts**,
+and each part decides something the robot can do:
 
-This task gives every robot a body of five **parts**: head, torso, left
-hand, right hand and legs. Each has its own condition and wear, and each decides
-something the robot can do. The parts are about function, not looks:
-
-| Part | What it decides | Wears from | When damaged or lost |
+| Part | Decides | Wears from | Damaged or lost |
 | --- | --- | --- | --- |
-| Legs | Whether and how fast the robot walks | Every minute walked | Walks take longer. Below `body.brokenLegs` the robot can only ride the metro or stay in. Lost legs: it cannot leave its room until legs are fitted. |
-| Left and right hand | What the robot can hold and which jobs it can do | Every shift (more in workshops than offices), the dominant hand more | Each held item takes one working hand. Work performance falls. A job that needs two hands cannot be done with one. |
-| Head | Thinking and talking | Age, being robbed, fighting | Talks go worse (affinity), punctuality slips, memories fade faster. A destroyed head scraps the robot. |
-| Torso | Power: the battery and what holds the rest together | Age and every charge cycle | The charge drains faster and holds less, so the robot must charge more often. A destroyed torso scraps the robot, but a worn one can be exchanged by surgery. |
+| Head | Talking, punctuality | Age, robberies, fights | Talks go worse, punctuality slips. **Destroyed: the robot is scrapped.** |
+| Torso | Power (the battery) | Age, every charge | Charge drains faster and tops out lower. **Destroyed: the robot is scrapped.** Can be exchanged by surgery before that. |
+| Left hand, right hand | Holding things, working | Every shift, the dominant hand more | Each held item needs a free working hand. Work needing two hands goes badly with one. |
+| Legs | Walking | Every minute walked | Walks are slower. Broken: metro only. Lost: crawls, and only to a clinic. |
 
-**Holding things** becomes simulation state, not only a picture. Today the
-view decides from the room a robot left whether it carries a shopping bag
-or a parcel (`Carried` in `app/Props.hpp`). With this task a robot holds
-items in its hands:
-- shopping from a shop;
-- a parcel from the black market;
-- an officer's baton on duty;
-- a builder's tool on shift.
-
-A robot with no free working hand cannot take one more. So a robot with
-one hand that holds a bag cannot also carry a parcel. The view draws what
-the simulation says it holds.
-
-Every number is a setting (a new `body` group in `Settings.hpp`), so a test
-can break a leg or take a hand in one minute.
+**Holding things** becomes simulation state: shopping from a shop, a parcel
+from the black market, a baton for an officer on shift, a tool for a builder
+on shift. The view draws what the simulation says, instead of guessing from
+the room the robot left (`Carried` in `app/CityView.cpp`).
 
 ## Decisions (the user, 2026-11-27)
 
-1. **The head and the torso are basic parts: a robot cannot exist without
-   either.** It is scrapped when its head or its torso is destroyed. Total
-   wear no longer scraps it by itself. Age wears both, so old robots still
-   die of age.
-2. **Parts can be lost and replaced.** A hand or the legs at 0 are lost. A
-   clinic fits a new part, and the black market fits a cheap second-hand one
-   that is sometimes dodgy (today's bad part).
-4. **A torso can be exchanged by robot surgery** before it is destroyed: a
-   long, dear clinic visit that gives the robot a new torso with no wear,
-   and so more life. The head cannot be exchanged, because it is the robot
-   itself. If the user wants head surgery too, it is a later feature.
-3. **Skins are not part of this task.** Every part carries basic chameleon
-   coverage that shows colours only (task M), changing nothing a robot can
-   do. A fitted or exchanged part comes with its own basic coverage.
+1. The head and the torso are basic parts: without either a robot cannot
+   exist. It is scrapped when its head or torso is destroyed, and total wear
+   no longer scraps it by itself.
+2. Hands and legs can be lost and replaced: new at a clinic, or cheap
+   second-hand and sometimes dodgy at the black market.
+3. A torso can be exchanged by surgery at a clinic before it is destroyed.
+   The head cannot be exchanged, because it is the robot.
+4. Skins are colours only (task M). Every part carries basic chameleon
+   coverage, and a fitted part comes with its own.
+
+## Design fixed for the implementer (2026-11-27)
+
+The design keeps every step small and lets most of them leave the headless
+log unchanged:
+
+- A part has a **condition** from 0 to 1000 and a **lost** flag, and nothing
+  else. Parts start at 1000. They lose condition only through the new rules
+  of this task (walking, work, fights, robberies), and only repairs give it
+  back.
+- `Robot::wear` keeps its meaning (lasting damage from age and neglect, which
+  clinics reduce) and **caps the head and the torso**: their condition is never
+  above `kMaxWear - wear`. A pure `void CapBody(Robot&)` in `Body.cpp` applies
+  the cap; call it wherever `wear` grows. So a robot whose `wear` reaches
+  `kMaxWear` has a destroyed head and torso and is scrapped on the same day
+  as today.
+- `Needs::condition` stays what it is today: the robot's general upkeep need
+  that repair shops restore. The parts are separate from it.
+- The head and the torso are never lost: at condition 0 the robot is
+  scrapped instead (decision 1).
+- When a rule hurts "one part", it picks the part by `(robot.id + tick) % 5`,
+  not by a random draw, so `state_.random` does not move (rule 1) and the
+  rest of the city's story stays the same.
 
 ## Steps
 
-### - [ ] L1. Parts are saved state (new module `bodies`, saves)
+### - [ ] L1. Body parts are saved state (new module `bodies`)
 
-- New `sim/include/mechapunk/sim/Body.hpp`, `sim/src/Body.cpp`, `tests/BodyTests.cpp`,
-  in a new module in `scripts/context_budget.py`.
-- `enum class BodyPart : std::uint8_t { Head, Torso, LeftHand, RightHand, Legs };`
-  `struct PartState { std::int32_t condition; std::int32_t wear; bool lost; };`
-  `struct Body { std::array<PartState, 5> parts; BodyPart dominantHand; };`
-  and `Robot::body`. Pure helpers in `Body.hpp`: `WalkFactor(body)`,
-  `CanWalk(body)`, `FreeHands(body, held)`, `HandsForWork(body)` and
-  `ChargeFactor(body)` (from the torso).
-- `Robot::wear` is replaced by the parts' wear. Today's scrap rule reads the
-  head and the torso (L2).
-- Save change (rule 3): bump the version. The migration splits each robot's
-  `needs.condition` and `wear` across the parts (derivable, as task I
-  derived styles) and picks a dominant hand by a hash of the id. Both are
-  spelled out in the migration, which never calls game code. Also add enum
-  names to `Save.cpp`, a new fixture and tests.
-- Validation (rule 5): parts in range, a lost part has condition 0, a valid
-  dominant hand, and no living robot with a destroyed head or torso (neither
-  can be marked lost).
-- New robots (`World::Generate`, `AddNewcomer`) get their parts from today's
-  condition and wear draws, and their dominant hand from a new fixed random
-  stream (never `state_.random`, so today's draws do not move).
+- Module: bodies (new: `sim/include/mechapunk/sim/Body.hpp`, `sim/src/Body.cpp`,
+  `tests/BodyTests.cpp`), plus the save files. Depends on: none. Save change:
+  yes.
+- Open: `sim/include/mechapunk/sim/World.hpp` (the `Robot` struct only:
+  `rg -n "struct Robot" -A 70`), `sim/src/Save.cpp` (the `glz::meta` blocks at the
+  top), the end of `sim/src/Migrations.cpp`, `sim/src/Migrations.hpp`,
+  `sim/src/Generation.cpp`, `sim/src/LifeCycle.cpp` (`AddNewcomer` only).
+- Do:
+  1. In `Body.hpp`:
+     `enum class BodyPart : std::uint8_t { Head, Torso, LeftHand, RightHand, Legs };`,
+     `struct PartState { std::int32_t condition{1000}; bool lost{false}; };` and
+     `struct Body { std::array<PartState, 5> parts; BodyPart dominantHand{BodyPart::RightHand}; };`,
+     plus `PartState& Part(Body&, BodyPart)` (and a const one) and `void CapBody(Robot&)`.
+  2. Add `Body body;` to `Robot`, and the enum names to `Save.cpp`.
+  3. Generation and newcomers: the parts stay at 1000, then `CapBody` runs.
+     The dominant hand is the left when `id % 10 == 0`, so no random draw
+     moves.
+  4. Migration: for every `world.robots[i]`, write `body`. The head and torso
+     get condition `min(1000, 1000 - wear)` (`kMaxWear` is 1000, spelled out),
+     the others 1000, all with `lost` false. The dominant hand follows the same
+     `id % 10` rule. The migration never calls game code.
+  5. New fixture, `CurrentVersionFixtureLoadsAndRoundTrips` retargeted, and
+     `VersionN-1FixtureMigratesAndRuns` added (rule 3).
+- Tests (`BodyTests.cpp`): `CapBody` caps the head and torso only; a new
+  city's robots have capped bodies; a save round trip keeps the body.
+- Check: build, ctest, seed 7 log byte-identical, save differs only by the
+  new keys.
 
-### - [ ] L2. Parts wear, and the head decides life and death (world, life-cycle)
+### - [ ] L2. Validate bodies (validation)
 
-- Legs wear per walked minute and hands per shift, by workplace type and
-  with the dominant hand by `body.dominantHandShare`. The head wears with age
-  (`body.headAgeShare`). The nightly `AgeRobots` spreads its wear over the
-  parts.
-- The torso wears with age (`body.torsoAgeShare`) and with every charge at a
-  charging bay or at home (`body.torsoChargeWear`).
-- Scrapping (decision 1): `AgeRobots` scraps a robot when its head or its
-  torso reaches `kMaxWear`, and only then.
-- `Needs::condition` becomes the worst working part's condition, computed
-  rather than stored. If that is too wide a change, keep a stored mirror
-  updated in one place; say which.
-- The gang fight in `Gangs.cpp` (`wear += 20`, `condition - 100`, still
-  literals) and the bad part in `Behaviour.cpp` hit one part, and their
-  numbers become settings.
-- This changes results: run the guide's 40-day check at 10000 robots and
-  compare the economy and the scrap rate with before. Write both in the note.
+- Module: validation. Depends on: L1. Save change: no.
+- Open: `sim/src/Validation.cpp` (the robot loop), `sim/include/mechapunk/sim/Body.hpp`.
+- Do: every part's condition is in `[0, 1000]`; a lost part has condition 0;
+  the head and torso are not lost and not above `kMaxWear - wear`; the
+  dominant hand is `LeftHand` or `RightHand`.
+- Tests: a save with each rule broken is refused with a message naming it.
+- Check: build, ctest.
 
-### - [ ] L3. Walking depends on the legs (world, metro)
+### - [ ] L3. The head and torso decide scrapping (life-cycle)
 
-- A walk's minutes are multiplied by `WalkFactor(body)`. Task J caches trip
-  minutes per room pair, so apply the factor to the walking part of a trip
-  *after* the cache: `PlanTrip` stays per room, while `StartWalk` and `Decide`
-  scale the walking legs.
-- Below `body.brokenLegs` a robot only takes trips the metro covers, with
-  short walks at each end. With lost legs it stays in its room, and work
-  and outings fail as being late does today. Say in the note how such a
-  robot gets to a clinic: the proposal is that a clinic sends for it, a
-  walk of the clinic's choosing at a fee.
-- Tests: a robot with damaged legs takes longer by the factor, and one with
-  broken legs takes the metro or stays in. A robot with healthy legs walks
-  exactly as before L3.
+- Module: life-cycle. Depends on: L1. Save change: no. The log must stay
+  **byte-identical**, because the cap makes the new rule fall on the same
+  day as the old one.
+- Open: `sim/src/LifeCycle.cpp` (`AgeRobots`).
+- Do: wherever `AgeRobots` adds wear, call `CapBody` after it. A robot is
+  scrapped when its head's or its torso's condition is 0, in place of
+  `wear >= kMaxWear`. Find every other place that adds to `wear` (`rg -n
+  "\.wear\s*[+=]|wear =" sim/src`) and call `CapBody` after it too, and the
+  same where it shrinks (clinics: the cap rises again, but condition is not
+  given back).
+- Tests: a robot scrapped by age is scrapped on the same day as before; a
+  robot whose torso is set to 0 in a test is scrapped at the next midnight.
+- Check: build, ctest, seed 7 byte-identical.
 
-### - [ ] L4. Holding things takes hands (world, units)
+### - [ ] L4. Walking wears the legs (world)
 
-- `Robot::held`, a short list of `HeldItem` (shopping, parcel, baton, tool),
-  is saved state (save change). A shop visit adds shopping, the black market
-  a parcel, an officer on shift a baton, a builder on shift a tool. Arriving
-  home drops shopping and parcels; ending a shift drops a baton or tool.
-- An item needs a free working hand: `Decide` skips a shop or the black
-  market when the robot has no free hand.
-- The view draws `held` instead of guessing from the room the robot left
-  (`Carried` in `app/CityView.cpp`), so `RobotFrame` gains it (guide section
-  9.5).
-- Tests: a one-handed robot holding shopping does not go to the black market
-  until it has been home; an officer on shift holds a baton and drops it
-  after.
+- Module: world. Depends on: L1, J0 (room in `world`). Save change:
+  settings only. The log stays byte-identical, because nothing reads leg
+  condition until L8.
+- Open: `sim/src/Behaviour.cpp` (`Arrive`).
+- Do: add the setting `body.legWearPerHundredMinutes` (1). On arrival, the
+  legs lose `walked minutes × that / 100` condition, never below 0. Walked
+  minutes are `nextActionAt - departedAt` of the walk that just ended.
+- Tests: a robot that walks 1000 minutes has 10 less leg condition.
+- Check: build, ctest, seed 7 byte-identical except the new keys.
 
-### - [ ] L5. Working depends on the hands and the head (careers, social)
+### - [ ] L5. Work wears the hands (careers)
 
-- Each workplace type and each staff room (`StaffRules`) says how many hands
-  its work needs (a setting per type). With fewer working hands the shift's
-  performance falls by `body.missingHandPenalty`, and the existing firing
-  rule does the rest. A worn dominant hand counts more than the other.
-- The head: talk affinity and punctuality fall with its condition.
-- The torso: the charge need falls faster and its effective top is lower by
-  `ChargeFactor(body)`, so a robot with a worn torso charges more often.
-  Apply it in `UpdateNeeds` (world module) and on arrival at a charging bay.
-- Tests per rule, plus: a healthy robot works and talks exactly as before L5.
+- Module: careers (23979 of 25000: make room first, as its own commit).
+  Depends on: L1. Save change: settings only. Byte-identical log, because
+  nothing reads hands until L10.
+- Open: `sim/src/Careers.cpp` (`EndShift`).
+- Do: add the settings `body.handWearPerShift` (2) and `body.dominantHandPercent`
+  (70). At the end of a shift the dominant hand loses that share of
+  `handWearPerShift` (rounded up) and the other hand the rest.
+- Tests: after 10 shifts the dominant hand has lost more than the other.
+- Check: build, ctest, seed 7 byte-identical except the new keys.
 
-### - [ ] L6. Repairs, replacement parts and torso surgery (units, money)
+### - [ ] L6. Fights and bad parts hurt one part (gangs, then world)
 
-- Repair shops mend hands and legs, and clinics mend the head and the
-  torso. A lost hand or lost legs are replaced (decision 2): new and dear at
-  a clinic, or second-hand and cheap at the black market, sometimes dodgy and
-  starting worn. `Decide` picks a repair by the worst part, and prices depend
-  on the part.
-- Torso surgery (decision 4): when its torso's wear passes
-  `body.surgeryWear` and it can pay `body.surgeryPrice` from its savings, a
-  robot books an exchange at a clinic. The clinic visit lasts
-  `body.surgeryMinutes`, and the robot leaves with a torso of no wear. This is
-  how a robot outlives its first torso. Record it in the chronicle.
-- Every payment goes through `Sell` (rule 2), and `ValidateEconomy` must pass.
+- Module: gangs, then world (the black market's bad part, in `Arrive`) as a
+  second commit. Depends on: L1, L3. Save change: settings only.
+  Byte-identical log, because the hurt part is picked without a draw.
+- Open: `sim/src/Gangs.cpp` (the fight: `rg -n "Fight at" sim/src/Gangs.cpp`),
+  then `sim/src/Behaviour.cpp` (`rg -n "badPart" sim/src/Behaviour.cpp`).
+- Do: the fight's literals `20` and `100` become the settings `crime.fightWear`
+  (20) and `crime.fightConditionLoss` (100), with the same effect as now. Each
+  fighter also loses `crime.fightPartDamage` (150) condition on the part picked
+  by `(id + tick) % 5`. A bad part also costs `body.badPartDamage` (100) on the
+  part picked the same way. If that takes the head or torso to 0, the robot
+  is scrapped at the next midnight (L3's rule).
+- Tests: a fight hurts one part of each fighter; a bad part hurts one part.
+- Check: build, ctest, seed 7 byte-identical except the new keys.
 
-### - [ ] L7. Injuries in crime (gangs, chronicle)
+### - [ ] L7. One trip time for a body (metro)
 
-- A robbery damages a part of the victim (a draw from `state_.random` in id
-  order, rule 1). A robber needs a free hand to take something. A fight
-  damages both robots and can knock an item out of a hand.
-- A destroyed head or torso scraps the robot: it is killed in the fight. The
-  chronicle names the part ("lost a hand in a fight with ..."), and a new
-  `MemoryKind` "was injured" is a save change.
+- Module: metro (`Transit.cpp`). Depends on: L1. Save change: settings only.
+- Open: `sim/src/Transit.cpp`, `sim/include/mechapunk/sim/Body.hpp`.
+- Do:
+  1. Add the settings `body.slowLegsCondition` (500), `body.brokenLegsCondition`
+     (100) and `body.crawlFactor` (500, percent).
+  2. A pure `std::uint32_t WalkFactorPercent(const Body&)`: 100 at or above
+     `slowLegsCondition`, rising linearly to 300 at `brokenLegsCondition`, and
+     `crawlFactor` when the legs are lost.
+  3. `World::TravelMinutesFor(const Robot&, EntityId from, EntityId to)`:
+     `PlanTrip` as today, then the walking minutes are scaled by the factor.
+     A metro trip's walking minutes are `minutesToStation` plus the minutes
+     after alighting; the minutes underground are not scaled. With broken
+     legs a walking-only trip of more than 10 minutes returns
+     `std::numeric_limits<std::uint32_t>::max()` ("cannot").
+- Tests: a robot with legs at 100% condition gets today's minutes; at the
+  broken condition, walking trips take 3 times as long; a lost-legs robot
+  crawls.
+- Check: build, ctest, seed 7 byte-identical: nobody calls the new function
+  yet.
 
-### - [ ] L8. The body in the view, the inspector and the statistics (view-robots, robot-pages, statistics)
+### - [ ] L8. Robots walk as their legs let them (outings, then world)
 
-- `RobotFigure` (`app/Props.cpp`) shows the parts' state as function, not
-  colour (colours are task M): a limp from damaged legs (the walk phase), a
-  stump for a lost hand, the held items in the hand that holds them, and
-  dents and sparks on a badly worn part.
-- The robot page gets a Body section: a bar per part, lost parts, the
-  dominant hand, what it holds and in which hand, what its body lets it do
-  ("walks 30% slower", "cannot hold more"), and its last repair and injury
-  as links. The rows come from a tested `app/BodyLists.*` (guide section 9.4).
-- The Statistics window gets injuries, parts lost and parts fitted per day.
-  New `DailyStats` fields are a save change (rule 3 table).
+- Module: outings (`Decide`), then world (`StartWalk`, `LatestHomeTick`) as a
+  second commit. Depends on: L7, J0. **Changes results.** Save change: no.
+- Open: `sim/src/Outings.cpp`, then `sim/src/Behaviour.cpp`.
+- Do:
+  1. `Decide` and `StartWalk` use `TravelMinutesFor`, and skip a venue it
+     says "cannot" reach.
+  2. A robot with lost legs is only offered clinics (it crawls there).
+  3. If J6 is done, its trip rows must keep the walking and metro minutes
+     apart so the factor can be applied; extend the row to two numbers.
+- Tests: a robot with broken legs only goes where the metro takes it; one
+  with lost legs only goes to a clinic; a healthy robot behaves as before.
+- Check: build, ctest, 40-day numbers in the note.
+
+### - [ ] L9. Held items are saved state (bodies)
+
+- Module: bodies. Depends on: L1. Save change: yes.
+- Open: `sim/include/mechapunk/sim/Body.hpp`, `sim/src/Body.cpp`,
+  `sim/src/Save.cpp` (`glz::meta`), the end of `sim/src/Migrations.cpp`,
+  `sim/src/Validation.cpp` (the robot loop).
+- Do:
+  1. `enum class HeldItem : std::uint8_t { Shopping, Parcel, Baton, Tool };`,
+     `Robot::held` as a `std::vector<HeldItem>`, and the pure
+     `std::uint32_t FreeHands(const Robot&)`: working hands (not lost and
+     condition above `body.brokenHandCondition`, a new setting, 100) minus the
+     items held.
+  2. The migration writes an empty list.
+  3. Validation: never more items than working hands.
+- Tests: `FreeHands` for two hands, one hand, one hand holding shopping.
+- Check: build, ctest, new fixture.
+
+### - [ ] L10. Robots pick things up and put them down (world, then careers)
+
+- Module: world, then careers as a second commit. Depends on: L9. **Changes
+  results** only where a hand is missing. Save change: no.
+- Open: `sim/src/Behaviour.cpp` (`Act`'s `Visiting` case, `Arrive` at home),
+  then `sim/src/Careers.cpp` (clock-in and `EndShift`).
+- Do:
+  1. Leaving a shop adds `Shopping`, and leaving the black market adds
+     `Parcel`, when `FreeHands > 0`. Arriving home drops both.
+  2. Clocking in at a police station adds `Baton`, and at a site office
+     `Tool`. `EndShift` drops them.
+  3. In `Decide` (outings module, its own commit), a shop or the black market
+     is skipped when `FreeHands` is 0.
+- Tests: a one-handed robot holding shopping skips the black market until it
+  has been home; an officer holds a baton on shift and none after.
+- Check: build, ctest; the seed 7 run is byte-identical (nobody lacks a hand
+  in a new city).
+
+### - [ ] L11. Hands decide work, the head talking and punctuality, the torso charge
+
+- Module: careers (hands), then social (head talks), then world (punctuality
+  and charge), as three commits. Depends on: L1. **Changes results.** Save
+  change: settings only.
+- Open (one per commit): `sim/src/Careers.cpp` (where a shift's performance is
+  scored: `rg -n "performance" sim/src/Careers.cpp`); `sim/src/Social.cpp`
+  (where a talk's affinity change is computed); `sim/src/World.cpp`
+  (`UpdateNeeds`) and `sim/src/Behaviour.cpp` (`ScheduleNextCommute`).
+- Do:
+  1. Hands: each `WorkplaceType` and staff room gets `handsNeeded` (1 or 2; a
+     field in the table, offices 1, workshops 2). With fewer working hands,
+     a shift loses `body.missingHandPenalty` (5) performance points.
+  2. Head: a talk's affinity change falls by `(1000 - head condition) /
+     body.headTalkDivisor` (200). Punctuality: `(1000 - head condition) /
+     body.headLateDivisor` (100) extra minutes late.
+  3. Torso: while not charging, `charge` falls by
+     `100 + (1000 - torso condition) / body.torsoDrainDivisor` (10) percent of
+     today's drain.
+- Tests per rule, plus: a robot with all parts at full condition behaves
+  exactly as before.
+- Check: build, ctest, 40-day numbers in the note.
+
+### - [ ] L12. Repairs, replacement parts and torso surgery (venues, then outings)
+
+- Module: the venue code that applies repairs (find it: `rg -n
+  "clinicWearRepair|RepairShop|Clinic" sim/src`), then outings for `Decide`.
+  Depends on: L1, L8. **Changes results.** Save change: settings only.
+- Open: the file `rg` finds for the repairs (likely `sim/src/Behaviour.cpp`'s
+  `Arrive` or `sim/src/World.cpp`), `sim/src/Outings.cpp` (`Decide`, for the
+  second commit), `sim/include/mechapunk/sim/Body.hpp`.
+- Do:
+  1. A repair shop mends the worse of hands and legs, and a clinic the head
+     and the torso.
+  2. A lost hand or lost legs are replaced at a clinic for
+     `body.newPartPrice` (300), or at the black market for
+     `body.usedPartPrice` (80). A black-market part is dodgy with today's
+     `behaviour.badPartPercent` and starts with `body.usedPartWear` (300) wear.
+  3. Torso surgery: when `wear` passes `body.surgeryWear` (700) and the
+     robot's savings cover `body.surgeryPrice` (2000), `Decide` sends it to a
+     clinic. The visit takes `body.surgeryMinutes` (240). It lowers `wear` by
+     `body.surgeryWearRemoved` (500) and sets the torso's condition to the new
+     cap: a new torso, so more life. The head keeps its condition.
+  4. Every payment goes through `Sell` (rule 2).
+- Tests: each of the four above; the money adds up.
+- Check: build, ctest, 40-day numbers in the note.
+
+### - [ ] L13. Robberies hurt, injuries are remembered (gangs, then social)
+
+- Module: gangs, then social (`MemoryKind`) as a second commit. Depends on:
+  L6. **Changes results.** Save change: yes (a new `MemoryKind` name).
+- Open: `sim/src/Gangs.cpp` (`ConsiderCrime`: the robbery), then
+  `sim/include/mechapunk/sim/Social.hpp` (`MemoryKind`), `sim/src/Social.cpp` (where
+  a memory is added: `rg -n "Remember(" sim/src/Social.cpp`), `sim/src/Save.cpp`
+  (`glz::meta<MemoryKind>`).
+- Do: a robbery hurts one part of the victim by `crime.robberyDamage` (60),
+  picked by `(id + tick) % 5`. A robber needs a
+  free hand (`FreeHands > 0`) to rob. A new `MemoryKind::Injured` is
+  remembered by the injured robot.
+- Tests: a robbed robot has a hurt part and remembers it; a robot with no
+  free hand does not rob.
+- Check: build, ctest, new fixture.
+
+### - [ ] L14. The figure shows the body (ui, then rendering, then view-core)
+
+- Module: ui (`RobotFrame`, `Publish`), then rendering (`Props.cpp`), then
+  view-core (`CityView.cpp`), as three commits. Depends on: L9, L10. Save
+  change: no.
+- Open (one per commit): `app/SimulationHost.hpp` and `.cpp`; `app/Props.hpp` and
+  `app/Props.cpp` (`RobotFigure`); `app/CityView.cpp` (where `Carried` is chosen).
+- Do:
+  1. `RobotFrame` gains the five parts' conditions, their `lost` flags and
+     `held`.
+  2. `RobotFigure` takes them: a limp when the legs are below
+     `slowLegsCondition` (halve the swing of one leg), no hand drawn for a lost
+     hand, the held items in the hands that hold them, and a dark dent box on
+     a part below 300.
+  3. The view passes `held` and stops guessing from the room the robot left.
+- Tests: none without a renderer. Check: build, ctest, `ContextBudget`.
+
+### - [ ] L15. The body on the robot page (robot-pages, new module `body-lists`)
+
+- Module: body-lists (new: `app/BodyLists.hpp`, `app/BodyLists.cpp`,
+  `tests/BodyListsTests.cpp`, in `mechapunk_layout`), then robot-pages. Depends
+  on: L14. Save change: no.
+- Open: `app/OrganizationLists.hpp`, `app/OrganizationLists.cpp` and
+  `tests/OrganizationListsTests.cpp` (the pattern to copy), `app/InspectorRobot.cpp`
+  (for the second commit), `app/SimulationHost.hpp` (`RobotFrame` only).
+- Do: `BodyLists` gives the rows (part, condition, wear, lost, held item) and
+  the sentences ("walks 2.5 times slower", "one hand free", "a new
+  torso would add life"). The robot page draws them in a Body section with
+  `ProgressBar`s. Test the rows from a frame built from a generated city
+  (guide section 9.4), and never skip a test.
+- Check: build, ctest.
+
+### - [ ] L16. Injuries and parts in the statistics (statistics)
+
+- Module: statistics. Depends on: L12, L13. Save change: yes (`DayCounters`
+  fields: `world.today` and every `world.history[i].counted`).
+- Open: `sim/include/mechapunk/sim/Economy.hpp` (`DayCounters`), the places
+  L12 and L13 changed (to add `++state_.today.x`), `app/Statistics.cpp` (the
+  Society tab), the end of `sim/src/Migrations.cpp`.
+- Do: count `injuries`, `partsLost`, `partsFitted` and `torsoSurgeries` per
+  day, and plot them in the Society tab with `PlotCount`.
+- Tests: a day with an injury counts it.
+- Check: build, ctest, new fixture.
 
 ## Done when
 
-- [ ] Every robot has five parts and a dominant hand, saved, migrated and
-      validated (L1).
-- [ ] Parts wear, a destroyed head or torso scraps the robot, and torso
-      surgery can extend its life (L2, L6).
-- [ ] Legs decide walking, hands decide holding and working, and the head
-      decides talking and punctuality (L3-L5).
-- [ ] Parts are repaired and replaced, and crime injures them (L6, L7).
-- [ ] It shows in the game, the inspector and the statistics (L8).
-- [ ] The guide's task table marks L done.
+- [ ] L1-L16 are ticked, robots' parts wear, break, slow, limit and are
+      repaired, the head and torso decide life, and the guide's table marks
+      L done.

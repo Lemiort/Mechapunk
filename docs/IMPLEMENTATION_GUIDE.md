@@ -22,6 +22,22 @@ individually).
    Tick the step in the task file (`- [x]`) in the same commit.
 5. If a step does not fit (a compile error leads into a third module, say),
    stop, commit what builds, and split the step in the task file.
+7. **Dispatching steps to several models at once:** run `git pull` before
+   starting a step and again before pushing. Two steps with a save change
+   must never run at the same time: both would take the same next save
+   version. Steps of tasks J to M name their **Depends on**; never start a step
+   before those are ticked. The planned order is J, K, L, M. L4 needs J0, and
+   M1 reads `kWorkplaceTypes`, which K1 may have moved.
+6. **Recipe: making room** when a step would push a module over 25k (the
+   step says so, or `ContextBudget` fails): move whole functions, by topic,
+   into a new file. Add the file to `sim/CMakeLists.txt` (or the root
+   `CMakeLists.txt` for `app/`, `tests/CMakeLists.txt` for tests), to a module in
+   `scripts/context_budget.py` (a new module, if the old one is still full),
+   and regenerate the table in `docs/MODULES.md` with
+   `python scripts/context_budget.py --markdown`. It is a pure move: the seed 7
+   headless log and save must stay byte for byte identical (section 2). Step
+   I1a of `docs/tasks/I-architecture.md` is the example. Commit the move on
+   its own, before the step's change.
 
 Never paste whole files into your context to "have a look": that is how a
 small context runs out. Never refactor outside the step.
@@ -134,6 +150,23 @@ python scripts/context_budget.py                                                
    5. In `tests/SaveTests.cpp`, point `CurrentVersionFixtureLoadsAndRoundTrips`
       at the new fixture (check the new data); a migration kept for the
       previous version gets its own `VersionN-1FixtureMigratesAndRuns`.
+   **Recipe: adding a setting** (a tunable number; most new rules need one):
+   1. Add the field with its default and a comment to its group's struct in
+      `sim/include/mechapunk/sim/Settings.hpp` (`std::int64_t name{default};`).
+      A new group needs a struct, a member of `SimSettings` and
+      `operator==` like the others.
+   2. Add `MECHAPUNK_SETTING(group, name, minimum, maximum),` to `kEntries` in
+      `sim/src/Settings.cpp`. A range must never let the simulation divide by
+      zero, loop forever or draw from an empty range. A `minX`/`maxX` pair
+      also gets a line in `kPairs`.
+   3. Read it as `state_.settings.group.name` (a `World` member) or through
+      `CityParams::city` (generation), cast to the type the code needs. Free
+      functions get the value as a parameter; never use a global.
+   4. It is saved state: bump the version, and the migration writes the
+      default into `world.settings.group.name` (and creates `world.settings.group`
+      for a new group). Then a new fixture and the two fixture tests, as above.
+   5. `Settings.EverySettingAtItsLimitsKeepsTheCityRunning` then runs it at both
+      ends of its range. If it fails, narrow the range; never skip the test.
 4. **No teleporting robots.** Robots walk through doors, corridors, stairs,
    streets and metro platforms; `CityView::RobotPosition` and
    `DriverPlacement` build every path. Hiding robots nobody can see is

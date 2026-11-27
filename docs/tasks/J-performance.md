@@ -1,155 +1,223 @@
 # Task J: performance
 
 Status: planned on 2026-11-27, nothing done. Save version 29, game 0.29.0.
-This task takes over steps E1 (profiling, done below) and E3 (caching trip
-times) of `docs/tasks/E-level-of-detail.md`; E2 and E4 stay there.
+It takes over steps E1 (profiling, done below) and E3 (caching trip times)
+of `docs/tasks/E-level-of-detail.md`; E2 and E4 stay there.
 
-## What and why
+Every step below has the same parts: **Module** (the one module it changes),
+**Depends on**, **Save change**, **Open** (the only files to read in full),
+**Do**, **Tests**, and **Check** (what to run before committing). Read the
+guide first. Do one step, commit, push, tick it, and stop.
 
-Measured on 2026-11-27 (12-thread machine, release build, seed 1, 10000
-robots), with throwaway timers that were removed again:
+## Measurements behind this task (2026-11-27)
+
+The numbers below are for a 12-thread machine, a release build, seed 1 and
+10000 robots.
 
 | Part of `World::Step` | Share of the time |
 | --- | --- |
 | `Act` (robots deciding what to do) | 97% |
 | `UpdateNeeds` + `Socialize` (every 10 minutes) | about 2.5% |
-| The midnight passes (rent, jobs, economy, construction) | under 1% |
+| The midnight passes | under 1% |
 
-Almost all of `Act` is `Decide` (`sim/src/Behaviour.cpp`), which scores every
-venue (about 480) for a robot that goes out and calls `TravelMinutes` twice per
-venue: there, and from there home. Two simulated days made 112 000 decisions,
-66 million `PlanTrip` calls (about 590 per decision) and 57 million
-`Metro::Route` calls. Planning trips is most of the simulation's cost.
+Almost all of `Act` is `World::Decide` (`sim/src/Behaviour.cpp`). It scores
+every venue (about 480) and calls `TravelMinutes` twice per venue. Two
+simulated days made 112 000 decisions, 66 million `PlanTrip` calls and 57
+million `Metro::Route` calls.
 
-The simulation already runs apart from rendering: `SimulationHost` steps the
-world on a worker thread (NEE `SimulationThread`) and hands the renderer
-immutable `WorldFrame` snapshots through a `SnapshotBuffer`. What still costs
-is that the worker builds a full snapshot (`SimulationHost::Publish`) after
-*every* simulated minute: 10000 `RobotFrame`s, and every 10 minutes a deep copy
-of all bonds and memories. On a busy morning that cut the game's throughput
-from 277 to 226 simulated minutes a second (about 18%); at night, when the
-simulation is cheap, the share is larger. At speed 100x and up almost none of
-those snapshots are ever drawn.
+The game runs the world on a worker thread (`SimulationHost`, NEE
+`SimulationThread`), but it builds a full snapshot (`SimulationHost::Publish`)
+after every simulated minute. That costs about 18% of a busy morning:
+throughput falls from 277 to 226 minutes a second.
 
-Rule 1 (determinism) decides what may run in parallel. Robots act in id
-order, draw from one `state_.random` and reserve venue places that later
-robots see, so `Act` itself must stay sequential. The trip times a decision
-needs are pure: they depend only on the city, the metro timetable and the
-clock. They can be computed in parallel beforehand, with byte-identical
-results.
+Timing commands used in every step's note:
+- headless: `build/build/Release/mechapunk-sim.exe --seed 1 --robots 10000 --days 2 --quiet`
+  (the last line prints the seconds; 8.4 s on 2026-11-27);
+- determinism: `mechapunk-sim --seed 7 --robots 2000 --days 6 --all --save X.json`,
+  run before and after the change and compared byte for byte, ignoring the
+  last two lines of the log (guide section 2).
 
-## Rules for every step
+## Rule for this whole task
 
-- Every step except J1 must leave the headless log and the save **byte for
-  byte identical**: `mechapunk-sim --seed 7 --robots 2000 --days 6 --all --save X.json`
-  before and after, compared ignoring the last two lines (guide section 2).
-  A step that changes the log is wrong, not "a small difference".
-- Time before and after with `mechapunk-sim --seed 1 --robots 10000 --days 2 --quiet`
-  and write both numbers in the step's note.
-- No save change in this task: thread counts and caches are not saved state.
+Every step except J1 must leave the seed 7 log and save **byte for byte
+identical**. If they differ, the step is wrong: undo it and find out why.
+Do not accept "a small difference".
 
 ## Steps
 
+### - [ ] J0. Make room in the world module (world)
+
+- Module: world (23979 of 25000, too full for J6). Depends on: none. Save
+  change: no.
+- Open: `sim/src/Behaviour.cpp`, `scripts/context_budget.py`, `sim/CMakeLists.txt`.
+- Do: move `World::Decide` and the file-local helpers only it uses (`Relief`
+  and the scoring helpers above it; check each with `rg -n "Name" sim/src`)
+  into a new `sim/src/Outings.cpp`. Put it in a new module `outings` in
+  `scripts/context_budget.py` (`World.hpp`, `WorldInternal.hpp`, `Outings.cpp`).
+  Helpers that `Behaviour.cpp` also uses go into `sim/src/WorldInternal.hpp`
+  as `inline`. This is the guide's "making room" recipe.
+- Tests: none new.
+- Check: build, ctest, seed 7 log and save byte-identical.
+
 ### - [ ] J1. Publish a snapshot only when a frame is due (ui)
 
-- Open: `app/SimulationHost.hpp`, `app/SimulationHost.cpp` (`Step`, `Publish`),
+- Module: ui. Depends on: none. Save change: no.
+- Open: `app/SimulationHost.hpp`, `app/SimulationHost.cpp`,
   `external/NEE/include/SnapshotBuffer.hpp` (read only: NEE changes only by
   pull request).
-- `SimulationHost::Step` calls `Publish` only when about one render frame has
-  passed since the last one (8 ms of steady clock), when the thread is paused
-  or single-stepping, and on the first step. Put that rule in a small pure
-  function, for example `ShouldPublish(sinceLast, paused, singleStep)`, so it
-  can be tested without a thread.
-- Check that the renderer copes with snapshots many minutes apart. Robots are
-  drawn from `departedAt`/`arrivesAt`, so they should; the `SnapshotBuffer`
-  alpha clamps at 1. Say in the note what was checked.
-- Measure: a throwaway test that builds a `SimulationHost` on a 10000-robot
-  city at 08:00, sets speed 100000 for 4 seconds and prints steps per second.
-  It needs `app/SimulationHost.cpp` added to `layout_tests` temporarily. Remove
-  it again afterwards. Today's number is 226; 277 is the bare world.
+- Do:
+  1. Add `std::chrono::steady_clock::time_point lastPublish_` to `SimulationHost`.
+  2. Add a free function in `SimulationHost.hpp`:
+     `bool ShouldPublish(std::chrono::nanoseconds sinceLast, bool paused)`,
+     which returns `paused || sinceLast >= 8ms`.
+  3. In `SimulationHost::Step`, after `world_.Step()`, call `Publish()` only
+     when `ShouldPublish(now - lastPublish_, thread_ == nullptr ||
+     thread_->IsPaused())` is true, and then set `lastPublish_ = now`. The
+     constructor's first `Publish()` stays.
+  4. A single step taken while paused must still publish, so the "paused"
+     argument covers it.
+- Tests: none possible without a window (`SimulationHost` is not in a test
+  library). Add a `static_assert` or a comment with the expected values of
+  `ShouldPublish` instead.
+- Check: build, ctest. In the note, write the steps per second from the
+  throwaway benchmark:
+  1. Add `${PROJECT_SOURCE_DIR}/app/SimulationHost.cpp` and a test file to
+     `layout_tests` in `tests/CMakeLists.txt`.
+  2. In the test, build `World::Generate({.seed = 1, .robots = 10000})`, run it
+     to minute 480, and wrap it in a `SimulationHost`.
+  3. Call `SetSpeed(100000)`, sleep 4 s, and read `LatestFrame()->tick` before
+     and after.
+  4. Remove both files again.
 
-### - [ ] J2. Skip a metro route that cannot win (world)
+  Before J1 it gave 226 steps a second.
 
-- Open: `sim/src/Transit.cpp` (`PlanTrip`), `sim/include/mechapunk/sim/Metro.hpp`.
-- A metro trip is never shorter than the walk to the boarding station plus
-  the walk from the alighting station. When the walking trip is already no
-  longer than that, `PlanTrip` returns it without calling `Metro::Route`. This
-  is exact, so the log must not change.
-- Count in the note how many `Metro::Route` calls are left (throwaway counter).
+### - [ ] J2. Skip a metro route that cannot win (metro)
+
+- Module: metro (`Transit.cpp` is in it; check `scripts/context_budget.py`).
+  Depends on: none. Save change: no.
+- Open: `sim/src/Transit.cpp` (`PlanTrip`).
+- Do: in `PlanTrip`, after `toStation` is known, compute
+  `fromStation` (the walk from the alighting station, already computed further
+  down) before calling `metro_.Route`. If `toStation + fromStation >=
+  trip.minutes` (the walking trip), return the walking trip without calling
+  `Route`. The metro also takes at least the minutes underground, so it
+  cannot win. This is exact.
+- Tests: none new; the existing suite and the byte-identical check prove it.
+- Check: build, ctest, seed 7 byte-identical, headless time in the note.
 
 ### - [ ] J3. Remember metro routes within a minute (metro)
 
-- Open: `sim/src/Transit.cpp`, `sim/src/Metro.cpp` (`Route`), `sim/src/WorldInternal.hpp`.
-- A cache in `World`, cleared when the tick changes, keyed by `(board,
-  alight, onPlatform)` and holding the arrival minute and the legs. It is
-  unsaved, like `routes_`. Many robots of one minute ask the same question.
+- Module: metro. Depends on: J2. Save change: no.
+- Open: `sim/src/Transit.cpp`, `sim/include/mechapunk/sim/World.hpp` (only the
+  private members near `routes_`; do not read the whole file),
+  `sim/src/WorldInternal.hpp`.
+- Do:
+  1. Add a small struct `RouteMemo` in `WorldInternal.hpp`: `Tick tick` and a
+     `std::unordered_map<std::uint64_t, Arrival>`. The key packs
+     `(board, alight, onPlatform)` into 64 bits. `Arrival` holds the minute
+     off the last train and the first leg's `toStation`. Looking up by key
+     never decides an order, so rule 1 holds.
+  2. `PlanTrip` takes an optional `RouteMemo*`. When given, and the memo's
+     tick is not `state_.tick`, clear it and set the tick. Then look up the
+     key, or call `metro_.Route` and store the result.
+  3. `World` owns one `RouteMemo routeMemo_` (unsaved, like `routes_`), and
+     `TravelMinutes` passes it. J6 gives each worker thread its own memo
+     instead, which is why it is a parameter and not hidden inside `PlanTrip`.
+- Tests: none new. Check: build, ctest, seed 7 byte-identical, time in the
+  note.
 
-### - [ ] J4. Flat tables instead of hash lookups in PlanTrip (city-streets)
+### - [ ] J4. Read-only street distances and room places (city-streets)
 
-- Open: `sim/include/mechapunk/sim/City.hpp` (`RoutePlanner`, `RoomIndex`),
-  `sim/src/City.cpp`, `sim/src/Transit.cpp`.
-- Build all street distances once when the city is loaded (the grid is
-  small: 350 buildings at 10000 robots), and a table from room to (entrance
-  node, floor). Rebuild both where `rooms_`/`routes_` are rebuilt today (a room
-  changing kind, a building raised). After this `RoutePlanner::DistanceMeters`
-  and `IndexStations` no longer write anything, which J6 needs.
-- Note the memory the distance table takes at 10000 and 20000 robots.
+- Module: city-streets. Depends on: none. Save change: no.
+- Open: `sim/include/mechapunk/sim/City.hpp` (`RoutePlanner`, `RoomIndex`), the
+  `RoutePlanner` part of `sim/src/City.cpp` (`rg -n "RoutePlanner::" sim/src/City.cpp`,
+  read only those functions), and `sim/src/Transit.cpp`.
+- Do:
+  1. Give `RoutePlanner` a method `void PrecomputeAll()` that fills the tree of
+     every origin node. After it, `DistanceMeters` and `Path` only read.
+  2. Call it wherever `routes_` is (re)built in `World`
+     (`rg -n "routes_ =" sim/src`).
+  3. Make `World::IndexStations` run where `metro_` is built instead of
+     lazily inside `PlanTrip`, so `PlanTrip` writes nothing (`rg -n
+     "IndexStations" sim/src`).
+- Tests: in `tests/CityStreetTests.cpp`, after `PrecomputeAll` the distances
+  equal the lazily computed ones for 50 node pairs.
+- Check: build, ctest, seed 7 byte-identical. Write the memory the trees take
+  at 10000 robots in the note (nodes × nodes × 8 bytes).
 
 ### - [ ] J5. A thread pool and `--threads` (new module `threads`)
 
-- New files `sim/include/mechapunk/sim/ThreadPool.hpp`, `sim/src/ThreadPool.cpp`,
-  `tests/ThreadPoolTests.cpp`, added to a new module in `scripts/context_budget.py`.
-- A fixed pool of `std::jthread` workers with one call: run `f(i)` for
-  `i` in `[0, n)` and wait. Work is split into fixed chunks by index, never by
-  who finishes first, so the result cannot depend on timing.
-- Default size: `std::thread::hardware_concurrency()` minus 2 (the render
-  thread and the OS), at least 1; 1 means "run inline, no threads".
-  `mechapunk-sim --threads N` and `mechapunk --threads N` override it. The size
-  is a runtime choice, not a setting and not saved: it must never change
-  a result.
-- Tests: the pool runs every index once, at sizes 1, 2 and 8; an exception in
-  a task reaches the caller.
+- Module: threads (new). Depends on: none. Save change: no.
+- Open: `sim/CMakeLists.txt`, `tests/CMakeLists.txt`, `scripts/context_budget.py`,
+  `tools/sim_runner/main.cpp` (the options part only, `rg -n "struct Options" -A 20`).
+- Do:
+  1. Create `sim/include/mechapunk/sim/ThreadPool.hpp` and `sim/src/ThreadPool.cpp`
+     with `class ThreadPool { public: explicit ThreadPool(std::size_t workers);
+     void ForEach(std::size_t count, const std::function<void(std::size_t
+     index, std::size_t worker)>& work); std::size_t Workers() const; };`.
+  2. `ForEach` splits `[0, count)` into one fixed chunk per worker, by index
+     only, runs the chunks on `std::jthread` workers that live as long as the
+     pool, and returns when all are done. It rethrows the first exception.
+  3. `workers == 0` or `1` runs everything inline on the caller.
+  4. Add `std::size_t DefaultThreads()`: `max(1, hardware_concurrency() - 2)`.
+  5. `mechapunk-sim --threads N` (default `DefaultThreads()`) stores the
+     number; J6 uses it. The game gets `--threads N` the same way, in
+     `app/main.cpp`'s option parsing.
+  6. The thread count is never saved and never a setting.
+- Tests (`tests/ThreadPoolTests.cpp`): every index runs exactly once at 1, 2
+  and 8 workers; `worker` is below `Workers()`; an exception thrown in one
+  index reaches the caller.
+- Check: build, ctest, `ContextBudget`.
 
-### - [ ] J6. Plan the trips of a minute's decisions in parallel (world)
+### - [ ] J6. Plan the trips of a minute's decisions in parallel (outings)
 
-- Open: `sim/src/World.cpp` (`Step`), `sim/src/Behaviour.cpp` (`Act`, `Decide`),
-  `sim/src/Transit.cpp`. The `world` module stands at about 24k of 25k, so put
-  the new code in a new `sim/src/TripPlanning.cpp` with its own module.
-- Each minute, in three phases:
-  1. Sequential: list the robots due this minute whose `Act` will call
-     `Decide`, from their activity and state.
-  2. Parallel, on the pool: for each of them, the trip minutes from its
-     location to every venue and from every venue to its apartment. This
-     phase only reads the city, the metro and the clock (J4 made them
-     read-only), and writes only its own row.
-  3. Sequential, in id order as today: `Act` and `Decide` run unchanged, and
-     `Decide` reads the trips from the table instead of calling
-     `TravelMinutes`. A robot that was not predicted, or whose location changed
-     since phase 1, falls back to computing them on the spot.
-- Test `World.SameFutureOnAnyThreadCount`: one city run 3 days at 1, 2 and 8
-  threads gives identical serialized saves. Also run the byte-identical
-  headless check at `--threads 1` and at the default.
+- Module: outings (from J0). Depends on: J0, J3, J4, J5. Save change: no.
+- Open: `sim/src/Outings.cpp`, `sim/src/World.cpp` (`Step` only),
+  `sim/src/Transit.cpp`, `sim/include/mechapunk/sim/ThreadPool.hpp`.
+- Do:
+  1. `World` gets a `ThreadPool* pool_` (null means one thread) and a setter
+     `SetThreadPool`. The runner and the game create the pool with
+     `--threads` and set it. It is not saved.
+  2. In `World::Step`, just before the "robots act in id order" loop, collect
+     the robots that will reach `Decide` this minute. `Act` calls `Decide` in
+     exactly three cases:
+     - `activity == Resting` and `tick < commuteAt`;
+     - `activity == Working` and `tick >= shiftStartsAt + ShiftOf(robot).lengthMinutes`;
+     - `activity == Visiting`;
 
-### - [ ] J7. Record the gain (world)
+     each with `nextActionAt <= tick`.
+  3. For each such robot, on the pool: a row of `std::uint32_t` trip minutes
+     from `robot.location` to every venue, in the order `Decide` walks them
+     (`VenueKinds()`, then `RoomsOfKind`), and a second row from every venue to
+     `robot.apartment`. Also store `location → apartment` (`walkHome`) and the
+     location the row was made for. Each worker uses its own `RouteMemo` (J3).
+  4. `Decide` takes the rows when their stored location equals
+     `robot.location`, and computes on the spot as today otherwise. Everything
+     else (filters, `state_.random`, reservations) stays exactly as it is, in
+     id order.
+- Tests: `World.SameFutureOnAnyThreadCount` (in a new
+  `tests/ParallelTests.cpp`): generate seed 3 with 500 robots and run 3 days
+  with no pool, with 2 workers and with 8. The three serialized saves are
+  identical.
+- Check: build, ctest, seed 7 byte-identical at `--threads 1` and at the
+  default; headless time at both in the note.
 
-- Run the guide's 40-day check at 10000 robots before J2 (keep the log) and
-  after J6, at 1 thread and at the default. Write the times in this file and
-  update the speed note at the top of task E and in the guide. If needs,
-  social life or the midnight passes now dominate, write down what a next
-  task should look at.
+### - [ ] J7. Record the gain (runner)
+
+- Module: none changed (docs only). Depends on: J6. Save change: no.
+- Do: run the guide's 40-day check (`--seed 1 --robots 10000 --days 40 --quiet`)
+  at `--threads 1` and at the default. Write both times in this file, and
+  update the speed note at the top of task E and in the guide's section 2
+  ("40 days at 10000 robots take about ...").
 
 ## Not in this task
 
 - Running `Act` itself in parallel: id order, the shared random stream and
   venue reservations make that a rule-1 break.
-- Threading `UpdateNeeds`, `Socialize` or the midnight passes: about 3%
-  together today. Revisit after J7.
-- Simulation level of detail (task E, step E2): that changes results on
-  purpose.
+- Threading `UpdateNeeds`, `Socialize` or the midnight passes (about 3%).
+- Fewer need updates (task E, step E2): that changes results on purpose.
 
 ## Done when
 
-- [ ] Snapshots are published at render rate, not every simulated minute (J1).
-- [ ] The trip work per decision is much cheaper on one thread (J2-J4).
-- [ ] Trips are planned on all cores with identical results (J5, J6).
-- [ ] The gain is measured and written down (J7).
+- [ ] J0-J7 are ticked, and the 40-day run is several times faster with the
+      default threads than before J0.
