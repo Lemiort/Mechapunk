@@ -297,6 +297,19 @@ struct CitySettings {
 
     std::int64_t stationOffset{1};
 
+    // 1 generates a seed town instead of a full city: one dormitory and one
+    // workshop on a small grid, with no metro. It grows on its own (task K).
+    std::int64_t seedTown{0};
+
+    // Intersections per side of a seed town's grid.
+    std::int64_t seedGridSize{3};
+
+    // Floors of homes in the seed town's dormitory (twelve beds a floor).
+    std::int64_t seedDormFloors{4};
+
+    // Workspaces of the seed town's workshop.
+    std::int64_t seedWorkspaces{2};
+
     bool operator==(const CitySettings&) const = default;
 };
 

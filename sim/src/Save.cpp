@@ -156,14 +156,7 @@ constexpr glz::opts kReadOptions{.error_on_missing_keys = true};
 
 // Every older format was dropped (kOldestSupportedSaveVersion). The next
 // format change appends its migration here.
-constexpr std::array kMigrations{
-    Migration{.fromVersion = 27,
-              .summary = "the simulation's settings are saved with the city",
-              .apply = &migrations::V27ToV28},
-    Migration{.fromVersion = 28,
-              .summary = "the rest of the simulation's settings",
-              .apply = &migrations::V28ToV29},
-};
+constexpr std::array<Migration, 0> kMigrations{};
 }  // namespace
 
 std::span<const Migration> SaveMigrations() noexcept { return kMigrations; }

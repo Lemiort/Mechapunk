@@ -217,7 +217,7 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 // tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v29-city.json";
+        kFixtureDirectory / "saves" / "v30-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -535,33 +535,6 @@ TEST(Save, RejectsChroniclesOutOfOrderOrOverfull) {
         << rejected.error();
 }
 
-
-// The previous version's fixture: a version 28 city has only the crime and
-// construction settings, and the migration gives it the rest at the defaults
-// that game ran with.
-TEST(Save, Version28FixtureMigratesAndRuns) {
-    const std::filesystem::path path = kFixtureDirectory / "saves" / "v28-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_EQ(state->settings, sim::SimSettings{});
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// A version 27 city, two steps behind: it is given every setting at its
-// default.
-TEST(Save, Version27FixtureMigratesAndRuns) {
-    const std::filesystem::path path = kFixtureDirectory / "saves" / "v27-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_EQ(state->settings, sim::SimSettings{});
-}
 
 // A city made with other settings keeps them through a save and a load, and
 // a save whose settings are out of range is refused.

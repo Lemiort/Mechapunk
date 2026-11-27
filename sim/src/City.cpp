@@ -198,6 +198,10 @@ const std::vector<RoomRef>& RoomIndex::RoomsOfKind(RoomKind kind) const {
 City GenerateCity(const CityParams& requested, Pcg32& random,
                   EntityIdAllocator& ids) {
     CityParams params = requested;
+    const bool seedTown = params.city.seedTown != 0;
+    if (seedTown) {
+        params.gridSize = static_cast<std::uint32_t>(params.city.seedGridSize);
+    }
     if (params.gridSize == 0) {
         params.gridSize = GridSizeFor(params.residents, params.city);
     }
@@ -218,8 +222,9 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
     }
 
     // Stations at every second intersection, one in from the edge, so no
-    // corner of the city is far from one.
-    for (std::uint32_t row = static_cast<std::uint32_t>(params.city.stationOffset); row < size; row += static_cast<std::uint32_t>(params.city.stationSpacing)) {
+    // corner of the city is far from one. A seed town has none: its metro
+    // opens when the town has spread (task K).
+    for (std::uint32_t row = static_cast<std::uint32_t>(params.city.stationOffset); !seedTown && row < size; row += static_cast<std::uint32_t>(params.city.stationSpacing)) {
         for (std::uint32_t column = static_cast<std::uint32_t>(params.city.stationOffset); column < size;
              column += static_cast<std::uint32_t>(params.city.stationSpacing)) {
             const auto number = static_cast<std::uint32_t>(city.stations.size());
@@ -282,13 +287,22 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
     // Dormitories until every robot has a dorm bed, and habitats until
     // there are homes on the market for kMarketHomesPercent of them,
     // whichever is shorter of its goal first.
+    std::uint32_t habitats = 0;
+    if (seedTown) {
+        // The dormitory in the middle of the grid, the workshop next to it.
+        const NodeId middle{(size / 2 * size) + (size / 2)};
+        city.buildings.push_back(
+            MakeSeedDormitory(params, random, buildingsAt, ids, middle));
+        city.buildings.push_back(MakeSeedWorkshop(params, random, buildingsAt, ids,
+                                                  NodeId{middle.value + 1}));
+        ++habitats;
+    }
     std::uint64_t dormBeds = 0;
     std::uint64_t marketBeds = 0;
     const std::uint64_t marketGoal =
         (static_cast<std::uint64_t>(params.residents) * static_cast<std::uint32_t>(params.city.marketHomesPercent)) / 100;
-    std::uint32_t habitats = 0;
     std::uint32_t storeRotation = 0;
-    while (dormBeds < params.residents || marketBeds < marketGoal) {
+    while (!seedTown && (dormBeds < params.residents || marketBeds < marketGoal)) {
         const bool dormitory =
             dormBeds < params.residents &&
             (marketBeds >= marketGoal ||
@@ -324,7 +338,7 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
 
     std::array<std::uint32_t, kWorkplaceTypes.size()> typeCounts{};
     std::uint32_t jobs = 0;
-    while (jobs < params.residents) {
+    while (!seedTown && jobs < params.residents) {
         Building workplace =
             MakeWorkplace(params, random, buildingsAt, ids, typeCounts);
         for (const Room& room : workplace.rooms) {

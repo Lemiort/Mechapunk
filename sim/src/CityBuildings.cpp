@@ -175,4 +175,75 @@ Building MakeWorkplace(const CityParams& params, Pcg32& random,
     return building;
 }
 
+Building MakeSeedDormitory(const CityParams& params, Pcg32& random,
+                           std::vector<std::uint32_t>& buildingsAt,
+                           EntityIdAllocator& ids, NodeId node) {
+    ++buildingsAt.at(node.value);
+    const auto floors = static_cast<std::uint32_t>(params.city.seedDormFloors);
+    Building building{.id = ids.Allocate(),
+                      .name = "Dormitory 1",
+                      .kind = BuildingKind::Habitat,
+                      .entrance = node,
+                      .floors = floors + 1,
+                      .shift = {},
+                      .rooms = {}};
+    for (const RoomKind kind : {RoomKind::ChargingBay, RoomKind::Diner}) {
+        const VenueRules& rules = *FindVenueRules(kind);
+        building.rooms.push_back(
+            {.id = ids.Allocate(),
+             .name = std::string{Pick(VenueNames(kind), random)},
+             .kind = kind,
+             .floor = 0,
+             .capacity = random.UniformInt(rules.minCapacity, rules.maxCapacity)});
+    }
+    for (std::uint32_t floor = 1; floor <= floors; ++floor) {
+        for (std::uint32_t index = 0; index < ApartmentsPerFloor(ApartmentClass::Dorm);
+             ++index) {
+            building.rooms.push_back(
+                {.id = ids.Allocate(),
+                 .name = std::format("{} {}-{:02}", RoomLabel(ApartmentClass::Dorm), floor,
+                                     index + 1),
+                 .kind = RoomKind::Apartment,
+                 .floor = floor,
+                 .capacity = Sleeps(ApartmentClass::Dorm),
+                 .rent = static_cast<std::uint32_t>(params.city.dormRent) + (floor / 4),
+                 .apartmentClass = ApartmentClass::Dorm});
+        }
+    }
+    building.style = StyleOf(building.kind, building.id, building.floors);
+    return building;
+}
+
+Building MakeSeedWorkshop(const CityParams& params, Pcg32& random,
+                          std::vector<std::uint32_t>& buildingsAt,
+                          EntityIdAllocator& ids, NodeId node) {
+    ++buildingsAt.at(node.value);
+    // An assembly line: the plainest of the workplace types.
+    constexpr std::size_t kWorkshopType = 1;
+    const WorkplaceType& type = kWorkplaceTypes.at(kWorkshopType);
+    Building building{.id = ids.Allocate(),
+                      .name = "Workshop 1",
+                      .kind = BuildingKind::Workplace,
+                      .entrance = node,
+                      .floors = 1,
+                      .shift = type.shift,
+                      .rooms = {}};
+    const auto workspaces = static_cast<std::uint32_t>(params.city.seedWorkspaces);
+    for (std::uint32_t index = 0; index < workspaces; ++index) {
+        const std::uint32_t floor =
+            index / static_cast<std::uint32_t>(params.city.workspacesPerFloor);
+        building.rooms.push_back(
+            {.id = ids.Allocate(),
+             .name = std::format("{} {}", type.workspace, index + 1),
+             .kind = RoomKind::Workspace,
+             .floor = floor,
+             .capacity = random.UniformInt(
+                 static_cast<std::uint32_t>(params.city.minWorkspaceSize),
+                 static_cast<std::uint32_t>(params.city.maxWorkspaceSize))});
+        building.floors = floor + 1;
+    }
+    building.style = StyleOf(building.kind, building.id, building.floors);
+    return building;
+}
+
 }  // namespace mechapunk::sim::city_build

@@ -191,8 +191,11 @@ TEST(Settings, EverySettingAtItsLimitsKeepsTheCityRunning) {
             std::fprintf(stderr, "limit %s = %lld\n", std::string{name}.c_str(),
                          static_cast<long long>(high ? top : low));
             std::fflush(stderr);
+            // A seed town is one dormitory and one workshop: it holds 20 robots,
+            // not 80.
+            const std::uint32_t robots = settings.city.seedTown != 0 ? 20 : 80;
             sim::World world =
-                sim::World::Generate({.seed = 4, .robots = 80, .settings = settings});
+                sim::World::Generate({.seed = 4, .robots = robots, .settings = settings});
             world.RunFor(2 * sim::kMinutesPerDay);
             EXPECT_TRUE(sim::ValidateWorldState(world.State())) << name;
             auto again = sim::DeserializeWorld(*sim::SerializeWorld(world.State()));

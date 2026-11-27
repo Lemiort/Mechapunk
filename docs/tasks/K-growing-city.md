@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 done. Save version 29, game 0.29.0.
+Status: planned on 2026-11-27; K1 and K2 done. Save version 30, game 0.30.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -73,7 +73,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   share, and `CityBuildings.cpp`. This is a pure move.
 - Check: build, ctest, seed 7 log and save byte-identical.
 
-### - [ ] K2. The seed-town settings and layout (city-buildings)
+### - [x] K2. The seed-town settings and layout (city-buildings)
 
 - Module: city-buildings. Depends on: K1. Save change: yes, settings only.
 - Open: `sim/src/City.cpp` (`GenerateCity`), `sim/src/CityBuildings.cpp`,

@@ -16,7 +16,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 |---|---:|---|
 | world | 23k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
 | generation | 20k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
-| city-buildings | 7k | `City.hpp`, `CityInternal.hpp`, `CityBuildings.cpp`, `CityTests.cpp` |
+| city-buildings | 8k | `City.hpp`, `CityInternal.hpp`, `CityBuildings.cpp`, `CityTests.cpp` |
+| seed-town | 3k | `City.hpp`, `SeedTownTests.cpp` |
 | city-streets | 11k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
 | city-styles | 11k | `City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp` |
 | validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
@@ -28,7 +29,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 14k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
+| saves | 11k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
 | settings | 12k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 13k | `World.hpp`, `main.cpp` |
@@ -95,7 +96,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `Transit.cpp`, `Metro.hpp/.cpp` | Trip planning, the metro network, timetable, trains, `PlanDriverRun` |
 | `Weather.*`, `Random.*`, `GameTime.*`, `Ids.hpp` | As named |
 | `Save.hpp/.cpp` | glaze JSON, enum names, the migration list, the oldest supported version |
-| `Migrations.cpp` | The migrations of supported versions (V27ToV28, V28ToV29): append new ones here |
+| `Migrations.cpp` | The migrations of supported versions (none now; version 30 is the oldest): append new ones here |
 
 ### Game (`app/`, namespace `mechapunk`)
 
@@ -141,6 +142,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | New city layout, buildings, depots, stations at start | generation | `City.cpp` (`GenerateCity`), `Generation.cpp` |
 | A building's architectural style | city-styles | `CityStyle.cpp` (`StyleOf`) |
 | How habitats and workplaces are made (`MakeHabitat`, `MakeWorkplace`, `kWorkplaceTypes`) | city-buildings | `CityBuildings.cpp`, `CityInternal.hpp` |
+| The seed town (a small start for a growing city) | city-buildings | `MakeSeedDormitory`, `MakeSeedWorkshop` in `CityBuildings.cpp`; `GenerateCity` in `City.cpp` |
 | A new invariant, a validation error | validation | `Validation.cpp` |
 | Event text in the log | validation | `Describe.cpp` |
 | Payments, loans, wages, what robots can afford | money | `Money.cpp` |

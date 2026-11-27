@@ -73,4 +73,16 @@ Building MakeWorkplace(const CityParams& params, Pcg32& random,
                        EntityIdAllocator& ids,
                        std::array<std::uint32_t, kWorkplaceTypes.size()>& counts);
 
+// The seed town's two buildings (task K): a dormitory of
+// `city.seedDormFloors` floors with a charging bay and a diner on its ground
+// floor, and a workshop of `city.seedWorkspaces` workspaces. Each takes a
+// corner at the given node.
+Building MakeSeedDormitory(const CityParams& params, Pcg32& random,
+                           std::vector<std::uint32_t>& buildingsAt,
+                           EntityIdAllocator& ids, NodeId node);
+
+Building MakeSeedWorkshop(const CityParams& params, Pcg32& random,
+                          std::vector<std::uint32_t>& buildingsAt,
+                          EntityIdAllocator& ids, NodeId node);
+
 }  // namespace mechapunk::sim::city_build
