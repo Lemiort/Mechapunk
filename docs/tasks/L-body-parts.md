@@ -12,8 +12,8 @@ A robot's body is two numbers today: `Robot::wear` (lasting damage, 0 to
 tear that repair shops and clinics fix). Nothing a robot can or cannot do
 depends on its body, apart from going to be repaired.
 
-This task gives every robot a body of four **parts**: head, left hand,
-right hand and legs. Each has its own condition and wear, and each decides
+This task gives every robot a body of five **parts**: head, torso, left
+hand, right hand and legs. Each has its own condition and wear, and each decides
 something the robot can do. The parts are about function, not looks:
 
 | Part | What it decides | Wears from | When damaged or lost |
@@ -21,6 +21,7 @@ something the robot can do. The parts are about function, not looks:
 | Legs | Whether and how fast the robot walks | Every minute walked | Walks take longer. Below `body.brokenLegs` the robot can only ride the metro or stay in. Lost legs: it cannot leave its room until legs are fitted. |
 | Left and right hand | What the robot can hold and which jobs it can do | Every shift (more in workshops than offices), the dominant hand more | Each held item takes one working hand. Work performance falls. A job that needs two hands cannot be done with one. |
 | Head | Thinking and talking | Age, being robbed, fighting | Talks go worse (affinity), punctuality slips, memories fade faster. A destroyed head scraps the robot. |
+| Torso | Power: the battery and what holds the rest together | Age and every charge cycle | The charge drains faster and holds less, so the robot must charge more often. A destroyed torso scraps the robot, but a worn one can be exchanged by surgery. |
 
 **Holding things** becomes simulation state, not only a picture. Today the
 view decides from the room a robot left whether it carries a shopping bag
@@ -40,15 +41,20 @@ can break a leg or take a hand in one minute.
 
 ## Decisions (the user, 2026-11-27)
 
-1. **A robot is scrapped when its head is destroyed.** Total wear no longer
-   scraps it by itself. Age wears the head most, so old robots still die of
-   age.
+1. **The head and the torso are basic parts: a robot cannot exist without
+   either.** It is scrapped when its head or its torso is destroyed. Total
+   wear no longer scraps it by itself. Age wears both, so old robots still
+   die of age.
 2. **Parts can be lost and replaced.** A hand or the legs at 0 are lost. A
    clinic fits a new part, and the black market fits a cheap second-hand one
    that is sometimes dodgy (today's bad part).
-3. **Skins are not part of this task.** They are chameleon coverage installed
-   on the parts and show colours only (task M), changing nothing a robot can
-   do. A lost part loses its coverage, and a fitted part comes bare.
+4. **A torso can be exchanged by robot surgery** before it is destroyed: a
+   long, dear clinic visit that gives the robot a new torso with no wear,
+   and so more life. The head cannot be exchanged, because it is the robot
+   itself. If the user wants head surgery too, it is a later feature.
+3. **Skins are not part of this task.** Every part carries basic chameleon
+   coverage that shows colours only (task M), changing nothing a robot can
+   do. A fitted or exchanged part comes with its own basic coverage.
 
 ## Steps
 
@@ -56,20 +62,22 @@ can break a leg or take a hand in one minute.
 
 - New `sim/include/mechapunk/sim/Body.hpp`, `sim/src/Body.cpp`, `tests/BodyTests.cpp`,
   in a new module in `scripts/context_budget.py`.
-- `enum class BodyPart : std::uint8_t { Head, LeftHand, RightHand, Legs };`
+- `enum class BodyPart : std::uint8_t { Head, Torso, LeftHand, RightHand, Legs };`
   `struct PartState { std::int32_t condition; std::int32_t wear; bool lost; };`
-  `struct Body { std::array<PartState, 4> parts; BodyPart dominantHand; };`
+  `struct Body { std::array<PartState, 5> parts; BodyPart dominantHand; };`
   and `Robot::body`. Pure helpers in `Body.hpp`: `WalkFactor(body)`,
-  `CanWalk(body)`, `FreeHands(body, held)` and `HandsForWork(body)`.
-- Decide and write in the note what `Robot::wear` becomes: the head's lasting
-  wear, or replaced by the parts' wear.
+  `CanWalk(body)`, `FreeHands(body, held)`, `HandsForWork(body)` and
+  `ChargeFactor(body)` (from the torso).
+- `Robot::wear` is replaced by the parts' wear. Today's scrap rule reads the
+  head and the torso (L2).
 - Save change (rule 3): bump the version. The migration splits each robot's
   `needs.condition` and `wear` across the parts (derivable, as task I
   derived styles) and picks a dominant hand by a hash of the id. Both are
   spelled out in the migration, which never calls game code. Also add enum
   names to `Save.cpp`, a new fixture and tests.
 - Validation (rule 5): parts in range, a lost part has condition 0, a valid
-  dominant hand, and no living robot with a destroyed head.
+  dominant hand, and no living robot with a destroyed head or torso (neither
+  can be marked lost).
 - New robots (`World::Generate`, `AddNewcomer`) get their parts from today's
   condition and wear draws, and their dominant hand from a new fixed random
   stream (never `state_.random`, so today's draws do not move).
@@ -80,8 +88,10 @@ can break a leg or take a hand in one minute.
   with the dominant hand by `body.dominantHandShare`. The head wears with age
   (`body.headAgeShare`). The nightly `AgeRobots` spreads its wear over the
   parts.
-- Scrapping (decision 1): `AgeRobots` scraps a robot when its head reaches
-  `kMaxWear`, and only then.
+- The torso wears with age (`body.torsoAgeShare`) and with every charge at a
+  charging bay or at home (`body.torsoChargeWear`).
+- Scrapping (decision 1): `AgeRobots` scraps a robot when its head or its
+  torso reaches `kMaxWear`, and only then.
 - `Needs::condition` becomes the worst working part's condition, computed
   rather than stored. If that is too wide a change, keep a stored mirror
   updated in one place; say which.
@@ -128,15 +138,23 @@ can break a leg or take a hand in one minute.
   performance falls by `body.missingHandPenalty`, and the existing firing
   rule does the rest. A worn dominant hand counts more than the other.
 - The head: talk affinity and punctuality fall with its condition.
+- The torso: the charge need falls faster and its effective top is lower by
+  `ChargeFactor(body)`, so a robot with a worn torso charges more often.
+  Apply it in `UpdateNeeds` (world module) and on arrival at a charging bay.
 - Tests per rule, plus: a healthy robot works and talks exactly as before L5.
 
-### - [ ] L6. Repairs and replacement parts (units, money)
+### - [ ] L6. Repairs, replacement parts and torso surgery (units, money)
 
-- Repair shops mend hands and legs, and clinics mend the head. A lost hand
-  or lost legs are replaced (decision 2): new and dear at a clinic, or
-  second-hand and cheap at the black market, sometimes dodgy and starting
-  worn. `Decide` picks a repair by the worst part, and prices depend on the
-  part.
+- Repair shops mend hands and legs, and clinics mend the head and the
+  torso. A lost hand or lost legs are replaced (decision 2): new and dear at
+  a clinic, or second-hand and cheap at the black market, sometimes dodgy and
+  starting worn. `Decide` picks a repair by the worst part, and prices depend
+  on the part.
+- Torso surgery (decision 4): when its torso's wear passes
+  `body.surgeryWear` and it can pay `body.surgeryPrice` from its savings, a
+  robot books an exchange at a clinic. The clinic visit lasts
+  `body.surgeryMinutes`, and the robot leaves with a torso of no wear. This is
+  how a robot outlives its first torso. Record it in the chronicle.
 - Every payment goes through `Sell` (rule 2), and `ValidateEconomy` must pass.
 
 ### - [ ] L7. Injuries in crime (gangs, chronicle)
@@ -144,7 +162,7 @@ can break a leg or take a hand in one minute.
 - A robbery damages a part of the victim (a draw from `state_.random` in id
   order, rule 1). A robber needs a free hand to take something. A fight
   damages both robots and can knock an item out of a hand.
-- A destroyed head scraps the robot: it is killed in the fight. The
+- A destroyed head or torso scraps the robot: it is killed in the fight. The
   chronicle names the part ("lost a hand in a fight with ..."), and a new
   `MemoryKind` "was injured" is a save change.
 
@@ -163,9 +181,10 @@ can break a leg or take a hand in one minute.
 
 ## Done when
 
-- [ ] Every robot has four parts and a dominant hand, saved, migrated and
+- [ ] Every robot has five parts and a dominant hand, saved, migrated and
       validated (L1).
-- [ ] Parts wear, and a destroyed head scraps the robot (L2).
+- [ ] Parts wear, a destroyed head or torso scraps the robot, and torso
+      surgery can extend its life (L2, L6).
 - [ ] Legs decide walking, hands decide holding and working, and the head
       decides talking and punctuality (L3-L5).
 - [ ] Parts are repaired and replaced, and crime injures them (L6, L7).

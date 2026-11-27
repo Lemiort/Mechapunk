@@ -254,8 +254,8 @@ Do them in this order; each file lists its steps and which are done.
 | I. Architecture: more building types (done; user to check in game) | `docs/tasks/I-architecture.md` | generation, saves, view-core, construction, inspector, statistics | yes (v27) |
 | J. Performance: snapshots at render rate, cheaper trips, trip planning on all cores | `docs/tasks/J-performance.md` | ui, world, metro, city-streets, threads (new) | no |
 | K. A city that grows from one dormitory: newcomers, buildings, metro, banks, corporations, gangs | `docs/tasks/K-growing-city.md` | generation, validation, money, life-cycle, construction, metro, careers, view-core, property, gangs, chronicle, statistics, runner | yes |
-| L. Body parts (head, hands, legs): walking, holding things, working, injuries, replacement parts | `docs/tasks/L-body-parts.md` | bodies (new), saves, world, life-cycle, metro, units, careers, social, money, gangs, chronicle, view-robots, robot-pages, statistics | yes |
-| M. Skins: chameleon coverage on body parts; own colours, dress codes on duty, gang colours | `docs/tasks/M-skins.md` | skins (new), saves, careers, gangs, units, view-robots, rendering, robot-pages | yes |
+| L. Body parts (head, torso, hands, legs): walking, holding things, working, injuries, replacement parts | `docs/tasks/L-body-parts.md` | bodies (new), saves, world, life-cycle, metro, units, careers, social, money, gangs, chronicle, view-robots, robot-pages, statistics | yes |
+| M. Skins: basic chameleon coverage on every body part; own colours, dress codes on duty, gang colours | `docs/tasks/M-skins.md` | skins (new), saves, careers, gangs, units, view-robots, rendering, robot-pages | yes |
 
 ## 9. Detail pages (the pattern from task A)
 
