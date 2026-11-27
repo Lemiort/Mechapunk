@@ -93,16 +93,7 @@ void CityView::AddLights(Scene& scene) {
                                                0.0F));  // sky fill
     scene.AddDirectionalLight(DirectionalLight(-0.3F, -1.0F, -0.4F, 0.0F, 0.0F,
                                                0.0F));  // inspection
-    for (const NeonSign& sign : neonSigns_) {
-        neons_.push_back({.lightIndex = scene.GetPointLights().size(),
-                          .color = sign.color,
-                          .building = sign.building,
-                          .position = sign.position,
-                          .unit = sign.unit});
-        scene.AddPointLight(PointLight(sign.position.x, sign.position.y,
-                                       sign.position.z, sign.color.r,
-                                       sign.color.g, sign.color.b, kNeonPower));
-    }
+    SyncLights(scene);
     lampPoolStart_ = scene.GetPointLights().size();
     for (std::size_t lamp = 0; lamp < kLampPool; ++lamp) {
         scene.AddPointLight(PointLight(0.0F, kHiddenDepth, 0.0F, 0.0F, 0.0F,
@@ -111,6 +102,30 @@ void CityView::AddLights(Scene& scene) {
     for (const vec3& bulb : streetLamps_) {
         scene.AddSpotLight(SpotLight(bulb.x, 0.0F, bulb.z, 0.0F, 0.0F, 0.0F,
                                      bulb.x, bulb.y, bulb.z, kStreetLampCutoff));
+    }
+}
+
+void CityView::SyncLights(Scene& scene) {
+    for (NeonSign& sign : neonSigns_) {
+        if (sign.lit) {
+            continue;
+        }
+        sign.lit = true;
+        const Neon fresh{.lightIndex = scene.GetPointLights().size(),
+                         .color = sign.color,
+                         .building = sign.building,
+                         .position = sign.position,
+                         .unit = sign.unit};
+        const auto spare = std::ranges::find_if(neons_, [](const Neon& neon) { return neon.retired; });
+        if (spare != neons_.end()) {
+            const std::size_t light = spare->lightIndex;
+            *spare = fresh;
+            spare->lightIndex = light;
+            continue;
+        }
+        neons_.push_back(fresh);
+        scene.AddPointLight(PointLight(sign.position.x, sign.position.y, sign.position.z,
+                                       sign.color.r, sign.color.g, sign.color.b, kNeonPower));
     }
 }
 
@@ -147,7 +162,7 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
     neonPositions.reserve(neons_.size());
     for (const Neon& sign : neons_) {
         // Units that are no venue now keep their light far underground.
-        const bool dark = sign.unit.IsValid() && !UnitIsVenue(sign.unit);
+        const bool dark = sign.retired || (sign.unit.IsValid() && !UnitIsVenue(sign.unit));
         neonPositions.push_back(dark ? vec3{0.0F, kHiddenDepth, 0.0F} : sign.position);
     }
     const std::vector<float> neonWeights =
@@ -160,7 +175,7 @@ void CityView::UpdateLights(Scene& scene, double minuteOfDay,
             const vec3 color = sign.unit.IsValid() ? UnitColor(sign.unit) : sign.color;
             points[sign.lightIndex].SetPos(neonPositions[index]);
             points[sign.lightIndex].SetColor(
-                inspected ? vec3(0.0F) : color * neon * neonWeights[index]);
+                inspected || sign.retired ? vec3(0.0F) : color * neon * neonWeights[index]);
         }
     }
     for (std::size_t lamp = 0; lamp < kLampPool; ++lamp) {

@@ -559,6 +559,7 @@ private:
             CityView::DaylightAt(std::fmod(
                 renderTick, static_cast<double>(sim::kMinutesPerDay))));
         rain_->Submit(queue_);
+        city_.SyncLights(scene_);
         city_.UpdateLights(
             scene_,
             std::fmod(renderTick, static_cast<double>(sim::kMinutesPerDay)),

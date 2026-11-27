@@ -59,9 +59,16 @@ void CityView::AddRoof(const sim::Building& building, vec3 center) {
         DetailOf(building.style, building.floors, building.id.value);
     pieces.insert(pieces.end(), detail.begin(), detail.end());
     for (const RoofPiece& piece : pieces) {
+        const vec3 at = center + (vec3{piece.x, piece.y, piece.z} * kS);
+        if (piece.material == RoofMaterial::Beacon) {
+            // The aerial's red light, which shines with the other neon.
+            neonSigns_.push_back({.position = at + vec3{0.0F, 0.5F * kS, 0.0F},
+                                  .color = kBeaconRed,
+                                  .building = building.id});
+        }
         statics_.push_back(
             {.mesh = assets_.cube.get(),
-             .transform = {.position = center + (vec3{piece.x, piece.y, piece.z} * kS),
+             .transform = {.position = at,
                            .rotationDegrees = {piece.rollXDegrees, 0.0F, piece.rollZDegrees},
                            .scale = vec3{piece.sizeX, piece.sizeY, piece.sizeZ} * kS},
              .material = material(piece.material)});

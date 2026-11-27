@@ -159,7 +159,7 @@ One module and one commit each. Steps that change saved state follow rule 3.
   untouched: it is still seeded from the building's centre, face (plus four
   per box, so `Plain` is unchanged), floor and window. `view-massing` 14389.
 
-### - [ ] I4. Lights follow the buildings (view-core)
+### - [x] I4. Lights follow the buildings (view-core)
 
 - Open: `app/CityLights.cpp` (`AddLights`, `UpdateLights`), `app/CityView.cpp`
   (`AddBuilding`, where `AddLights` is called once at startup).
@@ -168,6 +168,12 @@ One module and one commit each. Steps that change saved state follow rule 3.
   lights of one new building be added with it and removed with it, and give
   the roof clutter of I3 its small light where it has one.
 - This step is for the user to see in the game; no test.
+- Done. `CityView::SyncLights` (called every frame from `main.cpp` before
+  `UpdateLights`; `AddLights` calls it too) gives each `NeonSign` not yet lit
+  a point light, taking over the light of a removed building's sign first
+  (`Neon::retired`: dark and hidden until reused), so a building a project
+  raises later has working neon and nothing leaks. The aerial's beacon on a
+  roof is such a sign, in red. Not seen in the game.
 
 ### - [ ] I5. A site raises a styled building (construction)
 

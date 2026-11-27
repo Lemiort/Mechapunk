@@ -83,6 +83,10 @@ public:
     // buildings, neon signs, street lamps and the lamps of an open floor) to
     // `scene`.
     void AddLights(Scene& scene);
+    // Gives every sign added since (a building a project raised, task I,
+    // step I4) a point light, and takes the lights of removed buildings'
+    // signs over first. Call once a frame before UpdateLights.
+    void SyncLights(Scene& scene);
     // Day-night cycle, street lamps at night, and the lamps switched on in
     // the open floor as of the last Submit.
     // `focus` is where the camera looks: only the neon and street lamps
@@ -149,6 +153,8 @@ private:
         // building's own sign. The room's id, not its place in `unitSigns_`,
         // so adding and removing a building's signs cannot shift it.
         sim::EntityId unit{};
+        // Whether a point light of the scene already stands for it.
+        bool lit{false};
     };
     struct Neon {
         std::size_t lightIndex;
@@ -156,6 +162,9 @@ private:
         sim::EntityId building;
         glm::vec3 position;
         sim::EntityId unit{};
+        // Its building was removed: the light stays in the scene, dark and
+        // out of sight, until a new sign takes it over.
+        bool retired{false};
     };
     // A ground-floor unit's sign over its door.
     struct UnitSign {

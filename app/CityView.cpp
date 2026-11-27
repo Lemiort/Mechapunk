@@ -365,6 +365,9 @@ void CityView::RemoveBuilding(sim::EntityId building) {
     std::erase_if(staticBatches_, [id = building.value](const StaticBatch& batch) {
         return batch.building == id;
     });
+    for (Neon& neon : neons_) {
+        neon.retired = neon.retired || neon.building == building;
+    }
     std::erase_if(neonSigns_, [building](const NeonSign& sign) {
         return sign.building == building;
     });
