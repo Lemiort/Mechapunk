@@ -16,6 +16,7 @@
 
 #include "Links.hpp"
 #include "OrganizationLists.hpp"
+#include "ProjectLists.hpp"
 #include "mechapunk/sim/Careers.hpp"
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/GameTime.hpp"
@@ -210,6 +211,42 @@ std::optional<InspectorRequest> DrawOrganization(const Selection& selection,
             ImGui::TreePop();
         }
         ImGui::PopID();
+    }
+
+    // Sites this organization is raising now: the buildings going up whose
+    // owner it is, in the saved order (ProjectLists' `ProjectsOf`).
+    const std::vector<const sim::Project*> sites = ProjectsOf(frame, organization.id);
+    ImGui::SeparatorText(
+        std::format("Building now: {}", sites.size()).c_str());
+    if (sites.empty()) {
+        ImGui::TextDisabled("Raises no building now.");
+    } else if (ImGui::BeginTable("sites", 3, kListFlags, ListSize(sites.size()))) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Site", ImGuiTableColumnFlags_WidthStretch, 3.0F);
+        ImGui::TableSetupColumn("Floors", ImGuiTableColumnFlags_WidthStretch, 1.5F);
+        ImGui::TableSetupColumn("Nights left",
+                                ImGuiTableColumnFlags_WidthStretch, 1.5F);
+        ImGui::TableHeadersRow();
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(sites.size()));
+        while (clipper.Step()) {
+            for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+                const sim::Project& site = *sites[static_cast<std::size_t>(row)];
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                // The site's own page, named by the building it raises.
+                if (auto link = ProjectLink(city, frame, site.building, "")) {
+                    result = link;
+                }
+                ImGui::TableNextColumn();
+                // A site raises one floor a night, so its whole height is
+                // `floorsDone` plus `daysLeft` (Construction.cpp).
+                ImGui::Text("%u of %u", site.floorsDone, site.floorsDone + site.daysLeft);
+                ImGui::TableNextColumn();
+                ImGui::Text("%u", site.daysLeft);
+            }
+        }
+        ImGui::EndTable();
     }
 
     // Everyone whose job room it owns.

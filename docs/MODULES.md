@@ -25,19 +25,20 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 21k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
-| saves-frozen | 14k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
+| saves | 22k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
+| saves-frozen | 13k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `SaveFixtureTestsEarly.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 12k | `World.hpp`, `main.cpp` |
 | view-core | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
 | view-robots | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
-| view-interiors | 11k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
+| view-interiors | 12k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
 | ui | 16k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | project-lists | 5k | `ProjectLists.hpp`, `ProjectLists.cpp`, `ProjectListsTests.cpp` |
-| inspector | 23k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
+| inspector | 19k | `Inspector.hpp`, `Inspector.cpp`, `Links.hpp`, `Links.cpp`, `InspectorInternal.hpp`, `InspectorOrganization.cpp`, `InspectorGang.cpp` |
+| robot-pages | 9k | `InspectorRobot.cpp`, `InspectorInternal.hpp`, `Links.hpp`, `Inspector.hpp` |
 | project-pages | 6k | `InspectorProject.cpp`, `InspectorInternal.hpp`, `Links.hpp`, `ProjectLists.hpp`, `Inspector.hpp` |
 | chronicle-pages | 8k | `InspectorHistory.cpp`, `InspectorChronicle.cpp`, `ChroniclePagesInternal.hpp`, `InspectorInternal.hpp`, `Links.hpp`, `ChronicleLists.hpp`, `Inspector.hpp` |
 | gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
@@ -46,7 +47,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
 | chronicle | 9k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
 | construction | 24k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `ConstructionTests.cpp`, `SiteOfficeTests.cpp` |
-| site-supplies | 16k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `SiteSuppliesTests.cpp` |
+| site-supplies | 15k | `Construction.hpp`, `Construction.cpp`, `World.hpp`, `SiteSuppliesTests.cpp` |
 
 ## What lives where
 
@@ -110,7 +111,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `InteriorStores.cpp` | Ground-floor stores: venues, empty units, police stations, crew rooms |
 | `InteriorWorkplaces.cpp` | Workspaces fitted out for their trade |
 | `Props` | Box models of every prop and the robot figure. |
-| `Inspector` | Inspector window for the selected building, room or robot. |
+| `Inspector` | The inspector window itself, the room page and the building page; a building going up says "Being built" with its site's link and lists its builders. |
+| `InspectorRobot.cpp` | The robot's page in the inspector: what it is doing now, its needs, wear, money, bank and landlord, its gang, its home and work with the site it is building, the people it knows and what it remembers. |
 | `Links.hpp/.cpp` | Clickable names in the inspector: `RoomLabel`, `ShowRoom`, `RoomLink`, `ShowRobot`, `RobotLink`. |
 | `InspectorHistory.cpp` | The robot page's "History" section: the entries `EntriesAboutRobot` returns, newest first, each robot and room a link. |
 | `InspectorChronicle.cpp` | The room page's and the building page's "What happened here" sections and the organization page's "History" section: the chronicle entries of that room, of any room of that building, or about that organization, newest first, each robot and (except on the room page) each room a link. |
@@ -149,7 +151,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Drawing the open floor of a building | view-interiors | `CityInteriors.cpp` |
 | Furniture and layout of a room kind | floor-plans | `InteriorStores.cpp`, `InteriorHomes.cpp`, `InteriorWorkplaces.cpp` |
 | Prop models, rain, renderer | rendering | `Props.cpp` |
-| The inspector window and its clickable names | inspector | `Inspector.cpp`, `Links.cpp` |
+| The inspector window, its room and building pages, and its clickable names | inspector | `Inspector.cpp`, `Links.cpp` |
+| A robot's page in the inspector | robot-pages | `app/InspectorRobot.cpp` |
 | Which rows an organization page shows, sorted | organization-lists | `app/OrganizationLists.cpp` |
 | Which rows a gang page shows, sorted | gang-lists | `app/GangLists.cpp` |
 | Which rows a history list shows, filtered | chronicle-lists | `app/ChronicleLists.cpp` |

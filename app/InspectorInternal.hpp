@@ -97,6 +97,14 @@ inline std::string SectorLabel(sim::Sector sector) {
 [[nodiscard]] std::optional<InspectorRequest> DrawProject(
     const Selection& selection, const WorldFrame& frame, const CityView& city);
 
+// The robot's page in the inspector, in InspectorRobot.cpp: what it is doing
+// now, its needs, wear, money and gang, its home and work, the site it may be
+// building, the people it knows and what it remembers. `following` is the
+// camera's follow flag, which the page's "Follow (F)" checkbox writes.
+[[nodiscard]] std::optional<InspectorRequest> DrawRobot(
+    const RobotFrame& robot, const WorldFrame& frame, const CityView& city,
+    const SimulationHost& host, bool& following);
+
 // The "History" section of the robot page, in InspectorHistory.cpp: the
 // chronicle entries naming this robot, newest first, every entity in one a
 // link. Takes the page's request by pointer, as the Chronicle tab does, so a

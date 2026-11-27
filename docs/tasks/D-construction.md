@@ -33,7 +33,10 @@ lists a project's pages show. D5b2 was added on 2026-11-27, after D5b, and
 is done: a project saves the credits its site has paid for its supplies and
 the shortage that started it, which raised the save version to 25 and the
 game to 0.25.0. D5c is done on 2026-11-27, also with no save change: the
-inspector has a project's own page, opened by a new link.
+inspector has a project's own page, opened by a new link. D5d is done on
+2026-11-27, also with no save change: the building, the owner and the builder
+pages link the site, which needed the robot page out of `Inspector.cpp` into a
+new `robot-pages` module.
 
 ## What and why
 
@@ -1310,7 +1313,7 @@ it with the gang.
   `InspectorProject.cpp` row and the task row; the guide's task table row
   for D its new module and its progress.
 
-### - [ ] D5d. Links back to the project (inspector module)
+### - [x] D5d. Links back to the project (inspector module)
 
 Open: `app/Inspector.cpp` (the building page and the robot page),
 `app/InspectorOrganization.cpp`, `app/ProjectLists.hpp`.
@@ -1318,6 +1321,54 @@ Open: `app/Inspector.cpp` (the building page and the robot page),
 - **Links back**: a building under construction says "Being built:
   <ProjectLink>" and lists its builders; the organization page gets a
   "Building now" list; a builder's robot page shows its project as a link.
+
+Done as (inspector module, one commit): the three pages draw what step D5b's
+`ProjectLists` functions already return; no list function was added and no
+drawing helper is shared, so each page stays in its own file.
+
+- First make room, as the step's warning and D1a, D2b, D2c3 and D3d did:
+  `Inspector.cpp` stood at 9653 of the 10k file limit and `inspector` at
+  23856 of 25000, with 1144 tokens left - less than the three pages need. The
+  robot page moved out of the file, code moved only: a new `app/InspectorRobot.cpp`
+  holds `DrawRobot` and the helpers only it uses (`NeedBar`, `DrawBonds`,
+  `DrawWear`, `DrawPerformance`, `DrawMemories`) with their constants, and is
+  declared in `InspectorInternal.hpp` the way `DrawOrganization`, `DrawGangPage`
+  and `DrawProject` are. `Inspector.cpp` keeps the window, the room page and
+  the building page; the constants and the two includes only the robot page
+  used (`Careers.hpp`, `Social.hpp`) went with it, and `Title`, `Name` and
+  `Clock` did not: `InspectorInternal.hpp` already had them inline. The new
+  file joins a new `robot-pages` module, as C4c made `chronicle-pages` and D5c
+  `project-pages`: `inspector` 23856 to 19070, `robot-pages` 9441.
+- Building page (`Inspector.cpp`): when `ProjectOn` finds a site on the
+  building, the page says "Being built:" and draws `ProjectLink` (D5c's link:
+  the building's name ending in `##project<id>`, so it never shares an id with
+  the building's own link, and disabled "no site there" when the project ended
+  since the click), then the count of `BuildersOf` and each builder as a
+  `RobotLink`. The step's "lists its builders" is a plain indented list, not a
+  table: a site office holds at most its capacity of builders (D3b's
+  `kSiteBuilders`, 6), and the page's own rooms table is unclipped the same way.
+- Organization page (`InspectorOrganization.cpp`): a "Building now" section
+  between its property and its workers - a `ProjectsOf` list in the saved order
+  (by building id), a clipped table of at most 12 rows: the site as a
+  `ProjectLink`, its floors done of the floors it will have (`floorsDone` plus
+  `daysLeft`, since a site raises one floor a night), and its nights left.
+- Robot page (`InspectorRobot.cpp`): in "Home and work", a job room of kind
+  `SiteOffice` says the robot is a builder (ProjectLists' rule: the office is
+  the only room of a site anyone works in), so the page adds "Building the
+  site:" with a `ProjectLink` to the project on that room's building.
+- No new test: the pages need a live renderer and a GL context, so they are
+  checked by building, by ContextBudget and by the user in the game (as D4, D5a
+  and D5c did); the rows all three draw are what D5b's `ProjectLists` tests
+  already pin down, and none of those functions changed.
+- No save change, no simulation change: only `app/` files moved, so
+  `mechapunk-sim.exe` was not relinked (its timestamp predates the edit) and
+  the headless log and save cannot move, as in D1b, D4, D5a and D5c. No random
+  draw, no money movement, nothing new for `Validation`.
+- `CMakeLists.txt` gained `app/InspectorRobot.cpp`, `scripts/context_budget.py`
+  the `robot-pages` module, `docs/MODULES.md` the module row and the rows for
+  `Inspector`, `InspectorRobot.cpp` and the task; the guide's task table row
+  for D gained the module and its progress. ctest: 202/202 including
+  ContextBudget, unchanged.
 
 ### - [ ] D5e. The Construction section (statistics module)
 
