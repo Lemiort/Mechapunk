@@ -70,7 +70,8 @@ python scripts/context_budget.py                                                
   before and after and compare both files byte for byte, ignoring the last
   two lines of the log (timing and save path).
 - The game: `mechapunk.exe --save FILE` continues a save; `--new --save FILE`
-  starts a city; `--seed`, `--robots`, `--follow ROBOT_ID`. Keys: 1-5 speed,
+  starts a city; `--seed`, `--robots`, `--follow ROBOT_ID`; `--town` starts a seed
+  town that grows (30 robots, `sim::TownSettings`; the runner takes it too). Keys: 1-5 speed,
   Space pause, T statistics, F follow, Q/E floors, F12 screenshot.
   **Start it with the working directory `build/build/Release`**: it opens
   `fonts/Roboto-Medium.ttf` and the engine's `shaders/`, `models/` and
@@ -194,7 +195,7 @@ python scripts/context_budget.py                                                
 act in id order (`Act` in `Behaviour.cpp`), needs change every 10
 minutes, and at midnight (`MinuteOfDay == 0`):
 `CollectRent` → `AgeRobots` → `ReviewHomes` → `ReviewJobs` → `FadeBonds`
-→ `ForgetDeparted` → `TradeProperty` → `SettleEconomy` → `ReviewConstruction`
+→ `ForgetDeparted` → `TradeProperty` → `SettleEconomy` → `ReviewBanks` → `ReviewStreets` → `ReviewTransit` → `ReviewMetroAuthority` → `ReviewConstruction`
 (last, after the books roll over, so a site's supplies count into the new day).
 `SettleEconomy`: supply market → interest and repayments → supply price →
 employers' pay → `RunCityHall` → `SetPolicyRate` → dividends → deposits →
@@ -286,7 +287,7 @@ Do them in this order; each file lists its steps and which are done.
 | H. Engine (NEE, pull requests only) | `docs/tasks/H-engine.md` | external | no |
 | I. Architecture: more building types (done; user to check in game) | `docs/tasks/I-architecture.md` | generation, saves, view-core, construction, inspector, statistics | yes (v27) |
 | J. Performance: snapshots at render rate, cheaper trips, trip planning on all cores | `docs/tasks/J-performance.md` | ui, world, metro, city-streets, threads (new) | no |
-| K. A city that grows from one dormitory: newcomers, buildings, metro, banks, corporations, gangs | `docs/tasks/K-growing-city.md` | generation, validation, money, life-cycle, construction, metro, careers, view-core, property, gangs, chronicle, statistics, runner | yes |
+| K. A city that grows from one dormitory: newcomers, buildings, metro, banks, corporations, gangs (done; user to check in game) | `docs/tasks/K-growing-city.md` | generation, validation, money, life-cycle, construction, metro, careers, view-core, property, gangs, chronicle, statistics, runner | done (v30 to v41) |
 | L. Body parts (head, torso, hands, legs): walking, holding things, working, injuries, replacement parts | `docs/tasks/L-body-parts.md` | bodies (new), saves, world, life-cycle, metro, units, careers, social, money, gangs, chronicle, view-robots, robot-pages, statistics | yes |
 | M. Skins: basic chameleon coverage on every body part; own colours, dress codes on duty, gang colours | `docs/tasks/M-skins.md` | skins (new), saves, careers, gangs, units, view-robots, rendering, robot-pages | yes |
 

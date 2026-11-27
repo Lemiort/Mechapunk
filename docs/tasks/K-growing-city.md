@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K19 done. Save version 41, game 0.41.0.
+Status: planned on 2026-11-27; K1 to K20 done: all of task K. Save version 41, game 0.41.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -388,7 +388,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Tests: a grown seed town's chronicle holds each kind at least once.
 - Check: build, ctest, new fixture.
 
-### - [ ] K20. Start a seed town from the command line (runner, then ui)
+### - [x] K20. Start a seed town from the command line (runner, then ui)
 
 - Module: runner, then ui as a second commit. Depends on: K3, K7. Save
   change: no.
@@ -399,8 +399,17 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   Explicit `--set` options still win.
 - Check: run `mechapunk-sim --town --days 365 --quiet` and write in this file
   how big the town got.
+  Note (run on 2026-11-28, seed 1, 5.4 s): from 2 buildings and 30 robots the town
+  reached day 366 with 1050 robots in 53 buildings (17 habitats, 36 workplaces), a 5 by 5
+  grid of intersections (one ring of streets), 2 metro stations on one line with its
+  Metro Authority, 3 banks, 12 industry corporations and 2 venue chains, valid
+  throughout. No gang formed (1050 robots is under `crime.robotsPerGang` 1500, and the town
+  sets `minGangs` 0). Two things for a later task to look at: the price index
+  reached 1582 (venue prices at 216%) so the central bank sat at its maximum rate of 50,
+  inflation far over the 1% target; and every robot still lives in a dorm bed, since
+  the beds rule raises dormitories while the homes rule sees no market homes at all.
 
 ## Done when
 
-- [ ] K1-K20 are ticked, a year-long seed town grows streets, buildings, a
+- [x] K1-K20 are ticked, a year-long seed town grows streets, buildings, a
       metro, banks, corporations and gangs, and the guide's table marks K done.

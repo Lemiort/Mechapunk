@@ -308,6 +308,21 @@ std::expected<void, std::string> ValidateSettings(const SimSettings& settings) {
     return {};
 }
 
+SimSettings TownSettings() {
+    SimSettings settings;
+    settings.city.seedTown = 1;
+    settings.city.freePlotsMin = 4;
+    settings.population.wealthSpread = 1;
+    settings.population.immigration = 1;
+    settings.construction.freeBedsPercent = 10;
+    settings.metro.minBuildings = 6;
+    settings.economy.robotsPerBank = 400;
+    settings.economy.workplacesPerCorporation = 3;
+    settings.economy.inflationTarget = 1;
+    settings.crime.minGangs = 0;
+    return settings;
+}
+
 std::span<const std::string_view> SettingNames() noexcept { return kNames; }
 
 }  // namespace mechapunk::sim

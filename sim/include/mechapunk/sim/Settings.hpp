@@ -655,6 +655,15 @@ struct SimSettings {
     bool operator==(const SimSettings&) const = default;
 };
 
+// The settings of a growing town (task K): a seed town that takes newcomers, builds
+// dormitories, spreads its streets, metro, banks, corporations and gangs, and has a
+// central bank that steers by prices. Everything else stays at its default. The
+// game and the runner start one with `--town`.
+[[nodiscard]] SimSettings TownSettings();
+
+// Robots a new town starts with.
+inline constexpr std::uint32_t kTownRobots = 30;
+
 // Sets the setting called `name` ("crime.robberyPercent") to `value`. Fails
 // on an unknown name or a value outside the range that setting makes sense in.
 [[nodiscard]] std::expected<void, std::string> ApplySetting(SimSettings& settings,

@@ -40,6 +40,9 @@ struct Options {
     bool all{false};
     bool quiet{false};
     bool help{false};
+    // --town: a seed town that grows (sim::TownSettings), 30 robots unless --robots says.
+    bool town{false};
+    bool robotsGiven{false};
     std::optional<std::string> load;
     std::optional<std::string> save;
     // Settings changed with --set name=value (see Settings.hpp).
@@ -53,6 +56,8 @@ void PrintUsage() {
         "Usage: mechapunk-sim [options]\n"
         "  --seed N      world seed for a new city (default 1)\n"
         "  --robots N    population of a new city (default 100)\n"
+        "  --town        start a seed town that grows: one dormitory and one workshop, newcomers,\n"
+        "                streets, metro, banks, corporations and gangs (30 robots unless --robots)\n"
         "  --load FILE   continue a saved world instead of generating one\n"
         "  --days N      days to simulate (default 1 if no duration given)\n"
         "  --hours N     extra hours to simulate (default 0)\n"
@@ -96,7 +101,10 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
         bool ok = true;
         if (name == "--seed") {
             ok = number(options.seed);
+        } else if (name == "--town") {
+            options.town = true;
         } else if (name == "--robots") {
+            options.robotsGiven = true;
             ok = number(options.robots);
             if (ok && options.robots == 0) {
                 std::println(stderr, "--robots must be at least 1");
@@ -154,6 +162,16 @@ std::optional<Options> ParseOptions(std::span<char*> arguments) {
         if (!ok) {
             PrintUsage();
             return std::nullopt;
+        }
+    }
+    if (options.town) {
+        // The town's settings first; the settings named with --set win over them.
+        options.settings = sim::TownSettings();
+        for (const auto& [setting, value] : options.sets) {
+            (void)sim::ApplySetting(options.settings, setting, value);
+        }
+        if (!options.robotsGiven) {
+            options.robots = sim::kTownRobots;
         }
     }
     return options;

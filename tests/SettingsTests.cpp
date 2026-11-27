@@ -164,6 +164,23 @@ TEST(Settings, OneKnobOfEveryGroupChangesTheCityOrItsDays) {
 // for two days: it must not crash, stay valid, and survive a save round trip.
 // ApplySetting refuses a value that breaks a min/max pair; that bound is
 // skipped here.
+// The town's settings (task K, step K20) are valid, change what a town needs and
+// leave a full city's defaults alone.
+TEST(Settings, TheTownSettingsAreValidAndRunATown) {
+    const sim::SimSettings town = sim::TownSettings();
+    EXPECT_TRUE(sim::ValidateSettings(town));
+    EXPECT_EQ(town.city.seedTown, 1);
+    EXPECT_EQ(town.population.immigration, 1);
+    EXPECT_EQ(town.crime.minGangs, 0);
+    EXPECT_NE(town, sim::SimSettings{});
+    sim::World world = sim::World::Generate(
+        {.seed = 3, .robots = sim::kTownRobots, .settings = town});
+    EXPECT_EQ(world.State().city.buildings.size(), 2U);
+    world.RunFor(60 * sim::kMinutesPerDay);
+    EXPECT_GT(world.State().robots.size(), sim::kTownRobots);
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
 TEST(Settings, EverySettingAtItsLimitsKeepsTheCityRunning) {
     // MECHAPUNK_ONLY=name runs one setting, so a script can find every crash.
     const char* only = std::getenv("MECHAPUNK_ONLY");
