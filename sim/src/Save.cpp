@@ -143,7 +143,8 @@ struct glz::meta<mechapunk::sim::EventKind> {
         "soldProperty", SoldProperty, "inherited", Inherited, "moneySupplyChanged",
         MoneySupplyChanged, "unitOpened", UnitOpened, "unitClosed", UnitClosed,
         "robbed", Robbed, "arrested", Arrested, "fought", Fought, "joinedGang",
-        JoinedGang, "leftGang", LeftGang);
+        JoinedGang, "leftGang", LeftGang, "stationOpened", StationOpened, "bankFounded",
+        BankFounded, "corporationFounded", CorporationFounded, "gangFormed", GangFormed);
 };
 
 namespace mechapunk::sim {

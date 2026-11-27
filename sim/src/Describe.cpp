@@ -126,6 +126,23 @@ std::string World::Describe(const SimEvent& event) const {
         case EventKind::UnitClosed:
             return std::format("{}  A unit closed: {} stands empty", when,
                                DescribeRoom(event.room));
+        case EventKind::StationOpened: {
+            const auto index = static_cast<std::size_t>(event.credits);
+            return std::format("{}  City Hall opened the metro station {}", when,
+                               index < state_.city.stations.size()
+                                   ? std::string_view{state_.city.stations[index].name}
+                                   : std::string_view{"(unknown)"});
+        }
+        case EventKind::BankFounded:
+            return std::format("{}  {} was founded, a new bank", when, AccountName(event.account));
+        case EventKind::CorporationFounded:
+            return std::format("{}  {} was founded", when, AccountName(event.account));
+        case EventKind::GangFormed: {
+            const auto gang = std::ranges::find(state_.gangs, event.account, &Gang::id);
+            return std::format("{}  The {} formed", when,
+                               gang != state_.gangs.end() ? std::string_view{gang->name}
+                                                          : std::string_view{"(unknown gang)"});
+        }
         case EventKind::Robbed:
             return std::format("{}  {} robbed {} (took {}) at {}", when, who,
                                NameOf(event.otherRobot), event.credits,

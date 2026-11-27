@@ -220,6 +220,15 @@ enum class EventKind : std::uint8_t {
     JoinedGang,
     // A robot left its gang or was forced out at 3 arrests.
     LeftGang,
+    // A growing town (task K): City Hall opened a metro station; the entry's
+    // credits is the station's index in `City::stations`.
+    StationOpened,
+    // A bank, or a corporation (industry, or the Metro Authority), was founded;
+    // account: its id.
+    BankFounded,
+    CorporationFounded,
+    // A gang formed; account: its id (a gang has no account: this only names it).
+    GangFormed,
 };
 
 // Something that happened during a step, for logs and observers. Events are

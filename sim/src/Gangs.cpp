@@ -285,7 +285,9 @@ void World::FoundGang() {
         other.relations.push_back({gang.id, stance});
         gang.relations.push_back({other.id, stance});
     }
+    const EntityId id = gang.id;
     state_.gangs.push_back(std::move(gang));
+    Emit({.tick = state_.tick, .kind = EventKind::GangFormed, .account = id});
 }
 
 void World::ReviewGangs() {

@@ -35,6 +35,7 @@ void World::ReviewBanks() {
     const auto floor = static_cast<std::int64_t>(state_.settings.economy.bankFloor);
     SellShares({{id, floor}}, id, centralBank_,
                static_cast<std::int64_t>(state_.settings.economy.comfortableSavings));
+    Emit({.tick = state_.tick, .kind = EventKind::BankFounded, .account = id});
 }
 
 }  // namespace mechapunk::sim

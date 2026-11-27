@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K18 done. Save version 40, game 0.40.0.
+Status: planned on 2026-11-27; K1 to K19 done. Save version 41, game 0.41.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -375,7 +375,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   at 30 robots and one after it passes 40; relations stay symmetric.
 - Check: build, ctest, seed 7 byte-identical except the settings keys.
 
-### - [ ] K19. The growth in the chronicle (chronicle)
+### - [x] K19. The growth in the chronicle (chronicle)
 
 - Module: chronicle. Depends on: K11, K14, K15, K18. Save change: yes (new
   `EventKind` values: names in `Save.cpp`'s `glz::meta`).

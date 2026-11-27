@@ -105,6 +105,11 @@ void World::ReviewTransit() {
             {.node = node,
              .name = city_build::StationName(static_cast<std::uint32_t>(city.stations.size()))});
     }
+    for (std::size_t index = city.stations.size() - chosen.size(); index != city.stations.size();
+         ++index) {
+        Emit({.tick = state_.tick, .kind = EventKind::StationOpened,
+              .credits = static_cast<std::int64_t>(index)});
+    }
     metro_ = Metro(city);
     nearestStation_.clear();
     metersToStation_.clear();

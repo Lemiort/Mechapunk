@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 40,
-   "gameVersion": "0.40.0",
+   "version": 41,
+   "gameVersion": "0.41.0",
    "world": {
       "tick": 28370,
       "seed": 33,

@@ -22,14 +22,14 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | seed-town | 7k | `City.hpp`, `SeedTownTests.cpp` |
 | city-streets | 12k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
 | city-styles | 11k | `City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp` |
-| validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
+| validation | 15k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 24k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 24k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Banks.cpp`, `Corporations.cpp`, `Property.cpp`, `HousingTests.cpp`, `BanksTests.cpp` |
 | units | 15k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Units.cpp`, `VenueTests.cpp` |
 | statistics | 22k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
 | careers | 24k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
-| social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
-| life-cycle | 14k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
+| social | 21k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
+| life-cycle | 15k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 14k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `TransitGrowth.cpp`, `MetroTests.cpp`, `TransitTests.cpp`, `TransitGrowthTests.cpp` |
 | saves | 11k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
 | settings | 14k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
@@ -52,8 +52,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp`, `GangGrowthTests.cpp` |
 | gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
 | gang-lists | 5k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
-| chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
-| chronicle | 10k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `World.hpp` |
+| chronicle-lists | 9k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
+| chronicle | 11k | `Chronicle.hpp`, `Chronicle.cpp`, `ChronicleTests.cpp`, `GrowthChronicleTests.cpp`, `World.hpp` |
 | construction-rules | 1k | `ConstructionRules.hpp`, `ConstructionRules.cpp` |
 | construction | 24k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `World.hpp`, `ConstructionTests.cpp`, `SiteOfficeTests.cpp` |
 | site-supplies | 16k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `World.hpp`, `SiteSuppliesTests.cpp` |

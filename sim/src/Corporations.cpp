@@ -75,6 +75,7 @@ EntityId World::EmployerForNewWorkplace() {
     const std::int64_t jobs = build.workplaceFloors * build.workspacesPerFloor * build.workspacePlaces;
     SellShares({{id, 3 * jobs * construction::kSiteShift.wage}}, EntityId{}, centralBank_,
                static_cast<std::int64_t>(state_.settings.economy.comfortableSavings));
+    Emit({.tick = state_.tick, .kind = EventKind::CorporationFounded, .account = id});
     return id;
 }
 

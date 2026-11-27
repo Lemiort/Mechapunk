@@ -7,16 +7,16 @@ current version is kept.
 
 | File            | Version | How it was made                                                         |
 | --------------- | ------- | ----------------------------------------------------------------------- |
-| `v40-city.json` | 40      | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v40-city.json` (game 0.40.0) |
+| `v41-city.json` | 41      | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v41-city.json` (game 0.41.0) |
 
-`v40-city.json` stops on the third Saturday (Day 20, 16:50) in a town of 100
+`v41-city.json` stops on the third Saturday (Day 20, 16:50) in a town of 100
 robots, with every system of the game running: City Hall collecting taxes,
 venues with prices and rents moved, apartment classes, police and metro
 staff, gangs, a chronicle that names accounts, the city's free plots and
 every building's architectural style. It raised no construction site, so its
 projects are empty. Every tunable number of the simulation is a saved setting
 (behaviour, careers, the city's layout, money, population, social life,
-venues; since version 30 the seed town's, since 31 the wealth spread, since 32 the dormitory rule, since 33 immigration, since 34 the street growth settings, since 35 the metro growth settings, since 36 the bank growth setting, since 37 the corporation growth setting, since 38 the price index in the daily statistics, since 39 the inflation target settings, since 40 the gang growth settings); this one was made with the
+venues; since version 30 the seed town's, since 31 the wealth spread, since 32 the dormitory rule, since 33 immigration, since 34 the street growth settings, since 35 the metro growth settings, since 36 the bank growth setting, since 37 the corporation growth setting, since 38 the price index in the daily statistics, since 39 the inflation target settings, since 40 the gang growth settings, since 41 the growth events of the chronicle); this one was made with the
 defaults. `CurrentVersionFixtureLoadsAndRoundTrips` loads it, checks that
 saving it again reproduces it byte for byte, and runs a day.
 

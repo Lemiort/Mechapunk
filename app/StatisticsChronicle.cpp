@@ -49,6 +49,10 @@ std::string_view WhatName(const sim::ChronicleEntry& entry) {
         case sim::EventKind::Fought:          return "gang fight";
         case sim::EventKind::JoinedGang:      return "joined a gang";
         case sim::EventKind::LeftGang:        return "left a gang";
+        case sim::EventKind::StationOpened:   return "a metro station opened";
+        case sim::EventKind::BankFounded:     return "a bank founded";
+        case sim::EventKind::CorporationFounded: return "a corporation founded";
+        case sim::EventKind::GangFormed:      return "a gang formed";
         case sim::EventKind::MoneySupplyChanged:
             return entry.credits > 0 ? "money created" : "money destroyed";
         case sim::EventKind::Remembered:

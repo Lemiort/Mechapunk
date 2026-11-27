@@ -100,7 +100,7 @@ MODULES = {
     "gang-lists": ["app/GangLists.hpp", "app/GangLists.cpp", "tests/GangListsTests.cpp"],
     "chronicle-lists": ["app/ChronicleLists.hpp", "app/ChronicleLists.cpp",
                         "tests/ChronicleListsTests.cpp"],
-    "chronicle": [I + "Chronicle.hpp", "sim/src/Chronicle.cpp", "tests/ChronicleTests.cpp",
+    "chronicle": [I + "Chronicle.hpp", "sim/src/Chronicle.cpp", "tests/ChronicleTests.cpp", "tests/GrowthChronicleTests.cpp",
                   I + "World.hpp"],
     "construction-rules": ["sim/src/ConstructionRules.hpp", "sim/src/ConstructionRules.cpp"],
     "construction": [I + "Construction.hpp", "sim/src/Construction.cpp", "sim/src/ConstructionRules.hpp",

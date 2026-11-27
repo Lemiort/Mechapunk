@@ -142,11 +142,17 @@ std::optional<ChronicleGroup> GroupOf(const sim::ChronicleEntry& entry) {
         case sim::EventKind::Fought:
         case sim::EventKind::JoinedGang:
         case sim::EventKind::LeftGang:
+        case sim::EventKind::GangFormed:
             // A robot joining a gang reads as the city's crime story, the
-            // way the Crime tab already tells it.
+            // way the Crime tab already tells it; so does a gang forming.
             return ChronicleGroup::Crime;
         case sim::EventKind::MoneySupplyChanged:
+        case sim::EventKind::BankFounded:
             return ChronicleGroup::Money;
+        case sim::EventKind::CorporationFounded:
+            return ChronicleGroup::Work;
+        case sim::EventKind::StationOpened:
+            return ChronicleGroup::Venues;
         case sim::EventKind::Remembered:
             // The chronicle keeps only five memories, and each reads as one
             // of the buttons: see sim/src/Chronicle.cpp.

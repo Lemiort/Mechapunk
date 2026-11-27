@@ -32,6 +32,10 @@ bool IsNotable(const SimEvent& event) noexcept {
         case EventKind::Fought:
         case EventKind::JoinedGang:
         case EventKind::LeftGang:
+        case EventKind::StationOpened:
+        case EventKind::BankFounded:
+        case EventKind::CorporationFounded:
+        case EventKind::GangFormed:
             return true;
         case EventKind::MoneySupplyChanged:
             return event.credits > kMoneyNoteCredits;

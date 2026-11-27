@@ -45,6 +45,7 @@ void World::ReviewMetroAuthority() {
         // central bank creates it.
         Lend(centralBank_, id,
              1000 + (static_cast<std::int64_t>(state_.robots.size()) / 2));
+        Emit({.tick = state_.tick, .kind = EventKind::CorporationFounded, .account = id});
     }
 
     // One crew room for every line, taken from the empty unit nearest the
