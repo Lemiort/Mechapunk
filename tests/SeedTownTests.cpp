@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <vector>
 
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Random.hpp"
@@ -113,5 +114,67 @@ TEST(SeedTown, RunsTwentyDaysValid) {
                 << "seed " << seed << " day " << day;
         }
         EXPECT_EQ(world.State().robots.size(), 30U);
+    }
+}
+
+namespace {
+std::int64_t RichRobots(const sim::World& world, std::int64_t usualMaximum) {
+    return std::ranges::count_if(world.State().robots, [&](const sim::Robot& robot) {
+        return robot.credits > usualMaximum;
+    });
+}
+}  // namespace
+
+// Poor to rich (task K, step K4): about richPercent of the robots start with
+// richMultiplier times the usual credits; with the spread off nobody does.
+TEST(SeedTown, WealthSpreadMakesSomeRobotsRich) {
+    sim::SimSettings settings;
+    const std::int64_t usualMaximum = settings.population.maxStartingCredits;
+    const sim::World plain =
+        sim::World::Generate({.seed = 6, .robots = 1000, .settings = settings});
+    EXPECT_EQ(RichRobots(plain, usualMaximum), 0);
+
+    settings.population.wealthSpread = 1;
+    const sim::World spread =
+        sim::World::Generate({.seed = 6, .robots = 1000, .settings = settings});
+    const std::int64_t rich = RichRobots(spread, usualMaximum);
+    EXPECT_GT(rich, 60);   // Ten percent of a thousand, with margin.
+    EXPECT_LT(rich, 140);
+    // The same seed gives the same city.
+    const sim::World again =
+        sim::World::Generate({.seed = 6, .robots = 1000, .settings = settings});
+    EXPECT_EQ(RichRobots(again, usualMaximum), rich);
+}
+
+// Newcomers bring savings the same way: with every robot rich and the
+// multiplier at 50, each arrival's savings are 50 times the fixed draw.
+TEST(SeedTown, RichNewcomersBringMoreSavings) {
+    for (const bool spread : {false, true}) {
+        sim::SimSettings settings;
+        ASSERT_TRUE(sim::ApplySetting(settings, "population.maxNewcomerCredits", 100));
+        ASSERT_TRUE(sim::ApplySetting(settings, "population.minNewcomerCredits", 100));
+        ASSERT_TRUE(sim::ApplySetting(settings, "population.wealthSpread", spread ? 1 : 0));
+        ASSERT_TRUE(sim::ApplySetting(settings, "population.richPercent", 100));
+        ASSERT_TRUE(sim::ApplySetting(settings, "population.richMultiplier", 50));
+        sim::WorldState state =
+            sim::World::Generate({.seed = 7, .robots = 100, .settings = settings}).State();
+        for (std::size_t index = 0; index < 10; ++index) {
+            state.robots[index].wear = sim::kMaxWear - 1;
+        }
+        const std::size_t emissionsBefore = state.economy.emissions.size();
+        auto world = sim::World::FromState(std::move(state));
+        ASSERT_TRUE(world.has_value()) << world.error();
+        world->RunFor(2 * sim::kMinutesPerDay);
+        std::vector<std::int64_t> savings;
+        const auto& emissions = world->State().economy.emissions;
+        for (std::size_t index = emissionsBefore; index < emissions.size(); ++index) {
+            if (emissions[index].reason == sim::EmissionReason::NewcomerSavings) {
+                savings.push_back(emissions[index].amount);
+            }
+        }
+        ASSERT_FALSE(savings.empty()) << "nobody arrived";
+        for (const std::int64_t amount : savings) {
+            EXPECT_EQ(amount, spread ? 5000 : 100);
+        }
     }
 }

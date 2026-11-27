@@ -41,6 +41,9 @@ constexpr std::uint64_t kInterestStream = 4;
 constexpr std::uint64_t kCareerStream = 5;
 
 constexpr std::uint64_t kAgeStream = 6;
+// Which robots are rich (population.wealthSpread). A stream of its own, so a
+// city without the spread draws exactly what it always did.
+constexpr std::uint64_t kWealthStream = 8;
 
 // The gang stream (7) lives in Gangs.hpp, where both founders can see it.
 
@@ -151,6 +154,7 @@ World World::Generate(const WorldParams& params) {
         return static_cast<std::int32_t>(population.UniformInt(
             static_cast<std::int32_t>(params.settings.population.minStartingNeed), static_cast<std::int32_t>(params.settings.population.maxStartingNeed)));
     };
+    Pcg32 wealth = Pcg32::FromSeed(params.seed, kWealthStream);
     for (std::uint32_t index = 0; index < params.robots; ++index) {
         Robot robot;
         robot.name = RandomRobotName(population);
@@ -165,6 +169,11 @@ World World::Generate(const WorldParams& params) {
                        .social = need(), .fun = need()};
         robot.credits = population.UniformInt(static_cast<std::uint32_t>(params.settings.population.minStartingCredits),
                                               static_cast<std::uint32_t>(params.settings.population.maxStartingCredits));
+        if (params.settings.population.wealthSpread != 0 &&
+            wealth.UniformInt(1, 100) <=
+                static_cast<std::uint32_t>(params.settings.population.richPercent)) {
+            robot.credits *= params.settings.population.richMultiplier;
+        }
         // Two consecutive days off a week, different for each robot, so
         // workplaces stay staffed every day.
         const std::uint32_t firstDayOff =

@@ -158,7 +158,14 @@ void World::AddNewcomer() {
     robot.location = robot.apartment;
     robot.punctualityMinutes = random.UniformInt(static_cast<std::uint32_t>(state_.settings.population.minPunctuality), static_cast<std::uint32_t>(state_.settings.population.maxPunctuality));
     robot.needs = {.charge = need(), .condition = need(), .social = need(), .fun = need()};
-    const std::int64_t savings = random.UniformInt(static_cast<std::uint32_t>(state_.settings.population.minNewcomerCredits), static_cast<std::uint32_t>(state_.settings.population.maxNewcomerCredits));
+    std::int64_t savings = random.UniformInt(static_cast<std::uint32_t>(state_.settings.population.minNewcomerCredits), static_cast<std::uint32_t>(state_.settings.population.maxNewcomerCredits));
+    // With the wealth spread on, some arrive rich: one more draw, made only then
+    // so a city without it keeps its random stream.
+    if (state_.settings.population.wealthSpread != 0 &&
+        random.UniformInt(1, 100) <=
+            static_cast<std::uint32_t>(state_.settings.population.richPercent)) {
+        savings *= state_.settings.population.richMultiplier;
+    }
     // A bank of its own, the way the first robots were given theirs.
     std::vector<EntityId> banks;
     for (const Organization& organization : state_.economy.organizations) {

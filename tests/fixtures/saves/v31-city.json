@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 30,
-   "gameVersion": "0.30.0",
+   "version": 31,
+   "gameVersion": "0.31.0",
    "world": {
       "tick": 28370,
       "seed": 33,
@@ -19504,7 +19504,10 @@
             "maxNewcomerCredits": 200,
             "minPunctuality": 5,
             "maxPunctuality": 20,
-            "newcomerInterests": 2
+            "newcomerInterests": 2,
+            "wealthSpread": 0,
+            "richPercent": 10,
+            "richMultiplier": 20
          },
          "social": {
             "venueTalkPercent": 40,

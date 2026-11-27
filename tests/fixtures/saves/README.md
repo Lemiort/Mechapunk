@@ -7,16 +7,16 @@ current version is kept.
 
 | File            | Version | How it was made                                                         |
 | --------------- | ------- | ----------------------------------------------------------------------- |
-| `v30-city.json` | 30      | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v30-city.json` (game 0.30.0) |
+| `v31-city.json` | 31      | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v31-city.json` (game 0.31.0) |
 
-`v30-city.json` stops on the third Saturday (Day 20, 16:50) in a town of 100
+`v31-city.json` stops on the third Saturday (Day 20, 16:50) in a town of 100
 robots, with every system of the game running: City Hall collecting taxes,
 venues with prices and rents moved, apartment classes, police and metro
 staff, gangs, a chronicle that names accounts, the city's free plots and
 every building's architectural style. It raised no construction site, so its
 projects are empty. Every tunable number of the simulation is a saved setting
 (behaviour, careers, the city's layout, money, population, social life,
-venues, and since version 30 the seed town's); this one was made with the
+venues; since version 30 the seed town's, since 31 the wealth spread); this one was made with the
 defaults. `CurrentVersionFixtureLoadsAndRoundTrips` loads it, checks that
 saving it again reproduces it byte for byte, and runs a day.
 

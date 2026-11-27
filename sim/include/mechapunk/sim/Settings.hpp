@@ -455,6 +455,15 @@ struct PopulationSettings {
 
     std::int64_t newcomerInterests{2};
 
+    // 1 gives robots poor-to-rich savings: `richPercent` of them (in percent)
+    // start, or arrive, with `richMultiplier` times the usual credits. 0 gives
+    // everyone a draw from the usual range, as a full city always did.
+    std::int64_t wealthSpread{0};
+
+    std::int64_t richPercent{10};
+
+    std::int64_t richMultiplier{20};
+
     bool operator==(const PopulationSettings&) const = default;
 };
 

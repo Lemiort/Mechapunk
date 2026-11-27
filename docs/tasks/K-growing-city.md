@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K3 done. Save version 30, game 0.30.0.
+Status: planned on 2026-11-27; K1 to K4 done. Save version 31, game 0.31.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -114,7 +114,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Check: build, ctest, and the seed 7 run byte-identical (a full city must
   not change).
 
-### - [ ] K4. Robots arrive with poor-to-rich savings (generation)
+### - [x] K4. Robots arrive with poor-to-rich savings (generation)
 
 - Module: generation. Depends on: K1. Save change: yes, settings only.
 - Open: `sim/src/Generation.cpp` (starting credits), `sim/src/LifeCycle.cpp`
