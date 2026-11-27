@@ -78,9 +78,12 @@ EntityId AssignDorm(const RoomIndex& rooms, std::unordered_map<std::uint64_t, st
 
 // A job for a new robot: a venue short of staff on the shift it would work,
 // or failing that a workspace with room. Venues are staffed first, so every
-// bar has its barman; workspaces take everyone else.
+// bar has its barman; workspaces take everyone else. When every place is
+// taken a seed town leaves the robot out of work, which its careers handle as
+// ever; a full city is generated with a job for everyone, so it is a bug.
 EntityId AssignJob(const RoomIndex& rooms, EntityId robot,
-                   std::unordered_map<std::uint64_t, std::uint32_t>& staff, Pcg32& random) {
+                   std::unordered_map<std::uint64_t, std::uint32_t>& staff, Pcg32& random,
+                   bool mayBeJobless) {
     std::vector<const Room*> venues;
     for (const RoomKind kind : VenueKinds()) {
         for (const RoomRef& venue : rooms.RoomsOfKind(kind)) {
@@ -113,6 +116,9 @@ EntityId AssignJob(const RoomIndex& rooms, EntityId robot,
             ++staff[JobKey(room, robot)];
             return room.id;
         }
+    }
+    if (mayBeJobless) {
+        return EntityId{};
     }
     throw std::logic_error("Generated city has too few jobs");
 }
@@ -150,7 +156,8 @@ World World::Generate(const WorldParams& params) {
         robot.name = RandomRobotName(population);
         robot.id = state.ids.Allocate();
         robot.apartment = AssignDorm(rooms, used, population);
-        robot.workspace = AssignJob(rooms, robot.id, staff, population);
+        robot.workspace = AssignJob(rooms, robot.id, staff, population,
+                                    params.settings.city.seedTown != 0);
         robot.location = robot.apartment;
         robot.punctualityMinutes = population.UniformInt(
             static_cast<std::uint32_t>(params.settings.population.minPunctualityMinutes), static_cast<std::uint32_t>(params.settings.population.maxPunctualityMinutes));

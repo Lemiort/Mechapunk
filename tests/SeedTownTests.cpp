@@ -10,6 +10,7 @@
 #include "mechapunk/sim/Random.hpp"
 #include "mechapunk/sim/Settings.hpp"
 #include "mechapunk/sim/Venues.hpp"
+#include "mechapunk/sim/World.hpp"
 
 namespace sim = mechapunk::sim;
 
@@ -91,4 +92,26 @@ TEST(SeedTown, AFullCityIsStillTheDefault) {
     const sim::City city = sim::GenerateCity({.residents = 100}, random, ids);
     EXPECT_GT(city.buildings.size(), 2U);
     EXPECT_FALSE(city.stations.empty());
+}
+
+// A seed town of 30 robots runs for twenty days, valid after every day. The
+// workshop has fewer jobs than there are robots, so some start out of work.
+TEST(SeedTown, RunsTwentyDaysValid) {
+    for (const std::uint64_t seed : {1U, 2U, 3U}) {
+        sim::SimSettings settings;
+        settings.city.seedTown = 1;
+        sim::World world =
+            sim::World::Generate({.seed = seed, .robots = 30, .settings = settings});
+        ASSERT_EQ(world.State().robots.size(), 30U);
+        EXPECT_TRUE(std::ranges::any_of(world.State().robots, [](const sim::Robot& robot) {
+            return !robot.workspace.IsValid();
+        })) << "seed " << seed;
+        EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+        for (int day = 1; day <= 20; ++day) {
+            world.RunFor(sim::kMinutesPerDay);
+            ASSERT_TRUE(sim::ValidateWorldState(world.State()))
+                << "seed " << seed << " day " << day;
+        }
+        EXPECT_EQ(world.State().robots.size(), 30U);
+    }
 }

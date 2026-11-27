@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 and K2 done. Save version 30, game 0.30.0.
+Status: planned on 2026-11-27; K1 to K3 done. Save version 30, game 0.30.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -96,7 +96,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Check: build, ctest; the seed 7 run is byte-identical apart from the new
   settings keys in the save.
 
-### - [ ] K3. A seed town runs and stays valid (validation)
+### - [x] K3. A seed town runs and stays valid (validation)
 
 - Module: validation, with fixes in other modules as separate commits.
   Depends on: K2. Save change: no.
