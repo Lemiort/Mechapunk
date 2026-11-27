@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K16 done. Save version 38, game 0.38.0.
+Status: planned on 2026-11-27; K1 to K17 done. Save version 39, game 0.39.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -336,7 +336,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Tests: on day 1 the index is 1000 in a new city; it moves when prices move.
 - Check: build, ctest, new fixture by rule 3.
 
-### - [ ] K17. The central bank targets inflation (money)
+### - [x] K17. The central bank targets inflation (money)
 
 - Module: money (23122 of 25000: keep it small, or make room first). Depends
   on: K16. Save change: yes, settings only.
@@ -353,6 +353,11 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   prices flat, it falls toward the minimum.
 - Check: build, ctest, seed 7 byte-identical except the settings keys. Run
   a 40-day seed town with the target on, and write its inflation in the note.
+  Note (run on 2026-11-28, seed 1, 30 robots, all town settings, `--set economy.inflationTarget=1`):
+  the price index read 1000, 1020, 1047, 1047 and 1011 on days 1, 10, 20, 30 and 40
+  (up 1.1% over the 40 days, which is about 10% a year, over the 1% target); the
+  policy rate fell to 8 to 9 in the first days and the town stayed valid. A small town
+  swings with its few venues; the target only moves the rate, a step a night.
 
 ### - [ ] K18. Gangs form as the town grows (gangs)
 

@@ -404,6 +404,19 @@ struct EconomySettings {
     // a full city; a town sets 3.
     std::int64_t workplacesPerCorporation{0};
 
+    // 1 makes the central bank steer by the price index (`DailyStats::priceIndex`):
+    // it compares the index now with 30 days ago, scaled to a year (365 days), and
+    // raises the policy rate a step when that is over `inflationTargetPermille` plus
+    // `inflationBandPermille`, lowers it a step when under the target minus the
+    // band, always between the minimum and maximum rate. 0 keeps the rule on how
+    // much money the central bank created, as in a full city; a town sets 1.
+    std::int64_t inflationTarget{0};
+
+    // The target, in per mille of the index a year (10 is one percent).
+    std::int64_t inflationTargetPermille{10};
+
+    std::int64_t inflationBandPermille{5};
+
     // Each night, the chance in percent that a robot able to buy an apartment
     // does, and the nights of rent it keeps after paying.
     std::int64_t buyPercent{3};

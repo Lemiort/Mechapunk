@@ -1,6 +1,6 @@
 // The save migrations this game still reads. Once a version is released its
 // migration is frozen; append new ones here and register them in
-// `kMigrations` in Save.cpp. None now: version 38 is the oldest supported save.
+// `kMigrations` in Save.cpp. None now: version 39 is the oldest supported save.
 
 #include "Migrations.hpp"
 

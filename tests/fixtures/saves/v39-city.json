@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 38,
-   "gameVersion": "0.38.0",
+   "version": 39,
+   "gameVersion": "0.39.0",
    "world": {
       "tick": 28370,
       "seed": 33,
@@ -19477,6 +19477,9 @@
             "comfortableSavings": 1000,
             "robotsPerBank": 0,
             "workplacesPerCorporation": 0,
+            "inflationTarget": 0,
+            "inflationTargetPermille": 10,
+            "inflationBandPermille": 5,
             "buyPercent": 3,
             "buyReserveNights": 20,
             "depositPercent": 20,

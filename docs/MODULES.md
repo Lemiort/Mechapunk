@@ -23,7 +23,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | city-streets | 12k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
 | city-styles | 11k | `City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp` |
 | validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
-| money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
+| money | 24k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 24k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Banks.cpp`, `Corporations.cpp`, `Property.cpp`, `HousingTests.cpp`, `BanksTests.cpp` |
 | units | 15k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Units.cpp`, `VenueTests.cpp` |
 | statistics | 22k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
@@ -32,7 +32,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | life-cycle | 14k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 14k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `TransitGrowth.cpp`, `MetroTests.cpp`, `TransitTests.cpp`, `TransitGrowthTests.cpp` |
 | saves | 11k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
-| settings | 13k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
+| settings | 14k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 13k | `World.hpp`, `main.cpp` |
 | view-core | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |

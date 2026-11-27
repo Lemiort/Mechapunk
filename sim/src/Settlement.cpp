@@ -40,6 +40,26 @@ void World::SetPolicyRate() {
         bank->today.wages += interest;  // A cost of the bank's, like wages.
         state_.today.savingsInterest += interest;
     }
+    // With an inflation target the rate follows prices, not the money created:
+    // the price index now against thirty days ago, scaled to a year. Until
+    // there are thirty days of history the older rule below applies.
+    constexpr std::size_t kWindowDays = 30;
+    constexpr std::int64_t kDaysPerYear = 365;
+    if (state_.settings.economy.inflationTarget != 0 && state_.history.size() > kWindowDays) {
+        const std::int64_t now = state_.history.back().priceIndex;
+        const std::int64_t before = state_.history[state_.history.size() - 1 - kWindowDays].priceIndex;
+        const std::int64_t yearly =
+            before > 0 ? (now - before) * 1000 / before * kDaysPerYear / static_cast<std::int64_t>(kWindowDays)
+                       : 0;
+        const std::int64_t target = state_.settings.economy.inflationTargetPermille;
+        const std::int64_t band = state_.settings.economy.inflationBandPermille;
+        if (yearly > target + band) {
+            economy.policyRate = std::min<std::int64_t>(state_.settings.economy.maxPolicyRate, economy.policyRate + 1);
+        } else if (yearly < target - band) {
+            economy.policyRate = std::max<std::int64_t>(state_.settings.economy.minPolicyRate, economy.policyRate - 1);
+        }
+        return;
+    }
     // Up a point while the central bank created over a thousandth of the
     // money in the city today, down a point after a day it created under a
     // ten-thousandth (newcomers' savings, say).

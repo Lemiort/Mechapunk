@@ -121,6 +121,28 @@ TEST(Economy, PriceIndexStartsAtAThousandAndMoves) {
     }
 }
 
+// The inflation target (task K, step K17): prices rising fast raise the policy
+// rate, flat prices lower it toward the minimum.
+TEST(Economy, TheCentralBankSteersByThePriceIndex) {
+    const auto rateAfterADay = [](std::int64_t indexStep) {
+        sim::SimSettings settings;
+        settings.economy.inflationTarget = 1;
+        sim::World made = sim::World::Generate({.seed = 5, .robots = 100, .settings = settings});
+        made.RunFor(40 * sim::kMinutesPerDay);
+        sim::WorldState state = made.State();
+        state.economy.policyRate = 20;
+        for (std::size_t day = 0; day < state.history.size(); ++day) {
+            state.history[day].priceIndex = 1000 + (static_cast<std::int64_t>(day) * indexStep);
+        }
+        auto world = sim::World::FromState(std::move(state));
+        EXPECT_TRUE(world.has_value());
+        world->RunFor(sim::kMinutesPerDay);
+        return world->State().economy.policyRate;
+    };
+    EXPECT_GT(rateAfterADay(10), 20) << "prices rising ten per mille a day";
+    EXPECT_LT(rateAfterADay(0), 20) << "flat prices";
+}
+
 TEST(Economy, MoneyAddsUpEveryDay) {
     sim::World world = sim::World::Generate({.seed = 5, .robots = 300});
     std::int64_t logged = 0;
