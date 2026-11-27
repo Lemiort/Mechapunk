@@ -164,7 +164,8 @@ void CityView::AddPark(vec3 center, sim::Pcg32& random) {
     }
 }
 
-void CityView::AddFacade(vec3 center, std::span<const MassBox> boxes) {
+void CityView::AddFacade(vec3 center, std::span<const MassBox> boxes, sim::BuildingStyle style) {
+    const WindowRhythm rhythm = WindowRhythmOf(style);
     // Windows every 3.5 m on every side and floor, standing a little proud
     // of the wall so they read from a distance.
     const std::shared_ptr<const Material> glass =
@@ -184,7 +185,7 @@ void CityView::AddFacade(vec3 center, std::span<const MassBox> boxes) {
         hash ^= hash >> 13U;
         return hash % 10U < kLitWindowsInTen;
     };
-    constexpr float kSpacing = 3.5F * kS;
+    const float kSpacing = rhythm.spacingMeters * kS;
     constexpr float kWidth = 1.6F * kS;
     constexpr float kHeight = 1.4F * kS;
     constexpr float kSill = 0.9F * kS;
@@ -195,7 +196,14 @@ void CityView::AddFacade(vec3 center, std::span<const MassBox> boxes) {
             center + vec3{(box.x0 + box.x1) * 0.5F * kS, 0.0F, (box.z0 + box.z1) * 0.5F * kS};
         const int count = std::max(1, static_cast<int>(length / kSpacing));
         const std::uint32_t face = (alongX ? 0U : 2U) + (offset > 0.0F ? 1U : 0U) + (4U * index);
+        if ((box.blankFaces & (1U << (face % 4U))) != 0) {
+            return;
+        }
         for (std::uint32_t floor = box.firstFloor; floor < box.endFloor; ++floor) {
+            // A tower runs its windows in bands: every few floors stays blank.
+            if (rhythm.bandEvery != 0 && floor % rhythm.bandEvery == rhythm.bandEvery - 1) {
+                continue;
+            }
             const float y = (static_cast<float>(floor) * kFloorHeight) + kSill;
             for (int window = 0; window < count; ++window) {
                 const float along =

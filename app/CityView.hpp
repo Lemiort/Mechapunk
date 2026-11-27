@@ -351,7 +351,8 @@ private:
     void SubmitInterior(RenderQueue& queue, const WorldFrame& frame,
                         double renderTick, const Selection& selection);
     // Windows on every wall of the boxes a style makes of a building.
-    void AddFacade(glm::vec3 center, std::span<const MassBox> boxes);
+    void AddFacade(glm::vec3 center, std::span<const MassBox> boxes,
+                   sim::BuildingStyle style);
     // The wall blocks of a finished building by its style, and its roof
     // (task I, step I2); CityMassing.cpp.
     std::vector<StaticItem> MassingBlocks(const sim::Building& building,

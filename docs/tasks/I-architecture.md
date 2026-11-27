@@ -137,7 +137,7 @@ One module and one commit each. Steps that change saved state follow rule 3.
   signs (the gabled slopes and the sawtooth teeth) follow glm's right-handed
   rotation and should be checked by the user.
 
-### - [ ] I3. Facade and roof detail per style (view-core)
+### - [x] I3. Facade and roof detail per style (view-core)
 
 - Open: `app/CityStatic.cpp` (`AddFacade`, the lit-window rule),
   `app/CityViewInternal.hpp`, `app/CityView.cpp`.
@@ -150,6 +150,14 @@ One module and one commit each. Steps that change saved state follow rule 3.
 - Keep the lit-window rule seeded by face, floor and window as it is now,
   mixed with the building id, so a block's lit windows do not move when the
   city is rebuilt from the same seed.
+- Done. `WindowRhythmOf` (Gabled packs windows at 2.8 m, Sawtooth spaces them
+  at 4.5 m, the towers leave every third floor blank) and `DetailOf` (ledge
+  under every box, parapet on flat roofs, bays on Setback and Gabled, columns
+  on Plinth, roof clutter by hash of the id with a red beacon on the aerial)
+  are pure and tested in `tests/MassingTests.cpp`. `TwinTowers` blanks the
+  faces that look into the gap (`MassBox::blankFaces`). The lit rule is
+  untouched: it is still seeded from the building's centre, face (plus four
+  per box, so `Plain` is unchanged), floor and window. `view-massing` 14389.
 
 ### - [ ] I4. Lights follow the buildings (view-core)
 

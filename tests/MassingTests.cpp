@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 
 #include "Interior.hpp"
@@ -73,4 +76,47 @@ TEST(Massing, StylesLookDifferent) {
     EXPECT_FALSE(RoofOf(sim::BuildingStyle::Sawtooth, 2).empty());
     // A style the floor count cannot carry is a plain box, not a crash.
     EXPECT_EQ(MassingOf(sim::BuildingStyle::Plinth, 2).size(), 1U);
+}
+
+TEST(Massing, DetailIsSettledByTheIdAndSpreads) {
+    using mechapunk::DetailOf;
+    for (const sim::BuildingStyle style : kStyles) {
+        for (std::uint64_t id = 1; id <= 20; ++id) {
+            const auto first = DetailOf(style, 8, id);
+            const auto again = DetailOf(style, 8, id);
+            ASSERT_EQ(first.size(), again.size());
+            for (std::size_t index = 0; index < first.size(); ++index) {
+                EXPECT_EQ(first[index].x, again[index].x);
+                EXPECT_EQ(first[index].z, again[index].z);
+                // Inside the footprint, but for bays and columns which stand a meter proud.
+                EXPECT_LE(std::abs(first[index].x), mechapunk::kFootprintWidthMeters * 0.5F + 1.0F);
+                EXPECT_LE(std::abs(first[index].z), mechapunk::kFootprintDepthMeters * 0.5F + 1.0F);
+            }
+        }
+    }
+    EXPECT_TRUE(DetailOf(sim::BuildingStyle::Plain, 8, 1).empty());
+    // Clutter differs from building to building.
+    bool differs = false;
+    for (std::uint64_t id = 2; id <= 12; ++id) {
+        differs = differs || DetailOf(sim::BuildingStyle::Tower, 8, id).size() !=
+                                 DetailOf(sim::BuildingStyle::Tower, 8, 1).size() ||
+                  DetailOf(sim::BuildingStyle::Tower, 8, id).back().x !=
+                      DetailOf(sim::BuildingStyle::Tower, 8, 1).back().x;
+    }
+    EXPECT_TRUE(differs);
+}
+
+TEST(Massing, RhythmAndTrimDifferByStyle) {
+    using mechapunk::DetailOf;
+    using mechapunk::WindowRhythmOf;
+    EXPECT_LT(WindowRhythmOf(sim::BuildingStyle::Gabled).spacingMeters,
+              WindowRhythmOf(sim::BuildingStyle::Plain).spacingMeters);
+    EXPECT_NE(WindowRhythmOf(sim::BuildingStyle::Tower).bandEvery, 0U);
+    const auto twin = MassingOf(sim::BuildingStyle::TwinTowers, 6);
+    EXPECT_NE(twin[1].blankFaces, 0U);
+    EXPECT_NE(twin[2].blankFaces, 0U);
+    // Plinth has its arcade, Setback its bays.
+    EXPECT_GT(DetailOf(sim::BuildingStyle::Plinth, 6, 1).size(),
+              DetailOf(sim::BuildingStyle::Tower, 6, 1).size() - 20);
+    EXPECT_FALSE(DetailOf(sim::BuildingStyle::Setback, 6, 1).empty());
 }

@@ -178,7 +178,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     }
     for (const sim::Building& building : city_.buildings) {
         const BuildingShape& shape = shapes_.at(building.id.value);
-        AddFacade(shape.center, MassingOf(building.style, building.floors));
+        AddFacade(shape.center, MassingOf(building.style, building.floors), building.style);
         AddRoof(building, shape.center);
     }
 
@@ -342,7 +342,7 @@ void CityView::AddBuilding(const sim::Building& building) {
                               .building = building.id,
                               .unit = units[index]->id});
     }
-    AddFacade(centerOnGround, MassingOf(building.style, building.floors));
+    AddFacade(centerOnGround, MassingOf(building.style, building.floors), building.style);
     AddRoof(building, centerOnGround);
     BatchStaticsFor(building.id.value);
     // The block itself, batched under the building so it hides while it is
