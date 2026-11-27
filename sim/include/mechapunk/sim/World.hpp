@@ -360,6 +360,8 @@ private:
     void AgeRobots();
     void Scrap(EntityId id);
     void AddNewcomer();
+    // Whether a newcomer would find a free dorm bed and a job with a free place.
+    [[nodiscard]] bool RoomForNewcomer() const;
     void ForgetDeparted();
     // Relationships, in Social.cpp.
     void Socialize();

@@ -471,6 +471,14 @@ struct PopulationSettings {
 
     std::int64_t richMultiplier{20};
 
+    // 1 lets newcomers arrive beyond the ones that replace scrapped robots: each
+    // night up to `immigrantsPerNight` of them, while the city has a free dorm
+    // bed and a job with a free place. 0 is a full city, whose population only
+    // replaces scrapped robots.
+    std::int64_t immigration{0};
+
+    std::int64_t immigrantsPerNight{3};
+
     bool operator==(const PopulationSettings&) const = default;
 };
 

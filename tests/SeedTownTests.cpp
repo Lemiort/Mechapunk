@@ -270,3 +270,43 @@ TEST(SeedTown, FullDormsRaiseADormitory) {
     }
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }
+
+// Immigration (task K, step K7): each night up to immigrantsPerNight robots
+// arrive while a dorm bed and a job are free, and never more robots than beds.
+TEST(SeedTown, ImmigrantsArriveWhileThereIsRoom) {
+    for (const bool immigration : {false, true}) {
+        sim::SimSettings settings;
+        settings.city.seedTown = 1;
+        settings.city.seedWorkspaces = 4;
+        settings.population.immigration = immigration ? 1 : 0;
+        settings.population.immigrantsPerNight = 3;
+        sim::World world =
+            sim::World::Generate({.seed = 1, .robots = 10, .settings = settings});
+        std::uint32_t beds = 0;
+        for (const sim::Building& building : world.State().city.buildings) {
+            for (const sim::Room& room : building.rooms) {
+                if (room.kind == sim::RoomKind::Apartment) {
+                    beds += room.capacity;
+                }
+            }
+        }
+        std::size_t before = world.State().robots.size();
+        std::size_t largest = 0;
+        for (int night = 0; night < 15; ++night) {
+            world.RunFor(sim::kMinutesPerDay);
+            const std::size_t now = world.State().robots.size();
+            if (immigration && night == 0) {
+                EXPECT_GT(now, before) << "nobody arrived the first night";
+                EXPECT_LE(now - before, 3U + 1U);  // Three, and a replacement.
+            }
+            EXPECT_LE(now, beds) << "more robots than beds";
+            largest = std::max(largest, now);
+        }
+        if (immigration) {
+            EXPECT_GT(largest, 10U);
+        } else {
+            EXPECT_LE(largest, 11U);  // Only replacements.
+        }
+        EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+    }
+}

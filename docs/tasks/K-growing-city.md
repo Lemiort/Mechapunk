@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K6 done. Save version 32, game 0.32.0.
+Status: planned on 2026-11-27; K1 to K7 done. Save version 33, game 0.33.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -172,7 +172,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   within 3 nights.
 - Check: build, ctest, seed 7 byte-identical except the settings keys.
 
-### - [ ] K7. Newcomers arrive while there is room (life-cycle)
+### - [x] K7. Newcomers arrive while there is room (life-cycle)
 
 - Module: life-cycle. Depends on: K4. Save change: yes, settings only.
 - Open: `sim/src/LifeCycle.cpp` (`AgeRobots`, `AddNewcomer`).

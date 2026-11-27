@@ -67,6 +67,30 @@ void World::AgeRobots() {
     for (std::size_t newcomer = 0; newcomer < wornOut.size(); ++newcomer) {
         AddNewcomer();
     }
+    // Immigrants come on top of the replacements, while there is room.
+    if (state_.settings.population.immigration != 0) {
+        for (std::int64_t arrived = 0;
+             arrived < state_.settings.population.immigrantsPerNight && RoomForNewcomer();
+             ++arrived) {
+            AddNewcomer();
+        }
+    }
+}
+
+bool World::RoomForNewcomer() const {
+    std::unordered_set<std::uint64_t> homes;
+    for (const Robot& robot : state_.robots) {
+        homes.insert(robot.apartment.value);
+    }
+    const bool freeDorm = std::ranges::any_of(
+        rooms_.RoomsOfKind(RoomKind::Apartment), [&](const RoomRef& apartment) {
+            return apartment.room->apartmentClass == ApartmentClass::Dorm &&
+                   !homes.contains(apartment.room->id.value) &&
+                   !IsUnderConstruction(state_.projects, apartment.building->id);
+        });
+    // A job as the next robot would be offered it: ids only grow.
+    return freeDorm &&
+           !OpeningsFor(EntityId{state_.ids.next}, StaffCounts()).empty();
 }
 
 void World::Scrap(EntityId id) {

@@ -136,6 +136,8 @@ const std::array kEntries{
     MECHAPUNK_SETTING(population, wealthSpread, 0, 1),
     MECHAPUNK_SETTING(population, richPercent, 0, 100),
     MECHAPUNK_SETTING(population, richMultiplier, 1, 50),
+    MECHAPUNK_SETTING(population, immigration, 0, 1),
+    MECHAPUNK_SETTING(population, immigrantsPerNight, 0, 100),
     MECHAPUNK_SETTING(economy, utilitySupplyPercent, 0, 950),
     MECHAPUNK_SETTING(economy, transitSupplyPercent, 0, 950),
     MECHAPUNK_SETTING(economy, housingSupplyPercent, 0, 500),
