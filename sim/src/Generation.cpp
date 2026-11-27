@@ -23,22 +23,10 @@
 
 namespace mechapunk::sim {
 namespace {
-
-constexpr std::uint32_t kMinPunctualityMinutes = 5;
-
-constexpr std::uint32_t kMaxPunctualityMinutes = 20;
+constexpr std::uint32_t kMaxSerialNumber = 999;
 
 constexpr std::uint32_t kMinSerialNumber = 100;
 
-constexpr std::uint32_t kMaxSerialNumber = 999;
-
-constexpr std::int32_t kMinStartingNeed = 550;
-
-constexpr std::int32_t kMaxStartingNeed = 950;
-
-constexpr std::uint32_t kMinStartingCredits = 40;
-
-constexpr std::uint32_t kMaxStartingCredits = 200;
 
 // Independent random streams per purpose, so for example a change in robot
 // generation does not reshape the city.
@@ -55,14 +43,6 @@ constexpr std::uint64_t kCareerStream = 5;
 constexpr std::uint64_t kAgeStream = 6;
 
 // The gang stream (7) lives in Gangs.hpp, where both founders can see it.
-
-// Robots in a new city are up to about a year old.
-constexpr std::uint32_t kMaxStartingAge = 360;
-
-// Robots start somewhere between junior and senior.
-constexpr std::uint32_t kHighestStartingLevel = 2;
-
-constexpr std::uint32_t kInterestsPerRobot = 2;
 
 constexpr std::array<std::string_view, 8> kModelPrefixes{
     "KX", "VR", "NE", "TS", "OM", "ZR", "HK", "LU"};
@@ -154,7 +134,7 @@ World World::Generate(const WorldParams& params) {
     WorldState state;
     state.seed = params.seed;
     Pcg32 cityRandom = Pcg32::FromSeed(params.seed, kCityStream);
-    state.city = GenerateCity(CityParams{.residents = params.robots},
+    state.city = GenerateCity(CityParams{.residents = params.robots, .city = params.settings.city},
                               cityRandom, state.ids);
 
     const RoomIndex rooms(state.city);
@@ -163,7 +143,7 @@ World World::Generate(const WorldParams& params) {
     std::unordered_map<std::uint64_t, std::uint32_t> staff;
     const auto need = [&] {
         return static_cast<std::int32_t>(population.UniformInt(
-            kMinStartingNeed, kMaxStartingNeed));
+            static_cast<std::int32_t>(params.settings.population.minStartingNeed), static_cast<std::int32_t>(params.settings.population.maxStartingNeed)));
     };
     for (std::uint32_t index = 0; index < params.robots; ++index) {
         Robot robot;
@@ -173,11 +153,11 @@ World World::Generate(const WorldParams& params) {
         robot.workspace = AssignJob(rooms, robot.id, staff, population);
         robot.location = robot.apartment;
         robot.punctualityMinutes = population.UniformInt(
-            kMinPunctualityMinutes, kMaxPunctualityMinutes);
+            static_cast<std::uint32_t>(params.settings.population.minPunctualityMinutes), static_cast<std::uint32_t>(params.settings.population.maxPunctualityMinutes));
         robot.needs = {.charge = need(), .condition = need(),
                        .social = need(), .fun = need()};
-        robot.credits = population.UniformInt(kMinStartingCredits,
-                                              kMaxStartingCredits);
+        robot.credits = population.UniformInt(static_cast<std::uint32_t>(params.settings.population.minStartingCredits),
+                                              static_cast<std::uint32_t>(params.settings.population.maxStartingCredits));
         // Two consecutive days off a week, different for each robot, so
         // workplaces stay staffed every day.
         const std::uint32_t firstDayOff =
@@ -190,7 +170,7 @@ World World::Generate(const WorldParams& params) {
     Pcg32 tastes = Pcg32::FromSeed(params.seed, kInterestStream);
     for (Robot& robot : state.robots) {
         while (std::popcount(robot.interests) <
-               static_cast<int>(kInterestsPerRobot)) {
+               static_cast<int>(static_cast<std::uint32_t>(params.settings.population.interestsPerRobot))) {
             robot.interests = static_cast<std::uint8_t>(
                 robot.interests | (1U << tastes.UniformInt(0, kInterestCount - 1)));
         }
@@ -198,7 +178,7 @@ World World::Generate(const WorldParams& params) {
 
     Pcg32 ages = Pcg32::FromSeed(params.seed, kAgeStream);
     for (Robot& robot : state.robots) {
-        robot.age = ages.UniformInt(0, kMaxStartingAge);
+        robot.age = ages.UniformInt(0, static_cast<std::uint32_t>(params.settings.population.maxStartingAge));
         robot.wear = WearAtAge(robot.age);
         robot.needs.condition =
             std::min(robot.needs.condition, kMaxWear - robot.wear);
@@ -207,7 +187,7 @@ World World::Generate(const WorldParams& params) {
     Pcg32 careers = Pcg32::FromSeed(params.seed, kCareerStream);
     for (Robot& robot : state.robots) {
         robot.jobLevel =
-            static_cast<std::uint8_t>(careers.UniformInt(0, kHighestStartingLevel));
+            static_cast<std::uint8_t>(careers.UniformInt(0, static_cast<std::uint32_t>(params.settings.population.highestStartingLevel)));
     }
     state.weather = StartingWeather(params.seed, state.tick);
 

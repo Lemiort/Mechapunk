@@ -20,31 +20,14 @@
 namespace mechapunk::sim {
 
 namespace {
-constexpr std::array<std::string_view, kMaxJobLevel + 1> kJobTitles{
-    "junior", "regular", "senior", "lead"};
-constexpr std::uint32_t kRaisePercentPerLevel = 15;
-constexpr std::int32_t kFirstPromotion = 15;
 constexpr std::int32_t kPromotionStep = 10;
 
-// A shift earns 0 to 2 points of performance, less for a robot that turned
-// up worn down or miserable.
-constexpr std::uint32_t kBestShift = 2;
-constexpr std::int32_t kWornDownPenalty = 3;
-constexpr std::int32_t kMiserablePenalty = 1;
-constexpr std::int32_t kFitCondition = 300;
-constexpr std::int32_t kFitCharge = 150;
-constexpr std::int32_t kContentNeed = 200;
+constexpr std::int32_t kFirstPromotion = 15;
 
-// Chance in percent that a robot out of work is hired on a given night, if
-// there is an opening.
-constexpr std::uint32_t kHirePercent = 50;
+constexpr std::uint32_t kRaisePercentPerLevel = 15;
 
-// Owing this many nights of rent gets a robot evicted.
-// Robots with this much saved sometimes move to a nicer, pricier apartment
-// they can pay for this many nights from savings.
-constexpr std::int64_t kMoveUpSavings = 500;
-constexpr std::uint32_t kMoveUpPercent = 10;
-constexpr std::int64_t kAffordNights = 12;
+constexpr std::array<std::string_view, kMaxJobLevel + 1> kJobTitles{
+    "junior", "regular", "senior", "lead"};
 }  // namespace
 
 std::string_view JobTitle(std::uint8_t level) noexcept {
@@ -149,26 +132,26 @@ void World::ScoreArrivalAtWork(Robot& robot) {
     // is worn down only when below half of that, as well as below the bar.
     const std::int32_t reachable = kMaxWear - robot.wear;
     const bool neglected =
-        needs.condition < kFitCondition && needs.condition < reachable / 2;
-    if (neglected || needs.charge < kFitCharge) {
-        robot.performance -= kWornDownPenalty;
+        needs.condition < static_cast<std::int32_t>(state_.settings.careers.fitCondition) && needs.condition < reachable / 2;
+    if (neglected || needs.charge < static_cast<std::int32_t>(state_.settings.careers.fitCharge)) {
+        robot.performance -= static_cast<std::int32_t>(state_.settings.careers.wornDownPenalty);
     }
-    if (needs.fun < kContentNeed || needs.social < kContentNeed) {
-        robot.performance -= kMiserablePenalty;
+    if (needs.fun < static_cast<std::int32_t>(state_.settings.careers.contentNeed) || needs.social < static_cast<std::int32_t>(state_.settings.careers.contentNeed)) {
+        robot.performance -= static_cast<std::int32_t>(state_.settings.careers.miserablePenalty);
     }
 }
 
 void World::EndShift(Robot& robot) {
     const auto score =
-        static_cast<std::int32_t>(state_.random.UniformInt(0, kBestShift));
-    robot.performance = std::clamp(robot.performance + score, kFiringPerformance,
+        static_cast<std::int32_t>(state_.random.UniformInt(0, static_cast<std::uint32_t>(state_.settings.careers.bestShift)));
+    robot.performance = std::clamp(robot.performance + score, static_cast<std::int32_t>(state_.settings.careers.firingPerformance),
                                    PromotionTarget(robot.jobLevel));
     if (robot.performance >= PromotionTarget(robot.jobLevel) &&
         robot.jobLevel < kMaxJobLevel) {
         ++robot.jobLevel;
         robot.performance = 0;
         Remember(robot, MemoryKind::Promoted, {}, robot.workspace);
-    } else if (robot.performance <= kFiringPerformance) {
+    } else if (robot.performance <= static_cast<std::int32_t>(state_.settings.careers.firingPerformance)) {
         const EntityId lost = robot.workspace;
         robot.workspace = {};
         robot.jobLevel = 0;
@@ -182,7 +165,7 @@ void World::ReviewJobs() {
     std::unordered_map<std::uint64_t, std::uint32_t> staff = StaffCounts();
     for (Robot& robot : state_.robots) {
         if (robot.workspace.IsValid() ||
-            state_.random.UniformInt(1, 100) > kHirePercent) {
+            state_.random.UniformInt(1, 100) > static_cast<std::uint32_t>(state_.settings.careers.hirePercent)) {
             continue;
         }
         const std::vector<EntityId> openings = OpeningsFor(robot.id, staff);
@@ -203,12 +186,6 @@ void World::ReviewJobs() {
 }
 
 namespace {
-// Each night, the chance in percent that a robot living alone in a rented
-// home asks its closest friend to move in together.
-constexpr std::uint32_t kShareHomePercent = 10;
-// Sharing is how robots afford more sooner: each needs only this many
-// nights of its share saved, where moving alone takes kAffordNights.
-constexpr std::int64_t kShareAffordNights = 10;
 }  // namespace
 
 void World::ReviewHomes() {
@@ -255,7 +232,7 @@ void World::ReviewHomes() {
         const auto home = rooms_.Find(robot.apartment);
         // Owners behind on upkeep sell instead; see TradeProperty.
         const bool owns = home && home->room->owner == robot.id;
-        if (!owns && rent > 0 && robot.rentOwed >= kEvictionNights * rent) {
+        if (!owns && rent > 0 && robot.rentOwed >= static_cast<std::int64_t>(state_.settings.careers.evictionNights) * rent) {
             // Out to the cheapest place there is; the debt is written off.
             const auto cheapest = pick(
                 [&](const Room& a, const Room& b) { return RentFor(a) < RentFor(b); },
@@ -274,22 +251,22 @@ void World::ReviewHomes() {
             continue;
         }
         const std::int64_t means = robot.credits + robot.savings;
-        if (means < kMoveUpSavings ||
-            state_.random.UniformInt(1, 100) > kMoveUpPercent) {
+        if (means < static_cast<std::int64_t>(state_.settings.careers.moveUpSavings) ||
+            state_.random.UniformInt(1, 100) > static_cast<std::uint32_t>(state_.settings.careers.moveUpPercent)) {
             continue;
         }
         // The priciest apartment it can afford for a while. An owner sells
         // its home to the trust and buys the new one.
         const std::int64_t homeRent = home ? RentFor(*home->room) : 0;
-        const std::int64_t sale = owns ? PriceOf(*home->room) * kSellPercent / 100 : 0;
+        const std::int64_t sale = owns ? PriceOf(*home->room) * static_cast<std::int64_t>(state_.settings.economy.sellPercent) / 100 : 0;
         const auto nicer = pick(
             [&](const Room& a, const Room& b) { return RentFor(a) > RentFor(b); },
             [&](const Room& room) {
                 if (RentFor(room) <= homeRent) {
                     return false;
                 }
-                return owns ? PriceOf(room) + (kAffordNights * RentFor(room)) <= means + sale
-                            : RentFor(room) * kAffordNights <= means;
+                return owns ? PriceOf(room) + (static_cast<std::int64_t>(state_.settings.careers.affordNights) * RentFor(room)) <= means + sale
+                            : RentFor(room) * static_cast<std::int64_t>(state_.settings.careers.affordNights) <= means;
             });
         if (nicer) {
             if (owns) {
@@ -310,7 +287,7 @@ void World::ReviewHomes() {
     // when each can afford their share for a while.
     for (Robot& robot : state_.robots) {
         if (robot.activity == RobotActivity::Walking ||
-            state_.random.UniformInt(1, 100) > kShareHomePercent) {
+            state_.random.UniformInt(1, 100) > static_cast<std::uint32_t>(state_.settings.careers.shareHomePercent)) {
             continue;
         }
         const auto home = rooms_.Find(robot.apartment);
@@ -348,7 +325,7 @@ void World::ReviewHomes() {
                     return false;
                 }
                 const std::int64_t share = (RentFor(room) + room.capacity - 1) / room.capacity;
-                return share * kShareAffordNights <= means;
+                return share * static_cast<std::int64_t>(state_.settings.careers.shareAffordNights) <= means;
             });
         if (!shared) {
             continue;

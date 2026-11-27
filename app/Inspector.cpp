@@ -81,7 +81,7 @@ std::optional<InspectorRequest> DrawRoom(const Selection& selection,
         ImGui::TextDisabled("A %s of %u m2, sleeps %u; %u cr a night, worth %lld cr",
                             kind.c_str(), sim::AreaOf(room.apartmentClass),
                             sim::Sleeps(room.apartmentClass), room.rent,
-                            static_cast<long long>(room.rent * sim::kPriceNights));
+                            static_cast<long long>(room.rent * frame.settings.economy.priceNights));
     }
     if (frame.economy != nullptr) {
         // The owner runs a venue or workspace, and lets an apartment.

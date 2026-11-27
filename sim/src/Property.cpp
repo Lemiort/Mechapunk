@@ -25,23 +25,6 @@
 namespace mechapunk::sim {
 namespace {
 
-// Each night, the chance in percent that a robot able to buy an apartment
-// does, and the nights of rent it keeps after paying.
-constexpr std::uint32_t kBuyPercent = 3;
-
-constexpr std::int64_t kBuyReserveNights = 20;
-
-// A mortgage needs this much of the price down, and lends at most this many
-// shifts' pay.
-constexpr std::int64_t kDepositPercent = 20;
-
-constexpr std::int64_t kMortgageShifts = 60;
-
-// Each night, the chance a robot sells an apartment nobody lives in.
-constexpr std::uint32_t kSellVacantPercent = 20;
-
-constexpr std::int64_t kBankReservePercent = 10;
-
 }  // namespace
 
 void World::Transfer(EntityId apartment, EntityId buyer, std::int64_t price) {
@@ -129,12 +112,12 @@ std::int64_t World::ReserveOf(const Organization& organization) const {
         for (const Robot& robot : state_.robots) {
             held += robot.bank == organization.id ? robot.savings : 0;
         }
-        return kBankFloor + (held * kBankReservePercent / 100);
+        return static_cast<std::int64_t>(state_.settings.economy.bankFloor) + (held * static_cast<std::int64_t>(state_.settings.economy.bankReservePercent) / 100);
     }
     const auto costs = [](const Books& books) {
         return books.wages + books.supplies + books.upkeep + books.rent + books.taxes;
     };
-    return std::max(kCorporationFloor,
+    return std::max(static_cast<std::int64_t>(state_.settings.economy.corporationFloor),
                     std::max(costs(organization.today), costs(organization.yesterday)));
 }
 
@@ -148,10 +131,10 @@ void World::TradeProperty() {
     for (const RoomRef& apartment : rooms_.RoomsOfKind(RoomKind::Apartment)) {
         const Room& room = *apartment.room;
         if (lived.contains(room.id.value) || FindRobot(room.owner) == nullptr ||
-            state_.random.UniformInt(1, 100) > kSellVacantPercent || trust == nullptr) {
+            state_.random.UniformInt(1, 100) > static_cast<std::uint32_t>(state_.settings.economy.sellVacantPercent) || trust == nullptr) {
             continue;
         }
-        Transfer(room.id, housing_, PriceOf(room) * kSellPercent / 100);
+        Transfer(room.id, housing_, PriceOf(room) * static_cast<std::int64_t>(state_.settings.economy.sellPercent) / 100);
     }
     // Owners who cannot keep up with their bills sell their home and rent
     // it back.
@@ -161,10 +144,10 @@ void World::TradeProperty() {
             continue;
         }
         const std::int64_t upkeep = UpkeepOf(*home->room);
-        if (upkeep <= 0 || robot.rentOwed < kEvictionNights * upkeep) {
+        if (upkeep <= 0 || robot.rentOwed < static_cast<std::int64_t>(state_.settings.careers.evictionNights) * upkeep) {
             continue;
         }
-        Transfer(robot.apartment, housing_, PriceOf(*home->room) * kSellPercent / 100);
+        Transfer(robot.apartment, housing_, PriceOf(*home->room) * static_cast<std::int64_t>(state_.settings.economy.sellPercent) / 100);
         Remember(robot, MemoryKind::SoldHome, {}, robot.apartment);
         // The sale pays its debts.
         const std::int64_t bills = std::min(robot.rentOwed, robot.credits);
@@ -185,11 +168,11 @@ void World::TradeProperty() {
         const auto home = rooms_.Find(robot.apartment);
         if (!home || home->room->owner == robot.id || !robot.workspace.IsValid() ||
             robot.activity == RobotActivity::Walking || LoanOf(robot.id) != nullptr ||
-            robot.rentOwed > 0 || state_.random.UniformInt(1, 100) > kBuyPercent) {
+            robot.rentOwed > 0 || state_.random.UniformInt(1, 100) > static_cast<std::uint32_t>(state_.settings.economy.buyPercent)) {
             continue;
         }
         const std::int64_t means = robot.credits + robot.savings;
-        const std::int64_t mortgage = kMortgageShifts * PayOf(robot);
+        const std::int64_t mortgage = static_cast<std::int64_t>(state_.settings.economy.mortgageShifts) * PayOf(robot);
         // The dearest it can put a fifth down on, keeping a month's bills.
         // Homes of a building a project is raising are not candidates: a
         // habitat site's homes belong to its owner, which is the housing
@@ -206,8 +189,8 @@ void World::TradeProperty() {
                 continue;
             }
             const std::int64_t price = PriceOf(room);
-            const std::int64_t deposit = price * kDepositPercent / 100;
-            if (means < deposit + (kBuyReserveNights * UpkeepOf(room)) || price - deposit > mortgage ||
+            const std::int64_t deposit = price * static_cast<std::int64_t>(state_.settings.economy.depositPercent) / 100;
+            if (means < deposit + (static_cast<std::int64_t>(state_.settings.economy.buyReserveNights) * UpkeepOf(room)) || price - deposit > mortgage ||
                 (best != nullptr && RentFor(room) <= RentFor(*best))) {
                 continue;
             }
@@ -217,13 +200,13 @@ void World::TradeProperty() {
             continue;
         }
         const std::int64_t price = PriceOf(*best);
-        const std::int64_t own = std::min(means - (kBuyReserveNights * UpkeepOf(*best)), price);
+        const std::int64_t own = std::min(means - (static_cast<std::int64_t>(state_.settings.economy.buyReserveNights) * UpkeepOf(*best)), price);
         // A bank lends only what it can spare beyond its reserve, and only
         // while the interest takes no more than a third of the robot's pay.
         const Organization* bank = FindOrganization(robot.bank);
         const std::int64_t mortgageOwed = price - own;
         const std::int64_t nightly =
-            mortgageOwed * (state_.economy.policyRate + kBankMargin) / 10000;
+            mortgageOwed * (state_.economy.policyRate + static_cast<std::int64_t>(state_.settings.economy.bankMargin)) / 10000;
         if (bank == nullptr || bank->credits - mortgageOwed < ReserveOf(*bank) ||
             nightly * 3 > NetPayOf(robot)) {
             continue;
@@ -250,11 +233,11 @@ void World::TradeProperty() {
     }
     for (Robot& robot : state_.robots) {
         if (LoanOf(robot.id) != nullptr || robot.rentOwed > 0 ||
-            state_.random.UniformInt(1, 100) > kBuyPercent) {
+            state_.random.UniformInt(1, 100) > static_cast<std::uint32_t>(state_.settings.economy.buyPercent)) {
             continue;
         }
         const auto home = rooms_.Find(robot.apartment);
-        const std::int64_t keep = kBuyReserveNights * (home ? RentFor(*home->room) : 0);
+        const std::int64_t keep = static_cast<std::int64_t>(state_.settings.economy.buyReserveNights) * (home ? RentFor(*home->room) : 0);
         const std::int64_t means = robot.credits + robot.savings;
         EntityId target;
         if (home && home->room->owner == housing_ && means >= PriceOf(*home->room) + keep) {

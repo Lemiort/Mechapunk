@@ -160,6 +160,9 @@ constexpr std::array kMigrations{
     Migration{.fromVersion = 27,
               .summary = "the simulation's settings are saved with the city",
               .apply = &migrations::V27ToV28},
+    Migration{.fromVersion = 28,
+              .summary = "the rest of the simulation's settings",
+              .apply = &migrations::V28ToV29},
 };
 }  // namespace
 

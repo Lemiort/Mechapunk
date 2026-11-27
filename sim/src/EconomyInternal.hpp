@@ -26,12 +26,6 @@
 namespace mechapunk::sim {
 namespace economy_detail {
 
-// What a bank keeps before lending or paying out, plus a share of what it
-// has lent, in percent.
-constexpr std::int64_t kBankFloor = 1000;
-
-constexpr std::int64_t kCorporationFloor = 200;
-
 }  // namespace economy_detail
 using namespace economy_detail;
 }  // namespace mechapunk::sim

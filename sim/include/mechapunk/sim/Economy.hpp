@@ -11,6 +11,11 @@
 #include "mechapunk/sim/Ids.hpp"
 
 namespace mechapunk::sim {
+// The central bank's rate, in units of 1/10000 a night: it starts here and
+// stays within the bounds. Banks lend at the rate plus their margin and pay
+// savers half the rate.
+inline constexpr std::int64_t kStartingPolicyRate = 10;
+
 
 // The city's money is closed: credits only move from one account to
 // another (robots and organizations hold accounts). The one exception is
@@ -221,14 +226,6 @@ struct DailyStats {
     std::int64_t gangMembers{};
 };
 
-// The central bank's rate, in units of 1/10000 a night: it starts here and
-// stays within the bounds. Banks lend at the rate plus their margin and pay
-// savers half the rate.
-inline constexpr std::int64_t kStartingPolicyRate = 10;
-inline constexpr std::int64_t kMinPolicyRate = 2;
-inline constexpr std::int64_t kMaxPolicyRate = 50;
-inline constexpr std::int64_t kBankMargin = 5;
-
 struct Economy {
     // Sorted by id.
     std::vector<Organization> organizations;
@@ -254,22 +251,6 @@ struct Economy {
     std::int64_t policyRate{kStartingPolicyRate};
 };
 
-// City Hall's taxes, in percent: of every wage, withheld on payday; of a
-// home's rent each night, paid by its owner; and of a day's profit, paid by
-// corporations and banks. It pays kBenefit credits a night to every robot
-// out of work.
-inline constexpr std::int64_t kWageTaxPercent = 10;
-inline constexpr std::int64_t kPropertyTaxPercent = 5;
-inline constexpr std::int64_t kProfitTaxPercent = 20;
-inline constexpr std::int64_t kBenefit = 40;
-
-// The price of an apartment: so many nights of its rent.
-inline constexpr std::int64_t kPriceNights = 100;
-// Owners of a lived-in apartment pay this much of its rent each night for
-// power and water, in percent.
-inline constexpr std::int64_t kUpkeepPercent = 50;
-// Robots sell to the housing trust at this much of the price, in percent.
-inline constexpr std::int64_t kSellPercent = 90;
 // Days of statistics kept.
 inline constexpr std::size_t kHistoryDays = 400;
 // Emissions kept in the log.

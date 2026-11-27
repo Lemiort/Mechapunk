@@ -25,32 +25,6 @@
 namespace mechapunk::sim {
 namespace {
 
-constexpr std::int64_t kUtilitySupplyPercent = 95;
-
-constexpr std::int64_t kTransitSupplyPercent = 95;
-
-constexpr std::int64_t kHousingSupplyPercent = 50;
-
-// A robot with a job may owe up to this many shifts' wages.
-constexpr std::int64_t kRobotDebtShifts = 5;
-
-// A robot's daily budget for outings: this share of its average day's pay,
-// plus 1/kSavingsSpendDays of what it has saved beyond kSavingsTargetNights
-// of its bills (savings put by for a rainy day), plus a little.
-constexpr std::int64_t kBudgetPercent = 80;
-
-constexpr std::int64_t kSavingsSpendDays = 10;
-
-constexpr std::int64_t kSavingsTargetNights = 30;
-
-constexpr std::int64_t kBaseBudget = 10;
-
-constexpr std::int64_t kWorkDaysPerWeek = 5;
-
-// Robots with more saved than this spend a quarter of what is left of
-// their budget on every visit, on better drinks, parts and service.
-constexpr std::int64_t kComfortableSavings = 1000;
-
 }  // namespace
 
 const Organization* World::FindOrganization(EntityId id) const noexcept {
@@ -146,8 +120,8 @@ void World::Lend(EntityId lender, EntityId borrower, std::int64_t amount) {
     if (bank->kind == OrganizationKind::CentralBank) {
         // Money the city did not have.
         ChangeMoney(lender, amount, EmissionReason::BankRescue);
-    } else if (bank->credits - amount < kBankFloor) {
-        Lend(bank->bank, bank->id, amount + kBankFloor - bank->credits + (amount / 2));
+    } else if (bank->credits - amount < static_cast<std::int64_t>(state_.settings.economy.bankFloor)) {
+        Lend(bank->bank, bank->id, amount + static_cast<std::int64_t>(state_.settings.economy.bankFloor) - bank->credits + (amount / 2));
         bank = MutableOrganization(lender);
     }
     Pay(lender, borrower, amount);
@@ -172,7 +146,7 @@ bool World::MayBorrow(const Robot& robot, std::int64_t amount) const {
     }
     const Loan* loan = LoanOf(robot.id);
     const std::int64_t owed = loan != nullptr ? loan->owed : 0;
-    return owed + amount <= kRobotDebtShifts * WageOf(robot);
+    return owed + amount <= static_cast<std::int64_t>(state_.settings.economy.robotDebtShifts) * WageOf(robot);
 }
 
 std::int64_t World::PocketOf(const Robot& robot) const {
@@ -187,7 +161,7 @@ void World::Withdraw(Robot& robot, std::int64_t amount) {
     Organization* bank = MutableOrganization(robot.bank);
     if (bank->credits - amount < 0) {
         // A run on the bank: the central bank lends it what it lacks.
-        Lend(bank->bank, bank->id, amount - bank->credits + kBankFloor);
+        Lend(bank->bank, bank->id, amount - bank->credits + static_cast<std::int64_t>(state_.settings.economy.bankFloor));
     }
     robot.savings -= amount;
     Pay(robot.bank, robot.id, amount);
@@ -230,9 +204,9 @@ void World::PaySupplies(Organization& buyer, std::int64_t revenue) {
     std::int64_t percent = 0;
     switch (buyer.sector) {
         case Sector::Venues: percent = state_.economy.supplyPercent; break;
-        case Sector::Utilities: percent = kUtilitySupplyPercent; break;
-        case Sector::Transit: percent = kTransitSupplyPercent; break;
-        case Sector::Housing: percent = kHousingSupplyPercent; break;
+        case Sector::Utilities: percent = static_cast<std::int64_t>(state_.settings.economy.utilitySupplyPercent); break;
+        case Sector::Transit: percent = static_cast<std::int64_t>(state_.settings.economy.transitSupplyPercent); break;
+        case Sector::Housing: percent = static_cast<std::int64_t>(state_.settings.economy.housingSupplyPercent); break;
         default: return;
     }
     const std::int64_t supplies = std::min(buyer.credits, revenue * percent / 100);
@@ -246,7 +220,7 @@ void World::PaySupplies(Organization& buyer, std::int64_t revenue) {
 }
 
 std::int64_t World::LuxuryOf(const Robot& robot, std::int64_t price) const {
-    if (robot.savings <= kComfortableSavings) {
+    if (robot.savings <= static_cast<std::int64_t>(state_.settings.economy.comfortableSavings)) {
         return 0;
     }
     return std::max<std::int64_t>(0, BudgetOf(robot) - robot.spentToday - price) / 4;
@@ -261,16 +235,16 @@ std::int64_t World::PayOf(const Robot& robot) const {
 
 std::int64_t World::NetPayOf(const Robot& robot) const {
     const std::int64_t wage = PayOf(robot);
-    return wage - (wage * kWageTaxPercent / 100);
+    return wage - (wage * static_cast<std::int64_t>(state_.settings.economy.wageTaxPercent) / 100);
 }
 
 std::int64_t World::BudgetOf(const Robot& robot) const {
     // Out of work, a robot lives on City Hall's support.
     const std::int64_t pay =
-        robot.workspace.IsValid() ? NetPayOf(robot) * kWorkDaysPerWeek / kDaysPerWeek : kBenefit;
-    const std::int64_t target = kSavingsTargetNights * RentOf(robot);
+        robot.workspace.IsValid() ? NetPayOf(robot) * static_cast<std::int64_t>(state_.settings.economy.workDaysPerWeek) / kDaysPerWeek : static_cast<std::int64_t>(state_.settings.economy.benefit);
+    const std::int64_t target = static_cast<std::int64_t>(state_.settings.economy.savingsTargetNights) * RentOf(robot);
     const std::int64_t spare = std::max<std::int64_t>(0, robot.savings - target);
-    return (pay * kBudgetPercent / 100) + (spare / kSavingsSpendDays) + kBaseBudget;
+    return (pay * static_cast<std::int64_t>(state_.settings.economy.budgetPercent) / 100) + (spare / static_cast<std::int64_t>(state_.settings.economy.savingsSpendDays)) + static_cast<std::int64_t>(state_.settings.economy.baseBudget);
 }
 
 void World::Sell(Robot& buyer, EntityId seller, std::int64_t price) {
@@ -294,7 +268,7 @@ void World::PayWage(Robot& robot) {
     // The employer pays the wage, City Hall's share of it straight to City
     // Hall.
     const std::int64_t wage = PayOf(robot);
-    const std::int64_t tax = wage * kWageTaxPercent / 100;
+    const std::int64_t tax = wage * static_cast<std::int64_t>(state_.settings.economy.wageTaxPercent) / 100;
     employer->today.wages += wage;
     PayOrBorrow(*employer, robot.id, wage - tax);
     PayOrBorrow(*MutableOrganization(employer->id), cityHall_, tax);

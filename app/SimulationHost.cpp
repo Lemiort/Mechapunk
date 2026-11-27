@@ -184,6 +184,7 @@ void SimulationHost::Publish() {
     WorldFrame frame;
     frame.tick = world_.CurrentTick();
     frame.rain = world_.State().weather.rain;
+    frame.settings = world_.State().settings;
     if (social_ == nullptr || frame.tick % kSocialPeriod == 0) {
         auto social = std::make_shared<std::vector<RobotSocial>>();
         social->reserve(world_.State().robots.size());

@@ -24,19 +24,6 @@
 namespace mechapunk::sim {
 namespace {
 
-// Of every credit a sector takes, this much buys supplies from industry.
-constexpr std::int64_t kMinSupplyPercent = 20;
-
-constexpr std::int64_t kMaxSupplyPercent = 95;
-
-constexpr std::uint32_t kMinPayPercent = 50;
-
-constexpr std::uint32_t kMaxPayPercent = 150;
-
-// Of what a corporation has beyond twice its reserve, the share paid out
-// each night.
-constexpr std::int64_t kDividendPercent = 50;
-
 }  // namespace
 
 void World::SetPolicyRate() {
@@ -59,9 +46,9 @@ void World::SetPolicyRate() {
     const std::int64_t money = std::max<std::int64_t>(1, economy.created - economy.destroyed);
     const std::int64_t created = state_.today.created - state_.today.destroyed;
     if (created * 1000 > money) {
-        economy.policyRate = std::min(kMaxPolicyRate, economy.policyRate + 1);
+        economy.policyRate = std::min(static_cast<std::int64_t>(state_.settings.economy.maxPolicyRate), economy.policyRate + 1);
     } else if (created * 10000 < money) {
-        economy.policyRate = std::max(kMinPolicyRate, economy.policyRate - 1);
+        economy.policyRate = std::max(static_cast<std::int64_t>(state_.settings.economy.minPolicyRate), economy.policyRate - 1);
     }
 }
 
@@ -80,7 +67,7 @@ void World::RunCityHall() {
         const std::int64_t profit =
             books.revenue - (books.wages + books.supplies + books.upkeep + books.rent + books.taxes);
         const std::int64_t tax = std::min(organization.credits, std::max<std::int64_t>(0, profit) *
-                                                                    kProfitTaxPercent / 100);
+                                                                    static_cast<std::int64_t>(state_.settings.economy.profitTaxPercent) / 100);
         if (tax <= 0) {
             continue;
         }
@@ -92,15 +79,15 @@ void World::RunCityHall() {
     // Support for every robot out of work, borrowed if the treasury is bare.
     for (Robot& robot : state_.robots) {
         if (!robot.workspace.IsValid()) {
-            PayOrBorrow(*city, robot.id, kBenefit);
-            city->today.wages += kBenefit;
-            state_.today.benefits += kBenefit;
+            PayOrBorrow(*city, robot.id, static_cast<std::int64_t>(state_.settings.economy.benefit));
+            city->today.wages += static_cast<std::int64_t>(state_.settings.economy.benefit);
+            state_.today.benefits += static_cast<std::int64_t>(state_.settings.economy.benefit);
         }
     }
     // Public works: half of what City Hall has beyond twice its reserve
     // buys supplies from industry, unless it is in debt.
     const std::int64_t reserve = std::max<std::int64_t>(
-        kCorporationFloor * 5, 3 * (city->today.wages + city->today.upkeep));
+        static_cast<std::int64_t>(state_.settings.economy.corporationFloor) * 5, 3 * (city->today.wages + city->today.upkeep));
     const std::int64_t spare = city->credits - (2 * reserve);
     if (spare > 0 && LoanOf(cityHall_) == nullptr) {
         const std::int64_t works = spare / 2;
@@ -144,7 +131,7 @@ void World::SettleEconomy() {
     for (Loan& loan : economy.loans) {
         // The central bank lends at its rate; banks add their margin.
         const std::int64_t rate =
-            economy.policyRate + (loan.lender == centralBank_ ? 0 : kBankMargin);
+            economy.policyRate + (loan.lender == centralBank_ ? 0 : static_cast<std::int64_t>(state_.settings.economy.bankMargin));
         const std::int64_t interest = (loan.owed * rate + 9999) / 10000;
         loan.owed += interest;
         state_.today.interest += interest;
@@ -196,9 +183,9 @@ void World::SettleEconomy() {
             const std::int64_t step = std::clamp<std::int64_t>(std::abs(gapPercent) / 2, 1, 5);
             std::int64_t& price = economy.supplyPercent;
             if (gapPercent > 0) {
-                price = std::min(kMaxSupplyPercent, price + step);
+                price = std::min(static_cast<std::int64_t>(state_.settings.economy.maxSupplyPercent), price + step);
             } else if (gapPercent < -2) {
-                price = std::max(kMinSupplyPercent, price - step);
+                price = std::max(static_cast<std::int64_t>(state_.settings.economy.minSupplyPercent), price - step);
             }
         }
     }
@@ -213,9 +200,9 @@ void World::SettleEconomy() {
         const Books& books = corporation->today;
         const std::int64_t costs = books.wages + books.supplies;
         if (books.revenue < costs) {
-            corporation->payPercent = std::max(kMinPayPercent, corporation->payPercent - 1);
+            corporation->payPercent = std::max(static_cast<std::uint32_t>(state_.settings.economy.minPayPercent), corporation->payPercent - 1);
         } else if (LoanOf(corporation->id) == nullptr && books.revenue > costs) {
-            corporation->payPercent = std::min(kMaxPayPercent, corporation->payPercent + 1);
+            corporation->payPercent = std::min(static_cast<std::uint32_t>(state_.settings.economy.maxPayPercent), corporation->payPercent + 1);
         }
     }
 
@@ -237,7 +224,7 @@ void World::SettleEconomy() {
         const Books& books = organization.today;
         const std::int64_t profit =
             books.revenue - (books.wages + books.supplies + books.upkeep + books.rent);
-        std::int64_t payout = std::min(spare, profit) * kDividendPercent / 100;
+        std::int64_t payout = std::min(spare, profit) * static_cast<std::int64_t>(state_.settings.economy.dividendPercent) / 100;
         if (payout <= 0) {
             continue;
         }

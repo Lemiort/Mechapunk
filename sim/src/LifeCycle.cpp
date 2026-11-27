@@ -17,22 +17,12 @@
 namespace mechapunk::sim {
 
 namespace {
+constexpr std::uint32_t kDaysPerExtraWear = 300;
+
 // Wear added every night: a base amount, more with age, more for a robot
 // left run down.
 constexpr std::int32_t kBaseWearPerDay = 2;
-constexpr std::uint32_t kDaysPerExtraWear = 300;
-constexpr std::int32_t kNeglectWear = 5;
-constexpr std::int32_t kNeglectedCondition = 150;
-// Robots moving to the city are fairly new.
-constexpr std::uint32_t kMinNewcomerAge = 10;
-constexpr std::uint32_t kMaxNewcomerAge = 120;
-constexpr std::int32_t kMinNewcomerNeed = 550;
-constexpr std::int32_t kMaxNewcomerNeed = 950;
-constexpr std::uint32_t kMinNewcomerCredits = 40;
-constexpr std::uint32_t kMaxNewcomerCredits = 200;
-constexpr std::uint32_t kMinPunctuality = 5;
-constexpr std::uint32_t kMaxPunctuality = 20;
-constexpr std::uint32_t kNewcomerInterests = 2;
+
 }  // namespace
 
 std::int32_t WearAtAge(std::uint32_t days) noexcept {
@@ -62,8 +52,8 @@ void World::AgeRobots() {
         ++robot.age;
         std::int32_t wear =
             kBaseWearPerDay + static_cast<std::int32_t>(robot.age / kDaysPerExtraWear);
-        if (robot.needs.condition < kNeglectedCondition) {
-            wear += kNeglectWear;
+        if (robot.needs.condition < static_cast<std::int32_t>(state_.settings.population.neglectedCondition)) {
+            wear += static_cast<std::int32_t>(state_.settings.population.neglectWear);
         }
         robot.wear = std::min(robot.wear + wear, kMaxWear);
         robot.needs.condition = std::min(robot.needs.condition, kMaxWear - robot.wear);
@@ -157,7 +147,7 @@ void World::AddNewcomer() {
     };
     const auto need = [&] {
         return static_cast<std::int32_t>(
-            random.UniformInt(kMinNewcomerNeed, kMaxNewcomerNeed));
+            random.UniformInt(static_cast<std::int32_t>(state_.settings.population.minNewcomerNeed), static_cast<std::int32_t>(state_.settings.population.maxNewcomerNeed)));
     };
     Robot robot;
     robot.id = state_.ids.Allocate();
@@ -166,9 +156,9 @@ void World::AddNewcomer() {
     const std::vector<EntityId> openings = OpeningsFor(robot.id, StaffCounts());
     robot.workspace = openings.empty() ? EntityId{} : pick(openings);
     robot.location = robot.apartment;
-    robot.punctualityMinutes = random.UniformInt(kMinPunctuality, kMaxPunctuality);
+    robot.punctualityMinutes = random.UniformInt(static_cast<std::uint32_t>(state_.settings.population.minPunctuality), static_cast<std::uint32_t>(state_.settings.population.maxPunctuality));
     robot.needs = {.charge = need(), .condition = need(), .social = need(), .fun = need()};
-    const std::int64_t savings = random.UniformInt(kMinNewcomerCredits, kMaxNewcomerCredits);
+    const std::int64_t savings = random.UniformInt(static_cast<std::uint32_t>(state_.settings.population.minNewcomerCredits), static_cast<std::uint32_t>(state_.settings.population.maxNewcomerCredits));
     // A bank of its own, the way the first robots were given theirs.
     std::vector<EntityId> banks;
     for (const Organization& organization : state_.economy.organizations) {
@@ -182,11 +172,11 @@ void World::AddNewcomer() {
     const std::uint32_t firstDayOff = random.UniformInt(0, kDaysPerWeek - 1);
     robot.daysOff = static_cast<std::uint8_t>((1U << firstDayOff) |
                                               (1U << ((firstDayOff + 1) % kDaysPerWeek)));
-    while (std::popcount(robot.interests) < static_cast<int>(kNewcomerInterests)) {
+    while (std::popcount(robot.interests) < static_cast<int>(static_cast<std::uint32_t>(state_.settings.population.newcomerInterests))) {
         robot.interests = static_cast<std::uint8_t>(
             robot.interests | (1U << random.UniformInt(0, kInterestCount - 1)));
     }
-    robot.age = random.UniformInt(kMinNewcomerAge, kMaxNewcomerAge);
+    robot.age = random.UniformInt(static_cast<std::uint32_t>(state_.settings.population.minNewcomerAge), static_cast<std::uint32_t>(state_.settings.population.maxNewcomerAge));
     robot.wear = WearAtAge(robot.age);
     // Ids only grow, so the newcomer goes last and robots stay sorted.
     state_.robots.push_back(std::move(robot));

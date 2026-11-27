@@ -8,11 +8,11 @@
 
 namespace mechapunk::sim {
 namespace {
-
 // Money created by the central bank is small day by day (the guide's watch
 // list says so), so only an emission of more than this changes the city
 // enough to be worth reading about years later.
 constexpr std::int64_t kMoneyNoteCredits = 10000;
+
 
 // The events worth the chronicle's space: what shaped a robot, a building
 // or the whole city. Errands, talks, rent and prices are daily life and stay

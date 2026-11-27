@@ -55,20 +55,6 @@ const char* Doing(const RobotFrame& robot) {
     return "";
 }
 
-// Credits a night the site asks for: `kSiteSuppliesNight` in Construction.cpp.
-// The nightly review pays it through `PaySupplies` (Money.cpp), which moves
-// the owner's sector share of the ask - half for the housing trust, nothing
-// for an industry corporation - and counts that money into `costSoFar`, so
-// the two numbers on this line read alike only for the housing trust.
-constexpr std::int64_t kSiteSuppliesNight = 200;
-
-// The shares the nightly review reads off the saved history before it raises
-// a site, as `kMarketVacancyPercent` and `kUnemploymentPercent` in
-// Construction.cpp. The number of the night that fired is not saved, so the
-// page names the rule with its share.
-constexpr std::int64_t kMarketVacancyPercent = 25;
-constexpr std::int64_t kUnemploymentPercent = 5;
-
 // What the site is raising, from the building's own kind: a habitat stands
 // for homes, a workplace for jobs (Construction.cpp's `startSite`).
 const char* KindOf(const sim::Building& building) {
@@ -79,18 +65,21 @@ const char* KindOf(const sim::Building& building) {
 // The shortage that started the site, as `ProjectReason` (Construction.hpp).
 // `Unknown` is what a project of a version 24 save reads as: that game chose
 // a shortage without naming it, and the migration must not invent one.
-std::string ReasonOf(const sim::Project& project) {
+// The shares and the streak it names are the world's own settings
+// (`construction.*`): the number of the night that fired is not saved, so the
+// page names the rule with its share.
+std::string ReasonOf(const sim::Project& project, const sim::ConstructionSettings& rules) {
     switch (project.reason) {
         case sim::ProjectReason::HomesShort:
             return std::format(
                 "homes short: under {}% of the market's homes stood empty "
-                "for 7 nights running",
-                kMarketVacancyPercent);
+                "for {} nights running",
+                rules.marketVacancyPercent, rules.streakNights);
         case sim::ProjectReason::JobsShort:
             return std::format(
-                "jobs short: over {}% of the robots out of work for 7 nights "
+                "jobs short: over {}% of the robots out of work for {} nights "
                 "running",
-                kUnemploymentPercent);
+                rules.unemploymentPercent, rules.streakNights);
         default:
             return "not recorded: an older game started this site";
     }
@@ -160,11 +149,11 @@ std::optional<InspectorRequest> DrawProject(
     // started (step D5b2's `costSoFar`) and the ask every night pays.
     ImGui::SeparatorText("Cost");
     ImGui::Text("%s so far, %s asked a night", Credits(project->costSoFar).c_str(),
-                Credits(kSiteSuppliesNight).c_str());
+                Credits(frame.settings.construction.siteSuppliesNight).c_str());
 
     // The shortage that started it, with the share the review reads.
     ImGui::SeparatorText("Why it started");
-    ImGui::TextUnformatted(ReasonOf(*project).c_str());
+    ImGui::TextUnformatted(ReasonOf(*project, frame.settings.construction).c_str());
 
     // The crew: every robot whose job is this site's office (ProjectLists'
     // `BuildersOf`), by id. A site office holds six builders (Construction.cpp

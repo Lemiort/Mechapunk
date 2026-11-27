@@ -217,7 +217,7 @@ TEST(Careers, WagesFollowTheJobLevel) {
             static_cast<std::int64_t>(
                 sim::WageAtLevel(sim::JobShift(*room, robot->id).wage, robot->jobLevel)) *
             employer->payPercent / 100;
-        EXPECT_EQ(event.credits, wage - (wage * sim::kWageTaxPercent / 100));
+        EXPECT_EQ(event.credits, wage - (wage * static_cast<std::int64_t>(sim::SimSettings{}.economy.wageTaxPercent) / 100));
         ++shifts;
     });
     world.RunFor(3 * sim::kMinutesPerDay);
@@ -266,7 +266,7 @@ TEST(Careers, WornDownWorkersAreFiredAndHiredAgain) {
     // then guarantees the shift ends at or below it, whatever the random
     // shift score is. A single point above it made this test depend on the
     // score draw (and on unrelated RNG use elsewhere in the simulation).
-    robot.performance = sim::kFiringPerformance;
+    robot.performance = static_cast<std::int32_t>(sim::SimSettings{}.careers.firingPerformance);
     robot.needs.condition = 0;
     robot.wear = 0;
     const auto workspace = city.Rooms().Find(robot.workspace);

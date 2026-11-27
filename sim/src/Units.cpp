@@ -24,55 +24,10 @@
 namespace mechapunk::sim {
 namespace {
 
-// Venue prices move a step a night between these, in percent of base;
-// a venue counts as busy when it had kBusyTurns times its places in guests.
-constexpr std::uint32_t kPriceStep = 1;
-
-constexpr std::uint32_t kMinPricePercent = 50;
-
-constexpr std::uint32_t kMaxPricePercent = 300;
-
-constexpr std::uint32_t kBusyTurns = 3;
-
-// Market rents move a point a night while fewer homes than the tight share
-// stand empty, or more than the loose share; within these bounds.
-constexpr std::int64_t kTightVacancyPercent = 5;
-
-constexpr std::int64_t kLooseVacancyPercent = 15;
-
-constexpr std::int64_t kMinRentPercent = 50;
-
-constexpr std::int64_t kMaxRentPercent = 300;
-
-// A venue closes after this many nights in a row with fewer guests than
-// half its places, its prices already cut to kQuietPricePercent or less; a
-// workspace after as many under half staffed, while under the low share of
-// robots, in percent, is out of work.
-constexpr std::uint32_t kCloseAfterNights = 10;
-
-constexpr std::uint32_t kQuietPricePercent = 80;
-
-constexpr std::int64_t kLowUnemploymentPercent = 2;
-
-// Each night an empty unit may open, with this chance in percent: as a
-// workspace in a workplace while over the high share of robots is out of
-// work, otherwise as the venue the city is most short of.
-constexpr std::uint32_t kOpenUnitPercent = 10;
-
-constexpr std::int64_t kHighUnemploymentPercent = 5;
-
-// Venues of a kind count as in demand while their prices average this, in
-// percent of usual.
-constexpr std::int64_t kInDemandPercent = 105;
-
-constexpr std::uint32_t kMinWorkspaceStaff = 5;
-
-constexpr std::uint32_t kMaxWorkspaceStaff = 10;
-
 }  // namespace
 
 std::int64_t World::PriceOf(const Room& apartment) const {
-    return RentFor(apartment) * kPriceNights;
+    return RentFor(apartment) * static_cast<std::int64_t>(state_.settings.economy.priceNights);
 }
 
 std::int64_t World::RentFor(const Room& apartment) const {
@@ -163,7 +118,7 @@ void World::OpenUnit(Room& room, RoomKind kind) {
         room.capacity = state_.random.UniformInt(rules->minCapacity, rules->maxCapacity);
     } else {
         room.name = "Workshop";
-        room.capacity = state_.random.UniformInt(kMinWorkspaceStaff, kMaxWorkspaceStaff);
+        room.capacity = state_.random.UniformInt(static_cast<std::uint32_t>(state_.settings.venues.minWorkspaceStaff), static_cast<std::uint32_t>(state_.settings.venues.maxWorkspaceStaff));
     }
     room.pricePercent = 100;
     room.visits = 0;
@@ -210,7 +165,7 @@ void World::ReviewUnits() {
         for (const auto& [kind, sum] : demand) {
             // A kind the city lacks altogether is wanted most.
             const std::int64_t score = sum.second == 0 ? 1000 : sum.first / sum.second;
-            if (score >= kInDemandPercent && score > bestScore) {
+            if (score >= static_cast<std::int64_t>(state_.settings.venues.inDemandPercent) && score > bestScore) {
                 best = kind;
                 bestScore = score;
             }
@@ -223,24 +178,24 @@ void World::ReviewUnits() {
                 continue;
             }
             if (IsVenue(room.kind)) {
-                const bool quiet = room.visits * 2 < room.capacity && room.pricePercent <= kQuietPricePercent;
+                const bool quiet = room.visits * 2 < room.capacity && room.pricePercent <= static_cast<std::uint32_t>(state_.settings.venues.quietPricePercent);
                 room.quietNights = quiet ? room.quietNights + 1 : 0;
-                if (room.quietNights >= kCloseAfterNights && !busy.contains(room.id.value)) {
+                if (room.quietNights >= static_cast<std::uint32_t>(state_.settings.venues.closeAfterNights) && !busy.contains(room.id.value)) {
                     CloseUnit(room);
                 }
             } else if (room.kind == RoomKind::Workspace) {
                 room.quietNights = staff[room.id.value] * 2 < room.capacity ? room.quietNights + 1 : 0;
-                if (room.quietNights >= kCloseAfterNights && unemployment < kLowUnemploymentPercent &&
+                if (room.quietNights >= static_cast<std::uint32_t>(state_.settings.venues.closeAfterNights) && unemployment < static_cast<std::int64_t>(state_.settings.venues.lowUnemploymentPercent) &&
                     !busy.contains(room.id.value)) {
                     CloseUnit(room);
                 }
             } else if (room.kind == RoomKind::VacantStore) {
                 ++room.quietNights;
-                if (state_.random.UniformInt(1, 100) > kOpenUnitPercent || busy.contains(room.id.value)) {
+                if (state_.random.UniformInt(1, 100) > static_cast<std::uint32_t>(state_.settings.venues.openUnitPercent) || busy.contains(room.id.value)) {
                     continue;
                 }
                 if (building.kind == BuildingKind::Workplace &&
-                    unemployment >= kHighUnemploymentPercent) {
+                    unemployment >= static_cast<std::int64_t>(state_.settings.venues.highUnemploymentPercent)) {
                     OpenUnit(room, RoomKind::Workspace);
                 } else if (stations * 2000 < population) {
                     // City Hall takes the unit before any venue opens.
@@ -268,10 +223,10 @@ void World::SetPrices() {
             if (!IsVenue(room.kind)) {
                 continue;
             }
-            if (room.visits >= kBusyTurns * room.capacity) {
-                room.pricePercent = std::min(kMaxPricePercent, room.pricePercent + kPriceStep);
+            if (room.visits >= static_cast<std::uint32_t>(state_.settings.venues.busyTurns) * room.capacity) {
+                room.pricePercent = std::min(static_cast<std::uint32_t>(state_.settings.venues.maxPricePercent), room.pricePercent + static_cast<std::uint32_t>(state_.settings.venues.priceStep));
             } else if (room.visits < room.capacity) {
-                room.pricePercent = std::max(kMinPricePercent, room.pricePercent - kPriceStep);
+                room.pricePercent = std::max(static_cast<std::uint32_t>(state_.settings.venues.minPricePercent), room.pricePercent - static_cast<std::uint32_t>(state_.settings.venues.priceStep));
             }
             room.visits = 0;
         }
@@ -293,16 +248,16 @@ void World::SetPrices() {
         }
         std::int64_t& rent = state_.economy.rentPercent[kind];
         const std::int64_t vacancy = empty[kind] * 100 / homes[kind];
-        if (vacancy < kTightVacancyPercent) {
-            rent = std::min(kMaxRentPercent, rent + 1);
-        } else if (vacancy > kLooseVacancyPercent) {
-            rent = std::max(kMinRentPercent, rent - 1);
+        if (vacancy < static_cast<std::int64_t>(state_.settings.venues.tightVacancyPercent)) {
+            rent = std::min(static_cast<std::int64_t>(state_.settings.venues.maxRentPercent), rent + 1);
+        } else if (vacancy > static_cast<std::int64_t>(state_.settings.venues.looseVacancyPercent)) {
+            rent = std::max(static_cast<std::int64_t>(state_.settings.venues.minRentPercent), rent - 1);
         }
     }
 }
 
 std::int64_t World::UpkeepOf(const Room& apartment) const {
-    return RentFor(apartment) * kUpkeepPercent / 100;
+    return RentFor(apartment) * static_cast<std::int64_t>(state_.settings.economy.upkeepPercent) / 100;
 }
 
 }  // namespace mechapunk::sim

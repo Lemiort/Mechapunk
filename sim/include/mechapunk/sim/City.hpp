@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "mechapunk/sim/Ids.hpp"
+#include "mechapunk/sim/Settings.hpp"
 #include "mechapunk/sim/Random.hpp"
 
 namespace mechapunk::sim {
@@ -216,6 +217,8 @@ struct CityParams {
     std::uint32_t blockMeters{80};
     // Apartments and workspaces are added until both hold this many.
     std::uint32_t residents{100};
+    // How the city is laid out: floors, jobs, rents, stores and stations.
+    CitySettings city{};
 };
 
 // Allocates entity ids; the counter is saved with the world.

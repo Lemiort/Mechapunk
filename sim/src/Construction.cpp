@@ -24,14 +24,6 @@
 namespace mechapunk::sim {
 namespace {
 
-// Workplaces on a finished floor of a new workplace, and the places in one.
-constexpr std::uint32_t kWorkspacesPerFloor = 2;
-constexpr std::uint32_t kWorkspacePlaces = 8;
-
-// Daily rent of a new habitat's lowest floor, a credit more a floor up,
-// as generation asks of its own habitats (City.cpp).
-constexpr std::uint32_t kBaseRent = 30;
-
 // The hours a new workplace's staff stand: an assembly line's shift, the
 // plainest of generation's, so a new job is not the easiest in the city.
 constexpr Shift kSiteShift{.startMinute = 7 * 60, .lengthMinutes = 480, .wage = 100};
@@ -206,20 +198,20 @@ void World::ReviewConstruction() {
                     .kind = RoomKind::Apartment,
                     .floor = floor,
                     .capacity = Sleeps(kind),
-                    .rent = (kBaseRent + floor) * RentPercent(kind) / 100,
+                    .rent = (static_cast<std::uint32_t>(state_.settings.construction.baseRent) + floor) * RentPercent(kind) / 100,
                     .owner = project.owner,
                     .apartmentClass = kind,
                 });
             }
         } else {
-            for (std::uint32_t index = 0; index != kWorkspacesPerFloor; ++index) {
+            for (std::uint32_t index = 0; index != static_cast<std::uint32_t>(state_.settings.construction.workspacesPerFloor); ++index) {
                 building.rooms.push_back({
                     .id = state_.ids.Allocate(),
                     .name = std::format("Work Floor {}",
-                                        ((floor - 1) * kWorkspacesPerFloor) + index + 1),
+                                        ((floor - 1) * static_cast<std::uint32_t>(state_.settings.construction.workspacesPerFloor)) + index + 1),
                     .kind = RoomKind::Workspace,
                     .floor = floor,
-                    .capacity = kWorkspacePlaces,
+                    .capacity = static_cast<std::uint32_t>(state_.settings.construction.workspacePlaces),
                     .owner = project.owner,
                 });
             }

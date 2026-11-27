@@ -187,7 +187,7 @@ void World::FoundEconomy(std::uint64_t seed) {
                 break;
             case Sector::Banking:
                 organization.credits = organization.kind == OrganizationKind::Bank
-                                           ? kBankFloor + (population * 4)
+                                           ? static_cast<std::int64_t>(state_.settings.economy.bankFloor) + (population * 4)
                                            : 0;
                 break;
             default:

@@ -30,10 +30,6 @@ constexpr std::uint32_t kWalkingMetersPerMinute = 75;
 // Floors climbed per minute of stairs or elevator.
 constexpr std::uint32_t kFloorsPerMinute = 3;
 
-// A robot at a clinic loses this much wear every ten minutes, and values a
-// clinic visit by a third of its wear.
-constexpr std::int32_t kClinicWearRepair = 2;
-
 constexpr NeedEffects kWalking{.charge = -8, .condition = -1, .social = -5,
                                .fun = -3};
 
@@ -183,7 +179,7 @@ void World::UpdateNeeds() {
                         rules->socialGuestCap);
                     Apply(robot.needs, effects);
                     if (venue->room->kind == RoomKind::Clinic) {
-                        robot.wear = std::max(robot.wear - kClinicWearRepair, 0);
+                        robot.wear = std::max(robot.wear - static_cast<std::int32_t>(state_.settings.behaviour.clinicWearRepair), 0);
                     }
                 }
                 break;

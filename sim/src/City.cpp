@@ -24,43 +24,9 @@ namespace mechapunk::sim {
 
 namespace {
 constexpr std::uint32_t kUnreachable = std::numeric_limits<std::uint32_t>::max();
-// One candidate street segment in this many is considered for removal.
-constexpr std::uint32_t kStreetRemovalOdds = 10;
-// Habitats at the city's edge have five to ten floors of homes; toward the
-// middle they rise to fifteen to thirty.
-constexpr std::uint32_t kMinFloors = 5;
-constexpr std::uint32_t kMaxFloors = 10;
-constexpr std::uint32_t kMinCentralFloors = 15;
-constexpr std::uint32_t kMaxCentralFloors = 30;
-// Tall habitats get one more store, and bigger stores, so there is as much
-// room in venues for each resident as in a habitat of kTypicalResidents
-// with an average number of stores.
-constexpr std::uint32_t kResidentsForExtraStore = 100;
 constexpr double kTypicalResidents = 45.0;
-// Daily rent of a habitat's lowest studios; each floor up costs a credit
-// more. Other classes cost a multiple, in percent; dorm rooms are cheap
-// whatever the floor.
-constexpr std::uint32_t kMinBaseRent = 25;
-constexpr std::uint32_t kMaxBaseRent = 40;
-constexpr std::uint32_t kDormRent = 8;
-// A new city has a dorm bed for every robot, and homes on the market for
-// this share of them, in percent.
-constexpr std::uint32_t kMarketHomesPercent = 60;
 // Habitats this central or more have penthouses on top.
 constexpr double kLuxuryCentrality = 0.3;
-constexpr std::uint32_t kMinStores = 2;
-constexpr std::uint32_t kMaxStores = 3;
-// Workplaces grow toward the middle the same way.
-constexpr std::uint32_t kMinWorkplaceJobs = 15;
-constexpr std::uint32_t kMaxWorkplaceJobs = 40;
-constexpr std::uint32_t kMinCentralJobs = 60;
-constexpr std::uint32_t kMaxCentralJobs = 160;
-constexpr std::uint32_t kMinWorkspaceSize = 5;
-constexpr std::uint32_t kMaxWorkspaceSize = 10;
-constexpr std::uint32_t kWorkspacesPerFloor = 2;
-// Workplaces of this many jobs are office towers, one workspace per floor.
-constexpr std::uint32_t kTowerJobs = 60;
-
 struct WorkplaceType {
     std::string_view name;
     std::string_view workspace;
@@ -194,22 +160,22 @@ std::uint32_t Lerp(std::uint32_t edge, std::uint32_t central, double centrality)
 
 // The smallest grid of at least kMinGridSize on which the buildings for
 // `residents` take about kBuildingsPerNode of every intersection's corners.
-std::uint32_t GridSizeFor(std::uint32_t residents) {
+std::uint32_t GridSizeFor(std::uint32_t residents, const CitySettings& cfg) {
     constexpr std::uint32_t kMinGridSize = 4;
     // Sizes at the average centrality of a grid's intersections, about 0.45.
     const double averageCentrality = 0.45 * Urbanity(residents);
     const double averageFloors =
-        ((kMinFloors + kMaxFloors) / 2.0) +
-        ((((kMinCentralFloors + kMaxCentralFloors) - (kMinFloors + kMaxFloors)) / 2.0) *
+        ((static_cast<std::uint32_t>(cfg.minFloors) + static_cast<std::uint32_t>(cfg.maxFloors)) / 2.0) +
+        ((((static_cast<std::uint32_t>(cfg.minCentralFloors) + static_cast<std::uint32_t>(cfg.maxCentralFloors)) - (static_cast<std::uint32_t>(cfg.minFloors) + static_cast<std::uint32_t>(cfg.maxFloors))) / 2.0) *
          averageCentrality);
     const double averageJobs =
-        ((kMinWorkplaceJobs + kMaxWorkplaceJobs) / 2.0) +
-        ((((kMinCentralJobs + kMaxCentralJobs) -
-           (kMinWorkplaceJobs + kMaxWorkplaceJobs)) / 2.0) * averageCentrality);
+        ((static_cast<std::uint32_t>(cfg.minWorkplaceJobs) + static_cast<std::uint32_t>(cfg.maxWorkplaceJobs)) / 2.0) +
+        ((((static_cast<std::uint32_t>(cfg.minCentralJobs) + static_cast<std::uint32_t>(cfg.maxCentralJobs)) -
+           (static_cast<std::uint32_t>(cfg.minWorkplaceJobs) + static_cast<std::uint32_t>(cfg.maxWorkplaceJobs))) / 2.0) * averageCentrality);
     // Dormitories sleep 12 a floor, other habitats about 5.
     constexpr double kBuildingsPerNode = 3.0;
     const double habitats = std::ceil(residents / (12.0 * averageFloors)) +
-                            std::ceil(residents * (kMarketHomesPercent / 100.0) /
+                            std::ceil(residents * (static_cast<std::uint32_t>(cfg.marketHomesPercent) / 100.0) /
                                       (5.0 * averageFloors));
     const double buildings = habitats + std::ceil(residents / averageJobs);
     const auto size =
@@ -222,8 +188,6 @@ const T& Pick(std::span<const T> items, Pcg32& random) {
     return items[random.UniformInt(0, static_cast<std::uint32_t>(items.size() - 1))];
 }
 
-constexpr std::uint32_t kStationSpacing = 2;
-constexpr std::uint32_t kStationOffset = 1;
 constexpr std::array<std::string_view, 12> kStationNames{
     "Neon Square",  "Foundry Gate", "Old Grid",     "Chrome Market",
     "Circuit Park", "Signal Hill",  "Rust Docks",   "Ion Plaza",
@@ -276,8 +240,8 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
                       .rooms = {}};
     const double centrality =
         Centrality(building.entrance, params.gridSize) * Urbanity(params.residents);
-    const std::uint32_t floors = random.UniformInt(Lerp(kMinFloors, kMinCentralFloors, centrality),
-                                                   Lerp(kMaxFloors, kMaxCentralFloors, centrality));
+    const std::uint32_t floors = random.UniformInt(Lerp(static_cast<std::uint32_t>(params.city.minFloors), static_cast<std::uint32_t>(params.city.minCentralFloors), centrality),
+                                                   Lerp(static_cast<std::uint32_t>(params.city.maxFloors), static_cast<std::uint32_t>(params.city.maxCentralFloors), centrality));
     std::vector<ApartmentClass> classes;
     const bool luxury = !dormitory && centrality >= kLuxuryCentrality;
     for (std::uint32_t floor = 1; floor <= floors; ++floor) {
@@ -297,9 +261,9 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
     for (const ApartmentClass kind : classes) {
         residents += ApartmentsPerFloor(kind) * Sleeps(kind);
     }
-    const std::uint32_t stores = random.UniformInt(kMinStores, kMaxStores) +
-                                 (residents >= kResidentsForExtraStore ? 1 : 0);
-    constexpr double kAverageStores = (kMinStores + kMaxStores) / 2.0;
+    const std::uint32_t stores = random.UniformInt(static_cast<std::uint32_t>(params.city.minStores), static_cast<std::uint32_t>(params.city.maxStores)) +
+                                 (residents >= static_cast<std::uint32_t>(params.city.residentsForExtraStore) ? 1 : 0);
+    const double kAverageStores = (static_cast<std::uint32_t>(params.city.minStores) + static_cast<std::uint32_t>(params.city.maxStores)) / 2.0;
     const double capacityScale =
         std::max(1.0, (static_cast<double>(residents) * kAverageStores) /
                           (kTypicalResidents * static_cast<double>(stores)));
@@ -316,7 +280,7 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
              .capacity = static_cast<std::uint32_t>(
                  std::lround(static_cast<double>(capacity) * capacityScale))});
     }
-    const std::uint32_t baseRent = random.UniformInt(kMinBaseRent, kMaxBaseRent);
+    const std::uint32_t baseRent = random.UniformInt(static_cast<std::uint32_t>(params.city.minBaseRent), static_cast<std::uint32_t>(params.city.maxBaseRent));
     for (std::uint32_t floor = 1; floor <= floors; ++floor) {
         const ApartmentClass kind = classes[floor - 1];
         const std::uint32_t perFloor = ApartmentsPerFloor(kind);
@@ -329,7 +293,7 @@ Building MakeHabitat(const CityParams& params, Pcg32& random,
                  .floor = floor,
                  .capacity = Sleeps(kind),
                  .rent = kind == ApartmentClass::Dorm
-                             ? kDormRent + (floor / 4)
+                             ? static_cast<std::uint32_t>(params.city.dormRent) + (floor / 4)
                              : (baseRent + floor) * RentPercent(kind) / 100,
                  .apartmentClass = kind});
         }
@@ -358,15 +322,15 @@ Building MakeWorkplace(const CityParams& params, Pcg32& random,
     const double centrality =
         Centrality(building.entrance, params.gridSize) * Urbanity(params.residents);
     const std::uint32_t jobs =
-        random.UniformInt(Lerp(kMinWorkplaceJobs, kMinCentralJobs, centrality),
-                          Lerp(kMaxWorkplaceJobs, kMaxCentralJobs, centrality));
+        random.UniformInt(Lerp(static_cast<std::uint32_t>(params.city.minWorkplaceJobs), static_cast<std::uint32_t>(params.city.minCentralJobs), centrality),
+                          Lerp(static_cast<std::uint32_t>(params.city.maxWorkplaceJobs), static_cast<std::uint32_t>(params.city.maxCentralJobs), centrality));
     std::uint32_t staffed = 0;
     for (std::uint32_t index = 0; staffed < jobs; ++index) {
         const std::uint32_t size = std::min(
             jobs - staffed,
-            random.UniformInt(kMinWorkspaceSize, kMaxWorkspaceSize));
+            random.UniformInt(static_cast<std::uint32_t>(params.city.minWorkspaceSize), static_cast<std::uint32_t>(params.city.maxWorkspaceSize)));
         const std::uint32_t floor =
-            index / (jobs >= kTowerJobs ? 1 : kWorkspacesPerFloor);
+            index / (jobs >= static_cast<std::uint32_t>(params.city.towerJobs) ? 1 : static_cast<std::uint32_t>(params.city.workspacesPerFloor));
         building.rooms.push_back(
             {.id = ids.Allocate(),
              .name = std::format("{} {}", type.workspace, index + 1),
@@ -415,7 +379,7 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
                   EntityIdAllocator& ids) {
     CityParams params = requested;
     if (params.gridSize == 0) {
-        params.gridSize = GridSizeFor(params.residents);
+        params.gridSize = GridSizeFor(params.residents, params.city);
     }
     if (params.gridSize < 2 || params.blockMeters == 0) {
         throw std::invalid_argument(
@@ -435,9 +399,9 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
 
     // Stations at every second intersection, one in from the edge, so no
     // corner of the city is far from one.
-    for (std::uint32_t row = kStationOffset; row < size; row += kStationSpacing) {
-        for (std::uint32_t column = kStationOffset; column < size;
-             column += kStationSpacing) {
+    for (std::uint32_t row = static_cast<std::uint32_t>(params.city.stationOffset); row < size; row += static_cast<std::uint32_t>(params.city.stationSpacing)) {
+        for (std::uint32_t column = static_cast<std::uint32_t>(params.city.stationOffset); column < size;
+             column += static_cast<std::uint32_t>(params.city.stationSpacing)) {
             const auto number = static_cast<std::uint32_t>(city.stations.size());
             std::string name{kStationNames.at(number % kStationNames.size())};
             if (number >= kStationNames.size()) {
@@ -467,7 +431,7 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
     // Drop a few segments for less regular routes, keeping the city connected.
     std::vector<bool> removed(candidates.size(), false);
     for (std::size_t index = 0; index < candidates.size(); ++index) {
-        if (random.UniformInt(1, kStreetRemovalOdds) == 1) {
+        if (random.UniformInt(1, static_cast<std::uint32_t>(params.city.streetRemovalOdds)) == 1) {
             removed[index] = true;
             if (!IsConnected(size * size, candidates, removed)) {
                 removed[index] = false;
@@ -501,7 +465,7 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
     std::uint64_t dormBeds = 0;
     std::uint64_t marketBeds = 0;
     const std::uint64_t marketGoal =
-        (static_cast<std::uint64_t>(params.residents) * kMarketHomesPercent) / 100;
+        (static_cast<std::uint64_t>(params.residents) * static_cast<std::uint32_t>(params.city.marketHomesPercent)) / 100;
     std::uint32_t habitats = 0;
     std::uint32_t storeRotation = 0;
     while (dormBeds < params.residents || marketBeds < marketGoal) {

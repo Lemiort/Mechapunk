@@ -281,14 +281,14 @@ TEST(Economy, CityHallTaxesAndSupports) {
     // A tenth, give or take rounding on each wage.
     EXPECT_NEAR(static_cast<double>(day.counted.wageTax) * 100.0 /
                     static_cast<double>(day.counted.wages),
-                static_cast<double>(sim::kWageTaxPercent), 1.0);
+                static_cast<double>(static_cast<std::int64_t>(sim::SimSettings{}.economy.wageTaxPercent)), 1.0);
     EXPECT_GT(day.counted.propertyTax, 0);
     // Robots still out of work after the night's hiring got support.
     std::int64_t jobless = 0;
     for (const sim::Robot& robot : world->State().robots) {
         jobless += robot.workspace.IsValid() ? 0 : 1;
     }
-    EXPECT_EQ(day.counted.benefits, jobless * sim::kBenefit);
+    EXPECT_EQ(day.counted.benefits, jobless * static_cast<std::int64_t>(sim::SimSettings{}.economy.benefit));
     for (const sim::Organization& organization : world->State().economy.organizations) {
         if (organization.sector == sim::Sector::Transit) {
             ASSERT_EQ(organization.owners.size(), 1U);
@@ -304,7 +304,7 @@ TEST(Economy, TheCentralBankRateFallsWhileMoneyIsSteady) {
     sim::World world = sim::World::Generate({.seed = 10, .robots = 400});
     world.RunFor(6 * sim::kMinutesPerDay);
     EXPECT_LT(world.State().economy.policyRate, sim::kStartingPolicyRate);
-    EXPECT_GE(world.State().economy.policyRate, sim::kMinPolicyRate);
+    EXPECT_GE(world.State().economy.policyRate, static_cast<std::int64_t>(sim::SimSettings{}.economy.minPolicyRate));
     EXPECT_EQ(world.State().history.back().policyRate, world.State().economy.policyRate);
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }

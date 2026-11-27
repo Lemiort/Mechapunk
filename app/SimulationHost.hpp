@@ -101,6 +101,9 @@ struct WorldFrame {
     sim::Tick tick{};
     // The weather's rain, 0 (dry) to sim::kMaxRain.
     std::uint32_t rain{};
+    // The simulation's settings (task: settings), for numbers the interface
+    // shows, such as the tax rate and the point where a robot is fired.
+    sim::SimSettings settings;
     std::vector<RobotFrame> robots;
     std::uint32_t resting{};
     std::uint32_t working{};

@@ -153,15 +153,15 @@ void DrawWear(const RobotFrame& robot) {
 
 // How the robot is doing at work: a bar toward the next promotion, red
 // when it is on thin ice.
-void DrawPerformance(const RobotFrame& robot) {
+void DrawPerformance(const RobotFrame& robot, const sim::SimSettings& settings) {
     if (robot.performance < 0) {
         const float risk = static_cast<float>(-robot.performance) /
-                           static_cast<float>(-sim::kFiringPerformance);
+                           static_cast<float>(-settings.careers.firingPerformance);
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, kLowBar);
         ImGui::ProgressBar(risk, ImVec2{-1.0F, 0.0F},
                            std::format("doing poorly ({})", robot.performance).c_str());
         ImGui::PopStyleColor();
-        ImGui::SetItemTooltip("Fired at %d", sim::kFiringPerformance);
+        ImGui::SetItemTooltip("Fired at %d", settings.careers.firingPerformance);
         return;
     }
     if (robot.jobLevel >= sim::kMaxJobLevel) {
@@ -416,7 +416,7 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
                     pay = pay * employer->payPercent / 100;
                 }
             }
-            pay -= pay * sim::kWageTaxPercent / 100;  // After City Hall's share.
+            pay -= pay * frame.settings.economy.wageTaxPercent / 100;  // After City Hall's share.
             const std::string job = std::format(
                 "{}{}, {}-{}, {} cr a shift after tax", sim::JobTitle(robot.jobLevel),
                 sim::IsVenue(work->room->kind) ? " on the staff" : "",
@@ -424,7 +424,7 @@ std::optional<InspectorRequest> DrawRobot(const RobotFrame& robot,
                 sim::FormatClock((shift.startMinute + shift.lengthMinutes) % sim::kMinutesPerDay),
                 pay);
             ImGui::TextDisabled("%s", job.c_str());
-            DrawPerformance(robot);
+            DrawPerformance(robot, frame.settings);
             // A builder: its job is a site's office, the only room of a
             // building going up anyone works in (ProjectLists' rule), so the
             // project raising that building is the site it works on.

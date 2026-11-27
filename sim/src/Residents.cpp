@@ -121,7 +121,7 @@ void World::CollectRent() {
         if (room.owner == cityHall_ || city == nullptr) {
             continue;
         }
-        const std::int64_t tax = RentFor(room) * kPropertyTaxPercent / 100;
+        const std::int64_t tax = RentFor(room) * static_cast<std::int64_t>(state_.settings.economy.propertyTaxPercent) / 100;
         std::int64_t paid = tax;
         if (Organization* owner = MutableOrganization(room.owner)) {
             owner->today.taxes += tax;

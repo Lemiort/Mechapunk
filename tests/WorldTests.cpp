@@ -175,7 +175,7 @@ TEST(World, BillsArePaidOrOwed) {
     for (const sim::Robot& robot : world.State().robots) {
         const sim::Room& home = *world.Rooms().Find(robot.apartment)->room;
         billDue[robot.id.value] = home.owner == robot.id
-                                      ? home.rent * sim::kUpkeepPercent / 100
+                                      ? home.rent * static_cast<std::int64_t>(sim::SimSettings{}.economy.upkeepPercent) / 100
                                       : home.rent;
     }
     std::map<std::uint64_t, std::int64_t> paid;
@@ -227,7 +227,7 @@ TEST(World, RobotsKeepABudgetForRent) {
         // Tonight's bill: rent for a tenant, upkeep for an owner.
         const sim::Room& home = *world.Rooms().Find(robot->apartment)->room;
         const std::int64_t bill =
-            home.owner == robot->id ? home.rent * sim::kUpkeepPercent / 100 : home.rent;
+            home.owner == robot->id ? home.rent * static_cast<std::int64_t>(sim::SimSettings{}.economy.upkeepPercent) / 100 : home.rent;
         // Repairs a worn robot needs may come out of its savings.
         EXPECT_GE(robot->credits + robot->savings, bill + robot->rentOwed) << robot->name;
     });

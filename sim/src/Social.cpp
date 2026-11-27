@@ -24,36 +24,8 @@
 namespace mechapunk::sim {
 
 namespace {
-// Chance in percent that a robot starts a talk in ten minutes.
-constexpr std::uint32_t kVenueTalkPercent = 40;
-constexpr std::uint32_t kWorkTalkPercent = 5;
-// Affinity a talk adds: shared interests make talks go well; without any,
-// talks tend to turn into arguments.
-constexpr std::uint32_t kTalkSpread = 8;
-constexpr std::int32_t kSharedTalkBase = -3;
-constexpr std::int32_t kPerSharedInterest = 2;
-constexpr std::int32_t kStrangerTalkBase = -5;
-// Beyond friendship or rivalry, each talk moves feelings half as far.
-// A good talk lifts social, more with a friend; an argument costs fun.
-constexpr std::int32_t kTalkSocial = 6;
-constexpr std::int32_t kAffinityPerExtraSocial = 10;
-constexpr std::int32_t kArgumentFun = 4;
-// Partners are picked with weight kPartnerWeight plus affinity / 10.
-constexpr std::uint32_t kPartnerWeight = 2;
-constexpr std::int32_t kAffinityPerWeight = 10;
+constexpr std::size_t kMaxCrimeMemories = 12;
 
-// Bond levels: a bond rises at one affinity and falls back at a lower one.
-constexpr std::int32_t kBecomeFriends = 25;
-constexpr std::int32_t kStayFriends = 10;
-constexpr std::int32_t kBecomeClose = 70;
-constexpr std::int32_t kStayClose = 55;
-constexpr std::int32_t kBecomeRivals = -25;
-constexpr std::int32_t kStayRivals = -10;
-
-// A robot keeps this many bonds; to meet someone new it forgets its weakest
-// acquaintance, if that one is barely known.
-constexpr std::size_t kMaxBonds = 12;
-constexpr std::int32_t kForgettable = 10;
 // What a robot remembers, in two shares that cannot push each other out:
 // twelve memories of ordinary life, and twelve memories of crime - its rap
 // sheet, what it did to the city and what the city did to it. One share of
@@ -62,7 +34,24 @@ constexpr std::int32_t kForgettable = 10;
 // is durable) and had no arrest in its memories, the card the user read on
 // 2026-11-22 as "robber has no memory of arrest".
 constexpr std::size_t kMaxOrdinaryMemories = 12;
-constexpr std::size_t kMaxCrimeMemories = 12;
+
+// A robot keeps this many bonds; to meet someone new it forgets its weakest
+// acquaintance, if that one is barely known.
+constexpr std::size_t kMaxBonds = 12;
+
+constexpr std::int32_t kStayRivals = -10;
+
+constexpr std::int32_t kBecomeRivals = -25;
+
+constexpr std::int32_t kStayClose = 55;
+
+constexpr std::int32_t kBecomeClose = 70;
+
+constexpr std::int32_t kStayFriends = 10;
+
+// Bond levels: a bond rises at one affinity and falls back at a lower one.
+constexpr std::int32_t kBecomeFriends = 25;
+
 // The whole store, which is what validation and a save file allow.
 constexpr std::size_t kMaxMemories = kMaxOrdinaryMemories + kMaxCrimeMemories;
 
@@ -73,17 +62,6 @@ constexpr std::size_t kMaxMemories = kMaxOrdinaryMemories + kMaxCrimeMemories;
     return kind == MemoryKind::RobbedSomeone || kind == MemoryKind::WasRobbed ||
            kind == MemoryKind::Arrested || kind == MemoryKind::ArrestedSomeone;
 }
-// Bonds fade by kFadePerDay each night once the two have not talked for
-// kFadeAfter.
-constexpr Tick kFadeAfter = 2 * kMinutesPerDay;
-constexpr std::int32_t kFadePerDay = 2;
-
-// How much robots want to be where their friends are, or not where their
-// rivals are, when picking a venue.
-constexpr std::int64_t kFriendPull = 250;
-constexpr std::int64_t kCloseFriendPull = 500;
-constexpr std::int64_t kRivalPush = 200;
-
 constexpr std::array<std::string_view, kInterestCount> kInterestNames{
     "drone racing", "circuit bending", "old films", "poetry",
     "chess",        "scrap art",       "synth music", "gambling"};
@@ -299,7 +277,7 @@ void World::Socialize() {
         const bool venue =
             state_.robots[present.front()].activity == RobotActivity::Visiting;
         const std::uint32_t chance =
-            venue ? kVenueTalkPercent : kWorkTalkPercent;
+            venue ? static_cast<std::uint32_t>(state_.settings.social.venueTalkPercent) : static_cast<std::uint32_t>(state_.settings.social.workTalkPercent);
         busy.assign(present.size(), false);
         for (std::size_t self = 0; self < present.size(); ++self) {
             if (state_.random.UniformInt(1, 100) > chance || busy[self]) {
@@ -316,9 +294,9 @@ void World::Socialize() {
                 const std::int32_t affinity =
                     AffinityOf(robot, state_.robots[present[slot]].id);
                 weights[slot] =
-                    kPartnerWeight + static_cast<std::uint32_t>(
+                    static_cast<std::uint32_t>(state_.settings.social.partnerWeight) + static_cast<std::uint32_t>(
                                          std::max(affinity, 0) /
-                                         kAffinityPerWeight);
+                                         static_cast<std::int32_t>(state_.settings.social.affinityPerWeight));
                 total += weights[slot];
             }
             if (total == 0) {
@@ -351,11 +329,11 @@ void World::Talk(Robot& first, Robot& second) {
     const auto shared = static_cast<std::uint8_t>(first.interests &
                                                   second.interests);
     const auto spread = static_cast<std::int32_t>(
-        state_.random.UniformInt(0, kTalkSpread));
+        state_.random.UniformInt(0, static_cast<std::uint32_t>(state_.settings.social.talkSpread)));
     const std::int32_t change =
-        shared != 0 ? spread + kSharedTalkBase +
-                          (kPerSharedInterest * std::popcount(shared))
-                    : spread + kStrangerTalkBase;
+        shared != 0 ? spread + static_cast<std::int32_t>(state_.settings.social.sharedTalkBase) +
+                          (static_cast<std::int32_t>(state_.settings.social.perSharedInterest) * std::popcount(shared))
+                    : spread + static_cast<std::int32_t>(state_.settings.social.strangerTalkBase);
     ++state_.today.talks;
     state_.today.arguments += change < 0 ? 1 : 0;
     // About something they share, or failing that one of them likes.
@@ -375,11 +353,11 @@ void World::Talk(Robot& first, Robot& second) {
         if (change > 0) {
             const std::int32_t extra =
                 std::max(AffinityOf(*robot, other.id), 0) /
-                kAffinityPerExtraSocial;
+                static_cast<std::int32_t>(state_.settings.social.affinityPerExtraSocial);
             robot->needs.social =
-                std::min(robot->needs.social + kTalkSocial + extra, Needs::kMax);
+                std::min(robot->needs.social + static_cast<std::int32_t>(state_.settings.social.talkSocial) + extra, Needs::kMax);
         } else if (change < 0) {
-            robot->needs.fun = std::max(robot->needs.fun - kArgumentFun, 0);
+            robot->needs.fun = std::max(robot->needs.fun - static_cast<std::int32_t>(state_.settings.social.argumentFun), 0);
         }
         Emit({.tick = state_.tick,
               .kind = EventKind::Talked,
@@ -406,7 +384,7 @@ void World::ChangeBond(Robot& robot, EntityId other, std::int32_t change) {
                                : Bond::kMaxAffinity + 1;
                 });
             if (weakest->level != BondLevel::Acquaintance ||
-                std::abs(weakest->affinity) > kForgettable) {
+                std::abs(weakest->affinity) > static_cast<std::int32_t>(state_.settings.social.forgettable)) {
                 return;  // Everyone it knows matters more.
             }
             robot.bonds.erase(weakest);
@@ -491,14 +469,14 @@ void World::Remember(Robot& robot, MemoryKind kind, EntityId other,
 void World::FadeBonds() {
     for (Robot& robot : state_.robots) {
         for (Bond& bond : robot.bonds) {
-            if (state_.tick - bond.lastTalk < kFadeAfter) {
+            if (state_.tick - bond.lastTalk < static_cast<Tick>(state_.settings.social.fadeAfter)) {
                 continue;
             }
             // Feelings cool toward indifference.
             if (bond.affinity > 0) {
-                bond.affinity = std::max(bond.affinity - kFadePerDay, 0);
+                bond.affinity = std::max(bond.affinity - static_cast<std::int32_t>(state_.settings.social.fadePerDay), 0);
             } else {
-                bond.affinity = std::min(bond.affinity + kFadePerDay, 0);
+                bond.affinity = std::min(bond.affinity + static_cast<std::int32_t>(state_.settings.social.fadePerDay), 0);
             }
             UpdateBondLevel(robot, bond, EntityId{});
         }
@@ -529,13 +507,13 @@ std::int64_t World::CompanyAt(const Robot& robot, EntityId venue) const {
         }
         switch (bond.level) {
             case BondLevel::Friend:
-                pull += kFriendPull;
+                pull += static_cast<std::int64_t>(state_.settings.social.friendPull);
                 break;
             case BondLevel::CloseFriend:
-                pull += kCloseFriendPull;
+                pull += static_cast<std::int64_t>(state_.settings.social.closeFriendPull);
                 break;
             case BondLevel::Rival:
-                pull -= kRivalPush;
+                pull -= static_cast<std::int64_t>(state_.settings.social.rivalPush);
                 break;
             case BondLevel::Acquaintance:
                 break;

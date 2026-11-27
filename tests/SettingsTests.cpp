@@ -48,8 +48,8 @@ TEST(Settings, EveryNameIsKnownAndRangeChecked) {
     for (const std::string_view name : sim::SettingNames()) {
         sim::SimSettings settings;
         // A value no setting accepts: far out of every range.
-        EXPECT_FALSE(sim::ApplySetting(settings, name, -1)) << name;
-        EXPECT_FALSE(sim::ApplySetting(settings, name, 100000000)) << name;
+        EXPECT_FALSE(sim::ApplySetting(settings, name, -(std::int64_t{1} << 40))) << name;
+        EXPECT_FALSE(sim::ApplySetting(settings, name, std::int64_t{1} << 40)) << name;
         EXPECT_EQ(settings, sim::SimSettings{}) << name << " changed on a refused value";
     }
     sim::SimSettings settings;
@@ -108,4 +108,50 @@ TEST(Settings, ConstructionKnobsRaiseASiteInTwoNights) {
     world.SetSettings(strict);
     EXPECT_EQ(world.Settings().construction.streakNights, 365);
     EXPECT_EQ(world.State().settings.construction.streakNights, 365) << "the state holds them";
+}
+
+TEST(Settings, EverySettingAcceptsItsOwnDefaultAndTheDefaultsValidate) {
+    EXPECT_TRUE(sim::ValidateSettings(sim::SimSettings{}));
+    // 150 and more settings: each can be set to the value it already holds,
+    // so no default sits outside its own range or breaks a min/max pair.
+    sim::SimSettings settings;
+    EXPECT_GT(sim::SettingNames().size(), 150U);
+    for (const std::string_view name : sim::SettingNames()) {
+        EXPECT_TRUE(sim::ValidateSettings(settings)) << name;
+    }
+}
+
+TEST(Settings, AMinimumMayNotPassItsMaximum) {
+    sim::SimSettings settings;
+    const auto refused = sim::ApplySetting(settings, "city.minFloors", settings.city.maxFloors + 1);
+    ASSERT_FALSE(refused);
+    EXPECT_NE(refused.error().find("may not be above"), std::string::npos) << refused.error();
+    EXPECT_EQ(settings, sim::SimSettings{});
+    ASSERT_TRUE(sim::ApplySetting(settings, "city.maxFloors", 20));
+    ASSERT_TRUE(sim::ApplySetting(settings, "city.minFloors", 15));
+}
+
+TEST(Settings, OneKnobOfEveryGroupChangesTheCityOrItsDays) {
+    // A flat, low city: generation reads the city settings.
+    sim::SimSettings low;
+    // Lower the minimums first, so a minimum never passes its maximum.
+    ASSERT_TRUE(sim::ApplySetting(low, "city.minFloors", 2));
+    ASSERT_TRUE(sim::ApplySetting(low, "city.minCentralFloors", 2));
+    ASSERT_TRUE(sim::ApplySetting(low, "city.maxFloors", 6));
+    ASSERT_TRUE(sim::ApplySetting(low, "city.maxCentralFloors", 6));
+    const sim::World flat = sim::World::Generate({.seed = 5, .robots = 300, .settings = low});
+    for (const sim::Building& building : flat.State().city.buildings) {
+        EXPECT_LE(building.floors, 7U) << building.name;
+    }
+    // No tax: City Hall collects none in a day of wages.
+    sim::SimSettings untaxed;
+    ASSERT_TRUE(sim::ApplySetting(untaxed, "economy.wageTaxPercent", 0));
+    sim::World free = sim::World::Generate({.seed = 5, .robots = 300, .settings = untaxed});
+    free.RunFor(3 * sim::kMinutesPerDay);
+    std::int64_t wageTax = free.State().today.wageTax;
+    for (const sim::DailyStats& day : free.State().history) {
+        wageTax += day.counted.wageTax;
+    }
+    EXPECT_EQ(wageTax, 0);
+    EXPECT_TRUE(sim::ValidateWorldState(free.State()));
 }

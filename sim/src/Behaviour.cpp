@@ -25,63 +25,6 @@
 namespace mechapunk::sim {
 namespace {
 
-// Daily variation added to a robot's punctuality.
-constexpr std::uint32_t kMaxDailyExtraMinutes = 10;
-
-// A day off starts no earlier than this and may start up to two hours later.
-constexpr Tick kOutingEarliestMinute = 9 * kMinutesPerHour;
-
-constexpr std::uint32_t kOutingSpreadMinutes = 120;
-
-// No new outings from home after this minute of the day.
-constexpr Tick kLastOutingMinute = 22 * kMinutesPerHour;
-
-// A break at home between outings on a free day.
-constexpr std::uint32_t kMinHomeBreak = 90;
-
-constexpr std::uint32_t kMaxHomeBreak = 240;
-
-// A shorter break at home after work before thinking about going out.
-constexpr std::uint32_t kMinEveningBreak = 30;
-
-constexpr std::uint32_t kMaxEveningBreak = 90;
-
-// An outing needs at least this long before the robot must be back.
-constexpr Tick kMinOutingMinutes = 60;
-
-constexpr std::int64_t kWearPerClinicPoint = 3;
-
-// Chance in percent that a black market part turns out dodgy, and the wear
-// it causes.
-constexpr std::uint32_t kBadPartPercent = 10;
-
-constexpr std::int32_t kBadPartWear = 60;
-
-// Arriving late costs this much performance.
-constexpr std::int32_t kLatePerformance = 3;
-
-// Weights of the evening decision. Going home is judged by an hour of rest.
-constexpr std::int32_t kHomePeriods = 6;
-
-constexpr std::int64_t kHomeComfort = 120;
-
-constexpr std::int64_t kBedtimeUrge = 400;
-
-constexpr Tick kBedtimeWindow = 2 * kMinutesPerHour;
-
-constexpr std::int64_t kWalkCostPerMinute = 6;
-
-constexpr std::int64_t kPriceCostPerCredit = 3;
-
-constexpr std::uint32_t kMaxWhim = 80;
-
-// Going straight from one venue to another of the same kind is less
-// appealing than trying something different.
-constexpr std::int64_t kSameKindPenalty = 150;
-
-// Below this condition a robot pays for repairs from its savings.
-constexpr std::int32_t kRepairUrgentCondition = 400;
-
 // How much a need wants attention: grows with the square of what is
 // missing, from 0 when full to 1000 when empty.
 std::int64_t Urgency(std::int32_t need) {
@@ -249,7 +192,7 @@ void World::Arrive(Robot& robot) {
         const auto late = static_cast<std::uint32_t>(
             now > robot.shiftStartsAt ? now - robot.shiftStartsAt : 0);
         if (late > 0) {
-            robot.performance -= kLatePerformance;
+            robot.performance -= static_cast<std::int32_t>(state_.settings.behaviour.latePerformance);
         }
         ScoreArrivalAtWork(robot);
         state_.today.lateArrivals += late > 0 ? 1 : 0;
@@ -296,8 +239,8 @@ void World::Arrive(Robot& robot) {
     }
     ++state_.today.visits;
     if (venue->room->kind == RoomKind::BlackMarket &&
-        state_.random.UniformInt(1, 100) <= kBadPartPercent) {
-        robot.wear = std::min(robot.wear + kBadPartWear, kMaxWear);
+        state_.random.UniformInt(1, 100) <= static_cast<std::uint32_t>(state_.settings.behaviour.badPartPercent)) {
+        robot.wear = std::min(robot.wear + static_cast<std::int32_t>(state_.settings.behaviour.badPartWear), kMaxWear);
         Remember(robot, MemoryKind::GotBadPart, {}, robot.location);
     }
 
@@ -326,9 +269,9 @@ void World::Decide(Robot& robot) {
                                                   robot.apartment);
 
     std::int64_t bestScore =
-        kHomeComfort + Relief(robot.needs, kResting, kHomePeriods);
-    if (now + walkHome + kBedtimeWindow >= latestHome) {
-        bestScore += kBedtimeUrge;
+        static_cast<std::int64_t>(state_.settings.behaviour.homeComfort) + Relief(robot.needs, kResting, static_cast<std::int32_t>(state_.settings.behaviour.homePeriods));
+    if (now + walkHome + static_cast<Tick>(state_.settings.behaviour.bedtimeWindow) >= latestHome) {
+        bestScore += static_cast<std::int64_t>(state_.settings.behaviour.bedtimeUrge);
     }
     EntityId best = robot.apartment;
 
@@ -350,7 +293,7 @@ void World::Decide(Robot& robot) {
         // Within what it can pay, and what it means to spend today. A worn
         // robot pays for repairs out of its savings, budget or not.
         const bool needsRepair = (kind == RoomKind::Clinic || kind == RoomKind::RepairShop) &&
-                                 robot.needs.condition < kRepairUrgentCondition;
+                                 robot.needs.condition < static_cast<std::int32_t>(state_.settings.behaviour.repairUrgentCondition);
         for (const RoomRef& venue : rooms_.RoomsOfKind(kind)) {
             const Room& room = *venue.room;
             // A gang outing only goes to the neighbourhood it was drawn to.
@@ -391,12 +334,12 @@ void World::Decide(Robot& robot) {
                 kNeedPeriod);
             const std::int64_t score =
                 Relief(robot.needs, effects, periods) -
-                (kWalkCostPerMinute * walk) -
-                (kPriceCostPerCredit * price) -
-                (kind == hereKind ? kSameKindPenalty : 0) +
-                (kind == RoomKind::Clinic ? robot.wear / kWearPerClinicPoint : 0) +
+                (static_cast<std::int64_t>(state_.settings.behaviour.walkCostPerMinute) * walk) -
+                (static_cast<std::int64_t>(state_.settings.behaviour.priceCostPerCredit) * price) -
+                (kind == hereKind ? static_cast<std::int64_t>(state_.settings.behaviour.sameKindPenalty) : 0) +
+                (kind == RoomKind::Clinic ? robot.wear / static_cast<std::int64_t>(state_.settings.behaviour.wearPerClinicPoint) : 0) +
                 CompanyAt(robot, room.id) +
-                state_.random.UniformInt(0, kMaxWhim);
+                state_.random.UniformInt(0, static_cast<std::uint32_t>(state_.settings.behaviour.maxWhim));
             if (score > bestScore) {
                 bestScore = score;
                 best = room.id;
@@ -465,7 +408,7 @@ void World::ScheduleNextCommute(Robot& robot) {
     const Tick now = state_.tick;
     const Tick lead = TravelMinutes(robot.apartment, robot.workspace) +
                       robot.punctualityMinutes +
-                      state_.random.UniformInt(0, kMaxDailyExtraMinutes);
+                      state_.random.UniformInt(0, static_cast<std::uint32_t>(state_.settings.behaviour.maxDailyExtraMinutes));
     // The next working day's shift whose departure time is still ahead.
     const Tick start = NextShiftStart(robot, now + lead);
     robot.shiftStartsAt = start;
@@ -481,30 +424,30 @@ void World::PlanAtHome(Robot& robot) {
     const Tick today = StartOfDay(now);
     Tick outing = 0;
     const std::uint32_t minute = MinuteOfDay(now);
-    if (IsDayOff(robot, now) && minute < kLastOutingMinute) {
+    if (IsDayOff(robot, now) && minute < static_cast<Tick>(state_.settings.behaviour.lastOutingMinute)) {
         // Back home on a free day: out again after a break, but not before
         // the morning.
         const Tick afterBreak =
-            now + state_.random.UniformInt(kMinHomeBreak, kMaxHomeBreak);
-        const Tick morning = today + kOutingEarliestMinute +
-                             state_.random.UniformInt(0, kOutingSpreadMinutes);
+            now + state_.random.UniformInt(static_cast<std::uint32_t>(state_.settings.behaviour.minHomeBreak), static_cast<std::uint32_t>(state_.settings.behaviour.maxHomeBreak));
+        const Tick morning = today + static_cast<Tick>(state_.settings.behaviour.outingEarliestMinute) +
+                             state_.random.UniformInt(0, static_cast<std::uint32_t>(state_.settings.behaviour.outingSpreadMinutes));
         outing = std::max(afterBreak, morning);
-    } else if (minute >= kOutingEarliestMinute && minute < kLastOutingMinute) {
+    } else if (minute >= static_cast<Tick>(state_.settings.behaviour.outingEarliestMinute) && minute < static_cast<Tick>(state_.settings.behaviour.lastOutingMinute)) {
         // Home during the day or evening of a working day: after a break,
         // think again about going out.
-        outing = now + state_.random.UniformInt(kMinEveningBreak,
-                                                kMaxEveningBreak);
+        outing = now + state_.random.UniformInt(static_cast<std::uint32_t>(state_.settings.behaviour.minEveningBreak),
+                                                static_cast<std::uint32_t>(state_.settings.behaviour.maxEveningBreak));
     } else {
         for (Tick day = 1; day <= kDaysPerWeek; ++day) {
             const Tick start = today + (day * kMinutesPerDay);
             if (IsDayOff(robot, start)) {
-                outing = start + kOutingEarliestMinute +
-                         state_.random.UniformInt(0, kOutingSpreadMinutes);
+                outing = start + static_cast<Tick>(state_.settings.behaviour.outingEarliestMinute) +
+                         state_.random.UniformInt(0, static_cast<std::uint32_t>(state_.settings.behaviour.outingSpreadMinutes));
                 break;
             }
         }
     }
-    if (outing > now && outing + kMinOutingMinutes <= latest &&
+    if (outing > now && outing + static_cast<Tick>(state_.settings.behaviour.minOutingMinutes) <= latest &&
         outing < robot.nextActionAt) {
         robot.nextActionAt = outing;
     }
@@ -526,7 +469,7 @@ Tick World::NextShiftStart(const Robot& robot, Tick after) const {
 
 Tick World::MaxCommuteLead(const Robot& robot) {
     return TravelMinutes(robot.apartment, robot.workspace) +
-           robot.punctualityMinutes + kMaxDailyExtraMinutes;
+           robot.punctualityMinutes + static_cast<std::uint32_t>(state_.settings.behaviour.maxDailyExtraMinutes);
 }
 
 Tick World::LatestHomeTick(const Robot& robot) {
