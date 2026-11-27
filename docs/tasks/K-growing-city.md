@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K13 done. Save version 35, game 0.35.0.
+Status: planned on 2026-11-27; K1 to K14 done. Save version 36, game 0.36.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -292,13 +292,13 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   streets.
 - Check: build, ctest, `ContextBudget`.
 
-### - [ ] K14. New banks (property)
+### - [x] K14. New banks (property)
 
 - Module: property. Depends on: K5. Save change: yes, settings only.
 - Open: `sim/src/Founding.cpp`, `sim/src/Property.cpp` (how a robot's `bank` is
   chosen: `rg -n "\.bank =" sim/src`).
 - Do:
-  1. Add the setting `economy.robotsPerBank` (400).
+  1. Add the setting `economy.robotsPerBank` (default 0 = off so a full city is unchanged; a town sets 400).
   2. A midnight `ReviewBanks()`, after `SettleEconomy`: when robots per bank
      exceed `robotsPerBank`, found a bank. Its capital comes from shares
      bought by robots with savings over `economy.comfortableSavings`, and the
@@ -390,7 +390,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Open: `tools/sim_runner/main.cpp` (options), then `app/main.cpp` (options).
 - Do: `--town` sets `city.seedTown = 1`, `population.immigration = 1`,
   `population.wealthSpread = 1`, `economy.inflationTarget = 1` and
-  `crime.minGangs = 0`, `construction.freeBedsPercent = 10`, `city.freePlotsMin = 4` and `metro.minBuildings = 6`, with 30 robots unless `--robots` says otherwise.
+  `crime.minGangs = 0`, `construction.freeBedsPercent = 10`, `city.freePlotsMin = 4` `metro.minBuildings = 6` and `economy.robotsPerBank = 400`, with 30 robots unless `--robots` says otherwise.
   Explicit `--set` options still win.
 - Check: run `mechapunk-sim --town --days 365 --quiet` and write in this file
   how big the town got.

@@ -9,6 +9,7 @@ add_library(mechapunk_sim STATIC
     src/EconomyStatistics.cpp
     src/Founding.cpp
     src/Gangs.cpp
+    src/Banks.cpp
     src/Money.cpp
     src/Property.cpp
     src/Settlement.cpp

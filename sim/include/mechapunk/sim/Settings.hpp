@@ -391,6 +391,13 @@ struct EconomySettings {
     // their budget on every visit, on better drinks, parts and service.
     std::int64_t comfortableSavings{1000};
 
+    // When robots outnumber this many to a bank, a new bank is founded: robots
+    // with credits over `comfortableSavings` buy its shares and the central bank
+    // lends what it still lacks for `bankFloor`. Newcomers then bank where there
+    // are fewest accounts. 0 turns it off, as in a full city, whose banks are all
+    // founded at the start; a town sets 400.
+    std::int64_t robotsPerBank{0};
+
     // Each night, the chance in percent that a robot able to buy an apartment
     // does, and the nights of rent it keeps after paying.
     std::int64_t buyPercent{3};

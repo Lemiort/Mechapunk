@@ -291,7 +291,7 @@ void World::FoundEconomy(std::uint64_t seed) {
 // is the only money created. An organization nobody could pay for still gets
 // the richest robot as a token owner, so that it has one.
 void World::SellShares(const std::vector<std::pair<EntityId, std::int64_t>>& capital,
-                       EntityId bank, EntityId central) {
+                       EntityId bank, EntityId central, std::int64_t keep) {
     std::vector<EntityId> buyers;
     for (const Robot& robot : state_.robots) {
         buyers.push_back(robot.id);
@@ -305,7 +305,8 @@ void World::SellShares(const std::vector<std::pair<EntityId, std::int64_t>>& cap
         Organization& organization = *MutableOrganization(id);
         std::int64_t raised = 0;
         for (const EntityId buyer : buyers) {
-            const std::int64_t paying = std::min(wanted - raised, Balance(buyer) * 3 / 5);
+            const std::int64_t spare = keep < 0 ? Balance(buyer) * 3 / 5 : Balance(buyer) - keep;
+            const std::int64_t paying = std::min(wanted - raised, spare);
             if (paying <= 0) {
                 continue;
             }

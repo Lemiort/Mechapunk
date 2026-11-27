@@ -443,8 +443,13 @@ private:
     // The economy, in Founding.cpp, Money.cpp, Units.cpp, Property.cpp,
     // Settlement.cpp and EconomyStatistics.cpp (see docs/MODULES.md).
     void FoundEconomy(std::uint64_t seed);
+    // Robots buy the shares of the organizations in `capital` (id, credits wanted):
+    // each keeps back `keep` credits, or two fifths of what it has when `keep` is
+    // negative. A `bank` short of its capital is lent the rest by `central`.
     void SellShares(const std::vector<std::pair<EntityId, std::int64_t>>& capital,
-                    EntityId bank, EntityId central);
+                    EntityId bank, EntityId central, std::int64_t keep = -1);
+    // Founds a bank when robots outnumber `economy.robotsPerBank` to a bank.
+    void ReviewBanks();
     void IndexEconomy();
     [[nodiscard]] Organization* MutableOrganization(EntityId id) noexcept;
     [[nodiscard]] Robot* MutableRobot(EntityId id) noexcept;

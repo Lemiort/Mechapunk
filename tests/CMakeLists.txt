@@ -19,6 +19,7 @@ add_executable(sim_tests
     StreetsTests.cpp
     TransitGrowthTests.cpp
     MetroAuthorityTests.cpp
+    BanksTests.cpp
     EconomyTests.cpp
     HousingTests.cpp
     VenueTests.cpp

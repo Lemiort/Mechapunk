@@ -132,6 +132,7 @@ void World::Step() {
         ForgetDeparted();
         TradeProperty();
         SettleEconomy();
+        ReviewBanks();
         // After the settlement: the city raises a building when homes or
         // jobs have run short, and its sites pay supplies and grow
         // (Construction.cpp).

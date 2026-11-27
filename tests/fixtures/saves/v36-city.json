@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 35,
-   "gameVersion": "0.35.0",
+   "version": 36,
+   "gameVersion": "0.36.0",
    "world": {
       "tick": 28370,
       "seed": 33,
@@ -19475,6 +19475,7 @@
             "baseBudget": 10,
             "workDaysPerWeek": 5,
             "comfortableSavings": 1000,
+            "robotsPerBank": 0,
             "buyPercent": 3,
             "buyReserveNights": 20,
             "depositPercent": 20,

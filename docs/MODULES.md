@@ -24,7 +24,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | city-styles | 11k | `City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp` |
 | validation | 14k | `World.hpp`, `Validation.cpp`, `Describe.cpp` |
 | money | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
-| property | 21k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Property.cpp`, `HousingTests.cpp` |
+| property | 23k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Banks.cpp`, `Property.cpp`, `HousingTests.cpp`, `BanksTests.cpp` |
 | units | 15k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Units.cpp`, `VenueTests.cpp` |
 | statistics | 21k | `Economy.hpp`, `EconomyInternal.hpp`, `EconomyStatistics.cpp`, `Statistics.hpp`, `StatisticsInternal.hpp`, `Statistics.cpp`, `StatisticsChronicle.cpp`, `StatisticsConstruction.cpp` |
 | careers | 24k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |

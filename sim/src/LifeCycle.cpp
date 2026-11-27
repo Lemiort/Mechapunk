@@ -2,6 +2,7 @@
 // completely is scrapped, its friends remember losing it, and a newcomer
 // moves into the city to take its place.
 #include <algorithm>
+#include <limits>
 #include <bit>
 #include <cstdint>
 #include <functional>
@@ -197,7 +198,18 @@ void World::AddNewcomer() {
             banks.push_back(organization.id);
         }
     }
-    if (!banks.empty()) {
+    if (!banks.empty() && state_.settings.economy.robotsPerBank != 0) {
+        // The bank with fewest accounts, the lowest id among equals: no draw.
+        std::size_t fewest = std::numeric_limits<std::size_t>::max();
+        for (const EntityId bank : banks) {
+            const auto accounts = static_cast<std::size_t>(std::ranges::count(
+                state_.robots, bank, &Robot::bank));
+            if (accounts < fewest) {
+                fewest = accounts;
+                robot.bank = bank;
+            }
+        }
+    } else if (!banks.empty()) {
         robot.bank = pick(banks);
     }
     const std::uint32_t firstDayOff = random.UniformInt(0, kDaysPerWeek - 1);
