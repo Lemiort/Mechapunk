@@ -16,53 +16,14 @@
 #include <string_view>
 #include <utility>
 
+#include "ConstructionRules.hpp"
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/Economy.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace mechapunk::sim {
-namespace {
-
-// The hours a new workplace's staff stand: an assembly line's shift, the
-// plainest of generation's, so a new job is not the easiest in the city.
-constexpr Shift kSiteShift{.startMinute = 7 * 60, .lengthMinutes = 480, .wage = 100};
-
-// The class of homes on a floor of a new habitat: studios low, flats in
-// the middle, two-bedroom flats near the top, the rule generation uses for
-// a habitat of the same finished height.
-[[nodiscard]] ApartmentClass HomeClassFor(std::uint32_t floor,
-                                          std::uint32_t floors) noexcept {
-    if (floor * 3 <= floors) {
-        return ApartmentClass::Studio;
-    }
-    if (floor * 3 <= floors * 2) {
-        return ApartmentClass::OneBedroom;
-    }
-    return ApartmentClass::TwoBedroom;
-}
-
-// Rent of a class over the floor's base rent, and the word its rooms are
-// named with: copies of generation's file-local helpers, so a home raised
-// now reads and costs like a home raised with the city.
-[[nodiscard]] std::uint32_t RentPercent(ApartmentClass kind) noexcept {
-    switch (kind) {
-        case ApartmentClass::OneBedroom: return 150;
-        case ApartmentClass::TwoBedroom: return 240;
-        default: return 100;
-    }
-}
-
-[[nodiscard]] std::string_view HomeLabel(ApartmentClass kind) noexcept {
-    switch (kind) {
-        case ApartmentClass::Studio: return "Studio";
-        case ApartmentClass::OneBedroom: return "Flat";
-        case ApartmentClass::TwoBedroom: return "Two-Bedroom Flat";
-        default: return "Apartment";
-    }
-}
-
-}  // namespace
+using namespace construction;
 
 // Runs at midnight after `SettleEconomy`, so tonight's statistics are already
 // in `state_.history` and the supplies a site pays count into the new day's
