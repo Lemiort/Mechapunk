@@ -137,6 +137,15 @@ TEST(Save, RejectsForeignNewerAndBrokenSaves) {
     EXPECT_NE(newer.error().find("not supported"), std::string::npos)
         << newer.error();
 
+    // A save from before the oldest supported version is refused with a
+    // plain message, not a missing migration.
+    const auto old = sim::DeserializeWorld(
+        EditSave(json, [](sim::SaveDocument& document) {
+            document["version"] = sim::kOldestSupportedSaveVersion - 1;
+        }));
+    ASSERT_FALSE(old);
+    EXPECT_NE(old.error().find("not supported"), std::string::npos) << old.error();
+
     // A missing field means a migration was forgotten.
     const auto missing = sim::DeserializeWorld(
         EditSave(json, [](sim::SaveDocument& document) {
@@ -152,8 +161,8 @@ TEST(Save, RejectsForeignNewerAndBrokenSaves) {
 }
 
 TEST(Save, ShippedMigrationsCoverEveryVersion) {
-    for (std::uint32_t version = 1; version < sim::kCurrentSaveVersion;
-         ++version) {
+    for (std::uint32_t version = sim::kOldestSupportedSaveVersion;
+         version < sim::kCurrentSaveVersion; ++version) {
         EXPECT_TRUE(std::ranges::any_of(
             sim::SaveMigrations(),
             [&](const sim::Migration& migration) {
@@ -204,8 +213,8 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 
 // The committed fixture was written by the current save version. Saving it
 // again must reproduce it byte for byte; when the format changes on purpose,
-// bump kCurrentSaveVersion, add a migration and a new fixture, and keep this
-// one loading through the migration (see tests/fixtures/saves/README.md).
+// bump kCurrentSaveVersion, add a migration and a new fixture (see
+// tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
         kFixtureDirectory / "saves" / "v27-city.json";
@@ -326,10 +335,9 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     }));
     // And from version 25 a project carries the credits its site has paid
     // for its supplies and the shortage that started it (step D5b2). This
-    // fixture raised no site, so its list is empty and the two hand-written
-    // saves - `ProjectCostAndReasonRoundTrips` and
-    // `Version24FixtureMigratesAndRuns` - are what prove the keys read, write
-    // and migrate.
+    // fixture raised no site, so its list is empty and the hand-written save
+    // in `ProjectCostAndReasonRoundTrips` is what proves the keys read and
+    // write.
     // And from version 26 the daily statistics count construction (step D5e2):
     // the sites the review started and ended in a day, and the robots whose
     // job is a site office. This fixture ran the review through its twenty
@@ -360,72 +368,6 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
         }
         EXPECT_GE(styles.size(), 2U);
     }
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// Version 26 counts construction in the daily statistics (task D, step D5e2):
-// the sites the nightly review started and ended in a day, and the robots
-// whose job is a site office. The version 25 fixture names none of the three
-// keys - `"projects"` alone would prove nothing, the world has carried that
-// list since version 23 - so what loads is the migration's work, and every
-// counter reads as the zero a version 25 game would have written by never
-// counting, not as a count the migration invented.
-TEST(Save, Version25FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v25-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-    EXPECT_EQ(fixture.find("\"projectsStarted\""), std::string::npos)
-        << path.string() << " already names the started counter";
-    EXPECT_EQ(fixture.find("\"projectsFinished\""), std::string::npos)
-        << path.string() << " already names the finished counter";
-    EXPECT_EQ(fixture.find("\"buildersEmployed\""), std::string::npos)
-        << path.string() << " already names the builders counter";
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    EXPECT_EQ(state->today.projectsStarted, 0);
-    EXPECT_EQ(state->today.projectsFinished, 0);
-    for (const sim::DailyStats& day : state->history) {
-        EXPECT_EQ(day.counted.projectsStarted, 0);
-        EXPECT_EQ(day.counted.projectsFinished, 0);
-        EXPECT_EQ(day.buildersEmployed, 0);
-    }
-
-    auto world = sim::World::FromState(std::move(*state));
-    ASSERT_TRUE(world.has_value()) << world.error();
-    world->RunFor(sim::kMinutesPerDay);
-    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
-}
-
-// Version 27 dresses every building: its style is saved with it (task I,
-// step I1b). The version 26 fixture names no "style" key at all, so what
-// loads is the migration's work, and every building must read as the style
-// `StyleOf` gives the id, kind and floor count that save already had - not
-// as the plain box a migration that invented rather than derived would have
-// written for every old city.
-TEST(Save, Version26FixtureMigratesAndRuns) {
-    const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v26-city.json";
-    const std::string fixture = ReadText(path);
-    ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
-    EXPECT_EQ(fixture.find("\"style\""), std::string::npos)
-        << path.string() << " already names the style";
-
-    auto state = sim::DeserializeWorld(fixture);
-    ASSERT_TRUE(state.has_value()) << state.error();
-    std::set<sim::BuildingStyle> styles;
-    for (const sim::Building& building : state->city.buildings) {
-        EXPECT_EQ(building.style,
-                  sim::StyleOf(building.kind, building.id, building.floors))
-            << building.name;
-        styles.insert(building.style);
-    }
-    EXPECT_GE(styles.size(), 2U);
 
     auto world = sim::World::FromState(std::move(*state));
     ASSERT_TRUE(world.has_value()) << world.error();

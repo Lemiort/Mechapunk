@@ -20,8 +20,9 @@ building, room, store and robot can be seen and inspected.
   here.
 - UI uses plain Dear ImGui calls (`Begin`/`End`, `PushID`/`PopID`), never
   RAII wrappers around them. NEE's `ImGuiOverlay` is fine.
-- Saves are glaze JSON with frozen migrations. Any change to saved state
-  bumps the save version, adds a migration and a fixture (see
+- Saves are glaze JSON; only the current version loads (older migrations
+  were removed). Any change to saved state bumps the save version and
+  replaces the fixture (see
   `tests/fixtures/saves/README.md`). The current save version is 17, game
   version 0.17.0.
 

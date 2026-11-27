@@ -18,7 +18,6 @@
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Ids.hpp"
 #include "mechapunk/sim/Social.hpp"
-#include "Migrations.hpp"
 #include "mechapunk/sim/World.hpp"
 
 // Ids are written as plain numbers rather than {"value": n}.
@@ -154,86 +153,9 @@ constexpr glz::opts kWriteOptions{.prettify = true};
 // instead of silently filling in a default.
 constexpr glz::opts kReadOptions{.error_on_missing_keys = true};
 
-constexpr std::array kMigrations{
-    Migration{.fromVersion = 1,
-              .summary = "rooms, needs and credits",
-              .apply = &migrations::V1ToV2},
-    Migration{.fromVersion = 2,
-              .summary = "rent and days off",
-              .apply = &migrations::V2ToV3},
-    Migration{.fromVersion = 3,
-              .summary = "interests, relationships and memories",
-              .apply = &migrations::V3ToV4},
-    Migration{.fromVersion = 4,
-              .summary = "job levels and performance",
-              .apply = &migrations::V4ToV5},
-    Migration{.fromVersion = 5,
-              .summary = "age, wear and scrapped robots",
-              .apply = &migrations::V5ToV6},
-    Migration{.fromVersion = 6,
-              .summary = "metro stations and rides",
-              .apply = &migrations::V6ToV7},
-    Migration{.fromVersion = 7,
-              .summary = "weather",
-              .apply = &migrations::V7ToV8},
-    Migration{.fromVersion = 8,
-              .summary = "metro timetable and changing lines",
-              .apply = &migrations::V8ToV9},
-    Migration{.fromVersion = 9,
-              .summary = "a closed economy with owners, banks and statistics",
-              .apply = &migrations::V9ToV10},
-    Migration{.fromVersion = 10,
-              .summary = "daily budgets",
-              .apply = &migrations::V10ToV11},
-    Migration{.fromVersion = 11,
-              .summary = "apartment classes and the city's housing office",
-              .apply = &migrations::V11ToV12},
-    Migration{.fromVersion = 12,
-              .summary = "venue prices and market rents",
-              .apply = &migrations::V12ToV13},
-    Migration{.fromVersion = 13,
-              .summary = "venues and workspaces opening and closing",
-              .apply = &migrations::V13ToV14},
-    Migration{.fromVersion = 14,
-              .summary = "City Hall: taxes, support and the city's metro",
-              .apply = &migrations::V14ToV15},
-    Migration{.fromVersion = 15,
-              .summary = "the central bank's rate",
-              .apply = &migrations::V15ToV16},
-    Migration{.fromVersion = 16,
-              .summary = "police and metro staff",
-              .apply = &migrations::V16ToV17},
-    Migration{.fromVersion = 17,
-              .summary = "gangs and crime statistics",
-              .apply = &migrations::V17ToV18},
-    Migration{.fromVersion = 18,
-              .summary = "the chronicle",
-              .apply = &migrations::V18ToV19},
-    Migration{.fromVersion = 19,
-              .summary = "arrests name the arresting officer",
-              .apply = &migrations::V19ToV20},
-    Migration{.fromVersion = 20,
-              .summary = "chronicle entries name the account their money moved for",
-              .apply = &migrations::V20ToV21},
-    Migration{.fromVersion = 21,
-              .summary = "the city's free building plots",
-              .apply = &migrations::V21ToV22},
-    Migration{.fromVersion = 22,
-              .summary = "buildings under construction",
-              .apply = &migrations::V22ToV23},
-    Migration{.fromVersion = 23,
-              .summary = "the site office room kind of a building going up",
-              .apply = &migrations::V23ToV24},
-    Migration{.fromVersion = 24,
-              .summary = "a site's supplies paid so far and the shortage that started it",
-              .apply = &migrations::V24ToV25},
-    Migration{.fromVersion = 25,
-              .summary = "construction counters in the daily statistics",
-              .apply = &migrations::V25ToV26},
-    Migration{.fromVersion = 26,
-              .summary = "every building gains its architectural style",
-              .apply = &migrations::V26ToV27},
-};
+// None yet: every older format was dropped (kOldestSupportedSaveVersion).
+// The next format change appends its migration here.
+constexpr std::array<Migration, 0> kMigrations{};
 }  // namespace
 
 std::span<const Migration> SaveMigrations() noexcept { return kMigrations; }
@@ -304,11 +226,12 @@ std::expected<WorldState, std::string> DeserializeWorld(std::string_view json) {
         return std::unexpected("Save has no valid version number");
     }
     const std::uint64_t saveVersion = version->second.get<std::uint64_t>();
-    if (saveVersion == 0 || saveVersion > kCurrentSaveVersion) {
+    if (saveVersion < kOldestSupportedSaveVersion ||
+        saveVersion > kCurrentSaveVersion) {
         return std::unexpected(std::format(
-            "Save version {} is not supported; this game reads versions 1 "
+            "Save version {} is not supported; this game reads versions {} "
             "to {}",
-            saveVersion, kCurrentSaveVersion));
+            saveVersion, kOldestSupportedSaveVersion, kCurrentSaveVersion));
     }
     const auto worldEntry = root.find("world");
     if (worldEntry == root.end() || !worldEntry->second.is_object()) {

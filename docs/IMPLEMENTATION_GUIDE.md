@@ -90,14 +90,19 @@ python scripts/context_budget.py                                                
    credits plus the supply market equal `created - destroyed`. Savings are
    not money: `Robot::savings` is what the bank owes. In tests change
    credits only with `sim::SetCredits`.
-3. **Saves never break.** Any change to `WorldState` or a type inside it (a
-   field, an enum value) is a save format change:
+3. **Saves of the current version load.** Any change to `WorldState` or a
+   type inside it (a field, an enum value) is a save format change. Saves of
+   versions before `kOldestSupportedSaveVersion` (`Save.hpp`) are **not
+   supported**: their migrations, fixtures and tests were removed, so the
+   game refuses them with a plain message. For a format change:
    1. Bump `kCurrentSaveVersion` and `kGameVersion` in `Save.hpp`.
-   2. Write `VNToVN+1` at the end of `sim/src/Migrations.cpp`, declare it
-      in `Migrations.hpp`, register it in `kMigrations` in `Save.cpp`. It
-      edits the untyped JSON and never calls game code. Reading uses
-      `error_on_missing_keys`, so **every new key must be added**. Where a
-      new field goes depends on its type:
+   2. Either raise `kOldestSupportedSaveVersion` to the new version (old
+      saves stop loading; no migration), or keep the previous version
+      loading: add a `Migration` to the `kMigrations` table in `Save.cpp`
+      (empty now) that edits the untyped JSON and never calls game code.
+      Reading uses `error_on_missing_keys`, so **every new key must be
+      added** to the old save's JSON. Where a new field goes depends on its
+      type:
 
       | New field in | JSON paths to add it to |
       | --- | --- |
@@ -109,18 +114,16 @@ python scripts/context_budget.py                                                
       | `DailyStats` | every `world.history[i]` |
       | `Books` | every `world.economy.organizations[i].today` and `.yesterday` |
 
-      `V15ToV16` in `Migrations.cpp` is a short example covering
-      `DayCounters` and `DailyStats`.
-      Never edit a released migration.
+      A migration kept for a supported version is frozen once released.
    3. New enum values get a name in the `glz::meta` specializations at the
       top of `Save.cpp`.
    4. New fixture: `mechapunk-sim --seed 33 --robots 100 --minutes 28370
       --save tests/fixtures/saves/vN-city.json`, plus a row and a sentence
-      in `tests/fixtures/saves/README.md`.
+      in `tests/fixtures/saves/README.md`; delete the fixture of a version
+      that is no longer supported.
    5. In `tests/SaveTests.cpp`, point `CurrentVersionFixtureLoadsAndRoundTrips`
-      at the new fixture (check the new data) and add
-      `VersionN-1FixtureMigratesAndRuns` for the previous one. Never
-      regenerate an old fixture.
+      at the new fixture (check the new data); a migration kept for the
+      previous version gets its own `VersionN-1FixtureMigratesAndRuns`.
 4. **No teleporting robots.** Robots walk through doors, corridors, stairs,
    streets and metro platforms; `CityView::RobotPosition` and
    `DriverPlacement` build every path. Hiding robots nobody can see is

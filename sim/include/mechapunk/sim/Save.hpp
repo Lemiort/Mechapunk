@@ -23,6 +23,11 @@ namespace mechapunk::sim {
 // previous version, and a new fixture under tests/fixtures/saves.
 inline constexpr std::string_view kSaveFormatName = "mechapunk-save";
 inline constexpr std::uint32_t kCurrentSaveVersion = 27;
+// The oldest version this game still reads. Saves older than this are
+// refused: the migrations that upgraded them were removed, because nobody
+// keeps such saves. A new format change appends a migration from the
+// current version and leaves this number alone; raise it to drop old ones.
+inline constexpr std::uint32_t kOldestSupportedSaveVersion = 27;
 inline constexpr std::string_view kGameVersion = "0.27.0";
 
 // Untyped JSON tree of the "world" object, which migrations edit. Keys are

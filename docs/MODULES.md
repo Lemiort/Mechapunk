@@ -27,8 +27,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 13k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
 | metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
-| saves | 20k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `MigrationsInternal.hpp`, `Migrations.cpp`, `SaveTests.cpp`, `SaveFixtureTests.cpp` |
-| saves-frozen | 19k | `Migrations.hpp`, `MigrationsInternal.hpp`, `MigrationsEarly.cpp`, `MigrationsMid.cpp`, `SaveFixtureTestsEarly.cpp` |
+| saves | 11k | `Save.hpp`, `Save.cpp`, `SaveTests.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 12k | `World.hpp`, `main.cpp` |
 | view-core | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
@@ -45,7 +44,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | robot-pages | 9k | `InspectorRobot.cpp`, `InspectorInternal.hpp`, `Links.hpp`, `Inspector.hpp` |
 | project-pages | 6k | `InspectorProject.cpp`, `InspectorInternal.hpp`, `Links.hpp`, `ProjectLists.hpp`, `Inspector.hpp` |
 | chronicle-pages | 8k | `InspectorHistory.cpp`, `InspectorChronicle.cpp`, `ChroniclePagesInternal.hpp`, `InspectorInternal.hpp`, `Links.hpp`, `ChronicleLists.hpp`, `Inspector.hpp` |
-| gangs | 18k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
+| gangs | 17k | `Gangs.hpp`, `Gangs.cpp`, `GangRosterTests.cpp`, `GangCrimeTests.cpp` |
 | gang-officer | 8k | `Gangs.hpp`, `GangOfficerTests.cpp` |
 | gang-lists | 5k | `GangLists.hpp`, `GangLists.cpp`, `GangListsTests.cpp` |
 | chronicle-lists | 8k | `ChronicleLists.hpp`, `ChronicleLists.cpp`, `ChronicleListsTests.cpp` |
@@ -93,10 +92,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `LifeCycle.cpp` | Aging, wear, `Scrap` (with `Bequeath`), `AddNewcomer` (whose home skips a site's) |
 | `Transit.cpp`, `Metro.hpp/.cpp` | Trip planning, the metro network, timetable, trains, `PlanDriverRun` |
 | `Weather.*`, `Random.*`, `GameTime.*`, `Ids.hpp` | As named |
-| `Save.hpp/.cpp` | glaze JSON, enum names, the migration list |
-| `Migrations.cpp` | The save migrations still in play: append new ones here; once frozen, a migration moves unchanged to `MigrationsMid.cpp` or `MigrationsEarly.cpp` to keep the module small |
-| `MigrationsMid.cpp` | Frozen migrations 19 to 26 |
-| `MigrationsEarly.cpp` | Frozen migrations 1 to 18 |
+| `Save.hpp/.cpp` | glaze JSON, enum names, the (empty) migration list, the oldest supported version |
 
 ### Game (`app/`, namespace `mechapunk`)
 
@@ -140,7 +136,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Needs, the minute step, the midnight order | world | `World.cpp` (`Step`, `UpdateNeeds`) |
 | Rent collection, who lives where | world | `Residents.cpp` |
 | New city layout, buildings, depots, stations at start | generation | `City.cpp` (`GenerateCity`), `Generation.cpp` |
-| A building's architectural style, and the style an old save gains | city-styles | `CityStyle.cpp` (`StyleOf`) |
+| A building's architectural style | city-styles | `CityStyle.cpp` (`StyleOf`) |
 | A new invariant, a validation error | validation | `Validation.cpp` |
 | Event text in the log | validation | `Describe.cpp` |
 | Payments, loans, wages, what robots can afford | money | `Money.cpp` |
@@ -153,7 +149,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Friends, rivals, memories, talks | social | `Social.cpp` |
 | Aging, wear, scrapping, newcomers moving in | life-cycle | `LifeCycle.cpp` |
 | Timetable, trains, trips, driver runs | metro | `Metro.cpp`, `Transit.cpp` |
-| Any change to saved state (new version, migration, fixture) | saves | `Save.cpp`, end of `Migrations.cpp` |
+| Any change to saved state (new version, migration, fixture) | saves | `Save.cpp` (`kMigrations`, enum names) |
 | The headless runner's report | runner | `tools/sim_runner/main.cpp` |
 | What the city looks like from outside; lights | view-core | `CityStatic.cpp`, `CityLights.cpp` |
 | Where a robot is drawn; trains, platforms; drivers | view-robots | `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp` |
@@ -182,7 +178,7 @@ then the UI.
   `World.hpp`, groups the members by the file that implements them.
 - Each area has one private header for helpers its files share:
   `sim/src/WorldInternal.hpp`, `sim/src/EconomyInternal.hpp`,
-  `sim/src/MigrationsInternal.hpp`, `app/CityViewInternal.hpp`,
+  `app/CityViewInternal.hpp`,
   `app/InteriorKit.hpp`. Each puts its helpers in its own namespace
   (`world_detail`, `economy_detail`, ...) so two areas can never clash. Only
   that area's files include it.

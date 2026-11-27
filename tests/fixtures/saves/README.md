@@ -1,137 +1,21 @@
 # Save fixtures
 
-Each file is a save written by a released save-format version. Tests load
-every fixture, so old saves keep working as the format evolves.
+Saves older than `kOldestSupportedSaveVersion` (`Save.hpp`) are not
+supported: their migrations, fixtures and tests were removed, and the game
+refuses them with "Save version N is not supported". Only the fixture of the
+current version is kept.
 
-| File           | Version | How it was made                                                       |
-| -------------- | ------- | --------------------------------------------------------------------- |
-| `v1-city.json` | 1       | `mechapunk-sim --seed 6 --robots 60 --minutes 1900 --save v1-city.json` (game 0.1.0) |
-| `v2-city.json` | 2       | `mechapunk-sim --seed 5 --robots 60 --minutes 2580 --save v2-city.json` (game 0.2.0) |
-| `v3-city.json` | 3       | `mechapunk-sim --seed 9 --robots 60 --minutes 8340 --save v3-city.json` (game 0.3.0) |
-| `v4-city.json` | 4       | `mechapunk-sim --seed 9 --robots 60 --minutes 18420 --save v4-city.json` (game 0.4.0) |
-| `v5-city.json` | 5       | `mechapunk-sim --seed 10 --robots 60 --minutes 28500 --save v5-city.json` (game 0.5.0) |
-| `v6-city.json` | 6       | `mechapunk-sim --seed 10 --robots 60 --minutes 28500 --save v6-city.json` (game 0.6.0) |
-| `v7-city.json` | 7       | `mechapunk-sim --seed 10 --robots 60 --minutes 26432 --save v7-city.json` (game 0.7.0) |
-| `v8-city.json` | 8       | `mechapunk-sim --seed 33 --robots 60 --minutes 28370 --save v8-city.json` (game 0.8.0) |
-| `v9-city.json` | 9       | `mechapunk-sim --seed 33 --robots 60 --minutes 18093 --save v9-city.json` (game 0.9.0) |
-| `v10-city.json` | 10     | `mechapunk-sim --seed 33 --robots 60 --minutes 28370 --save v10-city.json` (game 0.10.0) |
-| `v11-city.json` | 11     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v11-city.json` (game 0.11.0) |
-| `v12-city.json` | 12     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v12-city.json` (game 0.12.0) |
-| `v13-city.json` | 13     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v13-city.json` (game 0.13.0) |
-| `v14-city.json` | 14     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v14-city.json` (game 0.14.0) |
-| `v15-city.json` | 15     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v15-city.json` (game 0.15.0) |
-| `v16-city.json` | 16     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v16-city.json` (game 0.16.0) |
-| `v17-city.json` | 17     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v17-city.json` (game 0.17.0) |
-| `v18-city.json` | 18     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v18-city.json` (game 0.18.0) |
-| `v19-city.json` | 19     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v19-city.json` (game 0.19.0) |
-| `v20-city.json` | 20     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v20-city.json` (game 0.20.0) |
-| `v21-city.json` | 21     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v21-city.json` (game 0.21.0) |
-| `v22-city.json` | 22     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v22-city.json` (game 0.22.0) |
-| `v23-city.json` | 23     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v23-city.json` (game 0.23.0) |
-| `v24-city.json` | 24     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v24-city.json` (game 0.24.0) |
-| `v25-city.json` | 25     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v25-city.json` (game 0.25.0) |
-| `v26-city.json` | 26     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v26-city.json` (game 0.26.0) |
-| `v27-city.json` | 27     | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v27-city.json` (game 0.27.0) |
+| File            | Version | How it was made                                                         |
+| --------------- | ------- | ----------------------------------------------------------------------- |
+| `v27-city.json` | 27      | `mechapunk-sim --seed 33 --robots 100 --minutes 28370 --save v27-city.json` (game 0.27.0) |
 
-All other fixtures stop at the same moment as the older ones: Day 20 Sat 16:50.
-`v1-city.json` stops at Day 2 07:40, with robots at home, commuting and
-working. `v2-city.json` stops at Day 2 19:00, with robots resting, walking,
-working and out at venues. `v3-city.json` stops on Saturday (Day 6) at 19:00,
-with every activity again and some robots on their days off. `v4-city.json`
-stops on the second Saturday (Day 13) at 19:00, when robots have friends,
-close friends and rivals, and memories of making them. `v5-city.json` stops
-on the third Saturday (Day 20) at 19:00, with robots at every job level, one
-out of work, and memories of losing and finding jobs and moving up.
-`v6-city.json` stops at the same time in a city that ages: some robots
-have been scrapped and are remembered by friends, and newcomers have moved
-in. `v7-city.json` stops during a weekday morning commute (Day 19,
-08:32), with robots walking to, riding and coming up from the metro.
-`v8-city.json` stops on a rainy Saturday afternoon (Day 20, 16:50) with a
-robot riding the metro to a diner, one out of work and a scrapped robot
-still remembered. It uses another seed than the older fixtures: the city
-generator changed, and seed 10 no longer makes a town anyone rides the
-metro in.
-`v9-city.json` stops on the second Saturday (Day 13, 13:33) with a robot
-on its way to lunch on the timetable's trains, changing lines; the town is
-small, and few rides need a change.
-`v10-city.json` stops on the third Saturday (Day 20, 16:50) in a closed
-economy: tenants, savers, robots and a corporation in debt, and nineteen
-days of statistics.
-`v11-city.json` stops at the same moment in a town of 100 robots, with venue
-staff on shifts, daily budgets and a market price for supplies; 60 robots
-no longer make a town with tenants and scrapped robots by then.
-`v12-city.json` stops at the same moment in a city with apartment classes:
-most robots still in the dorms they started in, others in studios, flats
-and two-bedroom flats, some of them shared.
-`v13-city.json` stops at the same moment with venues asking more or less
-than usual and market rents moved by empty homes.
-`v14-city.json` stops at the same moment with venues and workspaces
-counting their quiet nights.
-`v15-city.json` stops at the same moment with City Hall collecting taxes,
-supporting robots out of work and owning the metro.
-`v16-city.json` stops at the same moment with the central bank's rate
-moved and savers earning interest.
-`v17-city.json` stops at the same moment with police stations and metro
-depots, whose staff have no patrols yet.
-`v18-city.json` stops at the same moment in a city that has no gangs yet:
-its gang list is empty and no robot names one, which is how the game's
-first midnight comes to founding them (see `Gangs.OldSaveGrowsGangsAtMidnight`).
-`v19-city.json` stops at the same moment in a city that does have gangs, and
-carries a chronicle - empty, as nothing writes to that list until the
-recording step. `v20-city.json` stops at the same moment in the same kind
-of city run by the current game: its chronicle already tells a story, and
-from this version an arrest names the officer that made it (see
-`Gangs.OldSaveGrowsGangsAtMidnight` and step B15). `v21-city.json` stops at
-the same moment in the same kind of city: from this version a chronicle
-entry names the account its event's money moved for, and its story has
-such entries (see step C4e1). `v22-city.json` stops at the same moment in
-the same kind of city: from this version the city saves its free building
-plots - out of four corners per intersection, those no building stands on
-- and its grid has them (see step D1a). `v23-city.json` stops at the same
-moment in the same kind of city: from this version the world saves its
-projects - the buildings going up - and this fixture's list is empty, as
-nothing starts a project until the nightly review does (see step D2a).
-`v24-city.json` stops at the same moment in the same kind of city: from
-this version a room may be the site office of a building going up, and
-this fixture has none, as nothing raises one until step D3b (see step
-D3a). `v25-city.json` stops at the same moment in the same kind of city:
-from this version a project carries the credits its site has paid for its
-supplies and the shortage that started it, and this fixture raised no
-site, so its list is empty and names neither key (see step D5b2).
-`v26-city.json` stops at the same moment in the same kind of city: from
-this version the daily statistics count construction - the sites the
-nightly review started and ended in a day, and the robots whose job is a
-site office - and this fixture raised no site, so every one of those
-counters reads 0 (see step D5e2). `v27-city.json` stops at the same
-moment in the same kind of city: from this version every building names
-the style it is dressed in - its massing and its roof, which change
-nothing a robot does - and its buildings carry more than one style (see
-step I1b).
-`Version1FixtureMigratesAndRuns` loads the v1
-fixture through the migration, checks every robot kept its home and
-workplace, and runs two days of evenings; `Version2FixtureMigratesAndRuns`
-checks that the v2 fixture gains rent and days off and keeps paying rent;
-`Version3FixtureMigratesAndRuns` checks that every robot of the v3 fixture
-gets two interests and no bonds yet, and that friendships form;
-`Version4FixtureMigratesAndRuns` checks that v4 robots start as juniors with
-a clean record and keep working. `Version5FixtureMigratesAndRuns` checks that v5
-robots get an age and matching wear and go on aging. `Version6FixtureMigratesAndRuns` checks
-that a v6 city gets its stations and that robots start riding.
-`Version7FixtureMigratesAndRuns` checks that a v7 world starts dry for six
-hours and then its weather changes. `Version8FixtureMigratesAndRuns` checks
-that v8 riders change at their last station, that is, they don't, and that
-robots go on riding. `Version9FixtureMigratesAndRuns` checks that a v9
-city is founded an economy whose money adds up, and records statistics.
-`Version10FixtureMigratesAndRuns` checks that v10 robots start with an
-unspent budget, supplies cost 60% of venue takings, and the city runs on.
-`Version11FixtureMigratesAndRuns` checks that v11 apartments become studios
-and the city gets a housing office. `Version12FixtureMigratesAndRuns` checks
-that v12 venues ask their base prices and market rents start at their base.
-`Version13FixtureMigratesAndRuns` checks that v13 rooms start with no quiet
-nights. `Version14FixtureMigratesAndRuns` checks that the v14 housing office
-becomes City Hall and starts collecting taxes.
-`Version15FixtureMigratesAndRuns` checks that a v15 central bank starts at
-the old fixed rate.
+`v27-city.json` stops on the third Saturday (Day 20, 16:50) in a town of 100
+robots, with every system of the game running: City Hall collecting taxes,
+venues with prices and rents moved, apartment classes, police and metro
+staff, gangs, a chronicle that names accounts, the city's free plots and
+every building's architectural style. It raised no construction site, so its
+projects are empty; `CurrentVersionFixtureLoadsAndRoundTrips` loads it,
+checks that saving it again reproduces it byte for byte, and runs a day.
 
 ## Changing the save format
 
@@ -139,14 +23,11 @@ Any change to `WorldState` or the types inside it (field names, enum names,
 nesting, meaning of a value) changes the format:
 
 1. Increase `kCurrentSaveVersion` in `sim/include/mechapunk/sim/Save.hpp`.
-2. Add a `Migration` from the previous version in `sim/src/Save.cpp`. It edits
-   the untyped JSON of the `world` object, so it never depends on today's C++
-   types.
+2. Add a `Migration` from the previous version to the `kMigrations` table in
+   `sim/src/Save.cpp` (it is empty now). It edits the untyped JSON of the
+   `world` object, so it never depends on today's C++ types. Or, when old
+   saves do not matter, raise `kOldestSupportedSaveVersion` to the new
+   version instead and write no migration.
 3. Write a new fixture for the new version with `mechapunk-sim` and add it to
-   the table above.
-4. Point `CurrentVersionFixtureLoadsAndRoundTrips` at the new fixture, and
-   add a test that each older fixture still loads (through the migrations)
-   and keeps running.
-
-Never edit or regenerate a committed fixture of an older version: it stands
-for saves that players already have.
+   the table above; point `CurrentVersionFixtureLoadsAndRoundTrips` at it.
+   Delete the fixture of a version that is no longer supported.
