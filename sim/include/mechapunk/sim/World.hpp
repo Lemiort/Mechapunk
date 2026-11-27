@@ -504,6 +504,8 @@ private:
     void ReviewConstruction();
     // Adds a ring of streets around the grid when free plots run short.
     void ReviewStreets();
+    // Opens metro stations where buildings are out of reach of every station.
+    void ReviewTransit();
     [[nodiscard]] std::int64_t UpkeepOf(const Room& apartment) const;
     // Changes an apartment's owner for `price`, paid by the buyer.
     void Transfer(EntityId apartment, EntityId buyer, std::int64_t price);

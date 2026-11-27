@@ -162,6 +162,19 @@ constexpr std::array<std::string_view, 12> kStationNames{
     "Neon Square",  "Foundry Gate", "Old Grid",     "Chrome Market",
     "Circuit Park", "Signal Hill",  "Rust Docks",   "Ion Plaza",
     "Coil Street",  "Relay Yard",   "Static Cross", "Diode Row"};
+}  // namespace
+
+namespace city_build {
+std::string StationName(std::uint32_t number) {
+    std::string name{kStationNames.at(number % kStationNames.size())};
+    if (number >= kStationNames.size()) {
+        name += std::format(" {}", (number / kStationNames.size()) + 1);
+    }
+    return name;
+}
+}  // namespace city_build
+
+namespace {
 
 }  // namespace
 
@@ -228,12 +241,8 @@ City GenerateCity(const CityParams& requested, Pcg32& random,
         for (std::uint32_t column = static_cast<std::uint32_t>(params.city.stationOffset); column < size;
              column += static_cast<std::uint32_t>(params.city.stationSpacing)) {
             const auto number = static_cast<std::uint32_t>(city.stations.size());
-            std::string name{kStationNames.at(number % kStationNames.size())};
-            if (number >= kStationNames.size()) {
-                name += std::format(" {}", (number / kStationNames.size()) + 1);
-            }
             city.stations.push_back(
-                {.node = NodeId{(row * size) + column}, .name = std::move(name)});
+                {.node = NodeId{(row * size) + column}, .name = StationName(number)});
         }
     }
 

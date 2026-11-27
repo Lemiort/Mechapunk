@@ -17,6 +17,7 @@ add_executable(sim_tests
     CityStyleTests.cpp
     SeedTownTests.cpp
     StreetsTests.cpp
+    TransitGrowthTests.cpp
     EconomyTests.cpp
     HousingTests.cpp
     VenueTests.cpp

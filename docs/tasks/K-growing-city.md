@@ -1,6 +1,6 @@
 # Task K: a city that grows from one dormitory
 
-Status: planned on 2026-11-27; K1 to K10 done. Save version 34, game 0.34.0.
+Status: planned on 2026-11-27; K1 to K11 done. Save version 35, game 0.35.0.
 Steps that change saved state take the next free save version at the time
 (rule 3); most of them only add settings, through the guide's "adding a
 setting" recipe.
@@ -240,7 +240,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   `SyncLights` the way task I, step I4 added neon.
 - Tests: none without a renderer. Check: build, ctest, `ContextBudget`.
 
-### - [ ] K11. The metro opens stations as the town spreads (metro)
+### - [x] K11. The metro opens stations as the town spreads (metro)
 
 - Module: metro (`Transit.cpp`, `Metro.cpp`). Depends on: K9. Save change: yes,
   settings only.
@@ -248,7 +248,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   `sim/include/mechapunk/sim/Metro.hpp`.
 - Do:
   1. Add the settings `metro.stationReachMeters` (400), `metro.minBuildings`
-     (6) and `metro.stationCost` (2000).
+     (default 0 = off, so a full city is unchanged; a town sets 6) and `metro.stationCost` (2000).
   2. `World::ReviewTransit()` runs at midnight after `ReviewStreets`. When at
      least `minBuildings` buildings stand farther than `stationReachMeters`
      from any station, open stations, two at once if no line exists yet. A
@@ -390,7 +390,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
 - Open: `tools/sim_runner/main.cpp` (options), then `app/main.cpp` (options).
 - Do: `--town` sets `city.seedTown = 1`, `population.immigration = 1`,
   `population.wealthSpread = 1`, `economy.inflationTarget = 1` and
-  `crime.minGangs = 0`, `construction.freeBedsPercent = 10` and `city.freePlotsMin = 4`, with 30 robots unless `--robots` says otherwise.
+  `crime.minGangs = 0`, `construction.freeBedsPercent = 10`, `city.freePlotsMin = 4` and `metro.minBuildings = 6`, with 30 robots unless `--robots` says otherwise.
   Explicit `--set` options still win.
 - Check: run `mechapunk-sim --town --days 365 --quiet` and write in this file
   how big the town got.

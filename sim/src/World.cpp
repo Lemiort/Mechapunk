@@ -136,6 +136,7 @@ void World::Step() {
         // jobs have run short, and its sites pay supplies and grow
         // (Construction.cpp).
         ReviewStreets();
+        ReviewTransit();
         ReviewConstruction();
     }
     // Robots act in id order, so random draws happen in a fixed order.

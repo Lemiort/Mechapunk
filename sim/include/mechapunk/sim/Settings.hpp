@@ -589,6 +589,22 @@ struct VenuesSettings {
     bool operator==(const VenuesSettings&) const = default;
 };
 
+// How the metro grows with a town (task K, step K11).
+struct MetroSettings {
+    // A building farther than this from every station is out of the metro's reach.
+    std::int64_t stationReachMeters{400};
+
+    // When at least this many buildings are out of reach, City Hall opens a
+    // station (two when there is no line yet). 0 turns it off, as in a full city,
+    // whose stations are all laid out at the start; a town sets 6.
+    std::int64_t minBuildings{0};
+
+    // Credits City Hall pays the supply market for each station it opens.
+    std::int64_t stationCost{2000};
+
+    bool operator==(const MetroSettings&) const = default;
+};
+
 struct SimSettings {
     CrimeSettings crime;
     ConstructionSettings construction;
@@ -599,6 +615,7 @@ struct SimSettings {
     PopulationSettings population;
     SocialSettings social;
     VenuesSettings venues;
+    MetroSettings metro;
 
     bool operator==(const SimSettings&) const = default;
 };

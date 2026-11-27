@@ -100,6 +100,9 @@ void World::ReviewStreets() {
         join(id, at.at({inX, inZ}));
     }
     routes_ = RoutePlanner(city);
+    // The nearest station of every node was worked out for the old nodes.
+    nearestStation_.clear();
+    metersToStation_.clear();
     ++cityVersion_;
 }
 

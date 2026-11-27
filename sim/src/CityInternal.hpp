@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -72,6 +73,10 @@ Building MakeWorkplace(const CityParams& params, Pcg32& random,
                        std::vector<std::uint32_t>& buildingsAt,
                        EntityIdAllocator& ids,
                        std::array<std::uint32_t, kWorkplaceTypes.size()>& counts);
+
+// The name of the station with this index: the list of names, then the list again
+// numbered, as generation has always named them; a town names new stations the same way.
+std::string StationName(std::uint32_t number);
 
 // The seed town's two buildings (task K): a dormitory of
 // `city.seedDormFloors` floors with a charging bay and a diner on its ground

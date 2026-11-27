@@ -1,7 +1,7 @@
 {
    "format": "mechapunk-save",
-   "version": 34,
-   "gameVersion": "0.34.0",
+   "version": 35,
+   "gameVersion": "0.35.0",
    "world": {
       "tick": 28370,
       "seed": 33,
@@ -19550,6 +19550,11 @@
             "inDemandPercent": 105,
             "minWorkspaceStaff": 5,
             "maxWorkspaceStaff": 10
+         },
+         "metro": {
+            "stationReachMeters": 400,
+            "minBuildings": 0,
+            "stationCost": 2000
          }
       },
       "economy": {

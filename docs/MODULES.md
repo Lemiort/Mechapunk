@@ -16,7 +16,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 |---|---:|---|
 | world | 24k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
 | generation | 21k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
-| city-buildings | 8k | `City.hpp`, `CityInternal.hpp`, `CityBuildings.cpp`, `CityTests.cpp` |
+| city-buildings | 9k | `City.hpp`, `CityInternal.hpp`, `CityBuildings.cpp`, `CityTests.cpp` |
 | streets | 5k | `City.hpp`, `Streets.cpp`, `StreetsTests.cpp` |
 | seed-town | 7k | `City.hpp`, `SeedTownTests.cpp` |
 | city-streets | 12k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
@@ -29,7 +29,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | careers | 24k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 20k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 14k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
-| metro | 11k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `MetroTests.cpp`, `TransitTests.cpp` |
+| metro | 14k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `TransitGrowth.cpp`, `MetroTests.cpp`, `TransitTests.cpp`, `TransitGrowthTests.cpp` |
 | saves | 11k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
 | settings | 13k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |

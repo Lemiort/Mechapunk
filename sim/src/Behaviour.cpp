@@ -371,8 +371,11 @@ void World::StartWalk(Robot& robot, EntityId destination) {
         robot.rideTo = trip.toStation;
         robot.boardsAt = state_.tick + trip.minutesToStation;
         robot.alightsAt = robot.boardsAt + trip.minutesUnderground;
-        fare = std::min<std::int64_t>(kMetroFare, robot.credits);
-        Sell(robot, transit_, fare);
+        // A town's metro runs free until its Metro Authority is founded (K12).
+        fare = transit_.IsValid() ? std::min<std::int64_t>(kMetroFare, robot.credits) : 0;
+        if (fare > 0) {
+            Sell(robot, transit_, fare);
+        }
         state_.today.fares += fare;
         ++state_.today.metroRides;
     } else {
