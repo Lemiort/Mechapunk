@@ -4,6 +4,9 @@
 // inside its buildings is in CityTests.cpp, the streets, the route planner
 // and the free plots are in CityStreetTests.cpp.
 
+#include <set>
+#include <string_view>
+#include <iterator>
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -59,4 +62,17 @@ TEST(City, StyleIsSettledAndSpreads) {
             }
         }
     }
+}
+
+TEST(City, EveryStyleHasItsOwnName) {
+    constexpr sim::BuildingStyle kAll[] = {
+        sim::BuildingStyle::Plain,      sim::BuildingStyle::Setback, sim::BuildingStyle::Stepped,
+        sim::BuildingStyle::TwinTowers, sim::BuildingStyle::Plinth,  sim::BuildingStyle::Gabled,
+        sim::BuildingStyle::Sawtooth,   sim::BuildingStyle::Tower};
+    std::set<std::string_view> names;
+    for (const sim::BuildingStyle style : kAll) {
+        EXPECT_FALSE(sim::StyleName(style).empty());
+        names.insert(sim::StyleName(style));
+    }
+    EXPECT_EQ(names.size(), std::size(kAll));
 }

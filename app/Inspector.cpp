@@ -156,6 +156,9 @@ std::optional<InspectorRequest> DrawBuilding(const Selection& selection,
     const bool habitat = building->kind == sim::BuildingKind::Habitat;
     ImGui::Text("%s, %u floors", habitat ? "Habitat" : "Workplace",
                 building->floors);
+    ImGui::TextDisabled("A %s of %u floor%s",
+                        std::string{sim::StyleName(building->style)}.c_str(), building->floors,
+                        building->floors == 1 ? "" : "s");
     if (!habitat) {
         ImGui::TextDisabled(
             "Shift %s-%s, %u cr",

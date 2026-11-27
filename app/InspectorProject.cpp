@@ -151,6 +151,10 @@ std::optional<InspectorRequest> DrawProject(
                        ImVec2{-1.0F, 0.0F}, overlay.c_str());
     ImGui::Text("%u floors done of %u, %u nights left",
                 project->floorsDone, floorsTotal, project->daysLeft);
+    // What the scaffold will become: the style was set the night the site
+    // started (task I, step I5) and the view shows it once the site ends.
+    ImGui::TextDisabled("It will be a %s of %u floors",
+                        std::string{sim::StyleName(lot.building->style)}.c_str(), floorsTotal);
 
     // Cost: what the site has paid for its supplies since the night it
     // started (step D5b2's `costSoFar`) and the ask every night pays.

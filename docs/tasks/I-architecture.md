@@ -192,7 +192,7 @@ One module and one commit each. Steps that change saved state follow rule 3.
   test is a new `tests/SiteStyleTests.cpp` (module `site-style`) instead of
   `ConstructionTests.cpp`, whose module has no room (24262 of 25000).
 
-### - [ ] I6. The style in the inspector (inspector)
+### - [x] I6. The style in the inspector (inspector)
 
 - Open: `app/Inspector.cpp` (the building page), `app/Links.hpp`.
 - The building page names the style in its facts ("a stepped block of 9
@@ -200,6 +200,11 @@ One module and one commit each. Steps that change saved state follow rule 3.
   D5c) says what the finished building will look like.
 - No test; the words come from a `StyleName(BuildingStyle)` helper - put it
   in `City.hpp` beside `ApartmentClassName`, which is the same kind of thing.
+- Done. `StyleName` is declared in `City.hpp` and defined in `CityStyle.cpp`
+  (module `city-styles`, with a small test that every style has its own
+  name). The building page says "A stepped block of 9 floors" under its first
+  line; the site's page says "It will be a sawtooth yard of 5 floors" under
+  its progress. Not seen in the game.
 
 ### - [ ] I7. Buildings by style in the statistics window (statistics)
 
