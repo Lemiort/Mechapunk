@@ -3,7 +3,9 @@
 Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
 (save version 42, game 0.42.0), L3a and L3b done on 2026-11-28 (no save change:
 the body is already saved state, and step L3 was split on 2026-11-28 into L3a
-and L3b - see why under L3a), the rest still planned. Revised
+and L3b - see why under L3a), L2a done on 2026-11-28 (no save change, and step
+L2 was split into L2a and L2b - see why under L2a), the rest still planned.
+Revised
 again on 2026-11-28 for the save rule: the game was at save version 41 and
 `kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
 migration** - a save step bumps `kCurrentSaveVersion` (the next free version is
@@ -107,21 +109,78 @@ log unchanged:
 - Check: build, ctest, seed 7 log byte-identical, save differs only by the
   new keys.
 
-### - [ ] L2. Validate bodies (validation)
+### - [x] L2a. The parts are checked on load — split from L2 on 2026-11-28
 
 - Module: validation. Depends on: L1. Save change: no.
 - Open: `sim/src/Validation.cpp` (the robot loop), `sim/include/mechapunk/sim/Body.hpp`.
-- Do: every part's condition is in `[0, 1000]`; a lost part has condition 0;
-  the head and torso are not lost and not above `kMaxWear - wear`; the
-  dominant hand is `LeftHand` or `RightHand`.
+- Do: in the robot loop of `ValidateWorldState`: every part's condition is in
+  `[0, 1000]`; a lost part has condition 0; the head and the torso are not lost;
+  the dominant hand is `LeftHand` or `RightHand`.
+- Tests: `tests/ValidationTests.cpp` (a new file, registered as the fourth file
+  of the `validation` module): the save of a new town, with one number or one
+  flag changed in one robot's body, is refused by `World::FromState` with a
+  message naming the part and the rule.
+- Check: build, ctest. Nothing in the simulation reads a part yet, so the
+  headless log is untouched.
+
+### - [ ] L2b. The wear cap on the head and the torso is checked on load
+
+- Module: validation, then the test files that write a state by hand, then the
+  fixture. Depends on: L1, L3a, L2a. Save change: no new version (no key
+  changes), but `tests/fixtures/saves/v42-city.json` is regenerated.
+- Open: `sim/src/Validation.cpp` (the body block L2a added),
+  `sim/include/mechapunk/sim/Body.hpp`.
+- Do: add to that block: the head and the torso are never above
+  `kMaxWear - wear` (the robot's `wear` is already checked to lie in
+  `[0, kMaxWear]`, so the cap is never negative).
+- Then the states that break it, found by `rg -n "\.wear\s*=" tests`. Three
+  files set `wear` near `kMaxWear` on a robot and load that state through
+  `FromState`, which validates, so each of them calls `CapBody` afterwards,
+  the way the game does: `EconomyTests.cpp` line 274, `SeedTownTests.cpp` line
+  162, and `LifeCycleTests.cpp` lines 159, 240, 241, 242 and 378. The other
+  sites stay under the cap and need nothing: `LifeCycleTests.cpp` line 128 sets
+  `wear = 500` with a part condition of 100, and `CareersTests.cpp` line 271 and
+  `WorldTests.cpp` line 38 set `wear = 0`. `BodyTests.cpp` lines 146-150 write
+  part conditions by hand above the cap and pick worse ones instead. A doomed
+  robot scripted at `kMaxWear - 1` then carries its head and torso at 1, which
+  still dies at the next midnight (the nightly wear lands them on 0): what those
+  tests already expect.
+- Then regenerate `tests/fixtures/saves/v42-city.json` with the same command and
+  version: the fixture was written before step L3a capped the parts wherever
+  wear grows, so its heads sit above the cap - its first robot has a head of
+  978 at wear 120 - and the rule this step adds refuses it. Fix the sentence in
+  `tests/fixtures/saves/README.md` saying the parts were capped by the wear a
+  robot was **born** with, and the body block of `SaveTests.cpp` (line ~375)
+  that reads that way: from now on the head and the torso equal today's
+  `kMaxWear - wear`.
+- Tests: `Validation.RejectsBasicPartsAboveTheWearCap`: one more than the cap
+  on the head, and on the torso, is refused with a message naming the cap and
+  the wear.
+- Check: build, ctest.
+
+**Why L2 was split.** The rules themselves are four lines of one module, and
+they stay there. What reaches out is the consequence of the `kMaxWear - wear`
+rule: it holds in every state the game writes since step L3a, but not in two
+kinds of state that already exist - the v42 fixture, made before L3a, and four
+test files that write a state by hand (three set `wear` near `kMaxWear` and
+load it through `FromState`, which validates, and one of them segfaults once
+the load is refused and a helper's world comes back empty; `BodyTests.cpp`
+writes part conditions above the cap). Switching that rule on therefore needs
+a fixture for the `saves` module and repairs in the `money`, `seed-town`,
+`life-cycle` and `bodies` modules: not one step. The other four rules hold
+everywhere today, so L2a is the validation module on its own and everything
+still passes.
+
+The note below was written while doing L1 and delayed L2 until after L3a. It
+is about the game's own states only and misses the fixture and the hand-written
+states above.
+
 - Note (found while doing L1): the rule "not above `kMaxWear - wear`" only
   holds from step L3 on, which is where `CapBody` starts running wherever
   wear grows; until then a running city's head sits above that cap, so doing
   L2 before L3 makes a real city fail validation and breaks
   `CurrentVersionFixtureLoadsAndRoundTrips`. Do L2 after L3a, which is where
   the cap and the mend are put at every place that writes `wear`.
-- Tests: a save with each rule broken is refused with a message naming it.
-- Check: build, ctest.
 
 ### - [x] L3a. The head and the torso follow every change of wear — split on 2026-11-28
 

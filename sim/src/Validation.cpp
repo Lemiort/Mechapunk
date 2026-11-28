@@ -23,6 +23,17 @@
 
 namespace mechapunk::sim {
 
+// A part's condition is counted from 0 (destroyed) to whole, and whole is
+// what a new part starts at (Body.hpp). The bound is the scale of the number,
+// not a knob, so it is not a setting.
+constexpr std::int32_t kMaxPartCondition = 1000;
+
+// The five parts in the order `Body::parts` keeps them, which is the order of
+// the enum (Body.hpp) and the order of the names the save writes for them
+// (Save.cpp), so a message can name the part it found broken.
+constexpr std::string_view kPartNames[] = {"head", "torso", "leftHand",
+                                           "rightHand", "legs"};
+
 std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
     const auto fail = [](std::string message) {
         return std::unexpected(std::move(message));
@@ -245,6 +256,40 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
             robot.wear > kMaxWear) {
             return fail(std::format("Robot '{}' has needs or credits out of "
                                     "range",
+                                    robot.name));
+        }
+        // The body (task L, step L2a): five parts, each with a condition
+        // between destroyed and whole, and a part that is lost has no condition
+        // left. The head and the torso are never lost, because a robot without
+        // one is scrapped instead of saved (step L3b), so a save that marks one
+        // of them lost contradicts itself. Hands and legs can be lost: that is
+        // what replaces them, step L12. The hand a robot works with is one of
+        // its two hands. Step L2b adds the cap that keeps the head and the
+        // torso at or below `kMaxWear - wear`.
+        for (std::size_t index = 0; index < robot.body.parts.size(); ++index) {
+            const PartState& part = robot.body.parts[index];
+            if (part.condition < 0 || part.condition > kMaxPartCondition) {
+                return fail(std::format("Robot '{}' has a {} in condition {}, "
+                                        "outside 0 to {}",
+                                        robot.name, kPartNames[index],
+                                        part.condition, kMaxPartCondition));
+            }
+            if (part.lost && part.condition != 0) {
+                return fail(std::format("Robot '{}' has lost its {}, which still "
+                                        "has condition {}",
+                                        robot.name, kPartNames[index],
+                                        part.condition));
+            }
+            if (index < 2 && part.lost) {  // Head and torso, in enum order.
+                return fail(std::format("Robot '{}' has lost its {}, which a robot "
+                                        "cannot live without",
+                                        robot.name, kPartNames[index]));
+            }
+        }
+        if (robot.body.dominantHand != BodyPart::LeftHand &&
+            robot.body.dominantHand != BodyPart::RightHand) {
+            return fail(std::format("Robot '{}' works with a hand that is neither "
+                                    "its left nor its right",
                                     robot.name));
         }
     }
