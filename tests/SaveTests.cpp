@@ -376,19 +376,27 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     // step L1): head, torso, left hand, right hand and legs, each with a
     // condition from 0 to 1000 and a lost flag, plus the hand it works with,
     // written by name. A robot this game built starts with whole hands and
-    // legs and nothing lost, and its head and torso were capped by the wear
-    // it was born with, so both carry the same condition and at least one
-    // robot, old when it was built, is below whole. Nothing wears a part
-    // yet, so the round trip above is what proves the keys are written and
-    // read back at all.
+    // legs and nothing lost, and its head and its torso follow its wear in
+    // both directions (step L3a caps them wherever wear grows and mends them
+    // where a clinic takes wear away), so each of the two carries exactly
+    // `max(0, kMaxWear - wear)`: this fixture's oldest robots sit well below
+    // whole, and the one robot whose wear reached `kMaxWear` sits at 0 and is
+    // scrapped at the next midnight, which is the day this test then runs.
+    // Nothing wears a part by itself yet, so the round trip above is what
+    // proves the keys are written and read back at all.
     {
         bool capped = false;
         std::set<sim::BodyPart> hands;
         for (const sim::Robot& robot : state->robots) {
             EXPECT_EQ(robot.body.parts.size(), 5U);
+            // The cap step L3a holds in every state this game writes, and the
+            // rule part L2b6 adds to `ValidateWorldState` refuses more.
+            const std::int32_t cap =
+                std::max<std::int32_t>(0, sim::kMaxWear - robot.wear);
             const std::int32_t head =
                 sim::Part(robot.body, sim::BodyPart::Head).condition;
-            EXPECT_EQ(head, sim::Part(robot.body, sim::BodyPart::Torso).condition)
+            EXPECT_EQ(head, cap) << robot.name;
+            EXPECT_EQ(sim::Part(robot.body, sim::BodyPart::Torso).condition, cap)
                 << robot.name;
             EXPECT_GE(head, 0);
             EXPECT_LE(head, 1000);

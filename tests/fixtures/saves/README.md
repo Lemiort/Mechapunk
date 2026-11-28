@@ -25,8 +25,13 @@ gang growth settings, since 41 the growth events of the chronicle); this one
 was made with the defaults. From version 42 every robot also carries its
 five body parts: head, torso, left hand, right hand and legs, each with a
 condition from 0 to 1000 and a flag saying the part is lost, plus the hand
-the robot works with. `CurrentVersionFixtureLoadsAndRoundTrips` loads it,
-checks that saving it again reproduces it byte for byte, and runs a day.
+the robot works with. The head and the torso carry what the robot's wear
+allows today - `kMaxWear - wear`, never below 0 - rather than a value fixed
+at birth, because step L3a caps and mends them wherever wear moves: this
+town's oldest robots sit well below whole and its most worn robot sits at
+0 and is scrapped at the next midnight. `CurrentVersionFixtureLoadsAndRoundTrips`
+loads it, checks that saving it again reproduces it byte for byte, and
+runs a day.
 
 ## Changing the save format
 

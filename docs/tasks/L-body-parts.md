@@ -4,9 +4,10 @@ Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
 (save version 42, game 0.42.0), L3a and L3b done on 2026-11-28 (no save change:
 the body is already saved state, and step L3 was split on 2026-11-28 into L3a
 and L3b - see why under L3a), L2a done on 2026-11-28 (no save change, and step L2 was split into L2a and
-L2b - see why under L2a), L2b1, L2b2, L2b3 and L2b4 - the first four of the parts L2b was
-split into on 2026-11-28 - done the same day (no save change), the rest still
-planned.
+L2b - see why under L2a), L2b1 to L2b5 - the first five of the parts L2b was
+split into on 2026-11-28 - done the same day (no save change; part L2b5 rewrote
+the body values of the v42 fixture in place, at the same version 42), the rest
+still planned.
 Revised
 again on 2026-11-28 for the save rule: the game was at save version 41 and
 `kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
@@ -225,7 +226,7 @@ log unchanged:
 - Tests: no new test; `Body.BodySurvivesASaveRoundTrip` must pass.
 - Check: build, ctest.
 
-### - [ ] L2b5. The v42 fixture is regenerated with the parts capped — part 5 of L2b
+### - [x] L2b5. The v42 fixture is regenerated with the parts capped — part 5 of L2b
 
 - Module: saves. Depends on: L3a. Save change: no new version; the fixture of
   the current version is replaced, the format is unchanged.
