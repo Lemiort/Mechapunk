@@ -55,6 +55,7 @@ MODULES = {
                "tests/SocialTests.cpp"],
     "life-cycle": [I + "World.hpp", I + "Construction.hpp", "sim/src/LifeCycle.cpp",
                    "tests/LifeCycleTests.cpp"],
+    "bodies": [I + "Body.hpp", I + "World.hpp", "sim/src/Body.cpp", "tests/BodyTests.cpp"],
     "metro": [I + "Metro.hpp", "sim/src/Metro.cpp", "sim/src/Transit.cpp", "sim/src/TransitGrowth.cpp",
               "tests/MetroTests.cpp", "tests/TransitTests.cpp", "tests/TransitGrowthTests.cpp"],
     "saves": [I + "Save.hpp", "sim/src/Save.cpp", "sim/src/Migrations.hpp", "sim/src/Migrations.cpp",

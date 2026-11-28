@@ -2,6 +2,7 @@ find_package(GTest REQUIRED)
 include(GoogleTest)
 
 add_executable(sim_tests
+    BodyTests.cpp
     GangRosterTests.cpp
     GangCrimeTests.cpp
     GangOfficerTests.cpp

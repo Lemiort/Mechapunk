@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 #include "Names.hpp"
+#include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 #include "WorldInternal.hpp"
@@ -198,6 +199,12 @@ World World::Generate(const WorldParams& params) {
         robot.wear = WearAtAge(robot.age);
         robot.needs.condition =
             std::min(robot.needs.condition, kMaxWear - robot.wear);
+        // One robot in ten is left-handed, decided by its id so that no
+        // random draw moves, and its parts are new but capped by its age.
+        robot.body.dominantHand =
+            robot.id.value % 10 == 0 ? BodyPart::LeftHand
+                                      : BodyPart::RightHand;
+        CapBody(robot);
     }
 
     Pcg32 careers = Pcg32::FromSeed(params.seed, kCareerStream);

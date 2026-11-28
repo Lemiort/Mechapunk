@@ -213,11 +213,12 @@ TEST(Save, MigrationsRunInOrderAndReportGaps) {
 
 // The committed fixture was written by the current save version. Saving it
 // again must reproduce it byte for byte; when the format changes on purpose,
-// bump kCurrentSaveVersion, add a migration and a new fixture (see
+// bump kCurrentSaveVersion and kGameVersion, raise kOldestSupportedSaveVersion
+// with them and replace the fixture, writing no migration (see
 // tests/fixtures/saves/README.md).
 TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
     const std::filesystem::path path =
-        kFixtureDirectory / "saves" / "v41-city.json";
+        kFixtureDirectory / "saves" / "v42-city.json";
     const std::string fixture = ReadText(path);
     ASSERT_FALSE(fixture.empty()) << "missing " << path.string();
 
@@ -370,6 +371,40 @@ TEST(Save, CurrentVersionFixtureLoadsAndRoundTrips) {
             styles.insert(building.style);
         }
         EXPECT_GE(styles.size(), 2U);
+    }
+    // And from version 42 every robot carries its five body parts (task L,
+    // step L1): head, torso, left hand, right hand and legs, each with a
+    // condition from 0 to 1000 and a lost flag, plus the hand it works with,
+    // written by name. A robot this game built starts with whole hands and
+    // legs and nothing lost, and its head and torso were capped by the wear
+    // it was born with, so both carry the same condition and at least one
+    // robot, old when it was built, is below whole. Nothing wears a part
+    // yet, so the round trip above is what proves the keys are written and
+    // read back at all.
+    {
+        bool capped = false;
+        std::set<sim::BodyPart> hands;
+        for (const sim::Robot& robot : state->robots) {
+            EXPECT_EQ(robot.body.parts.size(), 5U);
+            const std::int32_t head =
+                sim::Part(robot.body, sim::BodyPart::Head).condition;
+            EXPECT_EQ(head, sim::Part(robot.body, sim::BodyPart::Torso).condition)
+                << robot.name;
+            EXPECT_GE(head, 0);
+            EXPECT_LE(head, 1000);
+            capped = capped || head < 1000;
+            for (const sim::BodyPart part :
+                {sim::BodyPart::LeftHand, sim::BodyPart::RightHand,
+                 sim::BodyPart::Legs}) {
+                EXPECT_EQ(sim::Part(robot.body, part).condition, 1000)
+                    << robot.name;
+                EXPECT_FALSE(sim::Part(robot.body, part).lost) << robot.name;
+            }
+            hands.insert(robot.body.dominantHand);
+        }
+        EXPECT_TRUE(capped);
+        // One robot in ten works with its left hand, so both names occur here.
+        EXPECT_EQ(hands.size(), 2U);
     }
 
     auto world = sim::World::FromState(std::move(*state));

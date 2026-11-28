@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "Names.hpp"
+#include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -232,6 +233,12 @@ void World::AddNewcomer() {
     }
     robot.age = random.UniformInt(static_cast<std::uint32_t>(state_.settings.population.minNewcomerAge), static_cast<std::uint32_t>(state_.settings.population.maxNewcomerAge));
     robot.wear = WearAtAge(robot.age);
+    // Its body parts are new; the hand it works with follows its id, like a
+    // built robot's, so no random draw moves, and its age caps the head and
+    // the torso (task L, step L1).
+    robot.body.dominantHand =
+        robot.id.value % 10 == 0 ? BodyPart::LeftHand : BodyPart::RightHand;
+    CapBody(robot);
     // Ids only grow, so the newcomer goes last and robots stay sorted.
     state_.robots.push_back(std::move(robot));
     ++populationVersion_;

@@ -1,0 +1,129 @@
+#include <gtest/gtest.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <set>
+#include <string>
+#include <utility>
+
+#include "mechapunk/sim/Body.hpp"
+#include "mechapunk/sim/Save.hpp"
+#include "mechapunk/sim/World.hpp"
+
+namespace sim = mechapunk::sim;
+
+// A part's condition in this robot's body, by which part it is.
+int Condition(const sim::Robot& robot, sim::BodyPart part) {
+    return sim::Part(robot.body, part).condition;
+}
+
+TEST(Body, CapBodyCapsHeadAndTorsoOnly) {
+    sim::Robot robot;
+    robot.wear = 400;
+    for (sim::PartState& part : robot.body.parts) {
+        part.condition = 1000;
+    }
+    // The head is worse than the cap allows, the torso already better: the
+    // cap holds neither of them up.
+    sim::Part(robot.body, sim::BodyPart::Head).condition = 800;
+    sim::Part(robot.body, sim::BodyPart::Torso).condition = 500;
+    sim::Part(robot.body, sim::BodyPart::Legs).lost = true;
+    robot.body.dominantHand = sim::BodyPart::LeftHand;
+
+    sim::CapBody(robot);
+
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Head), 600);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Torso), 500);
+    // Hands and legs can be lost and replaced, so wear does not cap them.
+    EXPECT_EQ(Condition(robot, sim::BodyPart::LeftHand), 1000);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::RightHand), 1000);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Legs), 1000);
+    // The cap touches nothing else about the body.
+    EXPECT_TRUE(sim::Part(robot.body, sim::BodyPart::Legs).lost);
+    EXPECT_EQ(robot.body.dominantHand, sim::BodyPart::LeftHand);
+}
+
+TEST(Body, WornOutRobotHasDestroyedHeadAndTorso) {
+    sim::Robot robot;
+    robot.wear = sim::kMaxWear;
+    sim::CapBody(robot);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Head), 0);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Torso), 0);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Legs), 1000);
+}
+
+TEST(Body, TheFivePartsAreEachTheirOwn) {
+    sim::Body body;
+    for (const sim::BodyPart part :
+         {sim::BodyPart::Head, sim::BodyPart::Torso, sim::BodyPart::LeftHand,
+          sim::BodyPart::RightHand, sim::BodyPart::Legs}) {
+        sim::Part(body, part).condition =
+            1 + static_cast<int>(static_cast<std::uint8_t>(part));
+    }
+    EXPECT_EQ(sim::Part(body, sim::BodyPart::Head).condition, 1);
+    EXPECT_EQ(sim::Part(body, sim::BodyPart::Torso).condition, 2);
+    EXPECT_EQ(sim::Part(body, sim::BodyPart::LeftHand).condition, 3);
+    EXPECT_EQ(sim::Part(body, sim::BodyPart::RightHand).condition, 4);
+    EXPECT_EQ(sim::Part(body, sim::BodyPart::Legs).condition, 5);
+}
+
+TEST(Body, NewCityRobotsHaveCappedBodies) {
+    const sim::World world = sim::World::Generate({.seed = 3, .robots = 60});
+    std::uint32_t leftHanded = 0;
+    for (const sim::Robot& robot : world.State().robots) {
+        // New, but no better than its age's wear allows.
+        EXPECT_EQ(Condition(robot, sim::BodyPart::Head),
+                  sim::kMaxWear - robot.wear)
+            << robot.name;
+        EXPECT_EQ(Condition(robot, sim::BodyPart::Torso),
+                  sim::kMaxWear - robot.wear)
+            << robot.name;
+        for (const sim::BodyPart part :
+             {sim::BodyPart::LeftHand, sim::BodyPart::RightHand,
+              sim::BodyPart::Legs}) {
+            EXPECT_EQ(Condition(robot, part), 1000) << robot.name;
+            EXPECT_FALSE(sim::Part(robot.body, part).lost) << robot.name;
+        }
+        // The hand it works with follows its id, so no random draw moved.
+        const bool left = robot.id.value % 10 == 0;
+        EXPECT_EQ(robot.body.dominantHand,
+                  left ? sim::BodyPart::LeftHand : sim::BodyPart::RightHand)
+            << robot.name;
+        leftHanded += left ? 1U : 0U;
+    }
+    EXPECT_GT(leftHanded, 0U);
+}
+
+TEST(Body, BodySurvivesASaveRoundTrip) {
+    sim::WorldState state =
+        sim::World::Generate({.seed = 5, .robots = 20}).State();
+    ASSERT_GT(state.robots.size(), 1U);
+    // Wear a robot down in a way a new city never starts with, so the round
+    // trip proves the numbers and the flags travel, not just the defaults.
+    sim::Robot& worn = state.robots.front();
+    worn.body.parts[0].condition = 700;
+    worn.body.parts[1].condition = 0;
+    worn.body.parts[2].lost = true;
+    worn.body.parts[2].condition = 0;
+    worn.body.parts[4].condition = 300;
+    worn.body.dominantHand = sim::BodyPart::LeftHand;
+
+    auto encoded = sim::SerializeWorld(state);
+    ASSERT_TRUE(encoded.has_value()) << encoded.error();
+    const std::string json = *encoded;
+    auto loaded = sim::DeserializeWorld(json);
+    ASSERT_TRUE(loaded.has_value()) << loaded.error();
+    ASSERT_EQ(loaded->robots.size(), state.robots.size());
+    for (std::size_t index = 0; index < state.robots.size(); ++index) {
+        EXPECT_EQ(loaded->robots[index].body, state.robots[index].body)
+            << index;
+    }
+    EXPECT_TRUE(loaded->robots.front().body.parts[2].lost);
+    // The part names are spelled out in the save, not numbered.
+    EXPECT_NE(json.find("\"leftHand\""), std::string::npos);
+
+    // The new keys do not keep a world from loading or validating.
+    auto world = sim::World::FromState(std::move(*loaded));
+    ASSERT_TRUE(world.has_value()) << world.error();
+    EXPECT_TRUE(sim::ValidateWorldState(world->State()));
+}

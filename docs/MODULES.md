@@ -17,7 +17,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | world | 24k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
 | generation | 21k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
 | city-buildings | 9k | `City.hpp`, `CityInternal.hpp`, `CityBuildings.cpp`, `CityTests.cpp` |
-| metro-authority | 9k | `World.hpp`, `MetroAuthority.cpp`, `MetroAuthorityTests.cpp` |
+| metro-authority | 11k | `World.hpp`, `MetroAuthority.cpp`, `MetroAuthorityTests.cpp` |
 | streets | 5k | `City.hpp`, `Streets.cpp`, `StreetsTests.cpp` |
 | seed-town | 7k | `City.hpp`, `SeedTownTests.cpp` |
 | city-streets | 12k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
@@ -30,19 +30,20 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | careers | 24k | `World.hpp`, `Careers.hpp`, `Construction.hpp`, `Careers.cpp`, `Venues.hpp`, `Venues.cpp`, `CareersTests.cpp` |
 | social | 21k | `World.hpp`, `Social.hpp`, `Social.cpp`, `SocialTests.cpp` |
 | life-cycle | 15k | `World.hpp`, `Construction.hpp`, `LifeCycle.cpp`, `LifeCycleTests.cpp` |
-| metro | 14k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `TransitGrowth.cpp`, `MetroTests.cpp`, `TransitTests.cpp`, `TransitGrowthTests.cpp` |
-| saves | 11k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
+| bodies | 10k | `Body.hpp`, `World.hpp`, `Body.cpp`, `BodyTests.cpp` |
+| metro | 16k | `Metro.hpp`, `Metro.cpp`, `Transit.cpp`, `TransitGrowth.cpp`, `MetroTests.cpp`, `TransitTests.cpp`, `TransitGrowthTests.cpp` |
+| saves | 12k | `Save.hpp`, `Save.cpp`, `Migrations.hpp`, `Migrations.cpp`, `SaveTests.cpp` |
 | settings | 14k | `Settings.hpp`, `Settings.cpp`, `SettingsTests.cpp` |
 | basics | 4k | `GameTime.hpp`, `Ids.hpp`, `Random.hpp`, `Weather.hpp`, `GameTime.cpp`, `Random.cpp`, `Weather.cpp`, `RandomTests.cpp`, `WeatherTests.cpp` |
 | runner | 13k | `World.hpp`, `main.cpp` |
-| view-core | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
-| view-massing | 16k | `CityView.hpp`, `CityViewInternal.hpp`, `Massing.hpp`, `Massing.cpp`, `CityMassing.cpp`, `MassingTests.cpp` |
+| view-core | 23k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
+| view-massing | 17k | `CityView.hpp`, `CityViewInternal.hpp`, `Massing.hpp`, `Massing.cpp`, `CityMassing.cpp`, `MassingTests.cpp` |
 | site-style | 9k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `City.hpp`, `SiteStyleTests.cpp` |
 | view-robots | 19k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
 | view-metro | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityMetroInternal.hpp`, `CityMetro.cpp`, `CityDepots.cpp`, `Metro.hpp` |
-| view-interiors | 12k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
+| view-interiors | 13k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
-| rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
+| rendering | 14k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
 | ui | 16k | `main.cpp`, `SimulationHost.hpp`, `SimulationHost.cpp` |
 | organization-lists | 3k | `OrganizationLists.hpp`, `OrganizationLists.cpp`, `OrganizationListsTests.cpp` |
 | project-lists | 5k | `ProjectLists.hpp`, `ProjectLists.cpp`, `ProjectListsTests.cpp` |
@@ -97,6 +98,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `EconomyStatistics.cpp` | `RecordStatistics`, `GiniPerMille`, sector and emission names, and the builders employed at the site offices |
 | `Social.hpp/.cpp` | Interests, bonds, memories (`MemoryKind`, `MemoryText`), talks, `Remember` (also counts daily statistics) |
 | `LifeCycle.cpp` | Aging, wear, `Scrap` (with `Bequeath`), `AddNewcomer` (whose home skips a site's) |
+| `Body.hpp/.cpp` | The five body parts (`BodyPart`, `PartState`, `Body`), which part of a robot `Part` names, and `CapBody`, the cap that holds the head and the torso to what its wear allows |
 | `Transit.cpp`, `Metro.hpp/.cpp` | Trip planning, the metro network, timetable, trains, `PlanDriverRun` |
 | `Weather.*`, `Random.*`, `GameTime.*`, `Ids.hpp` | As named |
 | `Save.hpp/.cpp` | glaze JSON, enum names, the migration list, the oldest supported version |
@@ -161,6 +163,7 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Jobs, shifts, hiring, firing, promotions, moving home | careers | `Careers.cpp`, `Venues.cpp` |
 | Friends, rivals, memories, talks | social | `Social.cpp` |
 | Aging, wear, scrapping, newcomers moving in | life-cycle | `LifeCycle.cpp` |
+| A robot's body parts, what they wear from, what it holds | bodies | `Body.hpp`, `Body.cpp` |
 | Timetable, trains, trips, driver runs | metro | `Metro.cpp`, `Transit.cpp` |
 | Any change to saved state (new version, migration, fixture) | saves | `Save.cpp` (`kMigrations`, enum names) |
 | The headless runner's report | runner | `tools/sim_runner/main.cpp` |

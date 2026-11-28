@@ -19,16 +19,18 @@ namespace mechapunk::sim {
 //     "world": { ...WorldState... } }
 //
 // Field names, enum names and nesting of WorldState are part of the format.
-// Any change to them needs a new kCurrentSaveVersion, a migration from the
-// previous version, and a new fixture under tests/fixtures/saves.
+// Any change to them needs a new kCurrentSaveVersion and kGameVersion, and a
+// new fixture under tests/fixtures/saves.
 inline constexpr std::string_view kSaveFormatName = "mechapunk-save";
-inline constexpr std::uint32_t kCurrentSaveVersion = 41;
+inline constexpr std::uint32_t kCurrentSaveVersion = 42;
 // The oldest version this game still reads. Saves older than this are
 // refused: the migrations that upgraded them were removed, because nobody
-// keeps such saves. A new format change appends a migration from the
-// current version and leaves this number alone; raise it to drop old ones.
-inline constexpr std::uint32_t kOldestSupportedSaveVersion = 41;
-inline constexpr std::string_view kGameVersion = "0.41.0";
+// keeps such saves. A format change raises this number together with
+// kCurrentSaveVersion and writes no migration, so a save reads only in the
+// game that wrote it; kMigrations in Save.cpp stays empty and versions between
+// the two numbers are never read.
+inline constexpr std::uint32_t kOldestSupportedSaveVersion = 42;
+inline constexpr std::string_view kGameVersion = "0.42.0";
 
 // Untyped JSON tree of the "world" object, which migrations edit. Keys are
 // sorted and 64-bit integers are kept exactly.

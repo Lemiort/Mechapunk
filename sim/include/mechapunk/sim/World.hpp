@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/Careers.hpp"
 #include "mechapunk/sim/Chronicle.hpp"
 #include "mechapunk/sim/Construction.hpp"
@@ -91,6 +92,10 @@ struct Robot {
     std::uint32_t age{};
     // Lasting damage from 0 to kMaxWear; clinics take some of it away.
     std::int32_t wear{};
+    // Its five body parts (Body.hpp): head, torso, hands and legs, new when
+    // the robot is built, and capped by its wear there (step L3 caps it again
+    // wherever wear grows).
+    Body body;
     // Which gang the robot belongs to, none if zero; arrests for robbing.
     EntityId gang;
     std::uint32_t arrests{};

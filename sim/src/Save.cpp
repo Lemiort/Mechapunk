@@ -16,6 +16,7 @@
 
 #include <glaze/glaze.hpp>
 
+#include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/City.hpp"
 #include "mechapunk/sim/Ids.hpp"
 #include "mechapunk/sim/Social.hpp"
@@ -69,6 +70,13 @@ struct glz::meta<mechapunk::sim::ProjectReason> {
     using enum mechapunk::sim::ProjectReason;
     static constexpr auto value =
         enumerate("unknown", Unknown, "homesShort", HomesShort, "jobsShort", JobsShort);
+};
+template <>
+struct glz::meta<mechapunk::sim::BodyPart> {
+    using enum mechapunk::sim::BodyPart;
+    static constexpr auto value =
+        enumerate("head", Head, "torso", Torso, "leftHand", LeftHand,
+                  "rightHand", RightHand, "legs", Legs);
 };
 template <>
 struct glz::meta<mechapunk::sim::RobotActivity> {
@@ -155,8 +163,9 @@ constexpr glz::opts kWriteOptions{.prettify = true};
 // instead of silently filling in a default.
 constexpr glz::opts kReadOptions{.error_on_missing_keys = true};
 
-// Every older format was dropped (kOldestSupportedSaveVersion). The next
-// format change appends its migration here.
+// Every older format was dropped (kOldestSupportedSaveVersion), so a format
+// change raises that number in Save.hpp and writes nothing here; a migration
+// is kept only for a version this game still reads.
 constexpr std::array<Migration, 0> kMigrations{};
 }  // namespace
 

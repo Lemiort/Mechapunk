@@ -1,7 +1,8 @@
 # Task L: body parts
 
-Status: planned on 2026-11-27 and revised the same day; nothing done. Revised
-again on 2026-11-28 for the save rule: the game is at save version 41 and
+Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
+(save version 42, game 0.42.0), the rest still planned. Revised
+again on 2026-11-28 for the save rule: the game was at save version 41 and
 `kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
 migration** - a save step bumps `kCurrentSaveVersion` (the next free version is
 **42**) and raises `kOldestSupportedSaveVersion` with it, replacing the fixture
@@ -71,7 +72,7 @@ log unchanged:
 
 ## Steps
 
-### - [ ] L1. Body parts are saved state (new module `bodies`)
+### - [x] L1. Body parts are saved state (new module `bodies`)
 
 - Module: bodies (new: `sim/include/mechapunk/sim/Body.hpp`, `sim/src/Body.cpp`,
   `tests/BodyTests.cpp`), plus the save files. Depends on: none. Save change:
@@ -111,6 +112,11 @@ log unchanged:
 - Do: every part's condition is in `[0, 1000]`; a lost part has condition 0;
   the head and torso are not lost and not above `kMaxWear - wear`; the
   dominant hand is `LeftHand` or `RightHand`.
+- Note (found while doing L1): the rule "not above `kMaxWear - wear`" only
+  holds from step L3 on, which is where `CapBody` starts running wherever
+  wear grows; until then a running city's head sits above that cap, so doing
+  L2 before L3 makes a real city fail validation and breaks
+  `CurrentVersionFixtureLoadsAndRoundTrips`. Do L2 after L3.
 - Tests: a save with each rule broken is refused with a message naming it.
 - Check: build, ctest.
 
