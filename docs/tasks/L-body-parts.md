@@ -4,7 +4,7 @@ Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
 (save version 42, game 0.42.0), L3a and L3b done on 2026-11-28 (no save change:
 the body is already saved state, and step L3 was split on 2026-11-28 into L3a
 and L3b - see why under L3a), L2a done on 2026-11-28 (no save change, and step L2 was split into L2a and
-L2b - see why under L2a), L2b1 and L2b2 - the first two of the parts L2b was
+L2b - see why under L2a), L2b1, L2b2 and L2b3 - the first three of the parts L2b was
 split into on 2026-11-28 - done the same day (no save change), the rest still
 planned.
 Revised
@@ -189,11 +189,12 @@ log unchanged:
   (the ten die at the next midnight, which is what brings the newcomers).
 - Check: build, ctest.
 
-### - [ ] L2b3. The hand-written life-cycle states get the cap — part 3 of L2b
+### - [x] L2b3. The hand-written life-cycle states get the cap — part 3 of L2b
 
 - Module: life-cycle. Depends on: L2a. Save change: no.
 - Open: `tests/LifeCycleTests.cpp`.
-- Do: four places, five wear sites.
+- Do: four tests, six wear sites (the count in the draft missed the third of
+  the three in `DestroyedHeadOrTorsoScrapsAtMidnight`).
   1. Line ~128 (`ClinicsTakeWearAway`): `sim::CapBody(robot);` after
      `robot.wear = 500;`. The torso this test leaves alone is at or below the
      cap of 500 today only because that patient's wear had already reached 500

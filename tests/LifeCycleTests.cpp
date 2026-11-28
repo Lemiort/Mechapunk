@@ -126,6 +126,12 @@ TEST(LifeCycle, ClinicsTakeWearAway) {
     sim::WorldState state = world.State();
     sim::Robot& robot = state.robots[*patient];
     robot.wear = 500;
+    // The wear is hand-written, so the head and the torso get the cap the game
+    // applies wherever wear grows (step L3a). Without it the torso this test
+    // leaves alone is under the cap only by luck: it sits at or below 500
+    // because this patient's wear had already reached 500 in the run that
+    // chose it, and step L2b6 refuses a state above `kMaxWear - wear`.
+    sim::CapBody(robot);
     // Both parts are damaged well below what the wear allows, so the clinic's
     // mend can be told apart from the cap rising: the head follows the wear
     // away, the legs do not (step L12 is what fits a leg).
@@ -157,6 +163,11 @@ TEST(LifeCycle, WornOutRobotsAreScrappedAndReplaced) {
     sim::Robot& doomed = state.robots[10];
     sim::Robot& mourner = state.robots[20];
     doomed.wear = sim::kMaxWear - 1;
+    // A hand-written wear caps the head and the torso the way the game caps
+    // them wherever wear grows (step L3a): they come to 1, the midnight one
+    // minute later than this test runs lands them on 0 and step L3b scraps
+    // the robot, and step L2b6 refuses a state that skips the cap.
+    sim::CapBody(doomed);
     mourner.bonds = {{.robot = doomed.id,
                       .affinity = 50,
                       .level = sim::BondLevel::Friend}};
@@ -240,10 +251,17 @@ TEST(LifeCycle, DestroyedHeadOrTorsoScrapsAtMidnight) {
     brokenTorso.wear = sim::kMaxWear / 2;
     brokenHead.wear = sim::kMaxWear / 2;
     wornOut.wear = sim::kMaxWear - 1;
+    // The three wear numbers are hand-written, so their heads and their torsos
+    // get the cap the game applies wherever wear grows (step L3a): the basic
+    // part that survives of each broken robot sits at the cap (500), not whole,
+    // and step L2b6 refuses a state whose basic parts sit above it.
+    for (sim::Robot* robot : {&brokenTorso, &brokenHead, &wornOut}) {
+        sim::CapBody(*robot);
+    }
     sim::Part(brokenTorso.body, sim::BodyPart::Torso).condition = 0;
     sim::Part(brokenHead.body, sim::BodyPart::Head).condition = 0;
-    // The other basic part of each of these two robots is whole, so it is the
-    // destroyed part that kills them.
+    // The other basic part of each of these two robots sits at the cap, whole
+    // as far as the wear allows, so it is the destroyed part that kills them.
     EXPECT_GT(sim::Part(brokenTorso.body, sim::BodyPart::Head).condition, 0);
     EXPECT_GT(sim::Part(brokenHead.body, sim::BodyPart::Torso).condition, 0);
 
@@ -376,6 +394,11 @@ TEST(LifeCycle, NewcomersSkipSiteHomes) {
     // newcomer moves into the city.
     sim::Robot& doomed = state.robots[10];
     doomed.wear = sim::kMaxWear - 1;
+    // A hand-written wear caps the head and the torso the way the game caps
+    // them wherever wear grows (step L3a): step L2b6 refuses a state whose
+    // basic parts sit above `kMaxWear - wear`, and this robot dies at this
+    // midnight whichever way the cap leaves it.
+    sim::CapBody(doomed);
     const std::uint64_t lastId = state.robots.back().id.value;
 
     sim::World world = Load(std::move(state));
