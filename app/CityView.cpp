@@ -120,7 +120,9 @@ void CityView::BatchApart(std::uint64_t key, const std::function<void()>& draw) 
 // grown city would lie in the same plane as the first and fight it for depth.
 void CityView::DrawGround() {
     BatchApart(kGroundBatch, [this] {
-        const float groundSize = extent_ + 8.0F;
+        // 100 m past the outermost streets, under the metro depots too: they
+        // stand up to 88 m beyond a line's first station (CityMetro.cpp).
+        const float groundSize = extent_ + (200.0F * kS);
         statics_.push_back({.mesh = assets_.plane.get(),
                             .transform = {.position = center_,
                                           .rotationDegrees = vec3(0.0F),

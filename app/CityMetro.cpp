@@ -65,6 +65,13 @@ constexpr float kDepotLength = 32.0F;
 
 constexpr float kDepotThroat = 12.0F;
 
+// Where the depot's throat starts, in meters along the line: beyond the city's
+// edge, and beyond the down track's tail and its crossover too, so the shed
+// never stands across a track and no rail runs past the end of the deck.
+float DepotStart(float edge) {
+    return std::min(edge, -static_cast<float>(sim::kTailMeters) - kDepotThroat) - kDepotGap;
+}
+
 constexpr vec3 kTrackSteel{0.22F, 0.23F, 0.27F};
 
 constexpr vec3 kRail{0.55F, 0.56F, 0.6F};
@@ -219,7 +226,7 @@ void CityView::AddElevatedLines() {
         const sim::MetroLine& line = metro_.Lines()[index];
         const LineFrame frame = FrameOf(index);
         const float length = static_cast<float>(line.meters.back());
-        const float depotStart = frame.edge - kDepotGap;
+        const float depotStart = DepotStart(frame.edge);
         const float depotEnd = depotStart - kDepotLength;
         const float sidingHalf =
             (static_cast<float>(line.trains - 1) * 0.5F * kSidingSpacing) + 2.5F;
@@ -307,7 +314,7 @@ void CityView::AddElevatedLines() {
 CityView::TrainPose CityView::TrainPoseOf(const sim::TrainState& train) const {
     const sim::MetroLine& line = metro_.Lines().at(train.line);
     const LineFrame frame = FrameOf(train.line);
-    const float depotStart = frame.edge - kDepotGap;
+    const float depotStart = DepotStart(frame.edge);
     const float siding = SidingOffset(line, train.train);
     const vec3 parked = LinePoint(frame, depotStart - (kDepotLength * 0.5F), siding);
     switch (train.phase) {
