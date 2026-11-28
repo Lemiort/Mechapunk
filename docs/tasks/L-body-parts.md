@@ -4,7 +4,7 @@ Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
 (save version 42, game 0.42.0), L3a and L3b done on 2026-11-28 (no save change:
 the body is already saved state, and step L3 was split on 2026-11-28 into L3a
 and L3b - see why under L3a), L2a done on 2026-11-28 (no save change, and step L2 was split into L2a and
-L2b - see why under L2a), L2b1, L2b2 and L2b3 - the first three of the parts L2b was
+L2b - see why under L2a), L2b1, L2b2, L2b3 and L2b4 - the first four of the parts L2b was
 split into on 2026-11-28 - done the same day (no save change), the rest still
 planned.
 Revised
@@ -212,7 +212,7 @@ log unchanged:
 - Tests: no new test; all four `LifeCycle` tests must pass unchanged.
 - Check: build, ctest.
 
-### - [ ] L2b4. The round-trip body is written under the cap (bodies) — part 4 of L2b
+### - [x] L2b4. The round-trip body is written under the cap (bodies) — part 4 of L2b
 
 - Module: bodies. Depends on: L2a. Save change: no.
 - Open: `tests/BodyTests.cpp` (`BodySurvivesASaveRoundTrip`, lines ~146-151).

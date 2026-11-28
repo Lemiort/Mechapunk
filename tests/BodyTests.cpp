@@ -143,11 +143,20 @@ TEST(Body, BodySurvivesASaveRoundTrip) {
     // Wear a robot down in a way a new city never starts with, so the round
     // trip proves the numbers and the flags travel, not just the defaults.
     sim::Robot& worn = state.robots.front();
-    worn.body.parts[0].condition = 700;
-    worn.body.parts[1].condition = 0;
-    worn.body.parts[2].lost = true;
-    worn.body.parts[2].condition = 0;
-    worn.body.parts[4].condition = 300;
+    // A new city already pins the head and the torso to `kMaxWear - wear`
+    // (step L3a), and step L2b6 refuses a save whose basic parts sit above that
+    // cap, so every number below stays under it. This robot is 136 days old,
+    // so its wear is `WearAtAge(136)` = 302 and the cap 698: the cap is read
+    // from the robot, not trusted from that number, and the test says so if a
+    // future change to generation makes the robot too worn for these values.
+    const std::int32_t cap = sim::kMaxWear - worn.wear;
+    ASSERT_GT(cap, 400)
+        << "the front robot's wear leaves no room under the cap";
+    worn.body.parts[0].condition = 300;  // the head, worn and under the cap
+    worn.body.parts[1].condition = 0;    // the torso, destroyed, not scrapped
+    worn.body.parts[2].lost = true;      // a hand this robot has lost
+    worn.body.parts[2].condition = 0;    // a lost part has no condition
+    worn.body.parts[4].condition = 300;  // legs worn; hands and legs uncapped
     worn.body.dominantHand = sim::BodyPart::LeftHand;
 
     auto encoded = sim::SerializeWorld(state);
