@@ -6,6 +6,7 @@
 // view puts the trains' shed on its roof and turns a track off the line into it.
 // While the line's street has no free corner the review tries again the next
 // night: a ring of streets the town grows adds corners at both ends of it.
+// Every night it also hires drivers for the crew rooms short of them.
 
 #include <algorithm>
 #include <cstdlib>
@@ -14,6 +15,7 @@
 #include <format>
 
 #include "mechapunk/sim/Construction.hpp"
+#include "mechapunk/sim/Venues.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace mechapunk::sim {
@@ -103,6 +105,54 @@ void World::ReviewMetroAuthority() {
     if (changed) {
         rooms_ = RoomIndex(state_.city);
         ++cityVersion_;
+    }
+    HireDrivers();
+}
+
+// Drivers: a crew room short of them on a shift takes one a night for it, a
+// robot out of work if one is free for that shift, or else a worker of an
+// ordinary workspace, the least senior first. Robots look for work only while
+// they have none, so in a town where everybody works the trains would run with
+// nobody hired to drive them. Only a robot at home between shifts changes jobs,
+// and it keeps its level; no random draw is made.
+void World::HireDrivers() {
+    const StaffRules* rules = FindStaffRules(RoomKind::CrewRoom);
+    if (rules == nullptr) {
+        return;
+    }
+    std::unordered_map<std::uint64_t, std::uint32_t> staff = StaffCounts();
+    for (const RoomRef& crew : rooms_.RoomsOfKind(RoomKind::CrewRoom)) {
+        const Room& room = *crew.room;
+        for (std::uint32_t opening = 0; opening < rules->shifts; ++opening) {
+            Robot* best = nullptr;
+            for (Robot& robot : state_.robots) {
+                if (robot.activity != RobotActivity::Resting ||
+                    staff[JobKey(room, robot.id)] >= StaffPerShift(room)) {
+                    continue;
+                }
+                const auto job = rooms_.Find(robot.workspace);
+                const bool idle = !robot.workspace.IsValid();
+                if (!idle && (!job || job->room->kind != RoomKind::Workspace)) {
+                    continue;
+                }
+                const bool bestIdle = best != nullptr && !best->workspace.IsValid();
+                if (best == nullptr || (idle && !bestIdle) ||
+                    (idle == bestIdle && robot.jobLevel < best->jobLevel)) {
+                    best = &robot;
+                }
+            }
+            if (best == nullptr) {
+                break;
+            }
+            if (const auto old = rooms_.Find(best->workspace)) {
+                --staff[JobKey(*old->room, best->id)];
+            }
+            ++staff[JobKey(room, best->id)];
+            best->workspace = room.id;
+            best->performance = 0;
+            Remember(*best, MemoryKind::FoundJob, {}, room.id);
+            ScheduleNextCommute(*best);
+        }
     }
 }
 

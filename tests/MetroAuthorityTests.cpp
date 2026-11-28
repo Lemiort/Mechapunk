@@ -8,6 +8,7 @@
 #include <optional>
 #include <vector>
 
+#include "mechapunk/sim/Venues.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace sim = mechapunk::sim;
@@ -104,5 +105,13 @@ TEST(MetroAuthority, RaisesADepotOnTheLinesStreet) {
     ASSERT_EQ(depot()->rooms.size(), 1U);
     EXPECT_EQ(depot()->rooms.front().kind, sim::RoomKind::CrewRoom);
     // Its corner is taken: validation checks no free plot lies under a building.
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+    // Drivers on all three shifts within three nights, even though nearly
+    // everybody in the town already has a job.
+    const sim::EntityId room = depot()->rooms.front().id;
+    world.RunFor(3 * sim::kMinutesPerDay);
+    const auto drivers = std::ranges::count_if(
+        world.State().robots, [&](const sim::Robot& robot) { return robot.workspace == room; });
+    EXPECT_EQ(drivers, 3 * sim::StaffPerShift(*sim::RoomIndex(world.State().city).Find(room)->room));
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }
