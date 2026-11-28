@@ -34,7 +34,7 @@ namespace {
 constexpr float kCabMeters = 11.5F;
 
 // Crew room to platform and back, and how early a driver is on the platform.
-constexpr double kDriverWalkMinutes = 2.0;
+constexpr double kDriverWalkMinutes = sim::kCrewWalkMinutes;
 
 constexpr double kDriverEarlyMinutes = 1.0;
 
@@ -116,9 +116,26 @@ std::optional<CityView::DriverPlan> CityView::PlanDriver(const RobotFrame& robot
     const sim::MetroLine& metro = metro_.Lines().at(*line);
     const double shiftEnd =
         static_cast<double>(robot.shiftStartsAt) + sim::JobShift(*crew, robot.id).lengthMinutes;
-    // One driver to a train; the rest of the shift stand by in the room.
+    // The next crew's start: the shifts overlap, so this driver drives on
+    // until the next crew's driver of the same rank takes the train over at
+    // the first stop it can reach.
+    double nextStart = shiftEnd;
+    if (const sim::StaffRules* rules = sim::FindStaffRules(sim::RoomKind::CrewRoom)) {
+        const auto day = static_cast<double>(sim::StartOfDay(robot.shiftStartsAt));
+        for (const double from : {day, day + static_cast<double>(sim::kMinutesPerDay)}) {
+            for (std::uint32_t slot = 0; slot < rules->shifts; ++slot) {
+                const double start = from + rules->shiftStarts.at(slot);
+                if (start > static_cast<double>(robot.shiftStartsAt)) {
+                    nextStart = std::min(nextStart, start);
+                }
+            }
+        }
+    }
+    // One driver to a train, the rank-th driver of a shift the line's
+    // rank-th train; the rest of the shift stand by in the room.
     if (rank->second < metro.trains) {
-        const auto run = metro_.PlanDriverRun(*line, clockIn + kDriverWalkMinutes, rank->second,
+        const auto run = metro_.PlanDriverRun(*line, rank->second, clockIn + kDriverWalkMinutes,
+                                              nextStart + kDriverWalkMinutes,
                                               shiftEnd - kDriverWalkMinutes - sim::kDwellMinutes);
         if (run) {
             // Out of the room in time to be on the platform a little before

@@ -16,7 +16,8 @@ namespace mechapunk::sim {
 // ends, and it crosses over to the other track. Each line has a depot
 // beyond its first station; trains leave it from kServiceStartMinute, run
 // whole round trips, and go back once a round trip would start after
-// kServiceEndMinute (01:00 the next day).
+// kServiceEndMinute (01:00 the next day), standing kDwellMinutes at the first
+// platform a last time to let everyone off.
 //
 // The timetable is fixed by the city alone, so it is never saved: a train
 // about every kTargetHeadwayMinutes each way, evenly spaced. Times are game
@@ -32,6 +33,10 @@ inline constexpr double kDoorMinutes = 0.05;       // Doors sliding open or shut
 inline constexpr double kTargetHeadwayMinutes = 4.0;
 inline constexpr std::uint32_t kServiceStartMinute = 5 * 60;
 inline constexpr std::uint32_t kServiceEndMinute = 25 * 60;
+// A driver's walk between its crew room and its line's first platform. The
+// crew's shifts (Venues.cpp) overlap by enough for this and a round trip, so
+// a driver going off hands its train to the next shift's at that platform.
+inline constexpr double kCrewWalkMinutes = 2.0;
 // Changing lines at a station: down or up a level to the other platform.
 inline constexpr double kTransferMinutes = 1.0;
 
@@ -68,7 +73,7 @@ struct Leg {
 };
 
 // A metro driver's run in one shift: the train it takes over at its line's
-// first station, and the stop there where it hands the train back.
+// first station, and the stop there where it hands the train on.
 struct DriverRun {
     std::uint32_t train{};
     double boards{};   // Doors open at the first station, up track.
@@ -132,18 +137,25 @@ public:
     // One train of a line at `time`.
     [[nodiscard]] TrainState TrainAt(std::uint32_t line, std::uint32_t train,
                                      double time) const;
-    // The run of the rank-th driver ready at the line's first station at
-    // `readyAt`: the rank-th train to leave it from then, ridden until the
-    // last time that train stands at the same platform by `latestOff`.
-    // Nothing when no such train runs (at night, or a shift too short).
-    [[nodiscard]] std::optional<DriverRun> PlanDriverRun(std::uint32_t line, double readyAt,
-                                                         std::uint32_t rank,
+    // The run of a train's driver ready at the line's first station at
+    // `readyAt`: on at the train's first stop there from then, off at its
+    // first stop there from `handoverAt` (where the next driver gets on), or
+    // at its last stop there by `latestOff` or before the depot if sooner.
+    // Nothing when the train runs no round trip in between (at night, or a
+    // shift too short).
+    [[nodiscard]] std::optional<DriverRun> PlanDriverRun(std::uint32_t line, std::uint32_t train,
+                                                         double readyAt, double handoverAt,
                                                          double latestOff) const;
     // The station where a row line and a column line cross.
     [[nodiscard]] std::optional<std::uint32_t> Crossing(std::uint32_t rowLine,
                                                         std::uint32_t columnLine) const;
 
 private:
+    // A train's first stop at its line's first platform, up track, at or
+    // after `after`: the start of one of its round trips, or its last
+    // arrival there before the depot.
+    [[nodiscard]] std::optional<double> NextStopAt(std::uint32_t line, std::uint32_t train,
+                                                   double after) const;
     [[nodiscard]] std::optional<Leg> RideOnDay(std::uint32_t line,
                                                std::size_t from, std::size_t to,
                                                double readyAt, double day) const;

@@ -237,13 +237,25 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
         state.cab = 1.0;  // Out of the depot toward the first platform.
         return state;
     }
-    if (time >= back + kDepotMinutes) {
+    // At the first platform a last time, doors open to let everyone off,
+    // then into the depot.
+    const double home = back + kDwellMinutes;
+    if (time >= home + kDepotMinutes) {
         return std::nullopt;
     }
-    if (time >= back) {
+    if (time >= home) {
         state.phase = TrainState::Phase::EnteringDepot;
-        state.progress = (time - back) / kDepotMinutes;
+        state.progress = (time - home) / kDepotMinutes;
         state.cab = -1.0;  // Back past the first platform into the depot.
+        return state;
+    }
+    if (time >= back) {
+        state.phase = TrainState::Phase::Running;
+        state.meters = 0.0;
+        state.side = -1.0;
+        state.towardEnd = true;
+        state.cab = 1.0;
+        state.doors = DoorsOpen(time - back, home - time);
         return state;
     }
     state.phase = TrainState::Phase::Running;
@@ -350,44 +362,60 @@ std::vector<TrainState> Metro::TrainsAt(double time) const {
 }
 
 
-std::optional<DriverRun> Metro::PlanDriverRun(std::uint32_t line, double readyAt,
-                                              std::uint32_t rank, double latestOff) const {
-    if (line >= lines_.size() || lines_[line].stations.size() < 2) {
+std::optional<double> Metro::NextStopAt(std::uint32_t line, std::uint32_t train,
+                                       double after) const {
+    const MetroLine& metro = lines_[line];
+    // The service day that began yesterday may still run after midnight;
+    // each day's stops come before the next day's.
+    const double today = std::floor(after / kDay) * kDay;
+    for (const double day : {today - kDay, today, today + kDay}) {
+        const double first =
+            FirstRoundTrip(day) + (static_cast<double>(train) * metro.headwayMinutes);
+        const double end = ServiceEnd(day);
+        if (first >= end) {
+            continue;  // This train sits the day out.
+        }
+        // Round trips start until the end of service; the last ends at
+        // the same platform before the depot.
+        const double trips = std::ceil((end - first) / metro.roundTripMinutes);
+        const double trip = std::max(0.0, std::ceil(((after - first) / metro.roundTripMinutes) - 1e-9));
+        if (trip <= trips) {
+            return first + (trip * metro.roundTripMinutes);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<DriverRun> Metro::PlanDriverRun(std::uint32_t line, std::uint32_t train,
+                                              double readyAt, double handoverAt,
+                                              double latestOff) const {
+    if (line >= lines_.size() || lines_[line].stations.size() < 2 ||
+        train >= lines_[line].trains) {
         return std::nullopt;
     }
     const MetroLine& metro = lines_[line];
-    const std::uint32_t first = metro.stations[0];
-    const std::uint32_t second = metro.stations[1];
-    // Drivers ready together take successive departures, one train each.
-    std::optional<Leg> leg = Ride(line, first, second, readyAt);
-    for (std::uint32_t skip = 0; skip < rank && leg; ++skip) {
-        leg = Ride(line, first, second, leg->departs - kDwellMinutes + 1e-6);
-    }
-    if (!leg) {
+    const auto boards = NextStopAt(line, train, readyAt);
+    if (!boards) {
         return std::nullopt;
     }
-    // The train is back at the same platform at the start of each of its
-    // round trips; the last one it still runs, by latestOff, is the stop to
-    // hand it over.
+    // Round trip after round trip, until the stop where the next driver gets
+    // on, the last stop before the shift ends, or the train's last stop of
+    // the night: the next one is then tomorrow's, more than a round trip on.
     std::optional<double> off;
-    for (std::uint32_t trip = 1;; ++trip) {
-        const double at = leg->roundTripStart + (static_cast<double>(trip) * metro.roundTripMinutes);
-        if (at > latestOff) {
+    double at = *boards;
+    while (at < handoverAt) {
+        const auto next = NextStopAt(line, train, at + 1e-6);
+        if (!next || *next > latestOff || *next - at > metro.roundTripMinutes + 1e-6) {
             break;
         }
-        const TrainState state = TrainAt(line, leg->train, at + 0.01);
-        if (state.phase != TrainState::Phase::Running || std::abs(state.meters) >= 0.5 ||
-            state.side >= 0.0) {
-            break;  // Into the depot for the night: the last stop was the one before.
-        }
-        off = at;
+        off = at = *next;
     }
     if (!off) {
         return std::nullopt;
     }
-    return DriverRun{.train = leg->train,
-                     .boards = leg->departs - kDwellMinutes,
-                     .departs = leg->departs,
+    return DriverRun{.train = train,
+                     .boards = *boards,
+                     .departs = *boards + kDwellMinutes,
                      .alights = *off};
 }
 

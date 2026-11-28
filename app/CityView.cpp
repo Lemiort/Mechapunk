@@ -530,9 +530,10 @@ void CityView::Submit(RenderQueue& queue, const WorldFrame& frame,
 
     const float figureScale = kS * streetFigureScale;
     // Drivers on shift. Within a crew room (one per line) the drivers of a
-    // shift, in id order, take that line's trains in the order they leave:
-    // ranked among everyone on the shift, not only those clocked in, so a
-    // late colleague never moves anyone to another train.
+    // shift, in id order, take that line's trains in train order, so each
+    // shift's rank-th driver relieves the last's on the same train: ranked
+    // among everyone on the shift, not only those clocked in, so a late
+    // colleague never moves anyone to another train.
     driverRank_.clear();
     std::map<std::pair<std::uint64_t, std::uint32_t>, std::vector<sim::EntityId>> crews;
     const sim::StaffRules* crewStaff = sim::FindStaffRules(sim::RoomKind::CrewRoom);

@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <set>
+#include <vector>
 
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Metro.hpp"
+#include "mechapunk/sim/Venues.hpp"
 #include "mechapunk/sim/World.hpp"
 
 namespace sim = mechapunk::sim;
@@ -157,32 +159,74 @@ TEST(Metro, TrainsStandAtThePlatformTheyLeaveFrom) {
     }
 }
 
-// Drivers ready together at a line's first station take successive trains,
-// and hand each back at the same platform before their shift ends.
-TEST(Metro, DriversTakeSuccessiveTrainsAndHandThemBack) {
+// A driver takes its own train at the line's first station and hands it on
+// there, at the first stop from the handover, to the next driver ready then.
+TEST(Metro, DriversHandTheirTrainOnAtTheSamePlatform) {
     const sim::Metro metro(City().State().city);
     const sim::MetroLine& line = metro.Lines().front();
-    const double ready = kNoon;
+    const double handover = kNoon + 60.0;
     const double latestOff = kNoon + (7.0 * 60.0);
-    std::set<std::uint32_t> trains;
-    double lastBoards = ready;
-    for (std::uint32_t rank = 0; rank < line.trains; ++rank) {
-        const auto run = metro.PlanDriverRun(0, ready, rank, latestOff);
-        ASSERT_TRUE(run.has_value()) << rank;
-        EXPECT_GE(run->boards, lastBoards);
-        lastBoards = run->boards;
-        EXPECT_TRUE(trains.insert(run->train).second) << "train taken twice";
+    for (std::uint32_t train = 0; train < line.trains; ++train) {
+        const auto run = metro.PlanDriverRun(0, train, kNoon, handover, latestOff);
+        ASSERT_TRUE(run.has_value()) << train;
+        EXPECT_EQ(run->train, train);
+        EXPECT_GE(run->boards, kNoon);
         EXPECT_GT(run->alights, run->departs);
-        EXPECT_LE(run->alights, latestOff);
+        EXPECT_GE(run->alights, handover);
+        EXPECT_LT(run->alights, handover + line.roundTripMinutes);
         // The train stands at the first station's up platform then.
-        const sim::TrainState at = metro.TrainAt(0, run->train, run->alights + 0.01);
+        const sim::TrainState at = metro.TrainAt(0, train, run->alights + 0.01);
         EXPECT_EQ(at.phase, sim::TrainState::Phase::Running);
         EXPECT_NEAR(at.meters, 0.0, 0.5);
         EXPECT_LT(at.side, 0.0);
+        const auto next = metro.PlanDriverRun(0, train, handover, latestOff, latestOff + 60.0);
+        ASSERT_TRUE(next.has_value()) << train;
+        EXPECT_EQ(next->boards, run->alights) << "the next driver boards where this one gets off";
     }
     // No trains between 01:00 and 05:00: a driver ready at 02:00 cannot hand a
-    // train back by 03:00.
-    EXPECT_FALSE(metro.PlanDriverRun(0, 2.0 * 60.0, 0, 3.0 * 60.0).has_value());
+    // train on by 03:00.
+    EXPECT_FALSE(metro.PlanDriverRun(0, 0, 2.0 * 60.0, 3.0 * 60.0, 3.0 * 60.0).has_value());
+}
+
+// The crew's shifts cover the whole service: whenever a train runs, from
+// leaving its first platform in the morning to its last stop there at night,
+// one driver or another of the crew of its rank is in its cab.
+TEST(Metro, TheCrewsShiftsLeaveNoTrainWithoutADriver) {
+    const sim::Metro metro(City().State().city);
+    const sim::StaffRules* crew = sim::FindStaffRules(sim::RoomKind::CrewRoom);
+    ASSERT_NE(crew, nullptr);
+    constexpr double kDay = static_cast<double>(sim::kMinutesPerDay);
+    std::vector<double> starts;
+    for (const double day : {0.0, kDay, 2.0 * kDay}) {
+        for (std::uint32_t slot = 0; slot < crew->shifts; ++slot) {
+            starts.push_back(day + crew->shiftStarts.at(slot));
+        }
+    }
+    std::ranges::sort(starts);
+    for (std::uint32_t line = 0; line < metro.Lines().size(); ++line) {
+        for (std::uint32_t train = 0; train < metro.Lines()[line].trains; ++train) {
+            std::vector<sim::DriverRun> runs;
+            for (std::size_t shift = 0; shift + 1 < starts.size(); ++shift) {
+                const double start = starts[shift];
+                const double end = start + crew->lengthMinutes;
+                if (const auto run = metro.PlanDriverRun(
+                        line, train, start + sim::kCrewWalkMinutes,
+                        starts[shift + 1] + sim::kCrewWalkMinutes,
+                        end - sim::kCrewWalkMinutes - sim::kDwellMinutes)) {
+                    runs.push_back(*run);
+                }
+            }
+            for (double time = kDay; time < 2.0 * kDay; time += 0.1) {
+                const sim::TrainState state = metro.TrainAt(line, train, time);
+                if (state.phase != sim::TrainState::Phase::Running) {
+                    continue;
+                }
+                EXPECT_TRUE(std::ranges::any_of(runs, [&](const sim::DriverRun& run) {
+                    return run.boards <= time && time <= run.alights + sim::kDwellMinutes;
+                })) << "line " << line << " train " << train << " at minute " << time;
+            }
+        }
+    }
 }
 
 // A driver changes ends while the train reverses, so the cab moves between

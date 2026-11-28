@@ -149,12 +149,19 @@ constexpr std::array<std::string_view, 4> kBlackMarketNames{
     "The Back Door", "Grey Parts", "Under the Bridge", "No Questions"};
 
 // Staff for rooms that are not venues: two officers or drivers per shift.
+// Metro drivers are in from half an hour before the first train leaves the
+// depot (05:00) until after the last is back in it (01:00 and a round trip);
+// their shifts overlap by an hour, so the going crew drives on until the
+// coming crew takes each train over (Metro::PlanDriverRun).
+constexpr std::uint32_t kCrewOverlapMinutes = 60;
+constexpr std::uint32_t kCrewFirstStart = Hour(4) + 30;
 constexpr StaffRules kPoliceStaff{.shiftStarts = {Hour(6), Hour(14), Hour(22)},
                                   .shifts = 3,
                                   .lengthMinutes = 480,
                                   .wage = 120,
                                   .guestsPerWorker = 1};
-constexpr StaffRules kCrewStaff{.shiftStarts = {Hour(6), Hour(14), Hour(22)},
+constexpr StaffRules kCrewStaff{.shiftStarts = {kCrewFirstStart, kCrewFirstStart + 480 - kCrewOverlapMinutes,
+                                                kCrewFirstStart + (2 * (480 - kCrewOverlapMinutes))},
                                 .shifts = 3,
                                 .lengthMinutes = 480,
                                 .wage = 120,
