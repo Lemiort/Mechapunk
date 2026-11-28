@@ -272,6 +272,10 @@ TEST(Economy, ScrappedRobotsLeaveTheirThingsBehind) {
     sim::WorldState state = start.State();
     sim::Robot& robot = state.robots.front();
     robot.wear = sim::kMaxWear - 1;
+    // A hand-written wear caps the head and the torso the way the game caps
+    // them wherever wear grows (step L3a): they come to 1, the next midnight
+    // lands them on 0, and step L2b6 refuses a state that skips the cap.
+    sim::CapBody(robot);
     robot.bonds.clear();
     const sim::EntityId id = robot.id;
     const sim::EntityId bank = robot.bank;

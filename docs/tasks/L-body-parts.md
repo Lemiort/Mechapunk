@@ -3,8 +3,9 @@
 Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
 (save version 42, game 0.42.0), L3a and L3b done on 2026-11-28 (no save change:
 the body is already saved state, and step L3 was split on 2026-11-28 into L3a
-and L3b - see why under L3a), L2a done on 2026-11-28 (no save change, and step
-L2 was split into L2a and L2b - see why under L2a), the rest still planned.
+and L3b - see why under L3a), L2a done on 2026-11-28 (no save change, and step L2 was split into L2a and
+L2b - see why under L2a), L2b1 - the first of the parts L2b was split into on
+2026-11-28 - done the same day (no save change), the rest still planned.
 Revised
 again on 2026-11-28 for the save rule: the game was at save version 41 and
 `kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
@@ -123,40 +124,148 @@ log unchanged:
 - Check: build, ctest. Nothing in the simulation reads a part yet, so the
   headless log is untouched.
 
-### - [ ] L2b. The wear cap on the head and the torso is checked on load
+### L2b. The wear cap on the head and the torso is checked on load — split on 2026-11-28 into L2b1 to L2b6
 
-- Module: validation, then the test files that write a state by hand, then the
-  fixture. Depends on: L1, L3a, L2a. Save change: no new version (no key
-  changes), but `tests/fixtures/saves/v42-city.json` is regenerated.
-- Open: `sim/src/Validation.cpp` (the body block L2a added),
-  `sim/include/mechapunk/sim/Body.hpp`.
-- Do: add to that block: the head and the torso are never above
-  `kMaxWear - wear` (the robot's `wear` is already checked to lie in
-  `[0, kMaxWear]`, so the cap is never negative).
-- Then the states that break it, found by `rg -n "\.wear\s*=" tests`. Three
-  files set `wear` near `kMaxWear` on a robot and load that state through
-  `FromState`, which validates, so each of them calls `CapBody` afterwards,
-  the way the game does: `EconomyTests.cpp` line 274, `SeedTownTests.cpp` line
-  162, and `LifeCycleTests.cpp` lines 159, 240, 241, 242 and 378. The other
-  sites stay under the cap and need nothing: `LifeCycleTests.cpp` line 128 sets
-  `wear = 500` with a part condition of 100, and `CareersTests.cpp` line 271 and
-  `WorldTests.cpp` line 38 set `wear = 0`. `BodyTests.cpp` lines 146-150 write
-  part conditions by hand above the cap and pick worse ones instead. A doomed
-  robot scripted at `kMaxWear - 1` then carries its head and torso at 1, which
-  still dies at the next midnight (the nightly wear lands them on 0): what those
-  tests already expect.
-- Then regenerate `tests/fixtures/saves/v42-city.json` with the same command and
-  version: the fixture was written before step L3a capped the parts wherever
-  wear grows, so its heads sit above the cap - its first robot has a head of
-  978 at wear 120 - and the rule this step adds refuses it. Fix the sentence in
-  `tests/fixtures/saves/README.md` saying the parts were capped by the wear a
-  robot was **born** with, and the body block of `SaveTests.cpp` (line ~375)
-  that reads that way: from now on the head and the torso equal today's
-  `kMaxWear - wear`.
-- Tests: `Validation.RejectsBasicPartsAboveTheWearCap`: one more than the cap
-  on the head, and on the torso, is refused with a message naming the cap and
-  the wear.
+- Depends on: L1, L3a, L2a. Save change: no new version (no key changes), but
+  `tests/fixtures/saves/v42-city.json` is regenerated (same version 42: the
+  body keys are already there, only their values move).
+- **Why L2b was split again.** The rule itself is four lines of the validation
+  module. Everything else is states that break it: the v42 fixture, written
+  before step L3a capped the parts wherever wear grows, and four test files
+  that write a state by hand. Six modules in one step, and the guide's rule is
+  one module per step, so each module gets a part: **L2b1 (money), L2b2
+  (seed-town), L2b3 (life-cycle), L2b4 (bodies), L2b5 (saves), L2b6
+  (validation)**.
+- **The rule comes last, not first** (the note under L2a suggested validation
+  first, and it cannot be: a part must leave every test passing). Adding the
+  rule while the states are still uncapped fails 6 of 244 tests, checked by
+  hand on 2026-11-28 (the rule patched into `Validation.cpp`, built, `ctest`,
+  then reverted): `Save.CurrentVersionFixtureLoadsAndRoundTrips`,
+  `SeedTown.RichNewcomersBringMoreSavings` and `Body.BodySurvivesASaveRoundTrip`
+  fail their load assertion, and `LifeCycle.WornOutRobotsAreScrappedAndReplaced`,
+  `LifeCycle.DestroyedHeadOrTorsoScrapsAtMidnight` and
+  `LifeCycle.NewcomersSkipSiteHomes` **segfault**, because `LifeCycleTests.cpp`'s
+  `Load` helper hands back an empty world once `FromState` refuses the state.
+  `Economy.ScrappedRobotsLeaveTheirThingsBehind` is the seventh and is already
+  gone: part L2b1 repaired it. Repairing a hand-written state the way the game
+  does - `CapBody` after the wear - cannot change any test's outcome, because
+  nothing reads a part except step L3b's scrapping, and the cap pins the parts
+  to the wear that already kills the robot on the same night. So the first five
+  parts are independent of each other and of the order; the validation part
+  must be last.
+- Found by `rg -n "\.wear\s*=" tests` plus the suite above. `CareersTests.cpp`
+  line 271 and `WorldTests.cpp` line 38 set `wear = 0` and need nothing.
+  `LifeCycleTests.cpp` line 128 (`ClinicsTakeWearAway`) passes today, but only
+  by luck: the test sets `wear = 500` and lowers the head to 100, and the torso
+  is at or below 500 only because that patient's wear had already reached 500
+  during the run that chose it. Part L2b3 caps it anyway.
+
+### - [x] L2b1. A hand-worn robot gets the cap too (money) — part 1 of L2b
+
+- Module: money. Depends on: L2a. Save change: no.
+- Open: `tests/EconomyTests.cpp` (`ScrappedRobotsLeaveTheirThingsBehind`, line
+  ~274).
+- Do: after `robot.wear = sim::kMaxWear - 1;` call `sim::CapBody(robot);`, the
+  way the game does wherever wear grows (step L3a; `CapBody` comes with
+  `World.hpp`, which the test already includes). Its head and its torso come to
+  1; the next midnight, one minute later than this test runs, lands them on 0
+  and step L3b scraps the robot, exactly as the test expects. The load at line
+  ~289 goes through `World::FromState`, which validates, so part L2b6 refuses
+  this state without the cap.
+- Tests: no new test. `Economy.ScrappedRobotsLeaveTheirThingsBehind` must pass
+  as before.
+- Check: build, ctest (the money module stays under 25k:
+  `python scripts/context_budget.py`). Nothing outside the test changed, so the
+  headless log is untouched.
+
+### - [ ] L2b2. A hand-worn robot gets the cap too (seed-town) — part 2 of L2b
+
+- Module: seed-town. Depends on: L2a. Save change: no.
+- Open: `tests/SeedTownTests.cpp` (`RichNewcomersBringMoreSavings`, line ~162).
+- Do: the loop that sets ten robots to `kMaxWear - 1` calls `sim::CapBody` on
+  each of them after the wear.
+- Tests: no new test; `SeedTown.RichNewcomersBringMoreSavings` must still pass
+  (the ten die at the next midnight, which is what brings the newcomers).
 - Check: build, ctest.
+
+### - [ ] L2b3. The hand-written life-cycle states get the cap — part 3 of L2b
+
+- Module: life-cycle. Depends on: L2a. Save change: no.
+- Open: `tests/LifeCycleTests.cpp`.
+- Do: four places, five wear sites.
+  1. Line ~128 (`ClinicsTakeWearAway`): `sim::CapBody(robot);` after
+     `robot.wear = 500;`. The torso this test leaves alone is at or below the
+     cap of 500 today only because that patient's wear had already reached 500
+     in the run that chose it; the cap makes the state hold whichever robot the
+     run picks. The head is already at 100, well under the cap, so the
+     assertions under it still hold (the head rises by exactly the wear the
+     clinic takes away, the legs do not move).
+  2. Line ~159 (`WornOutRobotsAreScrappedAndReplaced`): `sim::CapBody(doomed);`
+     after the wear.
+  3. Lines ~240-242 (`DestroyedHeadOrTorsoScrapsAtMidnight`): `sim::CapBody` on
+     all three after their wear and before the two `condition = 0` lines, so the
+     surviving basic part of each of the two broken robots sits at the cap (500
+     and 1) instead of whole, and the `EXPECT_GT` under them still holds.
+  4. Line ~378 (`NewcomersSkipSiteHomes`): `sim::CapBody(doomed);` after the wear.
+- Tests: no new test; all four `LifeCycle` tests must pass unchanged.
+- Check: build, ctest.
+
+### - [ ] L2b4. The round-trip body is written under the cap (bodies) — part 4 of L2b
+
+- Module: bodies. Depends on: L2a. Save change: no.
+- Open: `tests/BodyTests.cpp` (`BodySurvivesASaveRoundTrip`, lines ~146-151).
+- Do: the front robot of a seed 5 city of 20 robots is 136 days old when the city
+  is built, so its wear is `WearAtAge(136)` = 302 and the cap 698: the hand-written
+  head of 700 sits above it. Pick conditions clearly under the cap instead (a
+  head at 300, for instance), keeping the point of the test: numbers and flags a
+  new city never starts with, so the round trip proves they travel. Read the
+  robot's `wear` in the test if a fixed number feels brittle.
+- Tests: no new test; `Body.BodySurvivesASaveRoundTrip` must pass.
+- Check: build, ctest.
+
+### - [ ] L2b5. The v42 fixture is regenerated with the parts capped — part 5 of L2b
+
+- Module: saves. Depends on: L3a. Save change: no new version; the fixture of
+  the current version is replaced, the format is unchanged.
+- Open: `tests/SaveTests.cpp` (the body block at ~375),
+  `tests/fixtures/saves/README.md`,
+  `sim/include/mechapunk/sim/Save.hpp` (the two version numbers: they stay 42
+  and 0.42.0).
+- Do:
+  1. `build/build/Release/mechapunk-sim.exe --seed 33 --robots 100 --minutes
+     28370 --save tests/fixtures/saves/v42-city.json` from the repository root:
+     the same command, the same version, over the same file. Its heads move
+     down (its first robot had a head of 978 at wear 120, and step L3a now pins
+     the basic parts to `kMaxWear - wear` wherever wear grows), and the file
+     loads through the rule part L2b6 adds.
+  2. The body block of `SaveTests.cpp` (~375): from now on the head and the
+     torso **equal** `sim::kMaxWear - robot.wear` in a save this game built,
+     not "capped by the wear it was born with"; the round trip and the "at
+     least one robot is below whole" check stay.
+  3. `tests/fixtures/saves/README.md`: the draft's sentence about wear at birth
+     is not in the README (it is the comment inside `SaveTests.cpp`); if the
+     README is touched, it is to say the body values are pinned to the robot's
+     wear, not fixed at birth.
+- Tests: `Save.CurrentVersionFixtureLoadsAndRoundTrips` on the new file.
+- Check: build, ctest. Not a pure move: the fixture's body values move on
+  purpose; say so in the commit.
+
+### - [ ] L2b6. The cap is refused on load (validation) — part 6 of L2b
+
+- Module: validation. Depends on: L2b1 to L2b5. Save change: no.
+- Open: `sim/src/Validation.cpp` (the body block L2a added, line ~261),
+  `sim/include/mechapunk/sim/Body.hpp`, `tests/ValidationTests.cpp`.
+- Do: in that block, for the head and the torso only: the condition is never
+  above `kMaxWear - robot.wear` (`wear` is already checked to lie in `[0,
+  kMaxWear]`, so the cap is never negative). Hands and legs are not capped:
+  step L12 replaces them.
+- Tests: `Validation.RejectsBasicPartsAboveTheWearCap`: one more than the cap
+  on the head, and one more on the torso, is refused with a message naming the
+  part, the cap and the wear; and the cap exactly is accepted.
+- Check: build, ctest, and the headless check `--seed 1 --robots 10000 --days
+  40 --quiet`: the runner loads states through `FromState`, so a city whose
+  parts are capped wrongly would show here. Nothing reads a part, so the log
+  stays byte-identical.
 
 **Why L2 was split.** The rules themselves are four lines of one module, and
 they stay there. What reaches out is the consequence of the `kMaxWear - wear`
