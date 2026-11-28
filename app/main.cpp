@@ -52,8 +52,8 @@ constexpr int kWindowWidth = 1600;
 constexpr int kWindowHeight = 900;
 // Speeds for keys 1 to 6; at x1 a game minute takes two real seconds.
 // Times real time: at x1 a game minute takes a real minute.
-constexpr std::array<double, 7> kSpeeds{1.0,    2.0,     10.0,    100.0,
-                                        1000.0, 10000.0, 100000.0};
+constexpr std::array<double, 8> kSpeeds{1.0,    2.0,     10.0,    100.0,
+                                        1000.0, 10000.0, 100000.0, 1000000.0};
 constexpr double kOrbitDegreesPerPixel = 0.25;
 constexpr float kPanPerSecond = 40.0F;
 constexpr double kMessageSeconds = 3.0;
