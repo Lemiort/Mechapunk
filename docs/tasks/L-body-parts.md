@@ -1,7 +1,11 @@
 # Task L: body parts
 
-Status: planned on 2026-11-27 and revised the same day; nothing done. Save
-version 29, game 0.29.0. Skins are colours only, in task M
+Status: planned on 2026-11-27 and revised the same day; nothing done. Revised
+again on 2026-11-28 for the save rule: the game is at save version 41 and
+`kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
+migration** - a save step bumps `kCurrentSaveVersion` (the next free version is
+**42**) and raises `kOldestSupportedSaveVersion` with it, replacing the fixture
+and its tests. The game is 0.41.0. Skins are colours only, in task M
 (`docs/tasks/M-skins.md`). Steps that change saved state take the next free
 save version (rule 3); settings follow the guide's "adding a setting" recipe.
 
@@ -74,8 +78,8 @@ log unchanged:
   yes.
 - Open: `sim/include/mechapunk/sim/World.hpp` (the `Robot` struct only:
   `rg -n "struct Robot" -A 70`), `sim/src/Save.cpp` (the `glz::meta` blocks at the
-  top), the end of `sim/src/Migrations.cpp`, `sim/src/Migrations.hpp`,
-  `sim/src/Generation.cpp`, `sim/src/LifeCycle.cpp` (`AddNewcomer` only).
+  top), `sim/include/mechapunk/sim/Save.hpp` (the version numbers and the
+  comment above them), `sim/src/Generation.cpp`, `sim/src/LifeCycle.cpp` (`AddNewcomer` only).
 - Do:
   1. In `Body.hpp`:
      `enum class BodyPart : std::uint8_t { Head, Torso, LeftHand, RightHand, Legs };`,
@@ -86,12 +90,15 @@ log unchanged:
   3. Generation and newcomers: the parts stay at 1000, then `CapBody` runs.
      The dominant hand is the left when `id % 10 == 0`, so no random draw
      moves.
-  4. Migration: for every `world.robots[i]`, write `body`. The head and torso
-     get condition `min(1000, 1000 - wear)` (`kMaxWear` is 1000, spelled out),
-     the others 1000, all with `lost` false. The dominant hand follows the same
-     `id % 10` rule. The migration never calls game code.
-  5. New fixture, `CurrentVersionFixtureLoadsAndRoundTrips` retargeted, and
-     `VersionN-1FixtureMigratesAndRuns` added (rule 3).
+  4. No migration (rule 3, revised 2026-11-28): raise `kOldestSupportedSaveVersion` in
+     `Save.hpp` together with `kCurrentSaveVersion`, leaving the `kMigrations` table in
+     `Save.cpp` empty, so a version 41 save is refused with the game's plain message
+     instead of upgraded. Fix the comment above those numbers in `Save.hpp`, which
+     still promises a migration for every change: a body only has to be right for a
+     game that built it, which is what the bullet above does.
+  5. Replace `tests/fixtures/saves/v41-city.json` with a v42 fixture made by the guide's
+     command, its README row, and retarget `CurrentVersionFixtureLoadsAndRoundTrips`
+     to it. No `Version41FixtureMigratesAndRuns`: version 41 saves do not load.
 - Tests (`BodyTests.cpp`): `CapBody` caps the head and torso only; a new
   city's robots have capped bodies; a save round trip keeps the body.
 - Check: build, ctest, seed 7 log byte-identical, save differs only by the
@@ -204,7 +211,8 @@ log unchanged:
 
 - Module: bodies. Depends on: L1. Save change: yes.
 - Open: `sim/include/mechapunk/sim/Body.hpp`, `sim/src/Body.cpp`,
-  `sim/src/Save.cpp` (`glz::meta`), the end of `sim/src/Migrations.cpp`,
+  `sim/src/Save.cpp` (`glz::meta`), `sim/include/mechapunk/sim/Save.hpp` (the
+  two version numbers),
   `sim/src/Validation.cpp` (the robot loop).
 - Do:
   1. `enum class HeldItem : std::uint8_t { Shopping, Parcel, Baton, Tool };`,
@@ -212,7 +220,9 @@ log unchanged:
      `std::uint32_t FreeHands(const Robot&)`: working hands (not lost and
      condition above `body.brokenHandCondition`, a new setting, 100) minus the
      items held.
-  2. The migration writes an empty list.
+  2. No migration (rule 3, revised): raise `kOldestSupportedSaveVersion` with
+     `kCurrentSaveVersion` and replace the fixture; `Robot`'s default gives a new
+     robot an empty list.
   3. Validation: never more items than working hands.
 - Tests: `FreeHands` for two hands, one hand, one hand holding shopping.
 - Check: build, ctest, new fixture.
@@ -336,7 +346,7 @@ log unchanged:
   fields: `world.today` and every `world.history[i].counted`).
 - Open: `sim/include/mechapunk/sim/Economy.hpp` (`DayCounters`), the places
   L12 and L13 changed (to add `++state_.today.x`), `app/Statistics.cpp` (the
-  Society tab), the end of `sim/src/Migrations.cpp`.
+  Society tab), `sim/include/mechapunk/sim/Save.hpp` (the two version numbers).
 - Do: count `injuries`, `partsLost`, `partsFitted` and `torsoSurgeries` per
   day, and plot them in the Society tab with `PlotCount`.
 - Tests: a day with an injury counts it.
