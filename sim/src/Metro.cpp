@@ -391,4 +391,33 @@ std::optional<DriverRun> Metro::PlanDriverRun(std::uint32_t line, double readyAt
                      .alights = *off};
 }
 
+bool IsDepot(const Building& building) noexcept {
+    return !building.rooms.empty() &&
+           std::ranges::all_of(building.rooms,
+                               [](const Room& room) { return room.kind == RoomKind::CrewRoom; });
+}
+
+bool OnLineStreet(const City& city, const MetroLine& line, NodeId node) {
+    const CityNode& first = city.nodes.at(city.stations.at(line.stations.front()).node.value);
+    const CityNode& at = city.nodes.at(node.value);
+    return line.axis == LineAxis::Row ? at.z == first.z : at.x == first.x;
+}
+
+std::vector<EntityId> LineDepots(const City& city, const Metro& metro) {
+    std::vector<EntityId> depots(metro.Lines().size());
+    std::vector<bool> claimed(city.buildings.size(), false);
+    for (std::size_t line = 0; line != metro.Lines().size(); ++line) {
+        for (std::size_t index = 0; index != city.buildings.size(); ++index) {
+            const Building& building = city.buildings[index];
+            if (!claimed[index] && IsDepot(building) &&
+                OnLineStreet(city, metro.Lines()[line], building.entrance)) {
+                claimed[index] = true;
+                depots[line] = building.id;
+                break;
+            }
+        }
+    }
+    return depots;
+}
+
 }  // namespace mechapunk::sim

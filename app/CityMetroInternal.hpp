@@ -46,6 +46,15 @@ inline constexpr vec3 kStationSign{0.1F, 0.85F, 1.0F};
 
 inline constexpr vec3 kBumper{1.0F, 0.15F, 0.1F};
 
+// A train's middle runs kTailMeters past an end station before it turns; the
+// track runs on past that by half a train and a little, where its buffers
+// stand, so no part of a turning train hangs over the end of the deck.
+inline constexpr float kTrainHalfMeters = 13.5F;
+
+inline float TrackEndMeters() {
+    return static_cast<float>(sim::kTailMeters) + kTrainHalfMeters;
+}
+
 inline float DeckHeight(sim::LineAxis axis) {
     return (axis == sim::LineAxis::Row ? kRowDeck : kColumnDeck) * kS;
 }

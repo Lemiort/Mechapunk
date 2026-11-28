@@ -316,6 +316,12 @@ SimSettings TownSettings() {
     settings.population.immigration = 1;
     settings.construction.freeBedsPercent = 10;
     settings.metro.minBuildings = 6;
+    // A station serves its own block's corners and the next intersections
+    // (80 m, or 113 m across a block) but not two blocks away: a station about
+    // every second intersection, as a generated city has them, so the metro
+    // grows and gains lines with the town instead of waiting for it to span a
+    // kilometre.
+    settings.metro.stationReachMeters = 120;
     settings.economy.robotsPerBank = 400;
     settings.economy.workplacesPerCorporation = 3;
     settings.economy.inflationTarget = 1;

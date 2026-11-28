@@ -106,12 +106,29 @@ TEST(MetroAuthority, RaisesADepotOnTheLinesStreet) {
     EXPECT_EQ(depot()->rooms.front().kind, sim::RoomKind::CrewRoom);
     // Its corner is taken: validation checks no free plot lies under a building.
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
-    // Drivers on all three shifts within three nights, even though nearly
-    // everybody in the town already has a job.
+    // Drivers on all three shifts within ten nights, even though nearly
+    // everybody in the town already has a job: robots out of work and
+    // newcomers take a place in a crew room first.
     const sim::EntityId room = depot()->rooms.front().id;
-    world.RunFor(3 * sim::kMinutesPerDay);
+    world.RunFor(10 * sim::kMinutesPerDay);
     const auto drivers = std::ranges::count_if(
         world.State().robots, [&](const sim::Robot& robot) { return robot.workspace == room; });
     EXPECT_EQ(drivers, 3 * sim::StaffPerShift(*sim::RoomIndex(world.State().city).Find(room)->room));
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
+// The metro grows with the town: by day 300 a seed town has more than the two
+// stations it opened with and a second line, each line with a depot on its
+// street that no other line has.
+TEST(MetroAuthority, TheMetroGrowsAndEachLineGetsADepot) {
+    sim::World world = sim::World::Generate({.seed = 1, .robots = 30, .settings = sim::TownSettings()});
+    world.RunFor(300 * sim::kMinutesPerDay);
+    const sim::City& city = world.State().city;
+    EXPECT_GT(city.stations.size(), 2U);
+    ASSERT_GE(world.GetMetro().Lines().size(), 2U);
+    const std::vector<sim::EntityId> depots = sim::LineDepots(city, world.GetMetro());
+    for (std::size_t line = 0; line != depots.size(); ++line) {
+        EXPECT_TRUE(depots[line].IsValid()) << "line " << line << " has no depot";
+    }
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }

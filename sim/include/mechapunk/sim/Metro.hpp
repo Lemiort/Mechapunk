@@ -158,4 +158,18 @@ private:
     std::vector<std::optional<std::uint32_t>> columnLine_;
 };
 
+// A metro depot: a building whose rooms are all crew rooms, raised by
+// generation at a line's first station or by a town's Metro Authority.
+[[nodiscard]] bool IsDepot(const Building& building) noexcept;
+
+// Whether an intersection is on a line's street: its row for a row line, its
+// column for a column line.
+[[nodiscard]] bool OnLineStreet(const City& city, const MetroLine& line, NodeId node);
+
+// Each line's depot, by line: in line order, each line takes the first depot
+// in id order on its street that no line before it took. An invalid id: the
+// line has none. The Metro Authority and the view both go by this, so they
+// agree which line a depot serves after lines open and are numbered anew.
+[[nodiscard]] std::vector<EntityId> LineDepots(const City& city, const Metro& metro);
+
 }  // namespace mechapunk::sim

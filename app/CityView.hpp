@@ -282,9 +282,8 @@ private:
         float lead{};                 // The track from the curve to the throat.
         std::vector<float> sidings;   // One per train.
     };
-    [[nodiscard]] std::optional<Depot> FindDepot(std::uint32_t line) const;
-    // A building whose rooms are all crew rooms: a metro depot.
-    [[nodiscard]] static bool IsDepotBuilding(const sim::Building& building);
+    // The roof depot of a line in its depot building (sim::LineDepots).
+    [[nodiscard]] std::optional<Depot> FindDepot(std::uint32_t line, sim::EntityId depot) const;
     // Whether a line has gained, lost or changed its depot building since the
     // metro was drawn.
     [[nodiscard]] bool DepotsMoved() const;

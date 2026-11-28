@@ -42,41 +42,16 @@ constexpr double kDriverEarlyMinutes = 1.0;
 
 std::optional<std::uint32_t> CityView::CrewLineOf(sim::EntityId crewRoom) const {
     if (crewLines_.empty()) {
-        // Depots were built in line order, one per line at its first
-        // station: match them up in that order, by corner.
+        // A depot's crew rooms drive its line, as the simulation matches
+        // them (sim::LineDepots).
         std::vector<bool> taken(metro_.Lines().size(), false);
-        for (const sim::Building& building : city_.buildings) {
-            for (const sim::Room& room : building.rooms) {
-                if (room.kind != sim::RoomKind::CrewRoom) {
-                    continue;
-                }
-                for (std::uint32_t line = 0; line < metro_.Lines().size(); ++line) {
-                    const std::uint32_t first = metro_.Lines()[line].stations.front();
-                    if (!taken[line] && city_.stations.at(first).node == building.entrance) {
-                        taken[line] = true;
-                        crewLines_.emplace(room.id.value, line);
-                        break;
-                    }
-                }
-            }
-        }
-        // A town's depot stands on its line's street, not always at its first
-        // station: it takes the first line without one along that street.
-        for (const sim::Building& building : city_.buildings) {
-            if (!IsDepotBuilding(building) || crewLines_.contains(building.rooms.front().id.value)) {
-                continue;
-            }
-            for (std::uint32_t line = 0; line < metro_.Lines().size(); ++line) {
-                const sim::MetroLine& metro = metro_.Lines()[line];
-                const sim::CityNode& first =
-                    city_.nodes.at(city_.stations.at(metro.stations.front()).node.value);
-                const sim::CityNode& at = city_.nodes.at(building.entrance.value);
-                const bool onStreet =
-                    metro.axis == sim::LineAxis::Row ? at.z == first.z : at.x == first.x;
-                if (!taken[line] && onStreet) {
-                    taken[line] = true;
-                    crewLines_.emplace(building.rooms.front().id.value, line);
-                    break;
+        const std::vector<sim::EntityId> depots = sim::LineDepots(city_, metro_);
+        for (std::uint32_t line = 0; line < depots.size(); ++line) {
+            if (const sim::Building* depot =
+                    depots[line].IsValid() ? city_.FindBuilding(depots[line]) : nullptr) {
+                taken[line] = true;
+                for (const sim::Room& room : depot->rooms) {
+                    crewLines_.emplace(room.id.value, line);
                 }
             }
         }

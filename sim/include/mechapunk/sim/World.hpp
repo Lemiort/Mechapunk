@@ -397,9 +397,6 @@ private:
     [[nodiscard]] Shift ShiftOf(const Robot& robot) const;
     // Robots holding each job, by JobKey.
     [[nodiscard]] std::unordered_map<std::uint64_t, std::uint32_t> StaffCounts() const;
-    // Fills the crew rooms' empty driver places with robots out of work or
-    // invited newcomers (MetroAuthority.cpp).
-    void HireDrivers();
     // Jobs a robot could take now: workspaces with room, venues short of staff
     // on the shift it would work, and the site office of a building going up,
     // whose other rooms open only when the project is done (task D, steps D2c

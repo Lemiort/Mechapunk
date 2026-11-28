@@ -60,38 +60,29 @@ constexpr float kSidingInset = 2.5F;
 // city's edge, and beyond the down track's tail and its crossover too, so the
 // shed never stands across a track.
 float EdgeDepotStart(float edge) {
-    return std::min(edge, -static_cast<float>(sim::kTailMeters) - kEdgeThroat) - kEdgeGap;
+    return std::min(edge, -TrackEndMeters() - kEdgeThroat) - kEdgeGap;
 }
 
 }  // namespace
 
-bool CityView::IsDepotBuilding(const sim::Building& building) {
-    return !building.rooms.empty() &&
-           std::ranges::all_of(building.rooms, [](const sim::Room& room) {
-               return room.kind == sim::RoomKind::CrewRoom;
-           });
-}
-
-std::optional<CityView::Depot> CityView::FindDepot(std::uint32_t line) const {
+std::optional<CityView::Depot> CityView::FindDepot(std::uint32_t line,
+                                                  sim::EntityId depot) const {
+    const sim::Building* building = depot.IsValid() ? city_.FindBuilding(depot) : nullptr;
+    if (building == nullptr) {
+        return std::nullopt;
+    }
     const sim::MetroLine& metro = metro_.Lines().at(line);
     const LineFrame frame = FrameOf(line);
     const vec3 ground{frame.origin.x, 0.0F, frame.origin.z};
-    for (const sim::Building& building : city_.buildings) {
-        if (!IsDepotBuilding(building) || CrewLineOf(building.rooms.front().id) != line) {
-            continue;
-        }
-        // Its intersection, which must be on the line's street, and how far
-        // along the line that is.
-        const vec3 node = (NodePosition(building.entrance) - ground) / kS;
-        if (std::abs(glm::dot(node, frame.across)) > 1.0F) {
-            continue;
-        }
-        const float corner = glm::dot(node, frame.along);
-        const vec3 offset = (PlotCenter(building) - NodePosition(building.entrance)) / kS;
-        const float along = corner + glm::dot(offset, frame.along);
-        Depot found{.building = building.id.value,
-                    .alongSign = along < corner ? -1.0F : 1.0F,
-                    .acrossSign = glm::dot(offset, frame.across) < 0.0F ? -1.0F : 1.0F};
+    // How far along the line its intersection is, on the line's street, and
+    // its plot from there.
+    const float corner = glm::dot((NodePosition(building->entrance) - ground) / kS, frame.along);
+    const vec3 offset = (PlotCenter(*building) - NodePosition(building->entrance)) / kS;
+    const float along = corner + glm::dot(offset, frame.along);
+    Depot found{.building = building->id.value,
+                .alongSign = along < corner ? -1.0F : 1.0F,
+                .acrossSign = glm::dot(offset, frame.across) < 0.0F ? -1.0F : 1.0F};
+    {
         // The lead track at the building's end away from the station, the
         // sidings from there back toward it, squeezed when there are many.
         const float half = (metro.axis == sim::LineAxis::Row ? kFootprintWidthMeters
@@ -107,18 +98,17 @@ std::optional<CityView::Depot> CityView::FindDepot(std::uint32_t line) const {
             found.sidings.push_back(found.lead -
                                     (found.alongSign * spacing * static_cast<float>(train)));
         }
-        return found;
     }
-    return std::nullopt;
+    return found;
 }
 
 bool CityView::DepotsMoved() const {
-    if (depots_.size() != metro_.Lines().size()) {
+    const std::vector<sim::EntityId> depots = sim::LineDepots(city_, metro_);
+    if (depots_.size() != depots.size()) {
         return true;
     }
-    for (std::uint32_t line = 0; line < depots_.size(); ++line) {
-        const std::optional<Depot> found = FindDepot(line);
-        if ((found ? found->building : 0) != (depots_[line] ? depots_[line]->building : 0)) {
+    for (std::size_t line = 0; line < depots.size(); ++line) {
+        if (depots[line].value != (depots_[line] ? depots_[line]->building : 0)) {
             return true;
         }
     }
@@ -174,7 +164,7 @@ void CityView::AddDepot(std::uint32_t index, const LineFrame& frame) {
     const sim::MetroLine& line = metro_.Lines().at(index);
     const float deck = kDeckThickness * kS;
     const float height = frame.origin.y;
-    const float tail = static_cast<float>(sim::kTailMeters);
+    const float tail = TrackEndMeters();
     const auto column = [&](float meters, float across) {
         AddTrackSlab(frame, meters - 0.45F, meters + 0.45F, across - 0.45F, across + 0.45F, 0.0F,
                      height - deck, kTrackSteel);

@@ -211,9 +211,9 @@ game:
 - Trains have no limit on riders. Saves from before version 17 have no
   metro depots, so their trains never get drivers.
 - Robots never change jobs: a robot looks for work only while it has none,
-  and takes a random opening. A town's crew rooms get drivers only because
-  the Metro Authority hires robots out of work and invites newcomers to
-  drive. Planned: salary dynamics, where an organization short of workers
+  and takes a random opening (a place in a crew room first, so the trains
+  get drivers); newcomers arrive only while there are openings and free dorm
+  beds, so a town without jobs stops growing. Planned: salary dynamics, where an organization short of workers
   raises its pay and one with too many lowers it, and employed robots move
   to a better-paid job, so labour moves where it is needed.
 - A town's Metro Authority pays its six drivers per depot far more than a

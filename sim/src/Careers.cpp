@@ -172,8 +172,17 @@ void World::ReviewJobs() {
         if (openings.empty()) {
             continue;  // Nothing on the shifts it could work.
         }
-        const EntityId job = openings.at(state_.random.UniformInt(
+        EntityId job = openings.at(state_.random.UniformInt(
             0, static_cast<std::uint32_t>(openings.size() - 1)));
+        // The trains need drivers: a place in a crew room comes first. The
+        // draw above is made all the same, so the random stream does not move.
+        if (const auto driver = std::ranges::find_if(openings, [&](EntityId opening) {
+                const auto found = rooms_.Find(opening);
+                return found && found->room->kind == RoomKind::CrewRoom;
+            });
+            driver != openings.end()) {
+            job = *driver;
+        }
         ++staff[JobKey(*rooms_.Find(job)->room, robot.id)];
         robot.workspace = job;
         robot.jobLevel = 0;

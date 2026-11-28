@@ -167,8 +167,9 @@ void CityView::DrawMetro() {
     // Each line's depot first: the lines are drawn up to it, and the trains
     // leave from it.
     depots_.clear();
+    const std::vector<sim::EntityId> depots = sim::LineDepots(city_, metro_);
     for (std::uint32_t line = 0; line < metro_.Lines().size(); ++line) {
-        depots_.push_back(FindDepot(line));
+        depots_.push_back(FindDepot(line, depots[line]));
     }
     BatchApart(kMetroBatch, [this] {
         AddElevatedLines();
@@ -226,29 +227,35 @@ void CityView::AddBumper(const LineFrame& frame, float meters, float across, flo
 void CityView::AddElevatedLines() {
     const float deck = kDeckThickness * kS;
     const float tail = static_cast<float>(sim::kTailMeters);
+    const float end = TrackEndMeters();
     for (std::uint32_t index = 0; index < metro_.Lines().size(); ++index) {
         const sim::MetroLine& line = metro_.Lines()[index];
         const LineFrame frame = FrameOf(index);
         const float length = static_cast<float>(line.meters.back());
         const float height = frame.origin.y;
 
-        // The deck from tail to tail, and the tracks on it.
-        AddTrackSlab(frame, -tail, length + tail, -kDeckHalf, kDeckHalf, height - deck, height,
+        // The deck from end to end, and the tracks on it: on past each tail's
+        // crossover, far enough for a whole train turning there.
+        AddTrackSlab(frame, -end, length + end, -kDeckHalf, kDeckHalf, height - deck, height,
                      kTrackSteel);
-        AddRails(frame, -tail, length + tail, -kTrackOffset);
-        AddRails(frame, -tail, length + tail, kTrackOffset);
+        AddRails(frame, -end, length + end, -kTrackOffset);
+        AddRails(frame, -end, length + end, kTrackOffset);
         // Crossovers in the tails, where trains change ends and tracks.
         AddSwitchRails(frame, length + tail, -kTrackOffset, length + (tail * 0.5F), kTrackOffset);
         AddSwitchRails(frame, -tail, kTrackOffset, -tail * 0.5F, -kTrackOffset);
         // The up track runs on past the far tail to a depot beyond it.
         const std::optional<Depot>& depot = depots_.at(index);
-        if (!depot || DepotJunction(*depot) <= length + tail) {
-            AddBumper(frame, length + tail, -kTrackOffset, 1.0F);
+        if (!depot || DepotJunction(*depot) <= length + end) {
+            AddBumper(frame, length + end, -kTrackOffset, 1.0F);
         }
-        AddBumper(frame, length + tail, kTrackOffset, 1.0F);
-        AddBumper(frame, -tail, kTrackOffset, -1.0F);
-        // Columns under the middle of every block, and the tails.
+        AddBumper(frame, length + end, kTrackOffset, 1.0F);
+        AddBumper(frame, -end, kTrackOffset, -1.0F);
+        // Columns under the middle of every block, and the ends.
         for (float meters = -40.0F; meters <= length + 40.0F + 1.0F; meters += 80.0F) {
+            AddTrackSlab(frame, meters - 0.45F, meters + 0.45F, -0.45F, 0.45F, 0.0F,
+                         height - deck, kTrackSteel);
+        }
+        for (const float meters : {-end + 1.0F, length + end - 1.0F}) {
             AddTrackSlab(frame, meters - 0.45F, meters + 0.45F, -0.45F, 0.45F, 0.0F,
                          height - deck, kTrackSteel);
         }
