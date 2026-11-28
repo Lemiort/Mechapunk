@@ -210,6 +210,16 @@ game:
   stairs.
 - Trains have no limit on riders. Saves from before version 17 have no
   metro depots, so their trains never get drivers.
+- Robots never change jobs: a robot looks for work only while it has none,
+  and takes a random opening. A town's crew rooms get drivers only because
+  the Metro Authority hires robots out of work and invites newcomers to
+  drive. Planned: salary dynamics, where an organization short of workers
+  raises its pay and one with too many lowers it, and employed robots move
+  to a better-paid job, so labour moves where it is needed.
+- A town's Metro Authority pays its six drivers per depot far more than a
+  small town's fares bring in (240 a day against about 24 at 285 robots), so
+  it lives on bank loans and its pay slides to the minimum. City Hall covering
+  the metro's losses, or opening the first line later, would fix it.
 - The economy settles with industry paying near full wages, but banks lend
   more than they hold, so the central bank creates money slowly, and wealth
   inequality creeps up as owners pull ahead of robots still in dorms. The

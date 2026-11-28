@@ -78,20 +78,22 @@ void World::AgeRobots() {
     }
 }
 
-bool World::RoomForNewcomer() const {
+bool World::FreeDormBed() const {
     std::unordered_set<std::uint64_t> homes;
     for (const Robot& robot : state_.robots) {
         homes.insert(robot.apartment.value);
     }
-    const bool freeDorm = std::ranges::any_of(
+    return std::ranges::any_of(
         rooms_.RoomsOfKind(RoomKind::Apartment), [&](const RoomRef& apartment) {
             return apartment.room->apartmentClass == ApartmentClass::Dorm &&
                    !homes.contains(apartment.room->id.value) &&
                    !IsUnderConstruction(state_.projects, apartment.building->id);
         });
+}
+
+bool World::RoomForNewcomer() const {
     // A job as the next robot would be offered it: ids only grow.
-    return freeDorm &&
-           !OpeningsFor(EntityId{state_.ids.next}, StaffCounts()).empty();
+    return FreeDormBed() && !OpeningsFor(EntityId{state_.ids.next}, StaffCounts()).empty();
 }
 
 void World::Scrap(EntityId id) {
@@ -180,6 +182,15 @@ void World::AddNewcomer() {
     robot.apartment = pick(freeHomes);
     const std::vector<EntityId> openings = OpeningsFor(robot.id, StaffCounts());
     robot.workspace = openings.empty() ? EntityId{} : pick(openings);
+    // The trains need drivers: a place in a crew room comes first. The draw
+    // above is made all the same, so the random stream does not move.
+    if (const auto driver = std::ranges::find_if(openings, [&](EntityId job) {
+            const auto found = rooms_.Find(job);
+            return found && found->room->kind == RoomKind::CrewRoom;
+        });
+        driver != openings.end()) {
+        robot.workspace = *driver;
+    }
     robot.location = robot.apartment;
     robot.punctualityMinutes = random.UniformInt(static_cast<std::uint32_t>(state_.settings.population.minPunctuality), static_cast<std::uint32_t>(state_.settings.population.maxPunctuality));
     robot.needs = {.charge = need(), .condition = need(), .social = need(), .fun = need()};

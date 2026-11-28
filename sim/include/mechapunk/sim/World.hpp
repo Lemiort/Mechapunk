@@ -371,6 +371,8 @@ private:
     void AddNewcomer();
     // Whether a newcomer would find a free dorm bed and a job with a free place.
     [[nodiscard]] bool RoomForNewcomer() const;
+    // Whether a dorm room stands free for a newcomer.
+    [[nodiscard]] bool FreeDormBed() const;
     void ForgetDeparted();
     // Relationships, in Social.cpp.
     void Socialize();
@@ -395,7 +397,8 @@ private:
     [[nodiscard]] Shift ShiftOf(const Robot& robot) const;
     // Robots holding each job, by JobKey.
     [[nodiscard]] std::unordered_map<std::uint64_t, std::uint32_t> StaffCounts() const;
-    // Fills the crew rooms' empty driver places (MetroAuthority.cpp).
+    // Fills the crew rooms' empty driver places with robots out of work or
+    // invited newcomers (MetroAuthority.cpp).
     void HireDrivers();
     // Jobs a robot could take now: workspaces with room, venues short of staff
     // on the shift it would work, and the site office of a building going up,

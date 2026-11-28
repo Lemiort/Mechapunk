@@ -6,7 +6,8 @@
 // view puts the trains' shed on its roof and turns a track off the line into it.
 // While the line's street has no free corner the review tries again the next
 // night: a ring of streets the town grows adds corners at both ends of it.
-// Every night it also hires drivers for the crew rooms short of them.
+// Every night it also finds drivers for the crew rooms short of them: robots
+// out of work, or newcomers it invites.
 
 #include <algorithm>
 #include <cstdlib>
@@ -19,6 +20,12 @@
 #include "mechapunk/sim/World.hpp"
 
 namespace mechapunk::sim {
+
+namespace {
+// Newcomers invited to drive in one night, at most: a crew room has places for
+// two drivers on each of three shifts.
+constexpr std::uint32_t kMaxDriversInvited = 6;
+}  // namespace
 
 void World::ReviewMetroAuthority() {
     const std::vector<MetroLine>& lines = metro_.Lines();
@@ -109,50 +116,48 @@ void World::ReviewMetroAuthority() {
     HireDrivers();
 }
 
-// Drivers: a crew room short of them on a shift takes one a night for it, a
-// robot out of work if one is free for that shift, or else a worker of an
-// ordinary workspace, the least senior first. Robots look for work only while
-// they have none, so in a town where everybody works the trains would run with
-// nobody hired to drive them. Only a robot at home between shifts changes jobs,
-// and it keeps its level; no random draw is made.
+// Drivers: robots look for work only while they have none, picking among all
+// openings at random, so a town where everybody works would leave a new crew
+// room empty and its trains without anyone to drive them. Each night a crew
+// room short of drivers takes a robot out of work at home whose shift has a
+// place; and while it is still short, the town invites newcomers to drive,
+// while it has a free dorm bed for them and the next newcomer's shift has a
+// place (AddNewcomer gives a newcomer a place in a crew room first). Nobody is
+// taken from another job: no random draw is made here.
 void World::HireDrivers() {
-    const StaffRules* rules = FindStaffRules(RoomKind::CrewRoom);
-    if (rules == nullptr) {
-        return;
-    }
     std::unordered_map<std::uint64_t, std::uint32_t> staff = StaffCounts();
+    const auto place = [&](const Room& room, EntityId robot) {
+        return staff[JobKey(room, robot)] < StaffPerShift(room);
+    };
     for (const RoomRef& crew : rooms_.RoomsOfKind(RoomKind::CrewRoom)) {
         const Room& room = *crew.room;
-        for (std::uint32_t opening = 0; opening < rules->shifts; ++opening) {
-            Robot* best = nullptr;
-            for (Robot& robot : state_.robots) {
-                if (robot.activity != RobotActivity::Resting ||
-                    staff[JobKey(room, robot.id)] >= StaffPerShift(room)) {
-                    continue;
-                }
-                const auto job = rooms_.Find(robot.workspace);
-                const bool idle = !robot.workspace.IsValid();
-                if (!idle && (!job || job->room->kind != RoomKind::Workspace)) {
-                    continue;
-                }
-                const bool bestIdle = best != nullptr && !best->workspace.IsValid();
-                if (best == nullptr || (idle && !bestIdle) ||
-                    (idle == bestIdle && robot.jobLevel < best->jobLevel)) {
-                    best = &robot;
-                }
+        for (Robot& robot : state_.robots) {
+            if (robot.workspace.IsValid() || robot.activity != RobotActivity::Resting ||
+                !place(room, robot.id)) {
+                continue;
             }
-            if (best == nullptr) {
-                break;
-            }
-            if (const auto old = rooms_.Find(best->workspace)) {
-                --staff[JobKey(*old->room, best->id)];
-            }
-            ++staff[JobKey(room, best->id)];
-            best->workspace = room.id;
-            best->performance = 0;
-            Remember(*best, MemoryKind::FoundJob, {}, room.id);
-            ScheduleNextCommute(*best);
+            ++staff[JobKey(room, robot.id)];
+            robot.workspace = room.id;
+            robot.jobLevel = 0;
+            robot.performance = 0;
+            Remember(robot, MemoryKind::FoundJob, {}, room.id);
+            ScheduleNextCommute(robot);
         }
+    }
+    if (state_.settings.population.immigration == 0) {
+        return;
+    }
+    // Each newcomer takes a new id, so the next one may work another shift.
+    for (std::uint32_t invited = 0; invited < kMaxDriversInvited; ++invited) {
+        const EntityId next{state_.ids.next};
+        const bool wanted = std::ranges::any_of(
+            rooms_.RoomsOfKind(RoomKind::CrewRoom),
+            [&](const RoomRef& crew) { return place(*crew.room, next); });
+        if (!wanted || !FreeDormBed()) {
+            break;
+        }
+        AddNewcomer();
+        staff = StaffCounts();
     }
 }
 
