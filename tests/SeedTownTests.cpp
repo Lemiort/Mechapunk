@@ -158,8 +158,12 @@ TEST(SeedTown, RichNewcomersBringMoreSavings) {
         ASSERT_TRUE(sim::ApplySetting(settings, "population.richMultiplier", 50));
         sim::WorldState state =
             sim::World::Generate({.seed = 7, .robots = 100, .settings = settings}).State();
+        // A hand-written wear caps the head and the torso the way the game caps
+        // them wherever wear grows (step L3a): they come to 1, the next midnight
+        // lands them on 0, and step L2b6 refuses a state that skips the cap.
         for (std::size_t index = 0; index < 10; ++index) {
             state.robots[index].wear = sim::kMaxWear - 1;
+            sim::CapBody(state.robots[index]);
         }
         const std::size_t emissionsBefore = state.economy.emissions.size();
         auto world = sim::World::FromState(std::move(state));

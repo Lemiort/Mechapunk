@@ -4,8 +4,9 @@ Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
 (save version 42, game 0.42.0), L3a and L3b done on 2026-11-28 (no save change:
 the body is already saved state, and step L3 was split on 2026-11-28 into L3a
 and L3b - see why under L3a), L2a done on 2026-11-28 (no save change, and step L2 was split into L2a and
-L2b - see why under L2a), L2b1 - the first of the parts L2b was split into on
-2026-11-28 - done the same day (no save change), the rest still planned.
+L2b - see why under L2a), L2b1 and L2b2 - the first two of the parts L2b was
+split into on 2026-11-28 - done the same day (no save change), the rest still
+planned.
 Revised
 again on 2026-11-28 for the save rule: the game was at save version 41 and
 `kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
@@ -178,7 +179,7 @@ log unchanged:
   `python scripts/context_budget.py`). Nothing outside the test changed, so the
   headless log is untouched.
 
-### - [ ] L2b2. A hand-worn robot gets the cap too (seed-town) — part 2 of L2b
+### - [x] L2b2. A hand-worn robot gets the cap too (seed-town) — part 2 of L2b
 
 - Module: seed-town. Depends on: L2a. Save change: no.
 - Open: `tests/SeedTownTests.cpp` (`RichNewcomersBringMoreSavings`, line ~162).
