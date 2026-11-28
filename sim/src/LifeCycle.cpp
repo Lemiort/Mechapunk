@@ -1,6 +1,7 @@
-// Robots age and wear out. Clinics undo some of the wear; a robot worn out
-// completely is scrapped, its friends remember losing it, and a newcomer
-// moves into the city to take its place.
+// Robots age and wear out. Clinics undo some of the wear, and the head and
+// the torso follow it both ways (task L, step L3a); a robot worn out completely
+// is scrapped, its friends remember losing it, and a newcomer moves into the
+// city to take its place.
 #include <algorithm>
 #include <limits>
 #include <bit>
@@ -58,6 +59,11 @@ void World::AgeRobots() {
             wear += static_cast<std::int32_t>(state_.settings.population.neglectWear);
         }
         robot.wear = std::min(robot.wear + wear, kMaxWear);
+        // The head and the torso follow the wear the night brings: they are
+        // never in better condition than the damage allows, which is what lets
+        // step L3b scrap on the parts instead of on the wear number and still
+        // pick the same robot on the same night (task L, step L3a).
+        CapBody(robot);
         robot.needs.condition = std::min(robot.needs.condition, kMaxWear - robot.wear);
         if (robot.wear >= kMaxWear) {
             wornOut.push_back(robot.id);

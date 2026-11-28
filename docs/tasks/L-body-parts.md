@@ -1,7 +1,9 @@
 # Task L: body parts
 
 Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
-(save version 42, game 0.42.0), the rest still planned. Revised
+(save version 42, game 0.42.0), L3a done on 2026-11-28 (no save change: the
+body is already saved state, and step L3 was split on 2026-11-28 into L3a,
+done, and L3b, still planned - see why under L3a), the rest still planned. Revised
 again on 2026-11-28 for the save rule: the game was at save version 41 and
 `kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
 migration** - a save step bumps `kCurrentSaveVersion` (the next free version is
@@ -116,24 +118,85 @@ log unchanged:
   holds from step L3 on, which is where `CapBody` starts running wherever
   wear grows; until then a running city's head sits above that cap, so doing
   L2 before L3 makes a real city fail validation and breaks
-  `CurrentVersionFixtureLoadsAndRoundTrips`. Do L2 after L3.
+  `CurrentVersionFixtureLoadsAndRoundTrips`. Do L2 after L3a, which is where
+  the cap and the mend are put at every place that writes `wear`.
 - Tests: a save with each rule broken is refused with a message naming it.
 - Check: build, ctest.
 
-### - [ ] L3. The head and torso decide scrapping (life-cycle)
+### - [x] L3a. The head and the torso follow every change of wear — split on 2026-11-28
 
-- Module: life-cycle. Depends on: L1. Save change: no. The log must stay
-  **byte-identical**, because the cap makes the new rule fall on the same
-  day as the old one.
+- Module: bodies (`Body.hpp`, `Body.cpp`, `BodyTests.cpp`), then every place
+  that writes `wear`. Depends on: L1. Save change: no. The log must stay
+  **byte-identical**; the saved *values* of the head and the torso change,
+  because they are now kept up to date instead of only at birth.
+- Open: `sim/include/mechapunk/sim/Body.hpp`, `sim/src/Body.cpp`,
+  `sim/src/LifeCycle.cpp` (`AgeRobots`), `tests/BodyTests.cpp`,
+  `tests/LifeCycleTests.cpp`, plus the wear sites:
+  `rg -n "\.wear\s*[+=]|wear =" sim/src` (Behaviour.cpp's black market,
+  World.cpp's clinic, Gangs.cpp's fight; Generation.cpp and
+  `AddNewcomer` already cap, from L1).
+- Do:
+  1. `void MendBody(Robot&, std::int32_t wearTaken)`: the head and the torso
+     get back as much condition as the wear taken away, never above the cap.
+  2. `CapBody` after every place wear grows (nightly wear, `badPartWear`,
+     a fight's 20) and `MendBody` where a clinic takes `clinicWearRepair`
+     away.
+  3. Nothing yet reads a part's condition, so the city behaves as before.
+- Tests: `Body.MendBodyFollowsTheWearItTook` and
+  `Body.MendBodyNeverGoesAboveTheCap`;
+  `LifeCycle.TheBasicPartsFollowTheWearBothWays` (after 10, 20, 30 and 40
+  nights every robot's head and torso are exactly `max(0, kMaxWear - wear)`);
+  `LifeCycle.ClinicsTakeWearAway` extended: the head rises by exactly the wear
+  the clinic took, the legs do not move.
+- Check: build, ctest, seed 7 byte-identical log; the save differs only by
+  the head and torso conditions.
+
+**Why the split, and what was wrong in the draft.** L3 as drafted ("cap the
+head and the torso: their condition is never above `kMaxWear - wear`", plus
+"scrapped when the head's or the torso's condition is 0") is **not** byte-
+identical: a one-way cap makes the head remember the *worst wear ever reached*,
+while the old rule looks at today's wear, and clinics repair wear
+(`behaviour.clinicWearRepair` 2 per 10 minutes at a clinic). A robot whose
+dodgy part (`behaviour.badPartWear` 60, one visit in ten at a black market)
+pushed wear to `kMaxWear` one morning keeps a head at 0 forever, and the
+next midnight the parts rule kills it although the wear rule let it live.
+With 1000 robots that is about 2 extra deaths a day, and it broke
+`Settings.ConstructionKnobsRaiseASiteInTwoNights` (seed 5, 1000 robots, 3
+days: the deaths free homes and jobs, so the shortage never runs long enough
+to start a site). So `MendBody` had to come first: with the parts pinned to
+the wear in both directions, the two rules pick the same robot on the same
+night and L3b's swap is a no-op for the log.
+
+**Make room first (its own commit, the guide's recipe).** `world` was at
+24880 of 25000 tokens and step L3a's calls took it to 25063, so
+`World::Patrol` and `World::NextPatrolAt` moved to `sim/src/BehaviourPatrols.cpp`
+(byte for byte), registered in `sim/CMakeLists.txt` and as the new module
+`officer-patrols` in `scripts/context_budget.py` and `docs/MODULES.md`.
+`world` fell to 23881. Verified as a pure move: the seed 7 log and save are
+byte-identical.
+
+Found and left alone (pre-existing, task L6 will rewrite these lines): the
+fight in `Gangs.cpp` adds `first.wear += 20` **without** clamping to `kMaxWear`,
+so wear can pass `kMaxWear` and such a city would be refused by
+`ValidateWorldState` if it were saved before the next midnight. `CapBody`
+and `MendBody` use `max(0, kMaxWear - wear)` and are safe with it.
+
+### - [ ] L3b. The head and the torso decide scrapping (life-cycle)
+
+- Module: life-cycle. Depends on: L1, L3a. Save change: no. The log must stay
+  **byte-identical**: after L3a the parts are pinned to the wear in both
+  directions, so `head == 0 or torso == 0` at a midnight is exactly the
+  robots `wear >= kMaxWear` picked that night.
 - Open: `sim/src/LifeCycle.cpp` (`AgeRobots`).
-- Do: wherever `AgeRobots` adds wear, call `CapBody` after it. A robot is
-  scrapped when its head's or its torso's condition is 0, in place of
-  `wear >= kMaxWear`. Find every other place that adds to `wear` (`rg -n
-  "\.wear\s*[+=]|wear =" sim/src`) and call `CapBody` after it too, and the
-  same where it shrinks (clinics: the cap rises again, but condition is not
-  given back).
-- Tests: a robot scrapped by age is scrapped on the same day as before; a
-  robot whose torso is set to 0 in a test is scrapped at the next midnight.
+- Do: a robot is scrapped when its head's or its torso's condition is 0, in
+  place of `wear >= kMaxWear` (a local `Destroyed(const Robot&)` in the
+  anonymous namespace; hands and legs at 0 never scrap, decision 2). Nothing
+  else changes: the cap and the mend of L3a are already everywhere wear moves.
+- Tests: `LifeCycle.DestroyedHeadOrTorsoScrapsAtMidnight` (a torso set to 0,
+  and a head set to 0, on robots at half wear: both gone at the next
+  midnight, at the same minute a robot whose wear runs out is scrapped);
+  `LifeCycle.BrokenHandsAndLegsDoNotScrap` (hands and the legs at 0, alive
+  two days later).
 - Check: build, ctest, seed 7 byte-identical.
 
 ### - [ ] L4. Walking wears the legs (world)

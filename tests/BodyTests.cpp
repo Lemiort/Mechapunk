@@ -52,6 +52,48 @@ TEST(Body, WornOutRobotHasDestroyedHeadAndTorso) {
     EXPECT_EQ(Condition(robot, sim::BodyPart::Legs), 1000);
 }
 
+// A clinic that takes lasting damage away gives the head and the torso back
+// exactly as much condition as wear it took, never above the cap; a part
+// damaged beyond what the wear explains is mended only by that much, and a
+// hand or a leg is not mended by wear at all (step L12 fits those).
+TEST(Body, MendBodyFollowsTheWearItTook) {
+    sim::Robot robot;
+    for (sim::PartState& part : robot.body.parts) {
+        part.condition = 1000;
+    }
+    robot.wear = 600;
+    sim::CapBody(robot);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Head), 400);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Torso), 400);
+    // The clinic took 150 of the wear away: the parts follow the cap exactly.
+    robot.wear = 450;
+    sim::MendBody(robot, 150);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Head), 550);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Torso), 550);
+    // A head cut down to 50 by something the clinic has not reached is mended
+    // by the 20 it works, and stays below the cap.
+    sim::Part(robot.body, sim::BodyPart::Head).condition = 50;
+    robot.wear = 430;
+    sim::MendBody(robot, 20);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Head), 70);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Torso), 570);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Legs), 1000);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::LeftHand), 1000);
+}
+
+TEST(Body, MendBodyNeverGoesAboveTheCap) {
+    sim::Robot robot;
+    robot.wear = 300;
+    // More wear than the robot has: the mend stops at the cap.
+    sim::MendBody(robot, 900);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Head), sim::kMaxWear - 300);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Torso), sim::kMaxWear - 300);
+    // Nothing the robot has left to take away mends nothing at all.
+    sim::Part(robot.body, sim::BodyPart::Head).condition = 50;
+    sim::MendBody(robot, 0);
+    EXPECT_EQ(Condition(robot, sim::BodyPart::Head), 50);
+}
+
 TEST(Body, TheFivePartsAreEachTheirOwn) {
     sim::Body body;
     for (const sim::BodyPart part :

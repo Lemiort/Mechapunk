@@ -7,6 +7,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/Random.hpp"
 #include "mechapunk/sim/World.hpp"
 
@@ -540,6 +541,10 @@ void World::ConsiderCrime(Robot& first, Robot& second,
 
                 first.wear += 20;
                 second.wear += 20;
+                // The wear a fight adds caps the head and the torso of both
+                // fighters (task L, step L3).
+                CapBody(first);
+                CapBody(second);
                 // B4 said a fight also costs condition. B7 thought Robot has
                 // no condition field: it lives in Robot.needs.condition, on
                 // the 0..1000 needs scale, so a fight cuts it by 100.

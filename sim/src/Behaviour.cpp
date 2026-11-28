@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 #include "Names.hpp"
+#include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 #include "WorldInternal.hpp"
@@ -175,6 +176,8 @@ void World::Arrive(Robot& robot) {
     if (venue->room->kind == RoomKind::BlackMarket &&
         state_.random.UniformInt(1, 100) <= static_cast<std::uint32_t>(state_.settings.behaviour.badPartPercent)) {
         robot.wear = std::min(robot.wear + static_cast<std::int32_t>(state_.settings.behaviour.badPartWear), kMaxWear);
+        // A dodgy part's lasting damage caps the head and the torso too.
+        CapBody(robot);
         Remember(robot, MemoryKind::GotBadPart, {}, robot.location);
     }
 

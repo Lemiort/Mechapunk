@@ -43,8 +43,18 @@ struct Body {
 // The head and the torso of a robot can never be in better condition than
 // its lasting damage allows: `kMaxWear` minus its `wear` (World.hpp). Hands
 // and legs are not capped, because they can be lost and replaced. Call this
-// wherever a robot's wear grows, and again nowhere else: repairing a part
-// does not give condition back.
+// wherever a robot's wear grows; it only ever lowers a condition, so a part
+// already worse than the cap stays worse.
 void CapBody(Robot& robot) noexcept;
+
+// A clinic that takes lasting damage away gives the head and the torso back
+// the same amount of condition, never more than the cap allows: the basic
+// parts follow wear in both directions, while damage the clinic has not reached
+// stays. Without this the head would remember the worst wear a robot ever
+// reached, and a robot whose dodgy part pushed wear to `kMaxWear` one morning
+// would die the night a clinic had already repaired that wear - the day the
+// wear rule let it live (task L, step L3a). Repairing a hand or a leg is
+// step L12's rule and gives nothing back here.
+void MendBody(Robot& robot, std::int32_t wearTaken) noexcept;
 
 }  // namespace mechapunk::sim

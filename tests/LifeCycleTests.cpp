@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/GameTime.hpp"
 #include "mechapunk/sim/Social.hpp"
@@ -124,11 +125,26 @@ TEST(LifeCycle, ClinicsTakeWearAway) {
     sim::WorldState state = world.State();
     sim::Robot& robot = state.robots[*patient];
     robot.wear = 500;
+    // Both parts are damaged well below what the wear allows, so the clinic's
+    // mend can be told apart from the cap rising: the head follows the wear
+    // away, the legs do not (step L12 is what fits a leg).
+    sim::Part(robot.body, sim::BodyPart::Head).condition = 100;
+    sim::Part(robot.body, sim::BodyPart::Legs).condition = 300;
     robot.nextActionAt = state.tick + 120;  // Stays two more hours.
     const sim::EntityId id = robot.id;
     sim::World clinic = Load(std::move(state));
     clinic.RunFor(60);
-    EXPECT_LT(clinic.FindRobot(id)->wear, 500);
+    const sim::Robot* patientRobot = clinic.FindRobot(id);
+    ASSERT_TRUE(patientRobot != nullptr);
+    const std::int32_t wearTaken = 500 - patientRobot->wear;
+    EXPECT_GT(wearTaken, 0) << "the clinic took no wear";
+    EXPECT_LE(sim::Part(patientRobot->body, sim::BodyPart::Head).condition,
+              sim::kMaxWear - patientRobot->wear)
+        << "the mend went above the cap";
+    EXPECT_EQ(sim::Part(patientRobot->body, sim::BodyPart::Head).condition, 100 + wearTaken)
+        << "the head did not follow the wear the clinic took away";
+    EXPECT_EQ(sim::Part(patientRobot->body, sim::BodyPart::Legs).condition, 300)
+        << "a clinic mended a part it does not mend";
 }
 
 // A robot worn out completely is scrapped at night: it leaves the city,
@@ -180,6 +196,26 @@ TEST(LifeCycle, WornOutRobotsAreScrappedAndReplaced) {
     EXPECT_TRUE(Remembers(newcomer, sim::MemoryKind::ArrivedInCity));
     EXPECT_LT(newcomer.wear, sim::kMaxWear / 2);
     EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
+// Wear grows every night and a clinic takes it away again; the head and the
+// torso follow it both ways, so in a running city no robot has a basic part
+// whose condition disagrees with `kMaxWear - wear`. Step L3b scraps on those
+// parts instead of on the wear number and needs this to land on the same night
+// (task L, step L3a).
+TEST(LifeCycle, TheBasicPartsFollowTheWearBothWays) {
+    sim::World world = sim::World::Generate({.seed = 9, .robots = 300});
+    for (int nights = 0; nights < 4; ++nights) {
+        world.RunFor(10 * sim::kMinutesPerDay);
+        EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+        for (const sim::Robot& robot : world.State().robots) {
+            const std::int32_t cap = std::max(0, sim::kMaxWear - robot.wear);
+            for (const sim::BodyPart part : {sim::BodyPart::Head, sim::BodyPart::Torso}) {
+                EXPECT_EQ(sim::Part(robot.body, part).condition, cap)
+                    << robot.name << " at wear " << robot.wear;
+            }
+        }
+    }
 }
 
 // Over months robots wear out and newcomers replace them; the city keeps

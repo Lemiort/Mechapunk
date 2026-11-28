@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "Names.hpp"
+#include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/Venues.hpp"
 
 #include "WorldInternal.hpp"
@@ -183,7 +184,15 @@ void World::UpdateNeeds() {
                         rules->socialGuestCap);
                     Apply(robot.needs, effects);
                     if (venue->room->kind == RoomKind::Clinic) {
+                        const std::int32_t wearBefore = robot.wear;
                         robot.wear = std::max(robot.wear - static_cast<std::int32_t>(state_.settings.behaviour.clinicWearRepair), 0);
+                        // The head and the torso follow the wear the clinic
+                        // takes away: a dodgy part that pushed wear to
+                        // `kMaxWear` one morning must not leave a destroyed
+                        // head behind once the clinic has repaired that wear,
+                        // so the robot still dies when and only when its wear
+                        // is all used up (task L, step L3a).
+                        MendBody(robot, wearBefore - robot.wear);
                     }
                 }
                 break;
