@@ -14,7 +14,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 
 | Module | Tokens | Files |
 |---|---:|---|
-| world | 24k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
+| world | 23k | `World.hpp`, `WorldInternal.hpp`, `World.cpp`, `Behaviour.cpp`, `Residents.cpp`, `WorldTests.cpp` |
+| officer-patrols | 16k | `World.hpp`, `WorldInternal.hpp`, `BehaviourPatrols.cpp`, `WorldTests.cpp` |
 | generation | 21k | `World.hpp`, `WorldInternal.hpp`, `Generation.cpp`, `City.hpp`, `City.cpp`, `Names.hpp`, `CityTests.cpp` |
 | city-buildings | 9k | `City.hpp`, `CityInternal.hpp`, `CityBuildings.cpp`, `CityTests.cpp` |
 | metro-authority | 11k | `World.hpp`, `MetroAuthority.cpp`, `MetroAuthorityTests.cpp` |
@@ -74,7 +75,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | --- | --- |
 | `World.hpp` | `Robot`, `WorldState`, `EventKind`/`SimEvent`, gangs (`Gang`, `Stance`), the chronicle (`ChronicleEntry`, declared in `Chronicle.hpp`), the `World` class (every member, grouped by the file implementing it) |
 | `World.cpp` | Construction, `FromState`, `Step` (the midnight order), `RunFor`, `UpdateNeeds`, `IsGuestTrip`, `WalkOf` |
-| `Behaviour.cpp` | A robot's day: `Act`, `Arrive`, `Decide`, `StartWalk`, commutes, `PlanAtHome`, officers' `Patrol` |
+| `Behaviour.cpp` | A robot's day: `Act`, `Arrive`, `Decide`, `StartWalk`, commutes, `PlanAtHome` |
+| `BehaviourPatrols.cpp` | An officer on shift: `NextPatrolAt`, `Patrol` (which venue an officer walks out to, and back) |
 | `Generation.cpp` | `World::Generate`, `AssignDorm`, `AssignJob`, robot names |
 | `Residents.cpp` | `RentOf`, `ResidentsOf`, `CountResidents`, `CollectRent` |
 | `Describe.cpp` | `Describe`, `DescribeRoom`: event and room text |
@@ -144,7 +146,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 
 | Task | Module | Start at |
 | --- | --- | --- |
-| How a robot acts, walks, commutes, visits; officers' patrols | world | `Behaviour.cpp` (`Act`, `Arrive`, `Decide`) |
+| How a robot acts, walks, commutes, visits | world | `Behaviour.cpp` (`Act`, `Arrive`, `Decide`) |
+| An officer on shift going to a venue that was robbed | officer-patrols | `BehaviourPatrols.cpp` (`Patrol`) |
 | Needs, the minute step, the midnight order | world | `World.cpp` (`Step`, `UpdateNeeds`) |
 | Rent collection, who lives where | world | `Residents.cpp` |
 | New city layout, buildings, depots, stations at start | generation | `City.cpp` (`GenerateCity`), `Generation.cpp` |

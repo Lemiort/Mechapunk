@@ -25,6 +25,8 @@ I = "sim/include/mechapunk/sim/"
 MODULES = {
     "world": [I + "World.hpp", "sim/src/WorldInternal.hpp", "sim/src/World.cpp",
               "sim/src/Behaviour.cpp", "sim/src/Residents.cpp", "tests/WorldTests.cpp"],
+    "officer-patrols": [I + "World.hpp", "sim/src/WorldInternal.hpp",
+                        "sim/src/BehaviourPatrols.cpp", "tests/WorldTests.cpp"],
     "generation": [I + "World.hpp", "sim/src/WorldInternal.hpp", "sim/src/Generation.cpp",
                    I + "City.hpp", "sim/src/City.cpp", "sim/src/Names.hpp", "tests/CityTests.cpp"],
     "city-buildings": [I + "City.hpp", "sim/src/CityInternal.hpp", "sim/src/CityBuildings.cpp",

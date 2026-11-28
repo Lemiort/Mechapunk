@@ -35,6 +35,7 @@ add_library(mechapunk_sim STATIC
     src/Weather.cpp
     src/World.cpp
     src/Behaviour.cpp
+    src/BehaviourPatrols.cpp
     src/Describe.cpp
     src/Generation.cpp
     src/Residents.cpp
