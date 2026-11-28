@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
+#include <vector>
 
 #include "mechapunk/sim/World.hpp"
 
@@ -75,4 +77,32 @@ TEST(MetroAuthority, ComesWithTheFirstLineAndGetsACrewRoom) {
         }
     }
     EXPECT_GT(drivers, 0) << "nobody was hired to drive";
+}
+
+// The first line's crew room is in a depot of its own, raised on a free corner
+// of an intersection on the line's street, where the view puts the trains'
+// shed on its roof; it waits for one if the street has none.
+TEST(MetroAuthority, RaisesADepotOnTheLinesStreet) {
+    sim::World world = sim::World::Generate({.seed = 1, .robots = 30, .settings = Town()});
+    const auto depot = [&] {
+        return std::ranges::find_if(world.State().city.buildings,
+                                    [](const sim::Building& building) {
+                                        return building.name == "Metro Depot 1";
+                                    });
+    };
+    // Often the night the town grows a ring of streets, which reaches the line's.
+    for (int day = 1; day <= 300 && depot() == world.State().city.buildings.end(); ++day) {
+        world.RunFor(sim::kMinutesPerDay);
+    }
+    ASSERT_NE(depot(), world.State().city.buildings.end()) << "no depot in 300 days";
+    const sim::City& city = world.State().city;
+    const sim::MetroLine& line = world.GetMetro().Lines().front();
+    const sim::CityNode& first = city.nodes.at(city.stations.at(line.stations.front()).node.value);
+    const sim::CityNode& at = city.nodes.at(depot()->entrance.value);
+    EXPECT_TRUE(line.axis == sim::LineAxis::Row ? at.z == first.z : at.x == first.x);
+    EXPECT_EQ(depot()->kind, sim::BuildingKind::Workplace);
+    ASSERT_EQ(depot()->rooms.size(), 1U);
+    EXPECT_EQ(depot()->rooms.front().kind, sim::RoomKind::CrewRoom);
+    // Its corner is taken: validation checks no free plot lies under a building.
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }

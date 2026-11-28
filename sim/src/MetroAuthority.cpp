@@ -1,15 +1,17 @@
 // World::ReviewMetroAuthority: a growing town gets its Metro Authority with its
-// first metro line, and each line a crew room, where its drivers change shifts.
-// The authority's capital is lent by the central bank, which is where the
-// money comes from. A crew room is an empty ground-floor unit near the line's
-// first station; it is taken only when nobody stands in it or walks to it, so
-// when none is free the review tries again the next night.
+// first metro line, and each line a depot with a crew room, where its drivers
+// change shifts. The authority's capital is lent by the central bank, which is
+// where the money comes from. A depot is raised on a free corner of an
+// intersection on the line's street, the one nearest its first station; the
+// view puts the trains' shed on its roof and turns a track off the line into it.
+// While the line's street has no free corner the review tries again the next
+// night: a ring of streets the town grows adds corners at both ends of it.
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstddef>
 #include <cstdint>
 #include <format>
-#include <limits>
 
 #include "mechapunk/sim/Construction.hpp"
 #include "mechapunk/sim/World.hpp"
@@ -48,47 +50,54 @@ void World::ReviewMetroAuthority() {
         Emit({.tick = state_.tick, .kind = EventKind::CorporationFounded, .account = id});
     }
 
-    // One crew room for every line, taken from the empty unit nearest the
-    // line's first station.
+    // One depot for every line.
     std::size_t crewRooms = rooms_.RoomsOfKind(RoomKind::CrewRoom).size();
     bool changed = false;
     for (std::size_t line = crewRooms; line < lines.size(); ++line) {
         const CityNode& first =
             state_.city.nodes[state_.city.stations[lines[line].stations.front()].node.value];
-        Room* best = nullptr;
-        std::int64_t bestDistance = std::numeric_limits<std::int64_t>::max();
-        for (Building& building : state_.city.buildings) {
-            if (IsUnderConstruction(state_.projects, building.id)) {
+        const bool row = lines[line].axis == LineAxis::Row;
+        auto lot = state_.city.lots.end();
+        std::int64_t nearest = 0;
+        for (auto plot = state_.city.lots.begin(); plot != state_.city.lots.end(); ++plot) {
+            // A node id is its position in City::nodes (Ids.hpp).
+            const CityNode& at = state_.city.nodes[plot->node.value];
+            if (row ? at.z != first.z : at.x != first.x) {
                 continue;
             }
-            const CityNode& at = state_.city.nodes[building.entrance.value];
-            const std::int64_t dx = at.x - first.x;
-            const std::int64_t dz = at.z - first.z;
-            const std::int64_t distance = (dx * dx) + (dz * dz);
-            for (Room& room : building.rooms) {
-                if (room.kind != RoomKind::VacantStore || room.floor != 0 ||
-                    distance >= bestDistance) {
-                    continue;
-                }
-                const bool busy = std::ranges::any_of(state_.robots, [&](const Robot& robot) {
-                    return robot.location == room.id || robot.destination == room.id;
-                });
-                if (!busy) {
-                    best = &room;
-                    bestDistance = distance;
-                }
+            const std::int64_t distance = std::abs(static_cast<std::int64_t>(at.x) - first.x) +
+                                          std::abs(static_cast<std::int64_t>(at.z) - first.z);
+            if (lot == state_.city.lots.end() || distance < nearest) {
+                lot = plot;
+                nearest = distance;
             }
         }
-        if (best == nullptr) {
-            break;  // No empty unit tonight: try again tomorrow.
+        if (lot == state_.city.lots.end()) {
+            break;  // No free corner on the line's street tonight.
         }
-        best->kind = RoomKind::CrewRoom;
-        best->name = std::format("Crew Room {}", line + 1);
-        best->capacity = std::max<std::uint32_t>(2, lines[line].trains);
-        best->owner = transit_;
-        best->pricePercent = 100;
-        best->visits = 0;
-        best->quietNights = 0;
+        // A node's lowest free corner, which the view gives the newest of its
+        // buildings, as construction takes its plots.
+        const NodeId node = lot->node;
+        state_.city.lots.erase(lot);
+        const EntityId id = state_.ids.Allocate();
+        Building depot{.id = id,
+                       .name = std::format("Metro Depot {}", line + 1),
+                       .kind = BuildingKind::Workplace,
+                       .entrance = node,
+                       .floors = 1,
+                       .style = StyleOf(BuildingKind::Workplace, id, 1),
+                       .shift = {},
+                       .rooms = {}};
+        Room crew{.id = state_.ids.Allocate(),
+                  .name = std::format("Crew Room {}", line + 1),
+                  .kind = RoomKind::CrewRoom,
+                  .floor = 0,
+                  .capacity = std::max<std::uint32_t>(2, lines[line].trains)};
+        crew.owner = transit_;
+        crew.pricePercent = 100;
+        depot.rooms.push_back(std::move(crew));
+        // The new id is the highest there is, so the list stays sorted.
+        state_.city.buildings.push_back(std::move(depot));
         changed = true;
     }
     if (changed) {

@@ -38,7 +38,8 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | view-core | 22k | `CityView.hpp`, `CityViewInternal.hpp`, `CityView.cpp`, `CityStatic.cpp`, `CityLights.cpp` |
 | view-massing | 16k | `CityView.hpp`, `CityViewInternal.hpp`, `Massing.hpp`, `Massing.cpp`, `CityMassing.cpp`, `MassingTests.cpp` |
 | site-style | 9k | `Construction.hpp`, `Construction.cpp`, `ConstructionRules.hpp`, `City.hpp`, `SiteStyleTests.cpp` |
-| view-robots | 23k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
+| view-robots | 19k | `CityView.hpp`, `CityViewInternal.hpp`, `CityRobots.cpp`, `CityDrivers.cpp`, `Metro.hpp` |
+| view-metro | 21k | `CityView.hpp`, `CityViewInternal.hpp`, `CityMetroInternal.hpp`, `CityMetro.cpp`, `CityDepots.cpp`, `Metro.hpp` |
 | view-interiors | 12k | `CityView.hpp`, `CityViewInternal.hpp`, `CityInteriors.cpp`, `Interior.hpp` |
 | floor-plans | 19k | `Interior.hpp`, `InteriorKit.hpp`, `Interior.cpp`, `InteriorHomes.cpp`, `InteriorStores.cpp`, `InteriorWorkplaces.cpp`, `LayoutTests.cpp` |
 | rendering | 13k | `GameRenderer.hpp`, `GameRenderer.cpp`, `Props.hpp`, `Props.cpp`, `Rain.hpp`, `Rain.cpp`, `OrbitCamera.hpp` |
@@ -109,7 +110,9 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | `CityView.hpp` | The `CityView` class: everything drawn |
 | `CityView.cpp` | Construction, `UpdateCity` (redrawing buildings a project raised or dropped, `AddBuilding`/`RemoveBuilding`), `Submit` (the frame: robots, signs, trains, interior), picking, routes |
 | `CityStatic.cpp` | Static batches: buildings, facades, parks, street lamps, and the batches of one new building (`BatchStaticsFor`) |
-| `CityMetro.cpp` | Elevated lines, stations, stairs, platforms, trains, doors, `LegsOf`, `StationRoute` |
+| `CityMetro.cpp` | Elevated lines and track pieces, stations, stairs, platforms, trains with their sliding doors and lights, `TrainPoseOf`, `LegsOf`, `StationRoute` |
+| `CityDepots.cpp` | Metro depots: the shed on a depot building's roof and the curve into it (`FindDepot`, `AddDepot`), the old shed beyond the edge, `DepotWay` |
+| `CityMetroInternal.hpp` | Sizes and colors the metro's drawing shares |
 | `CityRobots.cpp` | Spots in rooms, ways out of rooms, `RobotPosition`, `FollowWalk` |
 | `CityDrivers.cpp` | Metro drivers: `PlanDriver`, `DriverPlacement`, `CabOf` |
 | `CityInteriors.cpp` | The open floor: `PlanOf`, `SubmitInterior`, props, unit signs |
@@ -162,7 +165,8 @@ anonymous namespace. `docs/MODULES.md` says which files to open for a task.
 | Any change to saved state (new version, migration, fixture) | saves | `Save.cpp` (`kMigrations`, enum names) |
 | The headless runner's report | runner | `tools/sim_runner/main.cpp` |
 | What the city looks like from outside; lights | view-core | `CityStatic.cpp`, `CityLights.cpp` |
-| Where a robot is drawn; trains, platforms; drivers | view-robots | `CityRobots.cpp`, `CityMetro.cpp`, `CityDrivers.cpp` |
+| Where a robot is drawn; drivers | view-robots | `CityRobots.cpp`, `CityDrivers.cpp` |
+| Metro lines, stations, depots, trains | view-metro | `CityMetro.cpp`, `CityDepots.cpp` |
 | Drawing the open floor of a building | view-interiors | `CityInteriors.cpp` |
 | Furniture and layout of a room kind | floor-plans | `InteriorStores.cpp`, `InteriorHomes.cpp`, `InteriorWorkplaces.cpp` |
 | Prop models, rain, renderer | rendering | `Props.cpp` |

@@ -44,6 +44,7 @@ add_executable(mechapunk
     app/CityLights.cpp
     app/CityMassing.cpp
     app/CityMetro.cpp
+    app/CityDepots.cpp
     app/CityRobots.cpp
     app/CityStatic.cpp
     app/GameRenderer.cpp

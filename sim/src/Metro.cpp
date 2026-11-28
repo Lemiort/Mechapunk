@@ -23,6 +23,12 @@ double FirstRoundTrip(double day) {
     return day + static_cast<double>(kServiceStartMinute) + kDepotMinutes;
 }
 double ServiceEnd(double day) { return day + static_cast<double>(kServiceEndMinute); }
+
+// How far a standing train's doors are open, since minutes after it stopped
+// and until minutes before it leaves.
+double DoorsOpen(double since, double until) {
+    return std::clamp(std::min(since, until) / kDoorMinutes, 0.0, 1.0);
+}
 }  // namespace
 
 Metro::Metro(const City& city)
@@ -264,6 +270,7 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
         }
         if (into < metro.upDeparts[index]) {
             state.meters = metro.meters[index];
+            state.doors = DoorsOpen(into - metro.upArrives[index], metro.upDeparts[index] - into);
             state.side = -1.0;
             state.towardEnd = true;
             return driven();
@@ -310,6 +317,8 @@ std::optional<TrainState> Metro::TrainOnDay(std::uint32_t line, std::uint32_t tr
         }
         if (into < metro.downDeparts[index]) {
             state.meters = metro.meters[index];
+            state.doors =
+                DoorsOpen(into - metro.downArrives[index], metro.downDeparts[index] - into);
             state.side = 1.0;
             state.towardEnd = false;
             return driven();

@@ -360,6 +360,10 @@ void CityView::UpdateCity(const sim::City& city) {
     for (const std::uint64_t id : gone) {
         RemoveBuilding(sim::EntityId{id});
     }
+    // A depot the Metro Authority raised: the line's trains move into its shed.
+    if (DepotsMoved()) {
+        DrawMetro();
+    }
 }
 
 // Draws one building the view has not drawn yet: a habitat or workplace a
@@ -368,7 +372,7 @@ void CityView::UpdateCity(const sim::City& city) {
 // in the saved order) - exactly where the constructor's placement loop would
 // put it. Newer buildings at the node do not count: a site redrawn as it rises
 // or finishes would otherwise move a corner on, onto the next one's plot.
-void CityView::AddBuilding(const sim::Building& building) {
+vec3 CityView::PlotCenter(const sim::Building& building) const {
     std::uint32_t slot = 0;
     for (const sim::Building& other : city_.buildings) {
         if (other.entrance == building.entrance && other.id < building.id) {
@@ -378,10 +382,13 @@ void CityView::AddBuilding(const sim::Building& building) {
     const vec2 quadrant = kQuadrants.at(slot % kQuadrants.size());
     // A fifth building at one corner moves to the far side of the block.
     const float ring = slot < kQuadrants.size() ? 1.0F : 3.0F;
-    const vec3 centerOnGround =
-        NodePosition(building.entrance) +
-        vec3{quadrant.x * kQuadrantOffset.x * ring, 0.0F,
-             quadrant.y * kQuadrantOffset.y * ring};
+    return NodePosition(building.entrance) +
+           vec3{quadrant.x * kQuadrantOffset.x * ring, 0.0F,
+                quadrant.y * kQuadrantOffset.y * ring};
+}
+
+void CityView::AddBuilding(const sim::Building& building) {
+    const vec3 centerOnGround = PlotCenter(building);
     const bool site = IsSite(building);
     const float height = static_cast<float>(building.floors) * kFloorHeight;
     shapes_[building.id.value] = {.center = centerOnGround,
@@ -389,7 +396,8 @@ void CityView::AddBuilding(const sim::Building& building) {
                                   .floors = building.floors,
                                   // The street is to the north (-z) when the
                                   // building sits south of its intersection.
-                                  .turned = quadrant.y > 0.0F,
+                                  .turned = centerOnGround.z >
+                                            NodePosition(building.entrance).z,
                                   .scaffold = site};
     if (site) {
         // A building going up is a scaffold: one thin slab per finished

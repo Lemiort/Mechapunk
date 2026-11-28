@@ -205,3 +205,20 @@ TEST(Metro, TheCabChangesEndsSmoothly) {
     }
     EXPECT_TRUE(between);
 }
+
+// Doors slide open after a train stops at a platform, stand open, and are shut
+// again before it leaves and while it runs.
+TEST(Metro, DoorsOpenOnlyWhileATrainStandsAtAPlatform) {
+    const sim::Metro metro(City().State().city);
+    const sim::MetroLine& line = metro.Lines().front();
+    const auto ride = metro.Ride(0, line.stations.front(), line.stations.back(), kNoon);
+    ASSERT_TRUE(ride.has_value());
+    const double stops = ride->departs - sim::kDwellMinutes;
+    const auto doors = [&](double time) { return metro.TrainAt(0, ride->train, time).doors; };
+    EXPECT_NEAR(doors(stops + (sim::kDwellMinutes * 0.5)), 1.0, 1e-9);
+    EXPECT_NEAR(doors(stops + (sim::kDoorMinutes * 0.5)), 0.5, 1e-6);
+    EXPECT_NEAR(doors(ride->departs - (sim::kDoorMinutes * 0.5)), 0.5, 1e-6);
+    EXPECT_EQ(doors(ride->departs + 0.05), 0.0);
+    EXPECT_EQ(metro.TrainAt(0, ride->train, ride->departs + 0.05).phase,
+              sim::TrainState::Phase::Running);
+}

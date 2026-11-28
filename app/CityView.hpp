@@ -220,6 +220,9 @@ private:
     };
 
     [[nodiscard]] glm::vec3 NodePosition(sim::NodeId node) const;
+    // The middle of a building's plot on the ground: the corner of its
+    // entrance's intersection after those its older buildings take.
+    [[nodiscard]] glm::vec3 PlotCenter(const sim::Building& building) const;
     // Intersections walked through between two buildings' doors.
     const std::vector<glm::vec3>& Route(sim::EntityId from, sim::EntityId to);
     // A line's frame: its first station's deck, the way it runs and the
@@ -256,8 +259,46 @@ private:
     void AddStaticBeam(glm::vec3 from, glm::vec3 to, float width, float height,
                        glm::vec3 color);
     void AddElevatedLines();
+    // Track pieces in a line's frame: meters along it, across it to its side.
+    void AddTrackSlab(const LineFrame& frame, float from, float to, float acrossFrom,
+                      float acrossTo, float bottom, float top, glm::vec3 color,
+                      bool glows = false);
+    void AddRails(const LineFrame& frame, float from, float to, float across);
+    void AddSwitchRails(const LineFrame& frame, float fromMeters, float fromAcross,
+                        float toMeters, float toAcross);
+    void AddBumper(const LineFrame& frame, float meters, float across, float facing);
+    // Rails, or a deck with rails, between two points at a deck's height.
+    void AddRailsBetween(glm::vec3 from, glm::vec3 to);
+    void AddTrackBetween(glm::vec3 from, glm::vec3 to);
+    // A line's depot in a shed on the roof of its depot building: a building on
+    // the line's street whose rooms are all crew rooms (CityDepots.cpp). The
+    // sidings run across the line on the building's side of it (acrossSign),
+    // and a curve off the up track turns into them past the station or before
+    // it (alongSign). Meters along the line from its first station.
+    struct Depot {
+        std::uint64_t building{};
+        float alongSign{1.0F};
+        float acrossSign{1.0F};
+        float lead{};                 // The track from the curve to the throat.
+        std::vector<float> sidings;   // One per train.
+    };
+    [[nodiscard]] std::optional<Depot> FindDepot(std::uint32_t line) const;
+    // A building whose rooms are all crew rooms: a metro depot.
+    [[nodiscard]] static bool IsDepotBuilding(const sim::Building& building);
+    // Whether a line has gained, lost or changed its depot building since the
+    // metro was drawn.
+    [[nodiscard]] bool DepotsMoved() const;
+    // Meters along the line where the curve into a roof depot leaves the up track.
+    [[nodiscard]] static float DepotJunction(const Depot& depot);
+    // A point of the curve into a roof depot, t from 0 (on the up track) to 1.
+    [[nodiscard]] glm::vec3 DepotCurvePoint(const LineFrame& frame, const Depot& depot,
+                                            float t) const;
+    // A train's way from its parked place to the first platform, on the up track.
+    [[nodiscard]] std::vector<glm::vec3> DepotWay(std::uint32_t line, std::uint32_t train) const;
+    // A line's depot: on its building's roof, or beyond the city's edge.
+    void AddDepot(std::uint32_t index, const LineFrame& frame);
     // The whole metro, lines and stations, as batches of its own: drawn again
-    // whenever stations open or the grid grows.
+    // whenever stations open, the grid grows or a depot is built.
     void DrawMetro();
     // A box that never moves; `glows` makes it shine with its own color.
     void AddStaticBox(glm::vec3 minimum, glm::vec3 maximum, glm::vec3 color,
@@ -448,6 +489,8 @@ private:
     // rebuilt each frame before robots are drawn.
     std::unordered_map<std::uint64_t, std::uint32_t> driverRank_;
     mutable std::unordered_map<std::uint64_t, std::uint32_t> crewLines_;  // Crew room to line.
+    // Per line as last drawn: its roof depot, or none for a shed beyond the edge.
+    std::vector<std::optional<Depot>> depots_;
     mutable std::unordered_map<std::uint64_t, CachedDriverPlan> driverPlans_;
     std::vector<NeonSign> neonSigns_;
     std::vector<UnitSign> unitSigns_;

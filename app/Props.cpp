@@ -31,6 +31,7 @@ constexpr vec3 kPot{0.5F, 0.3F, 0.25F};
 constexpr vec3 kChrome{0.7F, 0.72F, 0.76F};
 constexpr vec3 kLampShade{0.85F, 0.78F, 0.6F};
 constexpr vec3 kBulb{1.0F, 0.95F, 0.8F};
+constexpr vec3 kTailLight{1.0F, 0.08F, 0.05F};
 constexpr vec3 kBottle{0.12F, 0.45F, 0.22F};
 constexpr vec3 kAmber{0.85F, 0.55F, 0.15F};
 constexpr vec3 kFood{0.75F, 0.4F, 0.2F};
@@ -44,7 +45,7 @@ constexpr std::array<vec3, 6> kGoods{
 // Neon, bulbs, screens and status lights shine with their own color.
 bool Glows(vec3 color) {
     return color == kNeonPink || color == kNeonCyan || color == kGlow ||
-           color == kBulb || color == kScreen || color == kGreen;
+           color == kBulb || color == kScreen || color == kGreen || color == kTailLight;
 }
 
 // A box with its base-center at (x, y, z) and the given width, height, depth.
@@ -222,6 +223,20 @@ PropModel Make(PropKind kind) {
                  Box(0.7F, 0.9F, -0.1F, 0.3F, 0.35F, 0.3F, kDarkMetal),
                  Box(0, 0.3F, 0.41F, 1.9F, 0.04F, 0.02F, kNeonPink)};
             Legs(m, 2.0F, 0.8F, 0.85F, kDarkWood, 0.06F);
+            break;
+        case PropKind::TrainDoor:
+            // Steel below and above a window, on the outside of the wall.
+            m = {Box(0, 0.45F, 0, 0.05F, 0.95F, 1.3F, kDarkMetal),
+                 Glass(0, 1.4F, 0, 0.04F, 1.0F, 1.3F),
+                 Box(0, 2.4F, 0, 0.05F, 0.2F, 1.3F, kDarkMetal)};
+            break;
+        case PropKind::TrainHeadlights:
+            m = {Box(-0.85F, 0.7F, 0, 0.4F, 0.22F, 0.06F, kBulb),
+                 Box(0.85F, 0.7F, 0, 0.4F, 0.22F, 0.06F, kBulb)};
+            break;
+        case PropKind::TrainTailLights:
+            m = {Box(-0.95F, 0.7F, 0, 0.25F, 0.18F, 0.06F, kTailLight),
+                 Box(0.95F, 0.7F, 0, 0.25F, 0.18F, 0.06F, kTailLight)};
             break;
         case PropKind::TrainCar:
             // Hollow, so riders show through the windows: a floor at

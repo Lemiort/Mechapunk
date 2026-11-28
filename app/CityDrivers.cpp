@@ -60,6 +60,26 @@ std::optional<std::uint32_t> CityView::CrewLineOf(sim::EntityId crewRoom) const 
                 }
             }
         }
+        // A town's depot stands on its line's street, not always at its first
+        // station: it takes the first line without one along that street.
+        for (const sim::Building& building : city_.buildings) {
+            if (!IsDepotBuilding(building) || crewLines_.contains(building.rooms.front().id.value)) {
+                continue;
+            }
+            for (std::uint32_t line = 0; line < metro_.Lines().size(); ++line) {
+                const sim::MetroLine& metro = metro_.Lines()[line];
+                const sim::CityNode& first =
+                    city_.nodes.at(city_.stations.at(metro.stations.front()).node.value);
+                const sim::CityNode& at = city_.nodes.at(building.entrance.value);
+                const bool onStreet =
+                    metro.axis == sim::LineAxis::Row ? at.z == first.z : at.x == first.x;
+                if (!taken[line] && onStreet) {
+                    taken[line] = true;
+                    crewLines_.emplace(building.rooms.front().id.value, line);
+                    break;
+                }
+            }
+        }
         // A town's crew room (task K, step K12) is an empty unit near its line's
         // first station rather than a depot on it: each one left takes the
         // nearest line that has none, the lower line among equals.

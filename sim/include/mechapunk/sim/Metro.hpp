@@ -28,6 +28,7 @@ inline constexpr double kDwellMinutes = 0.5;       // At each platform.
 inline constexpr double kReverseMinutes = 1.0;     // In a tail track.
 inline constexpr double kTailMeters = 40.0;        // Beyond an end station.
 inline constexpr double kDepotMinutes = 1.5;       // Depot to first platform.
+inline constexpr double kDoorMinutes = 0.05;       // Doors sliding open or shut.
 inline constexpr double kTargetHeadwayMinutes = 4.0;
 inline constexpr std::uint32_t kServiceStartMinute = 5 * 60;
 inline constexpr std::uint32_t kServiceEndMinute = 25 * 60;
@@ -94,6 +95,10 @@ struct TrainState {
     double cab{1.0};
     // LeavingDepot and EnteringDepot: how far, 0 to 1, from the depot.
     double progress{};
+    // Running and standing at a platform: how far its doors are open, from 0
+    // (shut) to 1. They slide open over kDoorMinutes after it stops and shut
+    // over the same time before it leaves.
+    double doors{};
 };
 
 class Metro {
