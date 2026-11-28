@@ -1,7 +1,7 @@
 // Robots age and wear out. Clinics undo some of the wear, and the head and
-// the torso follow it both ways (task L, step L3a); a robot worn out completely
-// is scrapped, its friends remember losing it, and a newcomer moves into the
-// city to take its place.
+// the torso follow it both ways (task L, step L3a); a robot whose head or
+// torso is destroyed is scrapped, its friends remember losing it, and a
+// newcomer moves into the city to take its place.
 #include <algorithm>
 #include <limits>
 #include <bit>
@@ -25,6 +25,18 @@ constexpr std::uint32_t kDaysPerExtraWear = 300;
 // Wear added every night: a base amount, more with age, more for a robot
 // left run down.
 constexpr std::int32_t kBaseWearPerDay = 2;
+
+// The two basic parts decide whether the robot is still there: the head is the
+// robot itself and the torso the power it carries, so a robot with no condition
+// left in either of them is scrapped, while a hand or the legs at 0 only takes
+// something away from what it can do (decision 1 and 2 of task L; a lost limb
+// is replaced in step L12). Step L3a pinned the head and the torso to `wear`
+// in both directions, so this picks the same robots on the same night as the
+// wear number did, which is why the headless log stays byte-identical here.
+bool Destroyed(const Robot& robot) noexcept {
+    return Part(robot.body, BodyPart::Head).condition == 0 ||
+           Part(robot.body, BodyPart::Torso).condition == 0;
+}
 
 }  // namespace
 
@@ -65,7 +77,7 @@ void World::AgeRobots() {
         // pick the same robot on the same night (task L, step L3a).
         CapBody(robot);
         robot.needs.condition = std::min(robot.needs.condition, kMaxWear - robot.wear);
-        if (robot.wear >= kMaxWear) {
+        if (Destroyed(robot)) {
             wornOut.push_back(robot.id);
         }
     }

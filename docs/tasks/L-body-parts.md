@@ -1,9 +1,9 @@
 # Task L: body parts
 
 Status: planned on 2026-11-27 and revised the same day; L1 done on 2026-11-28
-(save version 42, game 0.42.0), L3a done on 2026-11-28 (no save change: the
-body is already saved state, and step L3 was split on 2026-11-28 into L3a,
-done, and L3b, still planned - see why under L3a), the rest still planned. Revised
+(save version 42, game 0.42.0), L3a and L3b done on 2026-11-28 (no save change:
+the body is already saved state, and step L3 was split on 2026-11-28 into L3a
+and L3b - see why under L3a), the rest still planned. Revised
 again on 2026-11-28 for the save rule: the game was at save version 41 and
 `kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
 migration** - a save step bumps `kCurrentSaveVersion` (the next free version is
@@ -181,7 +181,7 @@ so wear can pass `kMaxWear` and such a city would be refused by
 `ValidateWorldState` if it were saved before the next midnight. `CapBody`
 and `MendBody` use `max(0, kMaxWear - wear)` and are safe with it.
 
-### - [ ] L3b. The head and the torso decide scrapping (life-cycle)
+### - [x] L3b. The head and the torso decide scrapping (life-cycle)
 
 - Module: life-cycle. Depends on: L1, L3a. Save change: no. The log must stay
   **byte-identical**: after L3a the parts are pinned to the wear in both

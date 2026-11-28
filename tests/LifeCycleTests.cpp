@@ -6,6 +6,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "mechapunk/sim/Body.hpp"
 #include "mechapunk/sim/Construction.hpp"
@@ -216,6 +217,85 @@ TEST(LifeCycle, TheBasicPartsFollowTheWearBothWays) {
             }
         }
     }
+}
+
+// The two basic parts decide life (decision 1 of task L, step L3b): a robot
+// whose torso or whose head has no condition left is scrapped at the next
+// midnight even at half wear, on the very minute a robot whose `wear` runs out
+// is scrapped - the two rules pick the same robots, which is why the headless
+// log stays byte-identical.
+TEST(LifeCycle, DestroyedHeadOrTorsoScrapsAtMidnight) {
+    sim::World start = sim::World::Generate({.seed = 7, .robots = 150});
+    start.RunFor(sim::kMinutesPerDay + (23 * 60));  // Day 2, 23:00.
+    sim::WorldState state = start.State();
+    sim::Robot& brokenTorso = state.robots[10];
+    sim::Robot& brokenHead = state.robots[20];
+    sim::Robot& wornOut = state.robots[30];
+    for (sim::Robot* robot : {&brokenTorso, &brokenHead, &wornOut}) {
+        // Stay where they are until after the midnight: a robot that reached a
+        // clinic would have its head and its torso mended, and the test could
+        // no longer tell which of the two rules killed it.
+        robot->nextActionAt = state.tick + 240;
+    }
+    brokenTorso.wear = sim::kMaxWear / 2;
+    brokenHead.wear = sim::kMaxWear / 2;
+    wornOut.wear = sim::kMaxWear - 1;
+    sim::Part(brokenTorso.body, sim::BodyPart::Torso).condition = 0;
+    sim::Part(brokenHead.body, sim::BodyPart::Head).condition = 0;
+    // The other basic part of each of these two robots is whole, so it is the
+    // destroyed part that kills them.
+    EXPECT_GT(sim::Part(brokenTorso.body, sim::BodyPart::Head).condition, 0);
+    EXPECT_GT(sim::Part(brokenHead.body, sim::BodyPart::Torso).condition, 0);
+
+    const sim::EntityId torsoId = brokenTorso.id;
+    const sim::EntityId headId = brokenHead.id;
+    const sim::EntityId wearId = wornOut.id;
+
+    sim::World world = Load(std::move(state));
+    std::vector<sim::Tick> deathMinutes;
+    world.SetEventSink([&](const sim::SimEvent& event) {
+        if (event.kind == sim::EventKind::Scrapped &&
+            (event.robot == torsoId || event.robot == headId || event.robot == wearId)) {
+            deathMinutes.push_back(event.tick);
+        }
+    });
+    world.RunFor(90);  // Past midnight.
+
+    ASSERT_EQ(deathMinutes.size(), 3U) << "not all three robots died";
+    EXPECT_EQ(std::ranges::min(deathMinutes), std::ranges::max(deathMinutes))
+        << "the part rule and the wear rule picked different minutes";
+    EXPECT_TRUE(world.FindRobot(torsoId) == nullptr) << "a robot with a destroyed torso lived on";
+    EXPECT_TRUE(world.FindRobot(headId) == nullptr) << "a robot with a destroyed head lived on";
+    EXPECT_TRUE(world.FindRobot(wearId) == nullptr) << "a worn out robot lived on";
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
+}
+
+// A hand or the legs at 0 takes work and walking away but never ends a life
+// (decision 2 of task L): only the head and the torso scrap a robot, so a robot
+// with both hands and its legs gone lives on, and nothing mends or worsens a
+// part yet - step L4 onwards wears legs and L12 fits new parts.
+TEST(LifeCycle, BrokenHandsAndLegsDoNotScrap) {
+    sim::World start = sim::World::Generate({.seed = 7, .robots = 150});
+    start.RunFor(sim::kMinutesPerDay + (23 * 60));  // Day 2, 23:00.
+    sim::WorldState state = start.State();
+    sim::Robot& crippled = state.robots[10];
+    for (const sim::BodyPart part :
+        {sim::BodyPart::LeftHand, sim::BodyPart::RightHand, sim::BodyPart::Legs}) {
+        sim::Part(crippled.body, part).condition = 0;
+    }
+    const sim::EntityId id = crippled.id;
+    EXPECT_LT(crippled.wear, sim::kMaxWear / 2) << "the robot would die of wear";
+
+    sim::World world = Load(std::move(state));
+    world.RunFor(2 * sim::kMinutesPerDay);  // Past two midnights.
+    const sim::Robot* living = world.FindRobot(id);
+    ASSERT_TRUE(living != nullptr) << "a robot with broken hands and legs was scrapped";
+    for (const sim::BodyPart part :
+        {sim::BodyPart::LeftHand, sim::BodyPart::RightHand, sim::BodyPart::Legs}) {
+        EXPECT_EQ(sim::Part(living->body, part).condition, 0)
+            << "part " << static_cast<std::uint8_t>(part) << " changed on its own";
+    }
+    EXPECT_TRUE(sim::ValidateWorldState(world.State()));
 }
 
 // Over months robots wear out and newcomers replace them; the city keeps
