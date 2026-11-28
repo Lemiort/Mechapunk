@@ -129,14 +129,17 @@ float CityView::DepotJunction(const Depot& depot) {
     return depot.lead - (depot.alongSign * kCurveRadius);
 }
 
-vec3 CityView::DepotCurvePoint(const LineFrame& frame, const Depot& depot, float t) const {
+vec3 CityView::DepotCurvePoint(const LineFrame& frame, const Depot& depot, float t,
+                               float outward) const {
     // A quarter circle from the up track, heading along the line toward the
-    // lead track, to the lead track, heading straight out across it.
+    // lead track, to the lead track, heading straight out across it; a rail
+    // follows its own circle, `outward` meters wider.
     const float angle = t * std::numbers::pi_v<float> * 0.5F;
+    const float radius = kCurveRadius + outward;
     const float centerAlong = depot.lead - (depot.alongSign * kCurveRadius);
     const float centerAcross = -kTrackOffset + (depot.acrossSign * kCurveRadius);
-    return LinePoint(frame, centerAlong + (depot.alongSign * kCurveRadius * std::sin(angle)),
-                     centerAcross - (depot.acrossSign * kCurveRadius * std::cos(angle)));
+    return LinePoint(frame, centerAlong + (depot.alongSign * radius * std::sin(angle)),
+                     centerAcross - (depot.acrossSign * radius * std::cos(angle)));
 }
 
 std::vector<vec3> CityView::DepotWay(std::uint32_t line, std::uint32_t train) const {
@@ -237,13 +240,22 @@ void CityView::AddDepot(std::uint32_t index, const LineFrame& frame) {
     if (junction > length + tail) {
         extend(length + tail, junction + 4.0F, junction + 4.0F, 1.0F);
     }
-    // The curve off the up track, in short straight pieces, and the lead
-    // track on to the throat.
+    // The curve off the up track, in short straight pieces: the deck along
+    // the track's circle, each rail along its own, so the pieces of the outer
+    // rail meet as those of the inner one do. Then the lead track on to the
+    // throat.
     for (int step = 0; step < kCurveSteps; ++step) {
-        AddTrackBetween(
-            DepotCurvePoint(frame, depot, static_cast<float>(step) / static_cast<float>(kCurveSteps)),
-            DepotCurvePoint(frame, depot,
-                            static_cast<float>(step + 1) / static_cast<float>(kCurveSteps)));
+        const float from = static_cast<float>(step) / static_cast<float>(kCurveSteps);
+        const float to = static_cast<float>(step + 1) / static_cast<float>(kCurveSteps);
+        AddTrackBetween(DepotCurvePoint(frame, depot, from), DepotCurvePoint(frame, depot, to),
+                        false);
+        for (const float rail : {-kRailGauge, kRailGauge}) {
+            const vec3 a = DepotCurvePoint(frame, depot, from, rail);
+            const vec3 b = DepotCurvePoint(frame, depot, to, rail);
+            // A hair longer, to close the joint's wedge on the outside.
+            const vec3 overlap = glm::normalize(b - a) * (0.05F * kS);
+            AddStaticBeam(a - overlap, b + overlap, 0.16F * kS, 0.2F * kS, kRail);
+        }
     }
     AddTrackBetween(DepotCurvePoint(frame, depot, 1.0F),
                     LinePoint(frame, depot.lead, out * kThroatFrom));

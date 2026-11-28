@@ -205,14 +205,16 @@ void CityView::AddSwitchRails(const LineFrame& frame, float fromMeters, float fr
     AddRailsBetween(LinePoint(frame, fromMeters, fromAcross), LinePoint(frame, toMeters, toAcross));
 }
 
-void CityView::AddTrackBetween(vec3 from, vec3 to) {
+void CityView::AddTrackBetween(vec3 from, vec3 to, bool rails) {
     // A little longer than the piece, so the pieces of a curve leave no gaps.
     const float deck = kDeckThickness * kS;
     const vec3 down{0.0F, deck, 0.0F};
     const vec3 overlap = glm::normalize(to - from) * (0.4F * kS);
     AddStaticBeam(from - overlap - down, to + overlap - down, 2.0F * kDeckHalf * kS * 0.9F, deck,
                   kTrackSteel);
-    AddRailsBetween(from, to);
+    if (rails) {
+        AddRailsBetween(from, to);
+    }
 }
 
 void CityView::AddBumper(const LineFrame& frame, float meters, float across, float facing) {

@@ -269,7 +269,7 @@ private:
     void AddBumper(const LineFrame& frame, float meters, float across, float facing);
     // Rails, or a deck with rails, between two points at a deck's height.
     void AddRailsBetween(glm::vec3 from, glm::vec3 to);
-    void AddTrackBetween(glm::vec3 from, glm::vec3 to);
+    void AddTrackBetween(glm::vec3 from, glm::vec3 to, bool rails = true);
     // A line's depot in a shed on the roof of its depot building: a building on
     // the line's street whose rooms are all crew rooms (CityDepots.cpp). The
     // sidings run across the line on the building's side of it (acrossSign),
@@ -292,7 +292,7 @@ private:
     [[nodiscard]] static float DepotJunction(const Depot& depot);
     // A point of the curve into a roof depot, t from 0 (on the up track) to 1.
     [[nodiscard]] glm::vec3 DepotCurvePoint(const LineFrame& frame, const Depot& depot,
-                                            float t) const;
+                                            float t, float outward = 0.0F) const;
     // A train's way from its parked place to the first platform, on the up track.
     [[nodiscard]] std::vector<glm::vec3> DepotWay(std::uint32_t line, std::uint32_t train) const;
     // A line's depot: on its building's roof, or beyond the city's edge.
