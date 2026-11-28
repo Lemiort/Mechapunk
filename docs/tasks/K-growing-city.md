@@ -235,7 +235,7 @@ default (`city.seedTown = 0`), so old saves and existing tests do not change.
   `app/CityView.hpp`.
 - Do: when `UpdateCity` sees edges or lots the view did not draw, it draws
   their street slabs and lamps and the parks of new lots, and removes the
-  parks of lots that became buildings (not done: parks are batched with building 0 and a building drawn on a plot already covers its park, as since task D). Batch them under building 0 the way
+  parks of lots that became buildings (fixed after K: parks are one batch of their own, redrawn whenever the plots change, so a site never stands on a park). Batch them under building 0 the way
   `BatchStaticsFor` does. Street lamps are spot lights: add them in
   `SyncLights` the way task I, step I4 added neon.
 - Tests: none without a renderer. Check: build, ctest, `ContextBudget`.

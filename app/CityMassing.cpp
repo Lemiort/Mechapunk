@@ -36,14 +36,84 @@ std::vector<CityView::StaticItem> CityView::MassingBlocks(const sim::Building& b
     return blocks;
 }
 
+// A building going up: its finished floors as bare concrete plates on columns,
+// wrapped in scaffolding (poles a little out from the walls, a plank deck and a
+// guard rail at every floor) that rises with it, and a tower crane beside it.
+// All lengths in meters.
 void CityView::AddScaffold(std::uint32_t floors, vec3 center) {
+    constexpr vec3 kScaffoldSteel{0.78F, 0.56F, 0.14F};
+    constexpr vec3 kPlank{0.42F, 0.31F, 0.18F};
+    constexpr float kOut = 1.3F;          // Scaffold poles out from the walls.
+    constexpr float kDeck = 0.9F;         // Width of the plank deck.
+    constexpr float kPole = 0.12F;
+    constexpr float kPoleSpacing = 3.0F;
+    constexpr float kRail = 1.0F;         // Guard rail over each deck.
+    const float halfW = kFootprintWidthMeters * 0.5F;
+    const float halfD = kFootprintDepthMeters * 0.5F;
+    const float floorMeters = kFloorHeight / kS;
+    const float top = static_cast<float>(floors) * floorMeters;
+    const auto box = [&](float x0, float y0, float z0, float x1, float y1, float z1, vec3 color) {
+        AddStaticBox(center + (vec3{x0, y0, z0} * kS), center + (vec3{x1, y1, z1} * kS), color);
+    };
+
+    // The floor plates, the lowest just clear of the ground so the two never
+    // share a plane, and the columns that carry them.
     for (std::uint32_t floor = 0; floor < floors; ++floor) {
-        const float base = static_cast<float>(floor) * kFloorHeight;
-        AddStaticBox(center + vec3{-kBuildingWidth * 0.5F, base, -kBuildingDepth * 0.5F},
-                     center + vec3{kBuildingWidth * 0.5F, base + (kSlabMeters * kS),
-                                   kBuildingDepth * 0.5F},
-                     kConcrete);
+        const float base = (static_cast<float>(floor) * floorMeters) + (floor == 0 ? 0.03F : 0.0F);
+        box(-halfW, base, -halfD, halfW, base + kSlabMeters, halfD, kConcrete);
     }
+    for (const float x : {-halfW + 0.3F, 0.0F, halfW - 0.8F}) {
+        for (const float z : {-halfD + 0.3F, halfD - 0.8F}) {
+            box(x, 0.0F, z, x + 0.5F, top, z + 0.5F, kConcrete);
+        }
+    }
+
+    // Poles along the four sides, out from the walls.
+    const float outerW = halfW + kOut;
+    const float outerD = halfD + kOut;
+    const auto poles = [&](float from, float to, bool alongX, float at) {
+        const int count = std::max(2, static_cast<int>((to - from) / kPoleSpacing) + 1);
+        for (int index = 0; index < count; ++index) {
+            const float t = from + ((to - from) * static_cast<float>(index) / static_cast<float>(count - 1));
+            const float x = alongX ? t : at;
+            const float z = alongX ? at : t;
+            box(x - (kPole * 0.5F), 0.0F, z - (kPole * 0.5F), x + (kPole * 0.5F), top + kRail,
+                z + (kPole * 0.5F), kScaffoldSteel);
+        }
+    };
+    poles(-outerW, outerW, true, -outerD);
+    poles(-outerW, outerW, true, outerD);
+    poles(-outerD, outerD, false, -outerW);
+    poles(-outerD, outerD, false, outerW);
+
+    // A plank deck and a guard rail at every floor, up to the one going up now.
+    for (std::uint32_t level = 1; level <= floors; ++level) {
+        const float y = static_cast<float>(level) * floorMeters;
+        const float inW = outerW - kDeck;
+        const float inD = outerD - kDeck;
+        box(-outerW, y, -outerD, outerW, y + 0.06F, -inD, kPlank);
+        box(-outerW, y, inD, outerW, y + 0.06F, outerD, kPlank);
+        box(-outerW, y, -inD, -inW, y + 0.06F, inD, kPlank);
+        box(inW, y, -inD, outerW, y + 0.06F, inD, kPlank);
+        const float rail = y + kRail;
+        box(-outerW, rail, -outerD - 0.04F, outerW, rail + 0.08F, -outerD + 0.04F, kScaffoldSteel);
+        box(-outerW, rail, outerD - 0.04F, outerW, rail + 0.08F, outerD + 0.04F, kScaffoldSteel);
+        box(-outerW - 0.04F, rail, -outerD, -outerW + 0.04F, rail + 0.08F, outerD, kScaffoldSteel);
+        box(outerW - 0.04F, rail, -outerD, outerW + 0.04F, rail + 0.08F, outerD, kScaffoldSteel);
+    }
+
+    // A tower crane at the east side, its jib reaching over the building and a
+    // counterweight behind; it stands a few meters over the floors going up.
+    const float mastX = outerW + 2.5F;
+    const float craneTop = top + 8.0F;
+    box(mastX - 0.8F, 0.0F, -0.8F, mastX + 0.8F, craneTop, 0.8F, kScaffoldSteel);
+    box(-halfW, craneTop, -0.5F, mastX + 0.8F, craneTop + 1.0F, 0.5F, kScaffoldSteel);
+    box(mastX + 0.8F, craneTop, -0.5F, mastX + 8.0F, craneTop + 1.0F, 0.5F, kScaffoldSteel);
+    box(mastX + 5.5F, craneTop - 2.0F, -1.0F, mastX + 8.0F, craneTop, 1.0F, kConcrete);
+    box(mastX - 1.2F, craneTop - 2.2F, 0.8F, mastX + 0.8F, craneTop - 0.2F, 2.4F, kScaffoldSteel);
+    // The hook's cable and its load, hanging over the middle of the building.
+    box(-0.05F, top + 2.0F, -0.05F, 0.05F, craneTop, 0.05F, kConcrete);
+    box(-1.0F, top + 1.2F, -0.6F, 1.0F, top + 2.0F, 0.6F, kPlank);
 }
 
 void CityView::AddRoof(const sim::Building& building, vec3 center) {

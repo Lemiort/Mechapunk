@@ -98,7 +98,11 @@ CityView::LineFrame CityView::FrameOf(std::uint32_t line) const {
     return {.origin = NodePosition(first.id) + vec3{0.0F, DeckHeight(metro.axis), 0.0F},
             .along = AlongOf(metro.axis),
             .across = AcrossOf(metro.axis),
-            .edge = -static_cast<float>(metro.axis == sim::LineAxis::Row ? first.x : first.z)};
+            // Meters back from the first station to the grid's west or north edge,
+            // where the depot stands beyond: a generated grid starts at 0, a town's
+            // rings of streets reach below it.
+            .edge = -(static_cast<float>(metro.axis == sim::LineAxis::Row ? first.x : first.z) -
+                      ((metro.axis == sim::LineAxis::Row ? minimum_.x : minimum_.z) / kS))};
 }
 
 CityView::Stairs CityView::StairsOf(std::uint32_t station, sim::LineAxis axis,
@@ -127,10 +131,9 @@ vec3 CityView::PlatformSpot(sim::EntityId robot, std::uint32_t station,
            (AcrossOf(axis) * (side * across * kS));
 }
 
-void CityView::AddStations(std::size_t firstStation) {
+void CityView::AddStations() {
     const float deck = kDeckThickness * kS;
-    for (auto station = static_cast<std::uint32_t>(firstStation); station < city_.stations.size();
-         ++station) {
+    for (std::uint32_t station = 0; station < city_.stations.size(); ++station) {
         const vec3 node = NodePosition(city_.stations[station].node);
         for (const sim::LineAxis axis : {sim::LineAxis::Row, sim::LineAxis::Column}) {
             if (!metro_.LineOf(station, axis)) {
@@ -199,34 +202,20 @@ void CityView::AddStations(std::size_t firstStation) {
     }
 }
 
-// A grown metro (task K, step K13): the new stations and every line whose
-// stations are not those of a line already drawn. Lines that gained a station
-// keep their old deck under the longer one; the old depot of a line whose first
-// station changed stays where it was, since drawn statics are never removed.
-void CityView::AddGrownMetro(std::size_t firstStation) {
-    AddStations(firstStation);
-    std::vector<bool> fresh(metro_.Lines().size(), false);
-    for (std::size_t index = 0; index < fresh.size(); ++index) {
-        const sim::MetroLine& line = metro_.Lines()[index];
-        fresh[index] = std::ranges::none_of(drawnLines_, [&](const DrawnLine& drawn) {
-            return drawn.axis == line.axis && drawn.stations == line.stations;
-        });
-    }
-    AddElevatedLines(&fresh);
-    drawnLines_.clear();
-    for (const sim::MetroLine& line : metro_.Lines()) {
-        drawnLines_.push_back({.axis = line.axis, .stations = line.stations});
-    }
-    BatchStaticsFor(0);
+// The metro as batches of its own (task K, step K13). A grown city redraws it
+// whole: a line that gained a station is one longer deck, and a depot moves to
+// the city's new edge, with nothing of the old drawing left under them.
+void CityView::DrawMetro() {
+    BatchApart(kMetroBatch, [this] {
+        AddElevatedLines();
+        AddStations();
+    });
 }
 
-void CityView::AddElevatedLines(const std::vector<bool>* only) {
+void CityView::AddElevatedLines() {
     const float deck = kDeckThickness * kS;
     const float tail = static_cast<float>(sim::kTailMeters);
     for (std::uint32_t index = 0; index < metro_.Lines().size(); ++index) {
-        if (only != nullptr && !(*only)[index]) {
-            continue;
-        }
         const sim::MetroLine& line = metro_.Lines()[index];
         const LineFrame frame = FrameOf(index);
         const float length = static_cast<float>(line.meters.back());

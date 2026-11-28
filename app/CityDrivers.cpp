@@ -60,6 +60,37 @@ std::optional<std::uint32_t> CityView::CrewLineOf(sim::EntityId crewRoom) const 
                 }
             }
         }
+        // A town's crew room (task K, step K12) is an empty unit near its line's
+        // first station rather than a depot on it: each one left takes the
+        // nearest line that has none, the lower line among equals.
+        for (const sim::Building& building : city_.buildings) {
+            for (const sim::Room& room : building.rooms) {
+                if (room.kind != sim::RoomKind::CrewRoom || crewLines_.contains(room.id.value)) {
+                    continue;
+                }
+                const sim::CityNode& at = city_.nodes.at(building.entrance.value);
+                std::optional<std::uint32_t> best;
+                std::int64_t bestDistance = 0;
+                for (std::uint32_t line = 0; line < metro_.Lines().size(); ++line) {
+                    if (taken[line]) {
+                        continue;
+                    }
+                    const sim::CityNode& first = city_.nodes.at(
+                        city_.stations.at(metro_.Lines()[line].stations.front()).node.value);
+                    const std::int64_t dx = at.x - first.x;
+                    const std::int64_t dz = at.z - first.z;
+                    const std::int64_t distance = (dx * dx) + (dz * dz);
+                    if (!best || distance < bestDistance) {
+                        best = line;
+                        bestDistance = distance;
+                    }
+                }
+                if (best) {
+                    taken[*best] = true;
+                    crewLines_.emplace(room.id.value, *best);
+                }
+            }
+        }
         crewLines_.emplace(0, 0);  // Built: never search again.
     }
     const auto found = crewLines_.find(crewRoom.value);

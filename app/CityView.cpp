@@ -73,11 +73,10 @@ float Smoothstep(float edge0, float edge1, float value) {
 
 // namespace
 
-// Draws what a grown city added: the street slabs, their lamps, a wider
-// ground, and a park on every free plot that came inside the city's bounds.
-// Batched under building 0, as the constructor's statics are.
-void CityView::AddGrownStreets(std::size_t firstNode, std::size_t firstEdge,
-                               vec3 oldMinimum, vec3 oldMaximum) {
+// Draws what a grown city added: the street slabs and their lamps, batched
+// under building 0 as the constructor's streets are, and a ground as wide as
+// the city now is. Parks and the metro are redrawn whole by UpdateCity.
+void CityView::AddGrownStreets(std::size_t firstEdge) {
     vec3 minimum{0.0F};
     vec3 maximum{0.0F};
     for (const sim::CityNode& node : city_.nodes) {
@@ -89,12 +88,7 @@ void CityView::AddGrownStreets(std::size_t firstNode, std::size_t firstEdge,
     maximum_ = maximum;
     center_ = (minimum + maximum) * 0.5F;
     extent_ = std::max(maximum.x - minimum.x, maximum.z - minimum.z);
-    const float groundSize = extent_ + 8.0F;
-    statics_.push_back({.mesh = assets_.plane.get(),
-                        .transform = {.position = center_,
-                                      .rotationDegrees = vec3(0.0F),
-                                      .scale = {groundSize, 1.0F, groundSize}},
-                        .material = assets_.ground});
+    DrawGround();
     for (const sim::CityEdge& edge : std::span{city_.edges}.subspan(firstEdge)) {
         const vec3 from = NodePosition(edge.from);
         const vec3 to = NodePosition(edge.to);
@@ -108,26 +102,61 @@ void CityView::AddGrownStreets(std::size_t firstNode, std::size_t firstEdge,
              .material = assets_.street});
     }
     AddStreetLamps(firstEdge);
-    const auto inside = [](vec3 position, vec3 low, vec3 high) {
-        return position.x > low.x && position.z > low.z && position.x < high.x &&
-               position.z < high.z;
-    };
-    sim::Pcg32 random = sim::Pcg32::FromSeed(firstNode, kDecorationStream);
-    for (const sim::CityLot& lot : city_.lots) {
-        const vec2 quadrant = kQuadrants.at(lot.corner);
-        const vec3 position =
-            NodePosition(lot.node) +
-            vec3{quadrant.x * kQuadrantOffset.x, 0.0F, quadrant.y * kQuadrantOffset.y};
-        if (inside(position, minimum, maximum) && !inside(position, oldMinimum, oldMaximum)) {
-            AddPark(position, random);
-        }
-    }
     BatchStaticsFor(0);
+}
+
+// Statics drawn by `draw` become batches of their own under `key`, replacing
+// the ones drawn under it before; whatever statics_ held is kept for later.
+void CityView::BatchApart(std::uint64_t key, const std::function<void()>& draw) {
+    std::vector<StaticItem> kept = std::move(statics_);
+    statics_.clear();
+    std::erase_if(staticBatches_, [key](const StaticBatch& batch) { return batch.building == key; });
+    draw();
+    BatchStaticsFor(key);
+    statics_ = std::move(kept);
+}
+
+// One ground plane, under the whole city as it is now. A second plane under a
+// grown city would lie in the same plane as the first and fight it for depth.
+void CityView::DrawGround() {
+    BatchApart(kGroundBatch, [this] {
+        const float groundSize = extent_ + 8.0F;
+        statics_.push_back({.mesh = assets_.plane.get(),
+                            .transform = {.position = center_,
+                                          .rotationDegrees = vec3(0.0F),
+                                          .scale = {groundSize, 1.0F, groundSize}},
+                            .material = assets_.ground});
+    });
+}
+
+// A park on every free plot inside the grid's bounds, redrawn whenever the plots
+// change: a plot a project takes loses its park the night its site starts, so
+// no grass or tree is left standing inside the building raised there. Each
+// plot's trees come from its own stream, so a park keeps its look when others go.
+void CityView::DrawParks() {
+    BatchApart(kParksBatch, [this] {
+        for (const sim::CityLot& lot : city_.lots) {
+            const vec2 quadrant = kQuadrants.at(lot.corner);
+            const vec3 position =
+                NodePosition(lot.node) +
+                vec3{quadrant.x * kQuadrantOffset.x, 0.0F, quadrant.y * kQuadrantOffset.y};
+            // A corner outside the grid's bounding box gets no park.
+            const bool insideCity = position.x > minimum_.x && position.z > minimum_.z &&
+                                    position.x < maximum_.x && position.z < maximum_.z;
+            if (insideCity) {
+                sim::Pcg32 random = sim::Pcg32::FromSeed(
+                    seed_, kDecorationStream + 1 +
+                               ((static_cast<std::uint64_t>(lot.node.value) * sim::kCornersPerNode) +
+                                lot.corner));
+                AddPark(position, random);
+            }
+        }
+    });
 }
 
 CityView::CityView(const sim::City& city, std::uint64_t seed,
                    RenderAssets& assets)
-    : city_(city), rooms_(city_), routes_(city_), metro_(city_), assets_(assets) {
+    : city_(city), rooms_(city_), routes_(city_), metro_(city_), assets_(assets), seed_(seed) {
     vec3 minimum{0.0F};
     vec3 maximum{0.0F};
     for (const sim::CityNode& node : city_.nodes) {
@@ -140,12 +169,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     center_ = (minimum + maximum) * 0.5F;
     extent_ = std::max(maximum.x - minimum.x, maximum.z - minimum.z);
 
-    const float groundSize = extent_ + 8.0F;
-    statics_.push_back({.mesh = assets_.plane.get(),
-                        .transform = {.position = center_,
-                                      .rotationDegrees = vec3(0.0F),
-                                      .scale = {groundSize, 1.0F, groundSize}},
-                        .material = assets_.ground});
+    DrawGround();
 
     for (const sim::CityEdge& edge : city_.edges) {
         const vec3 from = NodePosition(edge.from);
@@ -162,11 +186,7 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
     }
 
     AddStreetLamps();
-    AddElevatedLines();
-    AddStations();
-    for (const sim::MetroLine& line : metro_.Lines()) {
-        drawnLines_.push_back({.axis = line.axis, .stations = line.stations});
-    }
+    DrawMetro();
 
     // Simulated buildings take the corners next to their entrance first.
     // Which corners are left free is saved state (`City::lots`), so the
@@ -193,8 +213,11 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
                  .turned = quadrant.y > 0.0F,
                  .scaffold = IsSite(building)};
         if (shape.scaffold) {
-            // A site a saved city holds is a scaffold, as AddBuilding draws one.
-            AddScaffold(building.floors, centerOnGround);
+            // A site a saved city holds is a scaffold, as AddBuilding draws one,
+            // batched with the building so that all of it - the poles and the
+            // crane stand outside its footprint - goes when the site is done.
+            BatchApart(building.id.value,
+                       [&] { AddScaffold(building.floors, centerOnGround); });
             continue;
         }
         buildingBlocks_.emplace(building.id.value, MassingBlocks(building, centerOnGround));
@@ -248,23 +271,8 @@ CityView::CityView(const sim::City& city, std::uint64_t seed,
         AddRoof(building, shape.center);
     }
 
-    // Corners without a building are small parks. The city saves exactly
-    // those corners as its free plots, sorted by node and then corner, which
-    // is the order the corners of `nodes` were walked in before, so the same
-    // parks get the same decoration draws.
-    sim::Pcg32 random = sim::Pcg32::FromSeed(seed, kDecorationStream);
-    for (const sim::CityLot& lot : city_.lots) {
-        const vec2 quadrant = kQuadrants.at(lot.corner);
-        const vec3 position =
-            NodePosition(lot.node) +
-            vec3{quadrant.x * kQuadrantOffset.x, 0.0F, quadrant.y * kQuadrantOffset.y};
-        // A corner outside the grid's bounding box gets no park.
-        const bool insideCity = position.x > minimum.x && position.z > minimum.z &&
-                                position.x < maximum.x && position.z < maximum.z;
-        if (insideCity) {
-            AddPark(position, random);
-        }
-    }
+    // Corners without a building are small parks.
+    DrawParks();
     BuildStaticBatches();
 }
 
@@ -301,28 +309,28 @@ void CityView::UpdateCity(const sim::City& city) {
     // simulation no longer has.
     // Streets the city grew (task K, step K9): draw them before the buildings
     // that may stand on them.
-    if (city.nodes.size() > city_.nodes.size()) {
-        const std::size_t firstNode = city_.nodes.size();
+    const bool grew = city.nodes.size() > city_.nodes.size();
+    if (grew) {
         const std::size_t firstEdge = city_.edges.size();
-        // Which plots were inside the drawn city, to park only the new ones.
-        const vec3 oldMinimum = minimum_;
-        const vec3 oldMaximum = maximum_;
         city_.nodes = city.nodes;
         city_.edges = city.edges;
-        city_.lots = city.lots;
         routes_ = sim::RoutePlanner(city_);
         routeCache_.clear();
-        AddGrownStreets(firstNode, firstEdge, oldMinimum, oldMaximum);
+        AddGrownStreets(firstEdge);
     }
-    // Stations the metro opened (task K, step K11): the view takes them, rebuilds
-    // its metro and draws the new platforms and track.
-    if (city.stations.size() > city_.stations.size()) {
-        const std::size_t firstStation = city_.stations.size();
+    // Stations the metro opened (task K, step K11), or a grid that grew and moved
+    // the city's edge, where the depots stand: the whole metro is drawn again.
+    if (grew || city.stations.size() != city_.stations.size()) {
         city_.stations = city.stations;
         metro_ = sim::Metro(city_);
         stationRoutes_.clear();
         rideLegs_.clear();
-        AddGrownMetro(firstStation);
+        DrawMetro();
+    }
+    // Plots taken by a project or added by a ring of streets: the parks follow.
+    if (grew || city.lots != city_.lots) {
+        city_.lots = city.lots;
+        DrawParks();
     }
     city_.buildings = city.buildings;
     rooms_ = sim::RoomIndex(city_);

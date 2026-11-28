@@ -255,11 +255,10 @@ private:
     // A box turned to run from one point to another.
     void AddStaticBeam(glm::vec3 from, glm::vec3 to, float width, float height,
                        glm::vec3 color);
-    // Draws the lines flagged in `only` (all of them when null).
-    void AddElevatedLines(const std::vector<bool>* only = nullptr);
-    // Draws what a grown metro added: new stations (from `firstStation`) and the
-    // lines that are new or changed, after the view has taken the new stations.
-    void AddGrownMetro(std::size_t firstStation);
+    void AddElevatedLines();
+    // The whole metro, lines and stations, as batches of its own: drawn again
+    // whenever stations open or the grid grows.
+    void DrawMetro();
     // A box that never moves; `glows` makes it shine with its own color.
     void AddStaticBox(glm::vec3 minimum, glm::vec3 maximum, glm::vec3 color,
                       bool glows = false);
@@ -277,7 +276,7 @@ private:
     // Intersections walked through from a building to a station.
     const std::vector<glm::vec3>& StationRoute(sim::EntityId building,
                                                std::uint32_t station);
-    void AddStations(std::size_t firstStation = 0);
+    void AddStations();
     // A metro driver's shift: from the crew room up to its line's first
     // platform, into the cab of its train through the front door, driving
     // it until the last time it stands at that platform before the shift
@@ -360,8 +359,15 @@ private:
     void AddStreetLamps(std::size_t firstEdge = 0);
     // Draws the streets, lamps and parks a grown city added: nodes from
     // `firstNode` and edges from `firstEdge` on, and the plots that came inside.
-    void AddGrownStreets(std::size_t firstNode, std::size_t firstEdge, glm::vec3 oldMinimum,
-                         glm::vec3 oldMaximum);
+    void AddGrownStreets(std::size_t firstEdge);
+    // Batches drawn apart from the others, so each can be replaced whole: the
+    // ground, the parks and the metro. Keys no entity id reaches.
+    static constexpr std::uint64_t kGroundBatch = ~std::uint64_t{0};
+    static constexpr std::uint64_t kParksBatch = ~std::uint64_t{0} - 1;
+    static constexpr std::uint64_t kMetroBatch = ~std::uint64_t{0} - 2;
+    void BatchApart(std::uint64_t key, const std::function<void()>& draw);
+    void DrawGround();
+    void DrawParks();
     // Grass, trees and benches on a corner without a building.
     void AddPark(glm::vec3 center, sim::Pcg32& random);
     void SubmitBox(RenderQueue& queue, glm::vec3 minimum, glm::vec3 maximum,
@@ -399,12 +405,6 @@ private:
     sim::RoomIndex rooms_;
     sim::RoutePlanner routes_;
     sim::Metro metro_;
-    // The lines the view has drawn, to tell a new or changed line when the metro grows.
-    struct DrawnLine {
-        sim::LineAxis axis{};
-        std::vector<std::uint32_t> stations;
-    };
-    std::vector<DrawnLine> drawnLines_;
     struct RideLegs {
         bool known{false};
         sim::Tick boardsAt{};
@@ -416,6 +416,8 @@ private:
     std::unordered_map<std::uint64_t, std::size_t> residentIndex_;
     sim::Tick residentsTick_{};
     RenderAssets& assets_;
+    // The city seed: each park's decoration is drawn from it and the plot.
+    std::uint64_t seed_{};
     std::vector<StaticItem> statics_;
     // Statics drawn as batches, made once by BuildStaticBatches. A batch
     // of a building's outside (its block, windows and signs) is skipped
