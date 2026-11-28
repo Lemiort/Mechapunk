@@ -362,13 +362,14 @@ void CityView::UpdateCity(const sim::City& city) {
 
 // Draws one building the view has not drawn yet: a habitat or workplace a
 // project raised on a free plot. It takes the corner its project consumed -
-// the slot after the node's other buildings, which are all older ids and so
-// stand before it in the saved order - exactly where the constructor's
-// placement loop would put it.
+// the slot after the node's older buildings (lower ids, which stand before it
+// in the saved order) - exactly where the constructor's placement loop would
+// put it. Newer buildings at the node do not count: a site redrawn as it rises
+// or finishes would otherwise move a corner on, onto the next one's plot.
 void CityView::AddBuilding(const sim::Building& building) {
     std::uint32_t slot = 0;
     for (const sim::Building& other : city_.buildings) {
-        if (other.entrance == building.entrance && other.id != building.id) {
+        if (other.entrance == building.entrance && other.id < building.id) {
             ++slot;
         }
     }
