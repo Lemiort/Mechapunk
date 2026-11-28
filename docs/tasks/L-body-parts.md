@@ -6,8 +6,9 @@ the body is already saved state, and step L3 was split on 2026-11-28 into L3a
 and L3b - see why under L3a), L2a done on 2026-11-28 (no save change, and step L2 was split into L2a and
 L2b - see why under L2a), L2b1 to L2b5 - the first five of the parts L2b was
 split into on 2026-11-28 - done the same day (no save change; part L2b5 rewrote
-the body values of the v42 fixture in place, at the same version 42), the rest
-still planned.
+the body values of the v42 fixture in place, at the same version 42), L2b6 - the
+last of those parts - done the same day too (no save change: the rule is four
+lines of `Validation.cpp` and a test), the rest still planned.
 Revised
 again on 2026-11-28 for the save rule: the game was at save version 41 and
 `kOldestSupportedSaveVersion` is 41 too, so **no step of this task adds a
@@ -253,15 +254,17 @@ log unchanged:
 - Check: build, ctest. Not a pure move: the fixture's body values move on
   purpose; say so in the commit.
 
-### - [ ] L2b6. The cap is refused on load (validation) — part 6 of L2b
+### - [x] L2b6. The cap is refused on load (validation) — part 6 of L2b
 
 - Module: validation. Depends on: L2b1 to L2b5. Save change: no.
 - Open: `sim/src/Validation.cpp` (the body block L2a added, line ~261),
   `sim/include/mechapunk/sim/Body.hpp`, `tests/ValidationTests.cpp`.
 - Do: in that block, for the head and the torso only: the condition is never
-  above `kMaxWear - robot.wear` (`wear` is already checked to lie in `[0,
-  kMaxWear]`, so the cap is never negative). Hands and legs are not capped:
-  step L12 replaces them.
+  above `max(0, kMaxWear - robot.wear)` (`wear` is already checked to lie in
+  `[0, kMaxWear]` just above the block, yet the `max(0, ...)` stays: the fight
+  in `Gangs.cpp` adds `wear += 20` without clamping, so a hand-written state
+  can carry a wear above `kMaxWear`, and its cap is then 0, never negative).
+  Hands and legs are not capped: step L12 replaces them.
 - Tests: `Validation.RejectsBasicPartsAboveTheWearCap`: one more than the cap
   on the head, and one more on the torso, is refused with a message naming the
   part, the cap and the wear; and the cap exactly is accepted.
@@ -269,6 +272,20 @@ log unchanged:
   40 --quiet`: the runner loads states through `FromState`, so a city whose
   parts are capped wrongly would show here. Nothing reads a part, so the log
   stays byte-identical.
+- Note (done 2026-11-28): the draft's claim "the cap is never negative,
+  because `wear` is checked to lie in `[0, kMaxWear]`" holds inside
+  `ValidateWorldState`, and is exactly why an uncapped cap cannot be read here
+  today - the wear check refuses such a state first. `CapBody` and `MendBody`
+  keep their `max(0, ...)` and this rule keeps it too, so the day step L6 makes
+  the fight a setting and clamps the wear, nothing has to be re-thought.
+  The robot the test picks is the first of the city with `wear > 0`: at
+  `wear == 0` the cap is whole, where one more is already outside 0 to 1000
+  and refused by step L2a's range rule instead of this one.
+  Left alone (another module): `tests/LifeCycleTests.cpp`'s `Load` helper still
+  hands back an empty world when `World::FromState` refuses a state, so a
+  refused state shows as a segfault there rather than a message; that file is
+  in the `life-cycle` module, not this one, so the assertion belongs to a step
+  of that module.
 
 **Why L2 was split.** The rules themselves are four lines of one module, and
 they stay there. What reaches out is the consequence of the `kMaxWear - wear`

@@ -258,14 +258,23 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                                     "range",
                                     robot.name));
         }
-        // The body (task L, step L2a): five parts, each with a condition
+        // The body (task L, steps L2a and L2b): five parts, each with a condition
         // between destroyed and whole, and a part that is lost has no condition
         // left. The head and the torso are never lost, because a robot without
         // one is scrapped instead of saved (step L3b), so a save that marks one
         // of them lost contradicts itself. Hands and legs can be lost: that is
         // what replaces them, step L12. The hand a robot works with is one of
-        // its two hands. Step L2b adds the cap that keeps the head and the
-        // torso at or below `kMaxWear - wear`.
+        // its two hands. The cap of step L2b is the rule here: the head and the
+        // torso are never in better condition than the robot's lasting damage
+        // allows, `kMaxWear - wear` (the `CapBody` of Body.hpp, which step L3a
+        // calls wherever wear grows). Hands and legs are not capped, because
+        // step L12 replaces them outright.
+        // The wear range is checked above, yet `max(0, ...)` stays: the fight in
+        // Gangs.cpp adds 20 to a fighter's wear without clamping it to
+        // `kMaxWear`, so a state can carry a worse wear than this file assumes
+        // (task L6 makes that fight a setting), and the cap of such a robot is
+        // simply 0 rather than a negative number the parts could never reach.
+        const auto partCap = std::max(0, kMaxWear - robot.wear);
         for (std::size_t index = 0; index < robot.body.parts.size(); ++index) {
             const PartState& part = robot.body.parts[index];
             if (part.condition < 0 || part.condition > kMaxPartCondition) {
@@ -284,6 +293,13 @@ std::expected<void, std::string> ValidateWorldState(const WorldState& state) {
                 return fail(std::format("Robot '{}' has lost its {}, which a robot "
                                         "cannot live without",
                                         robot.name, kPartNames[index]));
+            }
+            // Step L2b: a basic part cannot be healthier than the wear says.
+            if (index < 2 && part.condition > partCap) {
+                return fail(std::format("Robot '{}' has a {} in condition {}, above "
+                                        "the {} its wear {} allows",
+                                        robot.name, kPartNames[index], part.condition,
+                                        partCap, robot.wear));
             }
         }
         if (robot.body.dominantHand != BodyPart::LeftHand &&

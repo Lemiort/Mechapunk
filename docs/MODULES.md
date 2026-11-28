@@ -23,7 +23,7 @@ as `ContextBudget`): every source file belongs to a module, no file is over
 | seed-town | 7k | `City.hpp`, `SeedTownTests.cpp` |
 | city-streets | 12k | `World.hpp`, `City.hpp`, `CityStreetTests.cpp` |
 | city-styles | 11k | `City.hpp`, `City.cpp`, `CityStyle.cpp`, `CityStyleTests.cpp` |
-| validation | 17k | `World.hpp`, `Validation.cpp`, `Describe.cpp`, `ValidationTests.cpp` |
+| validation | 18k | `World.hpp`, `Validation.cpp`, `Describe.cpp`, `ValidationTests.cpp` |
 | money | 24k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Economy.cpp`, `Money.cpp`, `Settlement.cpp`, `EconomyTests.cpp` |
 | property | 24k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Founding.cpp`, `Banks.cpp`, `Corporations.cpp`, `Property.cpp`, `HousingTests.cpp`, `BanksTests.cpp` |
 | units | 15k | `World.hpp`, `Economy.hpp`, `EconomyInternal.hpp`, `Units.cpp`, `VenueTests.cpp` |

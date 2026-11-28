@@ -1,10 +1,12 @@
 // A save that breaks one of the body's invariants is refused by a load that
-// names the rule it broke (task L, step L2a). The save is the game's own, with
-// one number or one flag in one robot's body changed.
+// names the rule it broke: the invariants of step L2a and the wear cap of
+// step L2b. The save is the game's own, with one number or one flag in one
+// robot's body changed.
 
 #include <gtest/gtest.h>
 
 #include <expected>
+#include <format>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -39,6 +41,17 @@ void RejectsBody(const std::string& json, std::string_view reason) {
     ASSERT_FALSE(world);
     EXPECT_NE(world.error().find(reason), std::string::npos)
         << world.error();
+}
+
+// Reads such a save back and expects it: a rule must not refuse a state the
+// game itself writes, so the boundary of a rule is checked on both sides.
+void AcceptsBody(const std::string& json) {
+    auto state = sim::DeserializeWorld(json);
+    ASSERT_TRUE(state.has_value()) << state.error();
+    auto world = sim::World::FromState(std::move(*state));
+    if (!world) {
+        ADD_FAILURE() << world.error();
+    }
 }
 
 }  // namespace
@@ -89,7 +102,38 @@ TEST(Validation, RejectsAnImpossibleDominantHand) {
     }), "works with a hand that is neither its left nor its right");
 }
 
-// Step L2b, not this one: the head and the torso are also never above
-// `kMaxWear - wear`. A game's own save satisfies that since step L3a, but a
-// state written by hand does not, so that rule arrives with the repairs to
-// every state the tests script.
+// Step L2b: the head and the torso are never in better condition than the
+// robot's lasting damage allows, `max(0, kMaxWear - wear)`, which is what
+// `CapBody` pins them to wherever wear grows (Body.hpp, step L3a). Hands and
+// legs are not capped, because a clinic or the black market replaces them
+// whole (step L12). A robot at no wear would sit at the whole cap, where one
+// more condition is already outside 0 to 1000 and refused by the rule of
+// step L2a, so the city's first robot with some wear is the one checked.
+TEST(Validation, RejectsBasicPartsAboveTheWearCap) {
+    const sim::World world = sim::World::Generate({.seed = 3, .robots = 60});
+    const auto state = world.State();
+    std::size_t robot = 0;
+    while (robot < state.robots.size() && state.robots[robot].wear == 0) {
+        ++robot;
+    }
+    ASSERT_LT(robot, state.robots.size()) << "no robot of the city has wear";
+    const auto wear = state.robots[robot].wear;
+    const auto cap = sim::kMaxWear - wear;
+    RejectsBody(EditBody(world, robot, [=](sim::SaveDocument& body) {
+        body["parts"][0]["condition"] = std::int64_t{cap + 1};
+    }), std::format("head in condition {}, above the {} its wear {} allows",
+                    cap + 1, cap, wear));
+    RejectsBody(EditBody(world, robot, [=](sim::SaveDocument& body) {
+        body["parts"][1]["condition"] = std::int64_t{cap + 1};
+    }), std::format("torso in condition {}, above the {} its wear {} allows",
+                    cap + 1, cap, wear));
+    // Both basic parts exactly at the cap load, which is where the game's own
+    // state sits, and the hands and the legs are left as the new city has them
+    // at 1000: whole, so above a cap that is below 1000 because this robot has
+    // wear. That is what step L12's replaced parts look like, and the rule
+    // must let them through.
+    AcceptsBody(EditBody(world, robot, [=](sim::SaveDocument& body) {
+        body["parts"][0]["condition"] = std::int64_t{cap};
+        body["parts"][1]["condition"] = std::int64_t{cap};
+    }));
+}
